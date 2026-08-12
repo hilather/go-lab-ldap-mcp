@@ -13,26 +13,29 @@ import (
 
 	"github.com/hilather/go-lab-ldap-mcp/internal/apperr"
 	"github.com/hilather/go-lab-ldap-mcp/internal/config"
+	"github.com/hilather/go-lab-ldap-mcp/internal/config/v1alpha1"
 	"github.com/hilather/go-lab-ldap-mcp/internal/observability"
 )
 
 var laterPhases = []string{
-	"inspect", "backend", "tls", "pwpolicy", "plugins",
+	"inspect", "tls", "pwpolicy", "plugins",
 	"tree", "aci", "seed", "verify_runtime", "verify_app", "drift", "marker",
 }
 
 // Options is the parsed bootstrap command.
 type Options struct {
-	Command       string
-	ConfigPath    string
-	PasswordFile  string
-	LDAPURL       string
-	CAFile        string
-	DirectoryHost string
-	Deadline      time.Duration
-	Waiter        Waiter
-	Log           *slog.Logger
-	Now           func() time.Time
+	Command        string
+	ConfigPath     string
+	PasswordFile   string
+	LDAPURL        string
+	CAFile         string
+	DirectoryHost  string
+	Deadline       time.Duration
+	DSConfInstance string
+	Waiter         Waiter
+	Backend        BackendReconciler
+	Log            *slog.Logger
+	Now            func() time.Time
 }
 
 // Run executes apply, validate, or plan. Exit codes are returned separately
@@ -46,6 +49,9 @@ func Run(ctx context.Context, opt Options, stdout, stderr io.Writer) (Summary, e
 	}
 	if opt.DirectoryHost == "" {
 		opt.DirectoryHost = "127.0.0.1"
+	}
+	if opt.DSConfInstance == "" {
+		opt.DSConfInstance = "localhost"
 	}
 	if opt.Log == nil {
 		opt.Log = slog.New(slog.NewJSONHandler(stderr, nil))
@@ -97,6 +103,35 @@ func Run(ctx context.Context, opt Options, stdout, stderr io.Writer) (Summary, e
 			return nil, e
 		}
 		return map[string]int{"namingContexts": res.NamingContexts}, nil
+	})
+	if err != nil {
+		sum.Phases = rep.phases
+		return sum, err
+	}
+
+	write := opt.Command == "apply" && compiled.Normalized.StartupMode != v1alpha1.StartupValidate
+	err = rep.run("backend", func() (map[string]int, error) {
+		if opt.Backend == nil {
+			return nil, phaseErr("backend", "create_failed", "backend reconciler is not configured")
+		}
+		res, e := opt.Backend.Reconcile(ctx, BackendRequest{
+			PasswordFile: opt.PasswordFile,
+			Instance:     opt.DSConfInstance,
+			Name:         compiled.Engine.BackendName,
+			Suffix:       compiled.Engine.Suffix,
+			Write:        write,
+		})
+		if e != nil {
+			return nil, e
+		}
+		counts := map[string]int{"backends": 1}
+		switch res.Action {
+		case "created":
+			counts["created"] = 1
+		case "matched":
+			counts["matched"] = 1
+		}
+		return counts, nil
 	})
 	sum.Phases = rep.phases
 	if err != nil {

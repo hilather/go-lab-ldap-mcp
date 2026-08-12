@@ -4,6 +4,7 @@ package dirsrv
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -52,11 +53,12 @@ spec:
 		CAFile:        caPath,
 		DirectoryHost: inst.Hostname(t),
 		Waiter:        ds389.Admin{},
+		Backend:       stubBackend{},
 	}, ioDiscard(), ioDiscard())
 	if err != nil {
 		t.Fatalf("apply wait: %v summary=%+v", err, sum)
 	}
-	if !sum.OK || len(sum.Phases) != 2 {
+	if !sum.OK || len(sum.Phases) != 3 {
 		t.Fatalf("%+v", sum)
 	}
 
@@ -68,6 +70,7 @@ spec:
 		CAFile:        caPath,
 		DirectoryHost: inst.Hostname(t),
 		Waiter:        ds389.Admin{},
+		Backend:       stubBackend{},
 		Deadline:      2 * time.Second,
 	}, ioDiscard(), ioDiscard())
 	if err == nil {
@@ -87,6 +90,7 @@ spec:
 		CAFile:        filepath.Join(wrongCA.Dir, "ca", "ca.crt"),
 		DirectoryHost: inst.Hostname(t),
 		Waiter:        ds389.Admin{},
+		Backend:       stubBackend{},
 		Deadline:      3 * time.Second,
 	}, ioDiscard(), ioDiscard())
 	if err == nil {
@@ -96,6 +100,12 @@ spec:
 	if got := waitCode(err); got != "tls" {
 		t.Fatalf("wrong CA code = %q, want tls", got)
 	}
+}
+
+type stubBackend struct{}
+
+func (stubBackend) Reconcile(context.Context, bootstrap.BackendRequest) (bootstrap.BackendResult, error) {
+	return bootstrap.BackendResult{Action: "created", Name: "userroot", Suffix: "dc=example,dc=test"}, nil
 }
 
 func waitCode(err error) string {

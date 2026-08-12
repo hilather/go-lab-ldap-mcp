@@ -13,6 +13,26 @@ import (
 	"github.com/hilather/go-lab-ldap-mcp/internal/observability"
 )
 
+type fakeBackend struct {
+	err    error
+	res    BackendResult
+	called int
+	req    BackendRequest
+}
+
+func (f *fakeBackend) Reconcile(ctx context.Context, req BackendRequest) (BackendResult, error) {
+	_ = ctx
+	f.called++
+	f.req = req
+	if f.err != nil {
+		return BackendResult{}, f.err
+	}
+	if f.res.Action == "" {
+		f.res = BackendResult{Action: "created", Name: "userroot", Suffix: "dc=example,dc=test"}
+	}
+	return f.res, nil
+}
+
 type fakeWaiter struct {
 	err    error
 	res    WaitResult
@@ -84,19 +104,24 @@ func TestPlanOffline(t *testing.T) {
 func TestApplyLoadThenWaitOK(t *testing.T) {
 	cfg, pw := testConfigDir(t)
 	fw := &fakeWaiter{}
+	fb := &fakeBackend{}
 	sum, err := Run(t.Context(), Options{
 		Command:      "apply",
 		ConfigPath:   cfg,
 		PasswordFile: pw,
 		Waiter:       fw,
+		Backend:      fb,
 		LDAPURL:      "ldaps://127.0.0.1:3636",
 		CAFile:       "/tmp/ca.crt",
 	}, ioDiscard(), ioDiscard())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !sum.OK || fw.called != 1 {
-		t.Fatalf("sum=%+v called=%d", sum, fw.called)
+	if !sum.OK || fw.called != 1 || fb.called != 1 {
+		t.Fatalf("sum=%+v wait=%d backend=%d", sum, fw.called, fb.called)
+	}
+	if !fb.req.Write {
+		t.Fatal("apply merge must write backend")
 	}
 	if fw.req.Password.Reveal() != "dm-secret" {
 		t.Fatal("password not loaded from file")
@@ -104,7 +129,7 @@ func TestApplyLoadThenWaitOK(t *testing.T) {
 	if fw.req.LDAPURL != "ldaps://127.0.0.1:3636" {
 		t.Fatalf("url = %s", fw.req.LDAPURL)
 	}
-	if len(sum.Phases) != 2 || !sum.Phases[0].OK || !sum.Phases[1].OK {
+	if len(sum.Phases) != 3 || sum.Phases[2].Phase != "backend" || !sum.Phases[2].OK {
 		t.Fatalf("phases = %+v", sum.Phases)
 	}
 	if len(sum.Remaining) == 0 {
@@ -116,7 +141,7 @@ func TestApplyWaitBindFailure(t *testing.T) {
 	cfg, pw := testConfigDir(t)
 	fw := &fakeWaiter{err: PhaseError("wait", "bind", "Directory Manager bind failed")}
 	sum, err := Run(t.Context(), Options{
-		Command: "apply", ConfigPath: cfg, PasswordFile: pw, Waiter: fw,
+		Command: "apply", ConfigPath: cfg, PasswordFile: pw, Waiter: fw, Backend: &fakeBackend{},
 	}, ioDiscard(), ioDiscard())
 	if err == nil {
 		t.Fatal("expected bind failure")
@@ -127,6 +152,64 @@ func TestApplyWaitBindFailure(t *testing.T) {
 	apperr.Assert(t, err).Code(apperr.CodeBootstrap).FieldPath("phase.wait")
 	if sum.Phases[len(sum.Phases)-1].Code != "bind" {
 		t.Fatalf("phase code = %+v", sum.Phases)
+	}
+}
+
+func TestApplyValidateModeDoesNotWrite(t *testing.T) {
+	dir := t.TempDir()
+	sec := filepath.Join(dir, "secrets")
+	if err := os.Mkdir(sec, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(sec, "runtime-ldap"), []byte("runtime-secret\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg := filepath.Join(dir, "lab.yaml")
+	src := `apiVersion: labldap.dev/v1alpha1
+kind: LabScenario
+metadata: { name: t }
+spec:
+  directory: { suffix: "dc=example,dc=test" }
+  lifecycle: { startupMode: validate }
+  transport: { ldaps: { enabled: true, port: 3636 } }
+  runtimeAccount: { id: rt, passwordFile: secrets/runtime-ldap }
+`
+	if err := os.WriteFile(cfg, []byte(src), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	pw := filepath.Join(dir, "dm.pw")
+	if err := os.WriteFile(pw, []byte("dm-secret\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	fb := &fakeBackend{}
+	_, err := Run(t.Context(), Options{
+		Command: "apply", ConfigPath: cfg, PasswordFile: pw, Waiter: &fakeWaiter{}, Backend: fb,
+	}, ioDiscard(), ioDiscard())
+	if err == nil && fb.req.Write {
+		t.Fatal("validate mode must not set Write")
+	}
+	if fb.called != 1 {
+		t.Fatalf("backend called %d", fb.called)
+	}
+	if fb.req.Write {
+		t.Fatal("startupMode validate must not write")
+	}
+}
+
+func TestValidateSubcommandDoesNotWrite(t *testing.T) {
+	cfg, pw := testConfigDir(t)
+	fb := &fakeBackend{res: BackendResult{Action: "matched", Name: "userroot", Suffix: "dc=example,dc=test"}}
+	sum, err := Run(t.Context(), Options{
+		Command: "validate", ConfigPath: cfg, PasswordFile: pw, Waiter: &fakeWaiter{}, Backend: fb,
+	}, ioDiscard(), ioDiscard())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fb.req.Write {
+		t.Fatal("validate subcommand must not write")
+	}
+	if !sum.OK || sum.Phases[len(sum.Phases)-1].Phase != "backend" {
+		t.Fatalf("%+v", sum)
 	}
 }
 
@@ -141,7 +224,7 @@ func TestApplyInvalidConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 	sum, err := Run(t.Context(), Options{
-		Command: "apply", ConfigPath: path, PasswordFile: pw, Waiter: &fakeWaiter{},
+		Command: "apply", ConfigPath: path, PasswordFile: pw, Waiter: &fakeWaiter{}, Backend: &fakeBackend{},
 	}, ioDiscard(), ioDiscard())
 	if err == nil {
 		t.Fatal("expected load failure")

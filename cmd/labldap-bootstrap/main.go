@@ -35,6 +35,7 @@ Flags (apply / validate):
   --ldap-url URL                 optional ldaps://host:port override
   --directory-ca-file PATH       PEM CA used to verify LDAPS
   --directory-host HOST          TLS server name (default 127.0.0.1)
+  --dsconf-instance NAME         dsconf instance URL (default localhost)
   --deadline DURATION            default 90s
 
 --directory-host is the certificate name, not the dial address. When the
@@ -43,8 +44,8 @@ published address in --ldap-url.
 
 plan accepts --config and optional --directory-manager-password-file.
 
-This apply currently runs phases load and wait. Remaining phases
-(backend through marker) land in T-029+.
+This apply currently runs phases load, wait, and backend. Remaining
+phases (tls through marker) land in later M2 tasks.
 
 Structured logs go to stderr. Set LABLDAP_LOG_FORMAT=json for JSON logs.
 

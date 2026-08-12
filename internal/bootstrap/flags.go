@@ -78,6 +78,14 @@ func ParseArgs(cmd string, args []string) (Options, error) {
 				return Options{}, &UsageError{Msg: "invalid --deadline"}
 			}
 			opt.Deadline = d
+		case a == "--dsconf-instance":
+			v, err := takeValue(args, &i, a)
+			if err != nil {
+				return Options{}, err
+			}
+			opt.DSConfInstance = v
+		case strings.HasPrefix(a, "--dsconf-instance="):
+			opt.DSConfInstance = strings.TrimPrefix(a, "--dsconf-instance=")
 		default:
 			return Options{}, &UsageError{Msg: fmt.Sprintf("unknown flag %q", a)}
 		}

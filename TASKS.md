@@ -343,16 +343,16 @@ Acceptance:
 - [x] Certificate and bind failures are distinguished safely.
 - [x] Cancellation stops retry promptly.
 
-## [ ] T-029 Inspect and reconcile backend and suffix
+## [x] T-029 Inspect and reconcile backend and suffix
 
 Priority: P0 | Size: L | Depends on: T-024, T-028
 
 Deliverables: `dsconf` runner using argument vectors and password file, JSON output parser, backend create or verify, conflict detection, and index-plan hook.
 
 Acceptance:
-- [ ] Fresh backend is created with configured suffix.
-- [ ] Matching existing backend is accepted.
-- [ ] Name or suffix conflicts fail without repurposing data.
+- [x] Fresh backend is created with configured suffix.
+- [x] Matching existing backend is accepted.
+- [x] Name or suffix conflicts fail without repurposing data.
 
 ## [ ] T-030 Reconcile engine TLS and authentication settings
 
