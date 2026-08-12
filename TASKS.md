@@ -187,104 +187,104 @@ Acceptance:
 - [x] Secret digests are stable.
 - [x] Logging or formatting a secret yields only redacted output.
 
-## [ ] T-015 Normalize and validate users
+## [x] T-015 Normalize and validate users
 
 Priority: P0 | Size: L | Depends on: T-013, T-014
 
 Deliverables: user defaults, generated DN, required object classes and attributes, password reference resolution, enablement model, duplicate detection, and managed-field set.
 
 Acceptance:
-- [ ] Explicit ID, uid, RDN, and DN inconsistencies fail.
-- [ ] `userPassword`, `memberOf`, and operational attributes cannot be supplied in normal attributes.
-- [ ] Normalized users are canonically ordered and immutable.
+- [x] Explicit ID, uid, RDN, and DN inconsistencies fail.
+- [x] `userPassword`, `memberOf`, and operational attributes cannot be supplied in normal attributes.
+- [x] Normalized users are canonically ordered and immutable.
 
-## [ ] T-016 Normalize and validate groups and memberships
+## [x] T-016 Normalize and validate groups and memberships
 
 Priority: P0 | Size: L | Depends on: T-013, T-015
 
 Deliverables: static DN group model, generated DN, user and group reference resolution, duplicate removal, nesting-cycle detection, and member ordering.
 
 Acceptance:
-- [ ] Empty `groupOfNames` groups fail with a specific error.
-- [ ] Missing and circular member references fail with source paths.
-- [ ] Nested-group behavior follows the configured flag.
+- [x] Empty `groupOfNames` groups fail with a specific error.
+- [x] Missing and circular member references fail with source paths.
+- [x] Nested-group behavior follows the configured flag.
 
-## [ ] T-017 Compile and validate portable password policy
+## [x] T-017 Compile and validate portable password policy
 
 Priority: P0 | Size: M | Depends on: T-012
 
 Deliverables: normalized policy model, cross-field validation, supported storage-scheme allowlist, and adapter-facing plan.
 
 Acceptance:
-- [ ] Warning age cannot exceed maximum age.
-- [ ] Lockout values are required and positive when enabled.
-- [ ] Unsupported fields or schemes fail rather than being ignored.
+- [x] Warning age cannot exceed maximum age.
+- [x] Lockout values are required and positive when enabled.
+- [x] Unsupported fields or schemes fail rather than being ignored.
 
-## [ ] T-018 Implement ACL DSL and deterministic 389 DS ACI compiler
+## [x] T-018 Implement ACL DSL and deterministic 389 DS ACI compiler
 
 Priority: P0 | Size: L | Depends on: T-013, T-015, T-016
 
 Deliverables: principal, target, permission, attribute, and condition model; safe ACI emitter; raw-ACI gate; golden fixtures.
 
 Acceptance:
-- [ ] Generated ACIs are deterministic and named by stable ACL ID.
-- [ ] DNs, filters, attributes, and names cannot inject ACI clauses.
-- [ ] Runtime service cannot be granted `cn=config` access through normal DSL.
+- [x] Generated ACIs are deterministic and named by stable ACL ID.
+- [x] DNs, filters, attributes, and names cannot inject ACI clauses.
+- [x] Runtime service cannot be granted `cn=config` access through normal DSL.
 
-## [ ] T-019 Normalize management tokens and scopes
+## [x] T-019 Normalize management tokens and scopes
 
 Priority: P0 | Size: M | Depends on: T-012, T-014
 
 Deliverables: token definition validation, known scope registry, duplicate token-value detection, and redacted normalized token metadata.
 
 Acceptance:
-- [ ] Duplicate IDs, duplicate values, empty tokens, and unknown scopes fail.
-- [ ] `directory:write` does not imply password, reset, or export scopes.
-- [ ] Printable configuration never contains raw tokens.
+- [x] Duplicate IDs, duplicate values, empty tokens, and unknown scopes fail.
+- [x] `directory:write` does not imply password, reset, or export scopes.
+- [x] Printable configuration never contains raw tokens.
 
-## [ ] T-020 Generate deterministic engine and data plans
+## [x] T-020 Generate deterministic engine and data plans
 
 Priority: P0 | Size: L | Depends on: T-015, T-016, T-017, T-018, T-019
 
 Deliverables: engine plan, data plan, create/update/delete ordering, preserved-entry list, managed-field ownership, and redacted plan rendering.
 
 Acceptance:
-- [ ] Parents precede children on create and reverse on delete.
-- [ ] Runtime service account and marker handling are explicit.
-- [ ] Repeated compilation produces byte-identical redacted plans.
+- [x] Parents precede children on create and reverse on delete.
+- [x] Runtime service account and marker handling are explicit.
+- [x] Repeated compilation produces byte-identical redacted plans.
 
-## [ ] T-021 Implement directory baseline and control configuration revisions
+## [x] T-021 Implement directory baseline and control configuration revisions
 
 Priority: P0 | Size: M | Depends on: T-014, T-020
 
 Deliverables: canonical JSON encoder, compiler-contract version, directory revision, control revision, and revision diagnostics.
 
 Acceptance:
-- [ ] Input map order does not change either revision.
-- [ ] Seed password change changes directory revision.
-- [ ] Management-token value or scope change changes control revision without changing directory revision when directory data is unchanged.
+- [x] Input map order does not change either revision.
+- [x] Seed password change changes directory revision.
+- [x] Management-token value or scope change changes control revision without changing directory revision when directory data is unchanged.
 
-## [ ] T-022 Add configuration validate, normalize, and plan CLI commands
+## [x] T-022 Add configuration validate, normalize, and plan CLI commands
 
 Priority: P0 | Size: M | Depends on: T-020, T-021
 
 Deliverables: command output in human and JSON modes, redaction, exit codes, example invocation, and drift-ready plan format.
 
 Acceptance:
-- [ ] Invalid configuration exits non-zero with all safe diagnostics.
-- [ ] `--redact` is default and no option prints passwords or tokens.
-- [ ] JSON output is stable enough for CI use.
+- [x] Invalid configuration exits non-zero with all safe diagnostics.
+- [x] `--redact` is default and no option prints passwords or tokens.
+- [x] JSON output is stable enough for CI use.
 
-## [ ] T-023 Build configuration golden, property, and fuzz test suite
+## [x] T-023 Build configuration golden, property, and fuzz test suite
 
 Priority: P0 | Size: L | Depends on: T-010 to T-022
 
 Deliverables: valid and invalid fixtures, golden normalized models and ACIs, randomized ordering properties, and fuzz corpora.
 
 Acceptance:
-- [ ] Fuzz targets cover YAML, DN, filter, ACI, and cursor-ready primitives.
-- [ ] Secret corpus values are scanned from test output and absent.
-- [ ] `make test-unit` runs all deterministic configuration checks.
+- [x] Fuzz targets cover YAML, DN, filter, ACI, and cursor-ready primitives.
+- [x] Secret corpus values are scanned from test output and absent.
+- [x] `make test-unit` runs all deterministic configuration checks.
 
 # M2 - 389 DS bootstrap
 

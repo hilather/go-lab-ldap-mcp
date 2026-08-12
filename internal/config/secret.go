@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/hilather/go-lab-ldap-mcp/internal/apperr"
@@ -26,6 +27,26 @@ type fileResolver struct{}
 
 func FileSecretResolver() SecretResolver { return fileResolver{} }
 
+// DirSecretResolver tries path as given, then relative to baseDir (the YAML file directory).
+func DirSecretResolver(baseDir string) SecretResolver {
+	return dirResolver{base: baseDir, inner: fileResolver{}}
+}
+
+type dirResolver struct {
+	base  string
+	inner fileResolver
+}
+
+func (d dirResolver) Resolve(ctx context.Context, owner, path string) (ResolvedSecret, error) {
+	if filepath.IsAbs(path) {
+		return d.inner.Resolve(ctx, owner, path)
+	}
+	if _, err := os.Stat(path); err == nil {
+		return d.inner.Resolve(ctx, owner, path)
+	}
+	return d.inner.Resolve(ctx, owner, filepath.Join(d.base, path))
+}
+
 func (fileResolver) Resolve(ctx context.Context, owner, path string) (ResolvedSecret, error) {
 	_ = ctx
 	if path == "" {
@@ -38,6 +59,29 @@ func (fileResolver) Resolve(ctx context.Context, owner, path string) (ResolvedSe
 			WithField(apperr.Field{Path: owner, Code: "secret_unreadable", Message: "path " + path + " could not be read"})
 	}
 	norm := stripOneTrailingNewline(raw)
+	if len(norm) == 0 {
+		return ResolvedSecret{}, apperr.New(apperr.CodeConfiguration, "secret file empty").
+			WithField(apperr.Field{Path: owner, Code: "secret_empty", Message: "path " + path + " is empty"})
+	}
+	sum := sha256.Sum256(norm)
+	return ResolvedSecret{
+		Owner:  owner,
+		Path:   path,
+		Value:  observability.Secret(string(norm)),
+		Digest: hex.EncodeToString(sum[:]),
+	}, nil
+}
+
+// MapResolver is a test/CLI helper that maps logical paths to secret bytes.
+type MapResolver map[string]string
+
+func (m MapResolver) Resolve(ctx context.Context, owner, path string) (ResolvedSecret, error) {
+	_ = ctx
+	v, ok := m[path]
+	if !ok {
+		return FileSecretResolver().Resolve(ctx, owner, path)
+	}
+	norm := stripOneTrailingNewline([]byte(v))
 	if len(norm) == 0 {
 		return ResolvedSecret{}, apperr.New(apperr.CodeConfiguration, "secret file empty").
 			WithField(apperr.Field{Path: owner, Code: "secret_empty", Message: "path " + path + " is empty"})

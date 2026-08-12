@@ -46,13 +46,13 @@ func TestLoadConvertsSecretRefs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p.Input.RuntimeAccount.Password.File != "/run/secrets/runtime-ldap" {
+	if p.Input.RuntimeAccount.Password.File != "secrets/runtime-ldap" {
 		t.Fatalf("runtime secret = %#v", p.Input.RuntimeAccount.Password)
 	}
-	if p.Input.Users[0].Password.File != "/run/secrets/user-alice" {
+	if p.Input.Users[0].Password.File != "secrets/user-alice" {
 		t.Fatalf("user secret = %#v", p.Input.Users[0].Password)
 	}
-	if p.Input.Tokens[0].Secret.File != "/run/secrets/token-admin" {
+	if p.Input.Tokens[0].Secret.File != "secrets/token-admin" {
 		t.Fatalf("token secret = %#v", p.Input.Tokens[0].Secret)
 	}
 }

@@ -21,6 +21,9 @@ Usage:
 Commands:
   help       Show this help (also -h, --help)
   version    Print component and version fields
+  validate   Compile a scenario YAML (exit 0 if valid)
+  normalize  Print redacted normalized JSON
+  plan       Print a redacted engine/data plan (JSON)
 
 Structured logs go to stderr. Set LABLDAP_LOG_FORMAT=json for JSON logs.
 
@@ -40,6 +43,10 @@ func run(args []string, stdout, stderr io.Writer) int {
 	if isVersion(args[0]) {
 		observability.WriteVersion(stdout, info)
 		return 0
+	}
+	switch args[0] {
+	case "validate", "normalize", "plan":
+		return runConfigCommand(args[0], args[1:], stdout, stderr)
 	}
 	fmt.Fprintf(stderr, "labldap: unknown command %q\n\n", args[0])
 	fmt.Fprint(stderr, usage)

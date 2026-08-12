@@ -16,7 +16,8 @@ const (
 )
 
 type LoadOptions struct {
-	Caller LoadCaller
+	Secrets SecretResolver
+	Caller  LoadCaller
 }
 
 // Parsed is the T-009/T-011 result. Later tasks add Normalized, plans, and hashes.

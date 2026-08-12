@@ -69,11 +69,11 @@ spec:
       resetPerHour: 6
   runtimeAccount:
     id: labldap-runtime
-    passwordFile: /run/secrets/runtime-ldap
+    passwordFile: secrets/runtime-ldap
   users:
     - id: alice
       uid: alice
-      passwordFile: /run/secrets/user-alice
+      passwordFile: secrets/user-alice
       enabled: true
       attributes: {}
   groups:
@@ -103,7 +103,7 @@ spec:
         deny: [userPassword]
   tokens:
     - id: admin
-      secretFile: /run/secrets/token-admin
+      secretFile: secrets/token-admin
       scopes:
         - directory:read
         - directory:write

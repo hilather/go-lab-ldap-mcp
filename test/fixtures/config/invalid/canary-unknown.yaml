@@ -1,0 +1,6 @@
+apiVersion: labldap.dev/v1alpha1
+kind: LabScenario
+metadata:
+  name: canary
+spec:
+  leaked: super-secret-lab-token-value-32chars!!

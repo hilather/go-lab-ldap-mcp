@@ -1,0 +1,19 @@
+apiVersion: labldap.dev/v1alpha1
+kind: LabScenario
+metadata:
+  name: bad-identity
+spec:
+  directory:
+    suffix: dc=example,dc=test
+  transport:
+    ldaps:
+      enabled: true
+      port: 3636
+  runtimeAccount:
+    id: rt
+    passwordFile: secrets/runtime-ldap
+  users:
+    - id: alice
+      uid: bob
+      dn: uid=carol,ou=people,dc=example,dc=test
+      passwordFile: secrets/user-alice
