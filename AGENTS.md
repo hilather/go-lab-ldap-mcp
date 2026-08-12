@@ -65,6 +65,7 @@ The implementation should converge on this structure:
 |-- internal/
 |   |-- api/
 |   |-- app/
+|   |-- apperr/
 |   |-- audit/
 |   |-- auth/
 |   |-- config/
@@ -103,6 +104,7 @@ A different layout requires an ADR and must preserve package boundaries.
 - `internal/directory`: transport-neutral interfaces and domain types.
 - `internal/directory/ldapclient`: low-level LDAP connection, escaping, controls, and error translation.
 - `internal/directory/ds389`: 389 DS bootstrap and capability implementation.
+- `internal/apperr`: structured error taxonomy and test helpers. Leaf package; no LDAP, HTTP, or MCP imports.
 - `internal/app`: use cases, policy checks, transactions, reset orchestration, and audit calls.
 - `internal/api`: HTTP transport only.
 - `internal/mcpserver`: MCP transport only.

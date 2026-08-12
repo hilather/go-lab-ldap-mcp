@@ -1,0 +1,209 @@
+# LabLDAP continuous integration (T-004, T-007 wiring).
+#
+# Required PR gate today: static, unit, frontend, security.
+# integration and image exist so main can require them later (T-025, T-041/T-108).
+# They use continue-on-error and must not fail the M0 PR gate.
+#
+# Caches are only the Go module/build cache and the pnpm store.
+# Do not add cache paths that include /secrets, .env, or credential files.
+# Do not print secrets, tokens, or secret-file contents. Do not upload
+# credential files, /secrets, or .env as artifacts.
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+env:
+  GOTOOLCHAIN: go1.26.5
+  GOPROXY: https://proxy.golang.org,direct
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+
+jobs:
+  static:
+    name: static
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+          cache-dependency-path: go.mod
+
+      - name: Enable pnpm (runner Node, for setup-node cache)
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.14.0 --activate
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Activate pinned pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.14.0 --activate
+
+      - name: Format (fail on drift)
+        run: make format && git diff --exit-code
+
+      - name: Lint
+        run: make lint
+
+      - name: Generated-file drift
+        run: make generate-drift
+
+  unit:
+    name: unit
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+          cache-dependency-path: go.mod
+
+      - name: Enable pnpm (runner Node, for setup-node cache)
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.14.0 --activate
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Activate pinned pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.14.0 --activate
+
+      - name: Unit tests
+        run: make test-unit
+
+  frontend:
+    name: frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Enable pnpm (runner Node, for setup-node cache)
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.14.0 --activate
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Activate pinned pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.14.0 --activate
+
+      - name: Frontend production build
+        run: make frontend-build
+
+  security:
+    name: security
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+          cache-dependency-path: go.mod
+
+      # secretscan fails the job on high-confidence committed secrets.
+      # govulncheck enforces the critical-vulnerability policy.
+      # licensecheck enforces the denylist. None of these tools print
+      # secret values or private-registry credentials.
+      - name: Security scans
+        run: |
+          set -euo pipefail
+          make test-security 2>&1 | tee security-scan.log
+
+      # Retain scan output as a log artifact only. Do not upload /secrets,
+      # .env, password files, or other credential material.
+      - name: Upload scan log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-scan
+          path: security-scan.log
+          if-no-files-found: warn
+          retention-days: 30
+          include-hidden-files: false
+
+  # Placeholder until T-025 (real 389 DS harness). Not a required PR gate
+  # in M0. After the harness lands, remove continue-on-error so main can
+  # require this job.
+  integration:
+    name: integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Integration tests (placeholder)
+        run: make test-integration
+
+  # Placeholder until T-041/T-108 (bootstrap/control images). Not a required
+  # PR gate in M0. After image targets land, remove continue-on-error so
+  # main can require this job.
+  image:
+    name: image
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Image build (placeholder)
+        run: make image

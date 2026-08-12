@@ -1,0 +1,15 @@
+{
+  "name": "@labldap/frontend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "packageManager": "pnpm@10.14.0",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "build": "node ./scripts/build.mjs",
+    "lint": "node ./scripts/lint.mjs",
+    "test": "node --test ./scripts/build.test.mjs"
+  }
+}

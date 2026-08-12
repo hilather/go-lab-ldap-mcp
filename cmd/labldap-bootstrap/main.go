@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+
+	"github.com/hilather/go-lab-ldap-mcp/internal/observability"
 )
 
 const usage = `labldap-bootstrap — LabLDAP one-shot directory bootstrap
@@ -20,7 +22,10 @@ Usage:
   labldap-bootstrap [command]
 
 Commands:
-  help    Show this help (also -h, --help)
+  help       Show this help (also -h, --help)
+  version    Print component and version fields
+
+Structured logs go to stderr. Set LABLDAP_LOG_FORMAT=json for JSON logs.
 
 This is the T-001 scaffold. apply, validate, and plan commands land in later
 tasks (see TASKS.md, starting at T-027).
@@ -33,8 +38,13 @@ func main() {
 }
 
 func run(args []string, stdout, stderr io.Writer) int {
+	info, _ := observability.StartupLogger(stderr, "labldap-bootstrap")
 	if len(args) == 0 || isHelp(args[0]) {
 		fmt.Fprint(stdout, usage)
+		return 0
+	}
+	if isVersion(args[0]) {
+		observability.WriteVersion(stdout, info)
 		return 0
 	}
 	fmt.Fprintf(stderr, "labldap-bootstrap: unknown command %q\n\n", args[0])
@@ -45,6 +55,15 @@ func run(args []string, stdout, stderr io.Writer) int {
 func isHelp(arg string) bool {
 	switch arg {
 	case "help", "-h", "-help", "--help":
+		return true
+	default:
+		return false
+	}
+}
+
+func isVersion(arg string) bool {
+	switch arg {
+	case "version", "-version", "--version":
 		return true
 	default:
 		return false

@@ -42,82 +42,82 @@ Acceptance:
 - [x] Package layout follows `AGENTS.md` or an accepted replacement ADR.
 - [x] No application package imports HTTP and MCP transport types together.
 
-## [ ] T-002 Pin toolchains and initial dependency policy
+## [x] T-002 Pin toolchains and initial dependency policy
 
 Priority: P0 | Size: S | Depends on: T-001
 
 Deliverables: Go toolchain version, Node version, package manager lock file, dependency update policy, and pinned developer tools.
 
 Acceptance:
-- [ ] Go and frontend builds are reproducible from clean caches.
-- [ ] Exact tool versions are discoverable through committed files.
-- [ ] Version choices are documented against the design baseline.
+- [x] Go and frontend builds are reproducible from clean caches.
+- [x] Exact tool versions are discoverable through committed files.
+- [x] Version choices are documented against the design baseline.
 
-## [ ] T-003 Create Makefile and tool bootstrap commands
+## [x] T-003 Create Makefile and tool bootstrap commands
 
 Priority: P0 | Size: M | Depends on: T-001, T-002
 
 Deliverables: stable targets from `AGENTS.md`, local tool installation strategy, and help output.
 
 Acceptance:
-- [ ] `make format`, `lint`, `generate`, `test-unit`, `test-integration`, `test-e2e`, `image`, and `verify` exist.
-- [ ] Tool installation does not silently use floating versions.
-- [ ] Commands work from repository root on a clean environment.
+- [x] `make format`, `lint`, `generate`, `test-unit`, `test-integration`, `test-e2e`, `image`, and `verify` exist.
+- [x] Tool installation does not silently use floating versions.
+- [x] Commands work from repository root on a clean environment.
 
-## [ ] T-004 Establish continuous integration baseline
+## [x] T-004 Establish continuous integration baseline
 
 Priority: P0 | Size: M | Depends on: T-003
 
 Deliverables: static, Go unit, frontend unit, contract, integration placeholder, image, and security jobs.
 
 Acceptance:
-- [ ] Pull requests run formatting, linting, unit tests, and generated-drift checks.
-- [ ] Main branch can require integration and image gates.
-- [ ] CI caches do not contain committed credentials or expose secret values.
+- [x] Pull requests run formatting, linting, unit tests, and generated-drift checks.
+- [x] Main branch can require integration and image gates.
+- [x] CI caches do not contain committed credentials or expose secret values.
 
-## [ ] T-005 Implement structured logging, build information, and request IDs
+## [x] T-005 Implement structured logging, build information, and request IDs
 
 Priority: P0 | Size: M | Depends on: T-001
 
 Deliverables: `slog` configuration, human and JSON modes, build version structure, request or operation ID generator, and context propagation helpers.
 
 Acceptance:
-- [ ] Both commands emit structured component and version fields.
-- [ ] Request IDs can propagate from HTTP or MCP into application and LDAP logs.
-- [ ] A redaction test proves known sensitive value types do not stringify normally.
+- [x] Both commands emit structured component and version fields.
+- [x] Request IDs can propagate from HTTP or MCP into application and LDAP logs.
+- [x] A redaction test proves known sensitive value types do not stringify normally.
 
-## [ ] T-006 Define error taxonomy and test utilities
+## [x] T-006 Define error taxonomy and test utilities
 
 Priority: P0 | Size: M | Depends on: T-001
 
 Deliverables: structured application errors, field errors, retryability, test assertions, fakes, and golden-file helpers.
 
 Acceptance:
-- [ ] Error identity survives wrapping.
-- [ ] Error codes cover configuration, auth, directory, reset, export, and bootstrap categories.
-- [ ] Tests can assert code, fields, cause, and safe public message independently.
+- [x] Error identity survives wrapping.
+- [x] Error codes cover configuration, auth, directory, reset, export, and bootstrap categories.
+- [x] Tests can assert code, fields, cause, and safe public message independently.
 
-## [ ] T-007 Add security, secret, vulnerability, and license scans
+## [x] T-007 Add security, secret, vulnerability, and license scans
 
 Priority: P0 | Size: M | Depends on: T-002, T-004
 
 Deliverables: Go vulnerability scan, frontend audit, secret scan, container scan placeholder, and license policy.
 
 Acceptance:
-- [ ] CI fails on committed high-confidence secrets.
-- [ ] Critical vulnerability policy is documented and enforced.
-- [ ] Scan output is retained without exposing private registry credentials.
+- [x] CI fails on committed high-confidence secrets.
+- [x] Critical vulnerability policy is documented and enforced.
+- [x] Scan output is retained without exposing private registry credentials.
 
-## [ ] T-008 Add contribution, task-status, generation, and ADR workflow
+## [x] T-008 Add contribution, task-status, generation, and ADR workflow
 
 Priority: P1 | Size: S | Depends on: T-001, T-003
 
 Deliverables: contribution guide, generated-file policy, task completion template, ADR template, and pull-request checklist.
 
 Acceptance:
-- [ ] Contributors can identify source versus generated files.
-- [ ] Public contract changes require documentation and tests.
-- [ ] Task reports use the format in `AGENTS.md`.
+- [x] Contributors can identify source versus generated files.
+- [x] Public contract changes require documentation and tests.
+- [x] Task reports use the format in `AGENTS.md`.
 
 # M1 - Configuration compiler
 
