@@ -13,6 +13,22 @@ import (
 	"github.com/hilather/go-lab-ldap-mcp/internal/observability"
 )
 
+type fakeTLS struct {
+	err    error
+	called int
+	req    TLSRequest
+}
+
+func (f *fakeTLS) ReconcileTLS(ctx context.Context, req TLSRequest) (TLSResult, error) {
+	_ = ctx
+	f.called++
+	f.req = req
+	if f.err != nil {
+		return TLSResult{}, f.err
+	}
+	return TLSResult{Transports: []string{"ldaps"}, SASL: []string{"EXTERNAL"}}, nil
+}
+
 type fakeBackend struct {
 	err    error
 	res    BackendResult
@@ -105,20 +121,22 @@ func TestApplyLoadThenWaitOK(t *testing.T) {
 	cfg, pw := testConfigDir(t)
 	fw := &fakeWaiter{}
 	fb := &fakeBackend{}
+	ft := &fakeTLS{}
 	sum, err := Run(t.Context(), Options{
 		Command:      "apply",
 		ConfigPath:   cfg,
 		PasswordFile: pw,
 		Waiter:       fw,
 		Backend:      fb,
+		TLS:          ft,
 		LDAPURL:      "ldaps://127.0.0.1:3636",
 		CAFile:       "/tmp/ca.crt",
 	}, ioDiscard(), ioDiscard())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !sum.OK || fw.called != 1 || fb.called != 1 {
-		t.Fatalf("sum=%+v wait=%d backend=%d", sum, fw.called, fb.called)
+	if !sum.OK || fw.called != 1 || fb.called != 1 || ft.called != 1 {
+		t.Fatalf("sum=%+v wait=%d backend=%d tls=%d", sum, fw.called, fb.called, ft.called)
 	}
 	if !fb.req.Write {
 		t.Fatal("apply merge must write backend")
@@ -129,7 +147,7 @@ func TestApplyLoadThenWaitOK(t *testing.T) {
 	if fw.req.LDAPURL != "ldaps://127.0.0.1:3636" {
 		t.Fatalf("url = %s", fw.req.LDAPURL)
 	}
-	if len(sum.Phases) != 3 || sum.Phases[2].Phase != "backend" || !sum.Phases[2].OK {
+	if len(sum.Phases) != 4 || sum.Phases[3].Phase != "tls" || !sum.Phases[3].OK {
 		t.Fatalf("phases = %+v", sum.Phases)
 	}
 	if len(sum.Remaining) == 0 {
@@ -141,7 +159,7 @@ func TestApplyWaitBindFailure(t *testing.T) {
 	cfg, pw := testConfigDir(t)
 	fw := &fakeWaiter{err: PhaseError("wait", "bind", "Directory Manager bind failed")}
 	sum, err := Run(t.Context(), Options{
-		Command: "apply", ConfigPath: cfg, PasswordFile: pw, Waiter: fw, Backend: &fakeBackend{},
+		Command: "apply", ConfigPath: cfg, PasswordFile: pw, Waiter: fw, Backend: &fakeBackend{}, TLS: &fakeTLS{},
 	}, ioDiscard(), ioDiscard())
 	if err == nil {
 		t.Fatal("expected bind failure")
@@ -182,16 +200,14 @@ spec:
 		t.Fatal(err)
 	}
 	fb := &fakeBackend{}
+	ft := &fakeTLS{}
 	_, err := Run(t.Context(), Options{
-		Command: "apply", ConfigPath: cfg, PasswordFile: pw, Waiter: &fakeWaiter{}, Backend: fb,
+		Command: "apply", ConfigPath: cfg, PasswordFile: pw, Waiter: &fakeWaiter{}, Backend: fb, TLS: ft,
 	}, ioDiscard(), ioDiscard())
-	if err == nil && fb.req.Write {
-		t.Fatal("validate mode must not set Write")
+	if err != nil {
+		t.Fatal(err)
 	}
-	if fb.called != 1 {
-		t.Fatalf("backend called %d", fb.called)
-	}
-	if fb.req.Write {
+	if fb.req.Write || ft.req.Write {
 		t.Fatal("startupMode validate must not write")
 	}
 }
@@ -199,16 +215,17 @@ spec:
 func TestValidateSubcommandDoesNotWrite(t *testing.T) {
 	cfg, pw := testConfigDir(t)
 	fb := &fakeBackend{res: BackendResult{Action: "matched", Name: "userroot", Suffix: "dc=example,dc=test"}}
+	ft := &fakeTLS{}
 	sum, err := Run(t.Context(), Options{
-		Command: "validate", ConfigPath: cfg, PasswordFile: pw, Waiter: &fakeWaiter{}, Backend: fb,
+		Command: "validate", ConfigPath: cfg, PasswordFile: pw, Waiter: &fakeWaiter{}, Backend: fb, TLS: ft,
 	}, ioDiscard(), ioDiscard())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if fb.req.Write {
+	if fb.req.Write || ft.req.Write {
 		t.Fatal("validate subcommand must not write")
 	}
-	if !sum.OK || sum.Phases[len(sum.Phases)-1].Phase != "backend" {
+	if !sum.OK || sum.Phases[len(sum.Phases)-1].Phase != "tls" {
 		t.Fatalf("%+v", sum)
 	}
 }
@@ -224,7 +241,7 @@ func TestApplyInvalidConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 	sum, err := Run(t.Context(), Options{
-		Command: "apply", ConfigPath: path, PasswordFile: pw, Waiter: &fakeWaiter{}, Backend: &fakeBackend{},
+		Command: "apply", ConfigPath: path, PasswordFile: pw, Waiter: &fakeWaiter{}, Backend: &fakeBackend{}, TLS: &fakeTLS{},
 	}, ioDiscard(), ioDiscard())
 	if err == nil {
 		t.Fatal("expected load failure")

@@ -20,7 +20,9 @@ func runBootstrap(cmd string, args []string, stdout, stderr io.Writer, logger *s
 	}
 	opt.Log = logger
 	opt.Waiter = ds389.Admin{}
-	opt.Backend = ds389.Engine{}
+	eng := ds389.Engine{}
+	opt.Backend = eng
+	opt.TLS = eng
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()

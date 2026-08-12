@@ -7,8 +7,10 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/hilather/go-lab-ldap-mcp/internal/apperr"
@@ -18,7 +20,7 @@ import (
 )
 
 var laterPhases = []string{
-	"inspect", "tls", "pwpolicy", "plugins",
+	"inspect", "pwpolicy", "plugins",
 	"tree", "aci", "seed", "verify_runtime", "verify_app", "drift", "marker",
 }
 
@@ -34,6 +36,8 @@ type Options struct {
 	DSConfInstance string
 	Waiter         Waiter
 	Backend        BackendReconciler
+	TLS            TLSReconciler
+	RequireSASL    []string
 	Log            *slog.Logger
 	Now            func() time.Time
 }
@@ -133,6 +137,25 @@ func Run(ctx context.Context, opt Options, stdout, stderr io.Writer) (Summary, e
 		}
 		return counts, nil
 	})
+	if err != nil {
+		sum.Phases = rep.phases
+		return sum, err
+	}
+
+	err = rep.run("tls", func() (map[string]int, error) {
+		if opt.TLS == nil {
+			return nil, phaseErr("tls", "tls", "tls reconciler is not configured")
+		}
+		pw, e := readPasswordFile(opt.PasswordFile)
+		if e != nil {
+			return nil, e
+		}
+		res, e := opt.TLS.ReconcileTLS(ctx, tlsRequestFrom(compiled, opt, pw, write))
+		if e != nil {
+			return nil, e
+		}
+		return map[string]int{"transports": len(res.Transports), "sasl": len(res.SASL)}, nil
+	})
 	sum.Phases = rep.phases
 	if err != nil {
 		return sum, err
@@ -194,6 +217,39 @@ func waitRequestFrom(c *config.Compiled, opt Options, pw observability.Secret) W
 	}
 	req.LDAPURL = opt.LDAPURL
 	return req
+}
+
+func tlsRequestFrom(c *config.Compiled, opt Options, pw observability.Secret, write bool) TLSRequest {
+	pub := c.Public
+	dialHost := "127.0.0.1"
+	if opt.LDAPURL != "" {
+		u := strings.TrimPrefix(strings.TrimPrefix(opt.LDAPURL, "ldaps://"), "ldap://")
+		if h, _, err := net.SplitHostPort(u); err == nil && h != "" {
+			dialHost = h
+		}
+	}
+	ldapPort := pub.Spec.Transport.LDAP.Port
+	if ldapPort == 0 {
+		ldapPort = 3389
+	}
+	return TLSRequest{
+		PasswordFile:   opt.PasswordFile,
+		Instance:       opt.DSConfInstance,
+		LDAPURL:        opt.LDAPURL,
+		LDAPAddr:       net.JoinHostPort(dialHost, fmt.Sprintf("%d", ldapPort)),
+		CAFile:         opt.CAFile,
+		Host:           opt.DirectoryHost,
+		UseLDAPS:       pub.Spec.Transport.LDAPS.Enabled,
+		StartTLS:       pub.Spec.Transport.StartTLS,
+		Insecure:       pub.Spec.Transport.InsecureLabMode,
+		AllowCleartext: pub.Spec.Transport.AllowCleartextBind,
+		AllowAnonymous: pub.Spec.Transport.AllowAnonymousBind,
+		RequiredSASL:   append([]string(nil), opt.RequireSASL...),
+		BindDN:         defaultBindDN,
+		Password:       pw,
+		Write:          write,
+		DialTimeout:    5 * time.Second,
+	}
 }
 
 // WriteSummary prints the JSON summary and a short public error line.

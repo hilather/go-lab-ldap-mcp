@@ -354,16 +354,16 @@ Acceptance:
 - [x] Matching existing backend is accepted.
 - [x] Name or suffix conflicts fail without repurposing data.
 
-## [ ] T-030 Reconcile engine TLS and authentication settings
+## [x] T-030 Reconcile engine TLS and authentication settings
 
 Priority: P0 | Size: L | Depends on: T-028, T-029
 
 Deliverables: adapter plan for anonymous bind, secure simple bind expectations, LDAPS, StartTLS, and required SASL capability verification.
 
 Acceptance:
-- [ ] Configured LDAP transports are verified from a client connection.
-- [ ] Cleartext simple bind is rejected when disabled.
-- [ ] Required unsupported SASL mechanisms fail bootstrap.
+- [x] Configured LDAP transports are verified from a client connection.
+- [x] Cleartext simple bind is rejected when disabled.
+- [x] Required unsupported SASL mechanisms fail bootstrap.
 
 ## [ ] T-031 Reconcile and verify global password policy
 

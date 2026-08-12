@@ -54,11 +54,12 @@ spec:
 		DirectoryHost: inst.Hostname(t),
 		Waiter:        ds389.Admin{},
 		Backend:       stubBackend{},
+		TLS:           stubTLS{},
 	}, ioDiscard(), ioDiscard())
 	if err != nil {
 		t.Fatalf("apply wait: %v summary=%+v", err, sum)
 	}
-	if !sum.OK || len(sum.Phases) != 3 {
+	if !sum.OK || len(sum.Phases) != 4 {
 		t.Fatalf("%+v", sum)
 	}
 
@@ -71,6 +72,7 @@ spec:
 		DirectoryHost: inst.Hostname(t),
 		Waiter:        ds389.Admin{},
 		Backend:       stubBackend{},
+		TLS:           stubTLS{},
 		Deadline:      2 * time.Second,
 	}, ioDiscard(), ioDiscard())
 	if err == nil {
@@ -91,6 +93,7 @@ spec:
 		DirectoryHost: inst.Hostname(t),
 		Waiter:        ds389.Admin{},
 		Backend:       stubBackend{},
+		TLS:           stubTLS{},
 		Deadline:      3 * time.Second,
 	}, ioDiscard(), ioDiscard())
 	if err == nil {
@@ -106,6 +109,12 @@ type stubBackend struct{}
 
 func (stubBackend) Reconcile(context.Context, bootstrap.BackendRequest) (bootstrap.BackendResult, error) {
 	return bootstrap.BackendResult{Action: "created", Name: "userroot", Suffix: "dc=example,dc=test"}, nil
+}
+
+type stubTLS struct{}
+
+func (stubTLS) ReconcileTLS(context.Context, bootstrap.TLSRequest) (bootstrap.TLSResult, error) {
+	return bootstrap.TLSResult{Transports: []string{"ldaps"}}, nil
 }
 
 func waitCode(err error) string {

@@ -9,9 +9,10 @@ import (
 	"github.com/hilather/go-lab-ldap-mcp/internal/config"
 )
 
-// Engine reconciles the 389 DS backend/suffix via dsconf.
+// Engine reconciles 389 DS engine settings via dsconf and LDAP probes.
 type Engine struct {
 	Runner Runner
+	Dial   DialFunc
 }
 
 type listedBackend struct {

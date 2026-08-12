@@ -51,6 +51,10 @@ docker restart   # ns-slapd must reload NSS; then re-read published ports
 
 Upstream docs often show 389/636. This container listens on **3389/3636**. Health is not a Docker HEALTHCHECK; readiness is LDAPI socket `/data/run/slapd-localhost.socket` plus TCP accept on 3389.
 
+## Bind policy (observed, T-030)
+
+Default first-boot: `nsslapd-require-secure-binds: off`, `nsslapd-allow-anonymous-access: on`. LDAPS (3636) and StartTLS on 3389 both accept binds. After `dsconf security set --require-secure-authentication on`, a simple bind on `ldap://:3389` returns LDAP 13 (confidentiality required). SASL `get-mechs` includes EXTERNAL, GSSAPI, DIGEST-MD5, PLAIN, ANONYMOUS; there is no scenario YAML key for required SASL — `phase.tls` fails `sasl_missing` when `TLSRequest.RequiredSASL` names a mechanism not in that list.
+
 ## Environment (subset)
 
 - `DS_DM_PASSWORD` — set Directory Manager password after first start
