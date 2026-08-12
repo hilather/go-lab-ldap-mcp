@@ -20,7 +20,7 @@ help:
 		'  generate-drift     fail if generate would change the tree' \
 		'  test               alias for test-unit' \
 		'  test-unit          Go tests + frontend placeholder tests' \
-		'  test-integration   pending T-025 (real 389 DS harness)' \
+		'  test-integration   real 389 DS harness (pinned digest; needs Docker)' \
 		'  test-e2e           pending T-107 (Playwright)' \
 		'  test-security      secret scan, govulncheck, license denylist' \
 		'  compose-up         pending T-042' \
@@ -49,8 +49,7 @@ test-unit:
 	cd frontend && $(PNPM) test
 
 test-integration:
-	@printf '%s\n' 'test-integration: pending T-025 — real 389 DS harness not in this milestone'
-	@printf '%s\n' 'PENDING:test-integration'
+	$(GO) test -tags=integration ./test/integration/... -count=1 -timeout 15m
 
 test-e2e:
 	@printf '%s\n' 'test-e2e: pending T-107 — Playwright suite not in this milestone'

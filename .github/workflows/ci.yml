@@ -1,8 +1,7 @@
 # LabLDAP continuous integration (T-004, T-007 wiring).
 #
-# Required PR gate today: static, unit, frontend, security.
-# integration and image exist so main can require them later (T-025, T-041/T-108).
-# They use continue-on-error and must not fail the M0 PR gate.
+# Required PR gate: static, unit, frontend, security, integration.
+# image remains continue-on-error until T-041/T-108.
 #
 # Caches are only the Go module/build cache and the pnpm store.
 # Do not add cache paths that include /secrets, .env, or credential files.
@@ -174,21 +173,24 @@ jobs:
           retention-days: 30
           include-hidden-files: false
 
-  # Placeholder until T-025 (real 389 DS harness). Not a required PR gate
-  # in M0. After the harness lands, remove continue-on-error so main can
-  # require this job.
   integration:
     name: integration
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    continue-on-error: true
+    timeout-minutes: 25
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           persist-credentials: false
 
-      - name: Integration tests (placeholder)
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+          cache-dependency-path: go.mod
+
+      - name: Integration tests
         run: make test-integration
 
   # Placeholder until T-041/T-108 (bootstrap/control images). Not a required

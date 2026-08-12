@@ -1,6 +1,6 @@
 # Tests
 
-- `integration/` — real 389 DS container tests (T-025+)
+- `integration/` — real 389 DS container tests (`//go:build integration`; `make test-integration`)
 - `e2e/` — Playwright product acceptance (T-107)
 - `compatibility/` — LDAP client matrix (T-115)
 - `fixtures/` — configuration and golden files (M1)

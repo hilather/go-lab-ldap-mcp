@@ -10,7 +10,7 @@ Recorded 2026-08-12 against the LabLDAP design baseline.
 | pnpm | exact packageManager + lockfile | `pnpm@10.14.0` | `frontend/package.json` `packageManager`, `frontend/pnpm-lock.yaml` |
 | React | 19.2 | not yet (T-095) | placeholder frontend only |
 | MCP Go SDK | v1.7.0+ / spec 2026-07-28 | not yet (T-085) | — |
-| 389 DS image | pin by digest | not yet (T-024) | — |
+| 389 DS image | pin by digest | `quay.io/389ds/dirsrv@sha256:f2851654c5df545cd893d84bea8d08c28dc25f0930493fbfed1d8a6eacf657f7` | `deploy/docker/dirsrv.digest`, `deploy/docker/dirsrv-image-contract.md` |
 
 No deviation from the Go or Node baseline. The frontend is an empty-app placeholder: `pnpm install --frozen-lockfile && pnpm build` must succeed without React until T-095.
 

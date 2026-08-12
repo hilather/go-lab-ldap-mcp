@@ -22,7 +22,7 @@ No distribution license file (OD-003). Local images only (OD-004).
 Milestone **M0** is in progress. First usable release is the README definition
 in the design package plus every P0 task in [`TASKS.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/TASKS.md).
 
-Completed: **T-001–T-023** (M1 compiler). Next: **T-024** 389 DS image pin. Remaining-work design: [`docs/design/remaining-work-m1-m8.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/design/remaining-work-m1-m8.md).
+Completed: **T-001–T-026**. Next: **T-027** bootstrap apply/validate/plan. Remaining-work design: [`docs/design/remaining-work-m1-m8.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/design/remaining-work-m1-m8.md).
 
 ## Commands
 
@@ -35,8 +35,8 @@ make verify
 
 Structured logs go to stderr. `LABLDAP_LOG_FORMAT=json` selects JSON.
 
-See `docs/toolchain.md` for version pins. Integration, e2e, and image Make
-targets exist as explicit pending gates until later milestones.
+See `docs/toolchain.md` for version pins. `make test-integration` starts the
+pinned 389 DS image (Docker required). e2e and image targets remain pending.
 
 ## Layout
 

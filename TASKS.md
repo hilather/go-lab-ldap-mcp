@@ -288,38 +288,38 @@ Acceptance:
 
 # M2 - 389 DS bootstrap
 
-## [ ] T-024 Pin and document the 389 DS image contract
+## [x] T-024 Pin and document the 389 DS image contract
 
 Priority: P0 | Size: M | Depends on: T-002, T-007
 
 Deliverables: immutable image digest, version, architecture manifest, entrypoint inspection, ports, `/data` behavior, available CLI tools, user IDs, and secret-input findings.
 
 Acceptance:
-- [ ] Image digest and observed contract are committed to a versioned file.
-- [ ] Floating tags are absent from release-oriented files.
-- [ ] Any divergence from upstream documentation is recorded.
+- [x] Image digest and observed contract are committed to a versioned file.
+- [x] Floating tags are absent from release-oriented files.
+- [x] Any divergence from upstream documentation is recorded.
 
-## [ ] T-025 Implement the real 389 DS integration harness
+## [x] T-025 Implement the real 389 DS integration harness
 
 Priority: P0 | Size: L | Depends on: T-003, T-024
 
 Deliverables: container lifecycle helper, isolated network and state, log capture, cleanup, random ports, and CI support.
 
 Acceptance:
-- [ ] A test starts the pinned image and confirms process health.
-- [ ] Failures attach redacted directory logs.
-- [ ] Repeated runs do not leak containers, networks, volumes, or ports.
+- [x] A test starts the pinned image and confirms process health.
+- [x] Failures attach redacted directory logs.
+- [x] Repeated runs do not leak containers, networks, volumes, or ports.
 
-## [ ] T-026 Generate test CA and directory TLS certificates
+## [x] T-026 Generate test CA and directory TLS certificates
 
 Priority: P0 | Size: M | Depends on: T-025
 
 Deliverables: test-only CA helper, SAN certificate generation, trust mount, wrong-CA and wrong-name fixtures.
 
 Acceptance:
-- [ ] LDAPS succeeds with correct trust and name.
-- [ ] Wrong CA and wrong server name fail closed.
-- [ ] Private key values never appear in test logs.
+- [x] LDAPS succeeds with correct trust and name.
+- [x] Wrong CA and wrong server name fail closed.
+- [x] Private key values never appear in test logs.
 
 ## [ ] T-027 Implement bootstrap command and phase reporting
 
