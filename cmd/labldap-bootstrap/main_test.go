@@ -46,11 +46,30 @@ func TestVersion(t *testing.T) {
 
 func TestUnknownCommand(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	code := run([]string{"apply"}, &stdout, &stderr)
+	code := run([]string{"serve"}, &stdout, &stderr)
 	if code != 2 {
 		t.Fatalf("exit %d, want 2", code)
 	}
-	if !strings.Contains(stderr.String(), `unknown command "apply"`) {
+	if !strings.Contains(stderr.String(), `unknown command "serve"`) {
 		t.Fatalf("stderr = %q", stderr.String())
+	}
+}
+
+func TestApplyRejectsPasswordFlag(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"apply", "--config", "x.yaml", "--directory-manager-password", "nope"}, &stdout, &stderr)
+	if code != 2 {
+		t.Fatalf("exit %d, want 2; stderr=%s", code, stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "password-file") {
+		t.Fatalf("stderr = %q", stderr.String())
+	}
+}
+
+func TestPlanRequiresConfig(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"plan"}, &stdout, &stderr)
+	if code != 2 {
+		t.Fatalf("exit %d stderr=%s", code, stderr.String())
 	}
 }

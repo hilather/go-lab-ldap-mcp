@@ -45,6 +45,12 @@ func TestAGENTSImportBoundaries(t *testing.T) {
 		if strings.HasPrefix(rel, "internal/mcpserver") && hasAPI {
 			t.Errorf("%s (MCP transport) must not import internal/api", rel)
 		}
+		if forbiddenGoLDAP(rel, imps) {
+			t.Errorf("%s must not import github.com/go-ldap/ldap (only internal/directory/ds389 may)", rel)
+		}
+		if forbiddenDS389Admin(rel, imps) {
+			t.Errorf("%s must not import internal/directory/ds389 (bootstrap helper is command-only)", rel)
+		}
 	}
 }
 
@@ -143,6 +149,25 @@ func TestForbiddenConfigImport(t *testing.T) {
 			t.Errorf("forbidden import treated as allowed: %s", imp)
 		}
 	}
+}
+
+func forbiddenGoLDAP(rel string, imps []string) bool {
+	if rel == "internal/directory/ds389" || strings.HasPrefix(rel, "internal/directory/ds389/") {
+		return false
+	}
+	return hasImportPrefix(imps, "github.com/go-ldap/ldap")
+}
+
+func forbiddenDS389Admin(rel string, imps []string) bool {
+	switch {
+	case strings.HasPrefix(rel, "test/"):
+		return false
+	case rel == "cmd/labldap-bootstrap" || strings.HasPrefix(rel, "cmd/labldap-bootstrap/"):
+		return false
+	case rel == "internal/directory/ds389" || strings.HasPrefix(rel, "internal/directory/ds389/"):
+		return false
+	}
+	return hasImportPrefix(imps, "github.com/hilather/go-lab-ldap-mcp/internal/directory/ds389")
 }
 
 func forbiddenConfigImport(imp string) bool {

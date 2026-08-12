@@ -321,27 +321,27 @@ Acceptance:
 - [x] Wrong CA and wrong server name fail closed.
 - [x] Private key values never appear in test logs.
 
-## [ ] T-027 Implement bootstrap command and phase reporting
+## [x] T-027 Implement bootstrap command and phase reporting
 
 Priority: P0 | Size: M | Depends on: T-005, T-006, T-022, T-025
 
 Deliverables: `apply`, `validate`, and `plan` commands, phase state, deadlines, JSON summary, and exit codes.
 
 Acceptance:
-- [ ] Every phase reports duration and safe counts.
-- [ ] Any failed phase produces non-zero exit and stable code.
-- [ ] Directory Manager password is accepted through a file, not a command-line value.
+- [x] Every phase reports duration and safe counts.
+- [x] Any failed phase produces non-zero exit and stable code.
+- [x] Directory Manager password is accepted through a file, not a command-line value.
 
-## [ ] T-028 Implement engine wait, TLS probe, and administrative bind
+## [x] T-028 Implement engine wait, TLS probe, and administrative bind
 
 Priority: P0 | Size: M | Depends on: T-026, T-027
 
 Deliverables: bounded retry with jitter, Root DSE probe, LDAPS or StartTLS setup, DM bind, and cancellation.
 
 Acceptance:
-- [ ] Engine startup delay is tolerated within configured deadline.
-- [ ] Certificate and bind failures are distinguished safely.
-- [ ] Cancellation stops retry promptly.
+- [x] Engine startup delay is tolerated within configured deadline.
+- [x] Certificate and bind failures are distinguished safely.
+- [x] Cancellation stops retry promptly.
 
 ## [ ] T-029 Inspect and reconcile backend and suffix
 

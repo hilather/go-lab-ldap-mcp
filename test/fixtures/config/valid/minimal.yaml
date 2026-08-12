@@ -1,0 +1,14 @@
+apiVersion: labldap.dev/v1alpha1
+kind: LabScenario
+metadata:
+  name: bootstrap-min
+spec:
+  directory:
+    suffix: "dc=example,dc=test"
+  transport:
+    ldaps:
+      enabled: true
+      port: 3636
+  runtimeAccount:
+    id: labldap-runtime
+    passwordFile: secrets/runtime-ldap

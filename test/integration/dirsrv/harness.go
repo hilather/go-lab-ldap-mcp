@@ -8,10 +8,13 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net"
+	"os"
 	"os/exec"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/hilather/go-lab-ldap-mcp/internal/observability"
 )
 
 const label = "labldap.integration=1"
@@ -151,6 +154,37 @@ func runningLabeled() ([]string, error) {
 		}
 	}
 	return ids, nil
+}
+
+// Password returns the Directory Manager password set via DS_DM_PASSWORD.
+func (i *Instance) Password() observability.Secret {
+	if i == nil {
+		return ""
+	}
+	return observability.Secret(i.password)
+}
+
+// WriteCA copies the instance self-signed CA to dest and returns the PEM.
+func (i *Instance) WriteCA(t testing.TB, dest string) []byte {
+	t.Helper()
+	out, err := exec.Command("docker", "cp", i.Name+":/etc/dirsrv/slapd-localhost/ca.crt", dest).CombinedOutput()
+	if err != nil {
+		t.Fatalf("docker cp ca.crt: %v\n%s", err, redactLogs(string(out), i.password))
+	}
+	b, err := os.ReadFile(dest)
+	if err != nil || len(b) == 0 {
+		t.Fatalf("empty instance CA: %v", err)
+	}
+	return b
+}
+
+func (i *Instance) Hostname(t testing.TB) string {
+	t.Helper()
+	out, err := exec.Command("docker", "inspect", "-f", "{{.Config.Hostname}}", i.Name).Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return strings.TrimSpace(string(out))
 }
 
 func (i *Instance) Stop(t testing.TB) {
