@@ -1,0 +1,37 @@
+# Binaries
+/bin/
+/labldap
+/labldap-bootstrap
+*.exe
+*.test
+*.out
+
+# Go
+coverage.out
+coverage.html
+vendor/
+
+# Node / frontend (populated in T-002 / T-095)
+node_modules/
+frontend/dist/
+frontend/.vite/
+*.tsbuildinfo
+
+# Local secrets and generated lab material (T-112 / T-113)
+/secrets/
+*.secret
+.env
+.env.local
+.env.*.local
+!.gitkeep
+
+# Editor and OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*~
+
+# Compose / container local state
+.compose-data/
+*.log

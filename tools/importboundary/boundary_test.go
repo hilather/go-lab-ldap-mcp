@@ -1,0 +1,162 @@
+package importboundary_test
+
+import (
+	"go/parser"
+	"go/token"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+// TestAGENTSImportBoundaries enforces T-001 / AGENTS.md package rules:
+//   - no application package imports REST (internal/api) and MCP
+//     (internal/mcpserver) transport types together
+//   - cmd/labldap is the composition root and may import both
+//   - internal/web does not import internal/app
+//   - internal/config does not import LDAP packages
+//   - transports do not import each other
+func TestAGENTSImportBoundaries(t *testing.T) {
+	t.Parallel()
+	root := repoRoot(t)
+	imports := collectImports(t, root)
+
+	for pkg, imps := range imports {
+		rel := strings.TrimPrefix(pkg, "github.com/hilather/go-lab-ldap-mcp/")
+		hasAPI := hasImportPrefix(imps, "github.com/hilather/go-lab-ldap-mcp/internal/api")
+		hasMCP := hasImportPrefix(imps, "github.com/hilather/go-lab-ldap-mcp/internal/mcpserver")
+		if hasAPI && hasMCP && rel != "cmd/labldap" {
+			t.Errorf("%s imports both internal/api and internal/mcpserver; only cmd/labldap may wire both transports", rel)
+		}
+		if strings.HasPrefix(rel, "internal/web") && hasImportPrefix(imps, "github.com/hilather/go-lab-ldap-mcp/internal/app") {
+			t.Errorf("%s must not import internal/app (embed/static helpers only)", rel)
+		}
+		if strings.HasPrefix(rel, "internal/config") {
+			for _, imp := range imps {
+				if forbiddenConfigImport(imp) {
+					t.Errorf("%s must not import LDAP or transport packages (found %s)", rel, imp)
+				}
+			}
+		}
+		if strings.HasPrefix(rel, "internal/api") && hasMCP {
+			t.Errorf("%s (REST transport) must not import internal/mcpserver", rel)
+		}
+		if strings.HasPrefix(rel, "internal/mcpserver") && hasAPI {
+			t.Errorf("%s (MCP transport) must not import internal/api", rel)
+		}
+	}
+}
+
+func repoRoot(t *testing.T) string {
+	t.Helper()
+	dir, err := filepath.Abs("../..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "go.mod")); err != nil {
+		t.Fatalf("expected go.mod at repo root %s: %v", dir, err)
+	}
+	return dir
+}
+
+func collectImports(t *testing.T, root string) map[string][]string {
+	t.Helper()
+	fset := token.NewFileSet()
+	out := map[string][]string{}
+	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			name := d.Name()
+			if name == "vendor" || name == "frontend" || name == ".git" || name == "node_modules" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(path, ".go") {
+			return nil
+		}
+		f, err := parser.ParseFile(fset, path, nil, parser.ImportsOnly)
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(root, filepath.Dir(path))
+		if err != nil {
+			return err
+		}
+		pkg := "github.com/hilather/go-lab-ldap-mcp"
+		if rel != "." {
+			pkg += "/" + filepath.ToSlash(rel)
+		}
+		seen := map[string]struct{}{}
+		for _, existing := range out[pkg] {
+			seen[existing] = struct{}{}
+		}
+		for _, spec := range f.Imports {
+			imp := strings.Trim(spec.Path.Value, `"`)
+			if _, ok := seen[imp]; ok {
+				continue
+			}
+			seen[imp] = struct{}{}
+			out[pkg] = append(out[pkg], imp)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return out
+}
+
+func hasImportPrefix(imps []string, prefix string) bool {
+	for _, imp := range imps {
+		if imp == prefix || strings.HasPrefix(imp, prefix+"/") {
+			return true
+		}
+	}
+	return false
+}
+
+func TestForbiddenConfigImport(t *testing.T) {
+	t.Parallel()
+	allow := []string{
+		"github.com/hilather/go-lab-ldap-mcp/internal/config/v1alpha1",
+		"github.com/hilather/go-lab-ldap-mcp/internal/app",
+		"github.com/hilather/go-lab-ldap-mcp/internal/observability",
+	}
+	deny := []string{
+		"github.com/hilather/go-lab-ldap-mcp/internal/directory",
+		"github.com/hilather/go-lab-ldap-mcp/internal/directory/ds389",
+		"github.com/hilather/go-lab-ldap-mcp/internal/api",
+		"github.com/go-ldap/ldap/v3",
+		"gopkg.in/ldap.v3",
+	}
+	for _, imp := range allow {
+		if forbiddenConfigImport(imp) {
+			t.Errorf("allowed import treated as forbidden: %s", imp)
+		}
+	}
+	for _, imp := range deny {
+		if !forbiddenConfigImport(imp) {
+			t.Errorf("forbidden import treated as allowed: %s", imp)
+		}
+	}
+}
+
+func forbiddenConfigImport(imp string) bool {
+	prefixes := []string{
+		"github.com/hilather/go-lab-ldap-mcp/internal/directory",
+		"github.com/hilather/go-lab-ldap-mcp/internal/api",
+		"github.com/hilather/go-lab-ldap-mcp/internal/mcpserver",
+		"github.com/go-ldap/ldap",
+		"gopkg.in/ldap.v3",
+	}
+	for _, prefix := range prefixes {
+		if imp == prefix || strings.HasPrefix(imp, prefix+"/") {
+			return true
+		}
+	}
+	return false
+}
