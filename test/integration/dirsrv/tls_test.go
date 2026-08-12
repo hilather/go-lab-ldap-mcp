@@ -6,10 +6,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"net"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 )
@@ -21,16 +17,16 @@ func TestLDAPSTrustAndName(t *testing.T) {
 	}
 
 	inst := Start(t)
-	caPEM := extractInstanceCA(t, inst)
+	inst.ImportTLS(t, mat)
+
 	pool := x509.NewCertPool()
-	if !pool.AppendCertsFromPEM(caPEM) {
-		t.Fatal("instance CA")
+	if !pool.AppendCertsFromPEM(mat.CACertPEM) {
+		t.Fatal("generated CA")
 	}
-	host := instanceHostname(t, inst)
 	d := &net.Dialer{Timeout: 8 * time.Second}
 	cfg := &tls.Config{
 		RootCAs:    pool,
-		ServerName: host,
+		ServerName: "localhost",
 		MinVersion: tls.VersionTLS12,
 	}
 	var conn *tls.Conn
@@ -44,10 +40,17 @@ func TestLDAPSTrustAndName(t *testing.T) {
 		time.Sleep(500 * time.Millisecond)
 	}
 	if err != nil {
-		t.Fatalf("expected LDAPS success with instance CA and name %q: %v", host, err)
+		t.Fatalf("expected LDAPS success with generated CA and name localhost: %v", err)
 	}
-	if conn.ConnectionState().PeerCertificates == nil {
+	peers := conn.ConnectionState().PeerCertificates
+	if len(peers) == 0 {
 		t.Fatal("no peer certificates")
+	}
+	if err := peers[0].VerifyHostname("localhost"); err != nil {
+		t.Fatalf("peer SAN missing localhost: %v", err)
+	}
+	if peers[0].Issuer.CommonName != "labldap-test-ca" {
+		t.Fatalf("peer issuer = %q, want generated test CA", peers[0].Issuer.CommonName)
 	}
 	_ = conn.Close()
 
@@ -57,7 +60,7 @@ func TestLDAPSTrustAndName(t *testing.T) {
 	}
 	_, err = tls.DialWithDialer(d, "tcp", inst.LDAPSAddr, &tls.Config{
 		RootCAs:    wrong,
-		ServerName: host,
+		ServerName: "localhost",
 		MinVersion: tls.VersionTLS12,
 	})
 	if err == nil {
@@ -72,27 +75,4 @@ func TestLDAPSTrustAndName(t *testing.T) {
 	if err == nil {
 		t.Fatal("wrong name must fail closed")
 	}
-}
-
-func extractInstanceCA(t *testing.T, inst *Instance) []byte {
-	t.Helper()
-	dest := filepath.Join(t.TempDir(), "ca.crt")
-	out, err := exec.Command("docker", "cp", inst.Name+":/etc/dirsrv/slapd-localhost/ca.crt", dest).CombinedOutput()
-	if err != nil {
-		t.Fatalf("docker cp ca.crt: %v\n%s", err, redactLogs(string(out), inst.password))
-	}
-	b, err := os.ReadFile(dest)
-	if err != nil || len(b) == 0 {
-		t.Fatalf("empty instance CA: %v", err)
-	}
-	return b
-}
-
-func instanceHostname(t *testing.T, inst *Instance) string {
-	t.Helper()
-	out, err := exec.Command("docker", "inspect", "-f", "{{.Config.Hostname}}", inst.Name).Output()
-	if err != nil {
-		t.Fatal(err)
-	}
-	return strings.TrimSpace(string(out))
 }

@@ -10,6 +10,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -62,6 +63,7 @@ func Start(t *testing.T) *Instance {
 		"-e", "DS_DM_PASSWORD=" + pw,
 		"-p", "127.0.0.1::3389",
 		"-p", "127.0.0.1::3636",
+		"-v", "/data",
 		ref,
 	}
 	out, err := exec.Command("docker", args...).CombinedOutput()
@@ -87,21 +89,79 @@ func Start(t *testing.T) *Instance {
 	return inst
 }
 
+// ImportTLS loads generated CA + server key/cert into the running instance
+// NSS DB via dsctl (not first-boot PEM bind-mounts) and restarts so LDAPS
+// presents that Server-Cert. Host ports are refreshed after restart.
+func (i *Instance) ImportTLS(t *testing.T, mat *TLSMaterial) {
+	t.Helper()
+	copies := [][2]string{
+		{filepath.Join(mat.Dir, "ca", "ca.crt"), i.Name + ":/tmp/labldap-ca.crt"},
+		{filepath.Join(mat.Dir, "server.crt"), i.Name + ":/tmp/labldap-server.crt"},
+		{filepath.Join(mat.Dir, "server.key"), i.Name + ":/tmp/labldap-server.key"},
+	}
+	for _, c := range copies {
+		if out, err := exec.Command("docker", "cp", c[0], c[1]).CombinedOutput(); err != nil {
+			t.Fatalf("docker cp %s: %v\n%s", c[0], err, redactLogs(string(out), i.password))
+		}
+	}
+	cmds := [][]string{
+		{"dsctl", "localhost", "tls", "import-ca", "/tmp/labldap-ca.crt", "LabLDAP-Test-CA"},
+		{"dsctl", "localhost", "tls", "import-server-key-cert", "/tmp/labldap-server.crt", "/tmp/labldap-server.key"},
+	}
+	for _, args := range cmds {
+		out, err := exec.Command("docker", append([]string{"exec", i.Name}, args...)...).CombinedOutput()
+		if err != nil {
+			t.Fatalf("%s: %v\n%s", strings.Join(args, " "), err, redactLogs(string(out), i.password))
+		}
+	}
+	if out, err := exec.Command("docker", "restart", i.Name).CombinedOutput(); err != nil {
+		t.Fatalf("docker restart: %v\n%s", err, redactLogs(string(out), i.password))
+	}
+	ldapPort, err := hostPort(i.Name, "3389/tcp")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ldapsPort, err := hostPort(i.Name, "3636/tcp")
+	if err != nil {
+		t.Fatal(err)
+	}
+	i.LDAPAddr = net.JoinHostPort("127.0.0.1", ldapPort)
+	i.LDAPSAddr = net.JoinHostPort("127.0.0.1", ldapsPort)
+	waitReady(t, i)
+}
+
 func waitReady(t *testing.T, inst *Instance) {
 	t.Helper()
-	// container.inf is written before ns-slapd is up. The LDAPI socket is
-	// the contract readiness signal; TCP on 3389/3636 follows.
+	// container.inf is written at the end of first-boot, after setup's
+	// temporary slapd is already answering dsconf. Restarting before the
+	// marker exists makes dscontainer try to create a second instance.
 	deadline := time.Now().Add(90 * time.Second)
 	for time.Now().Before(deadline) {
-		if err := exec.Command("docker", "exec", inst.Name, "test", "-S", "/data/run/slapd-localhost.socket").Run(); err == nil {
-			waitTCP(t, inst.LDAPAddr, inst)
-			waitTCP(t, inst.LDAPSAddr, inst)
+		if err := exec.Command("docker", "exec", inst.Name, "test", "-f", "/data/config/container.inf").Run(); err == nil {
+			if err := exec.Command("docker", "exec", inst.Name, "test", "-S", "/data/run/slapd-localhost.socket").Run(); err == nil {
+				waitTCP(t, inst.LDAPAddr, inst)
+				waitTCP(t, inst.LDAPSAddr, inst)
+				waitDSConf(t, inst)
+				return
+			}
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+	logs, _ := exec.Command("docker", "logs", inst.Name).CombinedOutput()
+	t.Fatalf("instance marker or LDAPI socket missing\n%s", redactLogs(string(logs), inst.password))
+}
+
+func waitDSConf(t *testing.T, inst *Instance) {
+	t.Helper()
+	deadline := time.Now().Add(90 * time.Second)
+	for time.Now().Before(deadline) {
+		if err := exec.Command("docker", "exec", inst.Name, "dsconf", "localhost", "backend", "suffix", "list").Run(); err == nil {
 			return
 		}
 		time.Sleep(500 * time.Millisecond)
 	}
 	logs, _ := exec.Command("docker", "logs", inst.Name).CombinedOutput()
-	t.Fatalf("LDAPI socket /data/run/slapd-localhost.socket missing\n%s", redactLogs(string(logs), inst.password))
+	t.Fatalf("dsconf not ready\n%s", redactLogs(string(logs), inst.password))
 }
 
 func waitTCP(t *testing.T, addr string, inst *Instance) {
@@ -195,6 +255,6 @@ func (i *Instance) Stop(t testing.TB) {
 	if t.Failed() {
 		t.Logf("directory logs (redacted):\n%s", redactLogs(string(logs), i.password))
 	}
-	_ = exec.Command("docker", "rm", "-f", i.Name).Run()
+	_ = exec.Command("docker", "rm", "-fv", i.Name).Run()
 	i.Name = ""
 }

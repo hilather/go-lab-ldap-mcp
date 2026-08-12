@@ -33,22 +33,19 @@ The immutable digest is also in `deploy/docker/dirsrv.digest`. Harness code must
 
 The image **does not** implement `DS_DM_PASSWORD_FILE`. Directory Manager password is accepted only via **`DS_DM_PASSWORD`**. A thin file-to-env wrapper is deferred to T-027 if still required. Tests must not log the password and must redact it from captured `docker logs`.
 
-## TLS PEM import (observed)
+## TLS import (observed)
 
-If all of the following exist at start, `dscontainer` loads them into the NSS DB.
+**Do not** bind-mount PEMs or `pwdfile.txt` on first boot: NSS `reinit()` fails with `Device or resource busy`, and a later copy+restart leaves LDAPS looking for a missing `Server-Cert`.
 
-**Observed:**
-- Bind-mounting `/data/config/pwdfile.txt` on an empty `/data` makes first-time NSS `reinit()` fail (`Device or resource busy`).
-- Copying PEMs after the marker exists and restarting still leaves LDAPS disabled (`Can't find certificate (Server-Cert)`). Integration LDAPS tests therefore trust the **instance self-signed CA** extracted from `/etc/dirsrv/slapd-localhost/ca.crt`. The generated SAN helper remains for fixtures (wrong-CA) and a unit test.
+After first-boot writes `/data/config/container.inf`, import works. `/data` must be a Docker volume so restart does not look like an empty tree.
 
-If all of the following exist at start (after the instance marker exists), `dscontainer` loads them into the NSS DB:
+```text
+dsctl localhost tls import-ca /path/ca.crt LabLDAP-Test-CA
+dsctl localhost tls import-server-key-cert /path/server.crt /path/server.key
+docker restart   # ns-slapd must reload NSS; then re-read published ports
+```
 
-| Path | Role |
-| --- | --- |
-| `/data/tls/server.key` | server private key |
-| `/data/tls/server.crt` | server certificate |
-| `/data/tls/ca/*.crt` | CA certs |
-| `/data/config/pwdfile.txt` | NSS PIN file |
+`dsctl tls` is the supported wrapper around `certutil` / `pk12util`. Integration LDAPS tests use this path and trust the **generated test CA**, not the instance self-signed CA.
 
 ## Divergence from generic “LDAP on 389/636” docs
 
