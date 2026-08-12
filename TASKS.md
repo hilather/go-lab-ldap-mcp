@@ -154,38 +154,38 @@ Acceptance:
 - [x] Multiple independent parse or conversion errors are reported where possible.
 - [x] No secret value appears in parse diagnostics.
 
-## [ ] T-012 Validate transport, authentication, lifecycle, limits, and management settings
+## [x] T-012 Validate transport, authentication, lifecycle, limits, and management settings
 
 Priority: P0 | Size: L | Depends on: T-011
 
 Deliverables: defaulting and semantic validation for non-directory-object configuration.
 
 Acceptance:
-- [ ] Secure transport is required unless explicit insecure lab mode is enabled.
-- [ ] Duration, port, address, page, body, concurrency, and rate limits are bounded.
-- [ ] Startup and storage modes produce coherent warnings or errors.
+- [x] Secure transport is required unless explicit insecure lab mode is enabled.
+- [x] Duration, port, address, page, body, concurrency, and rate limits are bounded.
+- [x] Startup and storage modes produce coherent warnings or errors.
 
-## [ ] T-013 Implement DN, RDN, attribute-name, and value normalization
+## [x] T-013 Implement DN, RDN, attribute-name, and value normalization
 
 Priority: P0 | Size: L | Depends on: T-011
 
 Deliverables: canonical DN wrapper, safe RDN builder, descendant checks, attribute-name normalization, value-size rules, and operational-attribute deny list.
 
 Acceptance:
-- [ ] Generated DNs safely escape arbitrary valid IDs.
-- [ ] Descendant checks are structural rather than string suffix checks.
-- [ ] Unicode, escaped comma, plus, equals, leading space, and NUL cases are tested.
+- [x] Generated DNs safely escape arbitrary valid IDs.
+- [x] Descendant checks are structural rather than string suffix checks.
+- [x] Unicode, escaped comma, plus, equals, leading space, and NUL cases are tested.
 
-## [ ] T-014 Implement file secret resolver and sensitive-value handling
+## [x] T-014 Implement file secret resolver and sensitive-value handling
 
 Priority: P0 | Size: M | Depends on: T-006, T-011
 
 Deliverables: file resolver, trailing-newline rule, digest, redacted representation, duplicate and empty detection helpers.
 
 Acceptance:
-- [ ] Errors show logical owner and path but not content.
-- [ ] Secret digests are stable.
-- [ ] Logging or formatting a secret yields only redacted output.
+- [x] Errors show logical owner and path but not content.
+- [x] Secret digests are stable.
+- [x] Logging or formatting a secret yields only redacted output.
 
 ## [ ] T-015 Normalize and validate users
 

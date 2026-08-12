@@ -35,6 +35,10 @@ func Load(ctx context.Context, src []byte, origin string, opt LoadOptions) (*Par
 	if err != nil {
 		return nil, err
 	}
+	applyDefaults(pub)
+	if err := validateSettings(pub); err != nil {
+		return nil, err
+	}
 	in, err := DefaultConverter().Convert(pub)
 	if err != nil {
 		return nil, err
