@@ -121,38 +121,38 @@ Acceptance:
 
 # M1 - Configuration compiler
 
-## [ ] T-009 Define public configuration types and version registry
+## [x] T-009 Define public configuration types and version registry
 
 Priority: P0 | Size: M | Depends on: T-001, T-006
 
 Deliverables: `v1alpha1` Go types, `apiVersion` and `kind` dispatch, internal normalized-model types, and conversion interface.
 
 Acceptance:
-- [ ] Unsupported versions and kinds return stable errors.
-- [ ] Public YAML types are separate from immutable normalized types.
-- [ ] Sensitive fields use explicit secret-reference types.
+- [x] Unsupported versions and kinds return stable errors.
+- [x] Public YAML types are separate from immutable normalized types.
+- [x] Sensitive fields use explicit secret-reference types.
 
-## [ ] T-010 Create machine-readable configuration JSON Schema
+## [x] T-010 Create machine-readable configuration JSON Schema
 
 Priority: P0 | Size: M | Depends on: T-009
 
 Deliverables: JSON Schema for `v1alpha1`, validation command, and schema-generation or synchronization strategy.
 
 Acceptance:
-- [ ] Valid examples pass and invalid fixtures fail at expected paths.
-- [ ] Unknown behavior fields are rejected.
-- [ ] Schema enums match Go constants through a drift test.
+- [x] Valid examples pass and invalid fixtures fail at expected paths.
+- [x] Unknown behavior fields are rejected.
+- [x] Schema enums match Go constants through a drift test.
 
-## [ ] T-011 Implement strict YAML parsing and version conversion
+## [x] T-011 Implement strict YAML parsing and version conversion
 
 Priority: P0 | Size: M | Depends on: T-009, T-010
 
 Deliverables: strict decoder, duplicate-key detection, unknown-field rejection, source-path diagnostics, and conversion to internal input model.
 
 Acceptance:
-- [ ] Trailing YAML documents and duplicate keys fail.
-- [ ] Multiple independent parse or conversion errors are reported where possible.
-- [ ] No secret value appears in parse diagnostics.
+- [x] Trailing YAML documents and duplicate keys fail.
+- [x] Multiple independent parse or conversion errors are reported where possible.
+- [x] No secret value appears in parse diagnostics.
 
 ## [ ] T-012 Validate transport, authentication, lifecycle, limits, and management settings
 

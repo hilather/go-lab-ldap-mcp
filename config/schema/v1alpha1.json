@@ -1,0 +1,288 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://labldap.dev/schema/v1alpha1.json",
+  "title": "LabLDAP LabScenario v1alpha1 stand-in",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": { "type": "string", "enum": ["labldap.dev/v1alpha1"] },
+    "kind": { "type": "string", "enum": ["LabScenario"] },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": { "name": { "type": "string", "minLength": 1 } }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "directory": { "$ref": "#/$defs/directory" },
+        "lifecycle": { "$ref": "#/$defs/lifecycle" },
+        "transport": { "$ref": "#/$defs/transport" },
+        "management": { "$ref": "#/$defs/management" },
+        "limits": { "$ref": "#/$defs/limits" },
+        "runtimeAccount": { "$ref": "#/$defs/runtimeAccount" },
+        "users": { "type": "array", "items": { "$ref": "#/$defs/user" } },
+        "groups": { "type": "array", "items": { "$ref": "#/$defs/group" } },
+        "passwordPolicy": { "$ref": "#/$defs/passwordPolicy" },
+        "acls": { "type": "array", "items": { "$ref": "#/$defs/acl" } },
+        "tokens": { "type": "array", "items": { "$ref": "#/$defs/token" } }
+      }
+    }
+  },
+  "$defs": {
+    "directory": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "suffix": { "type": "string" },
+        "peopleRDN": { "type": "string" },
+        "groupsRDN": { "type": "string" },
+        "nestedGroups": { "type": "boolean" },
+        "allowRawACI": { "type": "boolean" }
+      }
+    },
+    "lifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "storageMode": { "type": "string", "enum": ["ephemeral", "persistent"] },
+        "startupMode": { "type": "string", "enum": ["validate", "merge", "reset"] },
+        "softReset": { "type": "boolean" }
+      }
+    },
+    "transport": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "insecureLabMode": { "type": "boolean" },
+        "ldap": { "$ref": "#/$defs/portSpec" },
+        "ldaps": { "$ref": "#/$defs/portSpec" },
+        "startTLS": { "type": "boolean" },
+        "allowCleartextBind": { "type": "boolean" },
+        "allowAnonymousBind": { "type": "boolean" }
+      }
+    },
+    "portSpec": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535 }
+      }
+    },
+    "management": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "listen": { "type": "string" },
+        "tls": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "mode": { "type": "string", "enum": ["generated", "files", "disabled"] },
+            "certFile": { "type": "string" },
+            "keyFile": { "type": "string" }
+          }
+        },
+        "cors": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": { "allowedOrigins": { "type": "array", "items": { "type": "string" } } }
+        },
+        "session": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "idleTimeout": { "type": "string" },
+            "absoluteTimeout": { "type": "string" },
+            "maxSessions": { "type": "integer" }
+          }
+        },
+        "mcp": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "registerMutations": { "type": "boolean" },
+            "registerPassword": { "type": "boolean" },
+            "registerReset": { "type": "boolean" },
+            "registerExport": { "type": "boolean" }
+          }
+        },
+        "metrics": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "requireAuth": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "requestTimeout": { "type": "string" },
+        "shutdownTimeout": { "type": "string" },
+        "maxRequestBodyBytes": { "type": "integer" },
+        "pageSizeDefault": { "type": "integer" },
+        "pageSizeMax": { "type": "integer" },
+        "searchTimeLimit": { "type": "string" },
+        "searchSizeLimit": { "type": "integer" },
+        "maxFilterDepth": { "type": "integer" },
+        "maxFilterLength": { "type": "integer" },
+        "exportMaxEntries": { "type": "integer" },
+        "exportMaxBytes": { "type": "integer" },
+        "ldapPoolSize": { "type": "integer" },
+        "ldapMaxIdle": { "type": "string" },
+        "ldapMaxLifetime": { "type": "string" },
+        "ldapDialTimeout": { "type": "string" },
+        "concurrentMutations": { "type": "integer" },
+        "rateLimit": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "requestsPerMinute": { "type": "integer" },
+            "passwordPerMinute": { "type": "integer" },
+            "bindTestPerMinute": { "type": "integer" },
+            "resetPerHour": { "type": "integer" }
+          }
+        }
+      }
+    },
+    "runtimeAccount": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "passwordFile": { "type": "string" }
+      }
+    },
+    "user": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": { "type": "string" },
+        "uid": { "type": "string" },
+        "rdn": { "type": "string" },
+        "dn": { "type": "string" },
+        "passwordFile": { "type": "string" },
+        "enabled": { "type": "boolean" },
+        "attributes": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
+      }
+    },
+    "group": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": { "type": "string" },
+        "members": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "user": { "type": "string" },
+              "group": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "passwordPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "minLength": { "type": "integer" },
+        "historyCount": { "type": "integer" },
+        "maxAge": { "type": "string" },
+        "warningAge": { "type": "string" },
+        "lockout": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "maxFailures": { "type": "integer" },
+            "lockoutDuration": { "type": "string" }
+          }
+        },
+        "storageScheme": {
+          "type": "string",
+          "enum": ["PBKDF2-SHA256", "PBKDF2_SHA256", "SSHA512"]
+        }
+      }
+    },
+    "acl": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "principal": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "type": "string", "enum": ["user", "group", "token"] },
+            "ref": { "type": "string" }
+          }
+        },
+        "target": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "type": "string", "enum": ["suffix", "people", "groups", "entry", "attribute"] },
+            "dn": { "type": "string" }
+          }
+        },
+        "permissions": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["read", "search", "compare", "add", "delete", "write"] }
+        },
+        "attributes": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "allow": { "type": "array", "items": { "type": "string" } },
+            "deny": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "rawACI": { "type": "string" }
+      }
+    },
+    "token": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "secretFile": { "type": "string" },
+        "scopes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "directory:read",
+              "directory:write",
+              "directory:password",
+              "lab:reset",
+              "lab:export",
+              "schema:read",
+              "audit:read"
+            ]
+          }
+        }
+      }
+    },
+    "searchScope": {
+      "type": "string",
+      "enum": ["base", "one", "sub", "children"]
+    }
+  }
+}
