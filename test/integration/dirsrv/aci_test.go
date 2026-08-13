@@ -4,6 +4,7 @@ package dirsrv
 
 import (
 	"errors"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -49,16 +50,45 @@ func TestShippedApplyACIReadback(t *testing.T) {
 	}
 }
 
+// invalidNamedACI is parseable enough to pass requireOwnedName but uses an
+// unknown permission so 389 returns LDAP 21 (ACL Syntax Error).
+const invalidNamedACI = `(target="ldap:///dc=example,dc=test")(targetattr="*")(version 3.0; acl "labldap:probe-reject"; allow (explode) userdn="ldap:///anyone";)`
+
 func TestShippedACIServerReject(t *testing.T) {
 	inst := Start(t)
-	_, guest := stageApply(t, inst, "dc=example,dc=test")
-	if out, err := execApply(t, inst, guest, nil); err != nil {
-		t.Fatalf("apply: %v\n%s", err, out)
+	hostDir, guest := stageApply(t, inst, "dc=example,dc=test")
+	bad := `apiVersion: labldap.dev/v1alpha1
+kind: LabScenario
+metadata: { name: reject }
+spec:
+  directory: { suffix: "dc=example,dc=test", allowRawACI: true }
+  transport: { ldaps: { enabled: true, port: 3636 } }
+  runtimeAccount: { id: rt, passwordFile: secrets/runtime-ldap }
+  acls:
+    - id: probe-reject
+      rawACI: '` + invalidNamedACI + `'
+`
+	hostBad := filepath.Join(hostDir, "bad.yaml")
+	if err := os.WriteFile(hostBad, []byte(bad), 0o600); err != nil {
+		t.Fatal(err)
 	}
+	if out, err := exec.Command("docker", "cp", hostBad, inst.Name+":/tmp/labldap-apply/bad.yaml").CombinedOutput(); err != nil {
+		t.Fatalf("cp bad.yaml: %v\n%s", err, out)
+	}
+	guest.Config = "/tmp/labldap-apply/bad.yaml"
+	out, err := execApply(t, inst, guest, nil)
+	t.Logf("shipped apply reject:\n%s", out)
+	if err == nil {
+		t.Fatalf("expected server_reject:\n%s", out)
+	}
+	if !strings.Contains(out, "phase.aci") || !strings.Contains(out, "server_reject") || !strings.Contains(out, "labldap:probe-reject") {
+		t.Fatalf("want phase.aci server_reject labldap:probe-reject:\n%s", out)
+	}
+
 	dir := t.TempDir()
 	ca := filepath.Join(dir, "ca.crt")
 	inst.WriteCA(t, ca)
-	_, err := ds389.Engine{}.ReconcileACIs(t.Context(), bootstrap.ACIRequest{
+	_, rerr := ds389.Engine{}.ReconcileACIs(t.Context(), bootstrap.ACIRequest{
 		TreeRequest: bootstrap.TreeRequest{
 			DMPassword: inst.Password(),
 			LDAPURL:    "ldaps://" + inst.LDAPSAddr,
@@ -69,15 +99,15 @@ func TestShippedACIServerReject(t *testing.T) {
 		ACIs: []config.NamedACI{{
 			ID:     "labldap:probe-reject",
 			Target: "dc=example,dc=test",
-			Text:   "(this is not a valid aci",
+			Text:   invalidNamedACI,
 		}},
 	})
-	if err == nil {
-		t.Fatal("expected server_reject")
+	if rerr == nil {
+		t.Fatal("expected ReconcileACIs server_reject")
 	}
-	apperr.Assert(t, err).Code(apperr.CodeBootstrap).FieldPath("phase.aci")
-	if !aciField(err, "server_reject") || !strings.Contains(err.Error(), "labldap:probe-reject") {
-		t.Fatalf("want server_reject with ACL id: %v", err)
+	apperr.Assert(t, rerr).Code(apperr.CodeBootstrap).FieldPath("phase.aci")
+	if !aciField(rerr, "server_reject") || !strings.Contains(rerr.Error(), "labldap:probe-reject") {
+		t.Fatalf("want server_reject with ACL id: %v", rerr)
 	}
 }
 
