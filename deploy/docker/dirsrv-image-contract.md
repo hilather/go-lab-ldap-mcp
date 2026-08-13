@@ -71,6 +71,10 @@ Default first-boot: MemberOf and referential integrity are **off**. `dsctl` has 
 
 Unknown compiled plugin names are `plugin_missing`. Failed MemberOf fix-up is `fixup_failed`. A second `plugin … set` with the same values exits 1 (`nothing to set`); apply treats that as success.
 
+## Base tree (observed, T-033)
+
+`dsconf backend create --create-suffix` creates the suffix root as `objectClass: top, domain` with no children. Re-adding an existing entry returns LDAP 68. People/groups containers are `organizationalUnit`. The runtime account is `inetOrgPerson` under `ou=people` (`uid=<id>,ou=people,<suffix>`). It is not placed in any group.
+
 ## Environment (subset)
 
 - `DS_DM_PASSWORD` — set Directory Manager password after first start

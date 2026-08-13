@@ -57,11 +57,12 @@ spec:
 		TLS:           stubTLS{},
 		Policy:        stubPolicy{},
 		Plugins:       stubPlugins{},
+		Tree:          stubTree{},
 	}, ioDiscard(), ioDiscard())
 	if err != nil {
 		t.Fatalf("apply wait: %v summary=%+v", err, sum)
 	}
-	if !sum.OK || len(sum.Phases) != 6 {
+	if !sum.OK || len(sum.Phases) != 7 {
 		t.Fatalf("%+v", sum)
 	}
 
@@ -77,6 +78,7 @@ spec:
 		TLS:           stubTLS{},
 		Policy:        stubPolicy{},
 		Plugins:       stubPlugins{},
+		Tree:          stubTree{},
 		Deadline:      2 * time.Second,
 	}, ioDiscard(), ioDiscard())
 	if err == nil {
@@ -100,6 +102,7 @@ spec:
 		TLS:           stubTLS{},
 		Policy:        stubPolicy{},
 		Plugins:       stubPlugins{},
+		Tree:          stubTree{},
 		Deadline:      3 * time.Second,
 	}, ioDiscard(), ioDiscard())
 	if err == nil {
@@ -133,6 +136,12 @@ type stubPlugins struct{}
 
 func (stubPlugins) ReconcilePlugins(context.Context, bootstrap.PluginRequest) (bootstrap.PluginResult, error) {
 	return bootstrap.PluginResult{Applied: []string{"memberof"}}, nil
+}
+
+type stubTree struct{}
+
+func (stubTree) ReconcileTree(context.Context, bootstrap.TreeRequest) (bootstrap.TreeResult, error) {
+	return bootstrap.TreeResult{Matched: []string{"dc=example,dc=test"}}, nil
 }
 
 func waitCode(err error) string {

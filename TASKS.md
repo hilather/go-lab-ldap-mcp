@@ -387,16 +387,16 @@ Acceptance:
 - [x] User deletion removes or repairs group references.
 - [x] Administrative disablement prevents bind without deleting the entry.
 
-## [ ] T-033 Create base tree and runtime service account
+## [x] T-033 Create base tree and runtime service account
 
 Priority: P0 | Size: M | Depends on: T-015, T-020, T-029
 
 Deliverables: suffix root and containers, runtime account entry, secure password set, and stable DN mapping.
 
 Acceptance:
-- [ ] Parent creation is idempotent.
-- [ ] Runtime account can bind over verified TLS.
-- [ ] Runtime account is not automatically placed in application groups.
+- [x] Parent creation is idempotent.
+- [x] Runtime account can bind over verified TLS.
+- [x] Runtime account is not automatically placed in application groups.
 
 ## [ ] T-034 Apply, read back, and compare generated ACIs
 

@@ -44,8 +44,8 @@ published address in --ldap-url.
 
 plan accepts --config and optional --directory-manager-password-file.
 
-This apply currently runs phases load, wait, backend, tls, pwpolicy, and plugins.
-Remaining phases (tree through marker) land in later M2 tasks.
+This apply currently runs phases load, wait, backend, tls, pwpolicy, plugins, and tree.
+Remaining phases (aci through marker) land in later M2 tasks.
 
 Structured logs go to stderr. Set LABLDAP_LOG_FORMAT=json for JSON logs.
 

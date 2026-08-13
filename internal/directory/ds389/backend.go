@@ -11,8 +11,10 @@ import (
 
 // Engine reconciles 389 DS engine settings via dsconf and LDAP probes.
 type Engine struct {
-	Runner Runner
-	Dial   DialFunc
+	Runner      Runner
+	Dial        DialFunc
+	TreeDial    TreeDialFunc
+	RuntimeBind func(ctx context.Context, req bootstrap.TreeRequest) error
 }
 
 type listedBackend struct {

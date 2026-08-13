@@ -22,6 +22,10 @@ func TestParseAndEscapeDN(t *testing.T) {
 	if rdn != `cn=foo\,bar` {
 		t.Fatalf("rdn = %q", rdn)
 	}
+	attr, value, ok := got.Leaf()
+	if !ok || attr != "uid" || value != "foo,bar" {
+		t.Fatalf("leaf = %q %q ok=%v", attr, value, ok)
+	}
 }
 
 func TestDNCases(t *testing.T) {

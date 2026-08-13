@@ -25,6 +25,7 @@ func runBootstrap(cmd string, args []string, stdout, stderr io.Writer, logger *s
 	opt.TLS = eng
 	opt.Policy = eng
 	opt.Plugins = eng
+	opt.Tree = eng
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()

@@ -78,6 +78,14 @@ func BuildRDN(attr, value string) (string, error) {
 	return strings.ToLower(attr) + "=" + EscapeAttributeValue(value), nil
 }
 
+// Leaf returns the leftmost RDN (attribute and unescaped value).
+func (d DN) Leaf() (attr, value string, ok bool) {
+	if len(d.rdns) == 0 {
+		return "", "", false
+	}
+	return d.rdns[0].attr, d.rdns[0].value, true
+}
+
 func (d DN) String() string {
 	parts := make([]string, len(d.rdns))
 	for i, r := range d.rdns {

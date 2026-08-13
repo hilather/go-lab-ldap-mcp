@@ -21,7 +21,7 @@ import (
 
 var laterPhases = []string{
 	"inspect",
-	"tree", "aci", "seed", "verify_runtime", "verify_app", "drift", "marker",
+	"aci", "seed", "verify_runtime", "verify_app", "drift", "marker",
 }
 
 // Options is the parsed bootstrap command.
@@ -39,6 +39,7 @@ type Options struct {
 	TLS            TLSReconciler
 	Policy         PolicyReconciler
 	Plugins        PluginReconciler
+	Tree           TreeReconciler
 	RequireSASL    []string
 	Log            *slog.Logger
 	Now            func() time.Time
@@ -199,6 +200,25 @@ func Run(ctx context.Context, opt Options, stdout, stderr io.Writer) (Summary, e
 		}
 		return map[string]int{"applied": len(res.Applied)}, nil
 	})
+	if err != nil {
+		sum.Phases = rep.phases
+		return sum, err
+	}
+
+	err = rep.run("tree", func() (map[string]int, error) {
+		if opt.Tree == nil {
+			return nil, phaseErr("tree", "parent_failed", "tree reconciler is not configured")
+		}
+		pw, e := readPasswordFile(opt.PasswordFile)
+		if e != nil {
+			return nil, e
+		}
+		res, e := opt.Tree.ReconcileTree(ctx, treeRequestFrom(compiled, opt, pw, write))
+		if e != nil {
+			return nil, e
+		}
+		return map[string]int{"created": len(res.Created), "matched": len(res.Matched)}, nil
+	})
 	sum.Phases = rep.phases
 	if err != nil {
 		return sum, err
@@ -297,6 +317,29 @@ func tlsRequestFrom(c *config.Compiled, opt Options, pw observability.Secret, wr
 		Password:       pw,
 		Write:          write,
 		DialTimeout:    5 * time.Second,
+	}
+}
+
+func treeRequestFrom(c *config.Compiled, opt Options, dm observability.Secret, write bool) TreeRequest {
+	tls := tlsRequestFrom(c, opt, dm, write)
+	n := c.Normalized
+	return TreeRequest{
+		Suffix:          n.Suffix.String(),
+		PeopleDN:        n.PeopleDN.String(),
+		GroupsDN:        n.GroupsDN.String(),
+		RuntimeDN:       n.Runtime.DN,
+		RuntimePassword: n.Runtime.Password.Value,
+		DMPassword:      dm,
+		LDAPURL:         tls.LDAPURL,
+		LDAPAddr:        tls.LDAPAddr,
+		LDAPSAddr:       tls.LDAPSAddr,
+		CAFile:          tls.CAFile,
+		Host:            tls.Host,
+		UseLDAPS:        tls.UseLDAPS,
+		StartTLS:        tls.StartTLS,
+		Insecure:        tls.Insecure,
+		Write:           write,
+		DialTimeout:     tls.DialTimeout,
 	}
 }
 
