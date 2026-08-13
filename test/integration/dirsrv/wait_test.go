@@ -58,11 +58,12 @@ spec:
 		Policy:        stubPolicy{},
 		Plugins:       stubPlugins{},
 		Tree:          stubTree{},
+		ACIs:          stubACIs{},
 	}, ioDiscard(), ioDiscard())
 	if err != nil {
 		t.Fatalf("apply wait: %v summary=%+v", err, sum)
 	}
-	if !sum.OK || len(sum.Phases) != 7 {
+	if !sum.OK || len(sum.Phases) != 8 {
 		t.Fatalf("%+v", sum)
 	}
 
@@ -79,6 +80,7 @@ spec:
 		Policy:        stubPolicy{},
 		Plugins:       stubPlugins{},
 		Tree:          stubTree{},
+		ACIs:          stubACIs{},
 		Deadline:      2 * time.Second,
 	}, ioDiscard(), ioDiscard())
 	if err == nil {
@@ -103,6 +105,7 @@ spec:
 		Policy:        stubPolicy{},
 		Plugins:       stubPlugins{},
 		Tree:          stubTree{},
+		ACIs:          stubACIs{},
 		Deadline:      3 * time.Second,
 	}, ioDiscard(), ioDiscard())
 	if err == nil {
@@ -142,6 +145,12 @@ type stubTree struct{}
 
 func (stubTree) ReconcileTree(context.Context, bootstrap.TreeRequest) (bootstrap.TreeResult, error) {
 	return bootstrap.TreeResult{Matched: []string{"dc=example,dc=test"}}, nil
+}
+
+type stubACIs struct{}
+
+func (stubACIs) ReconcileACIs(context.Context, bootstrap.ACIRequest) (bootstrap.ACIResult, error) {
+	return bootstrap.ACIResult{Matched: []string{"labldap:runtime-suffix-read"}}, nil
 }
 
 func waitCode(err error) string {

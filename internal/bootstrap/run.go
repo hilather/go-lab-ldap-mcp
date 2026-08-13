@@ -21,7 +21,7 @@ import (
 
 var laterPhases = []string{
 	"inspect",
-	"aci", "seed", "verify_runtime", "verify_app", "drift", "marker",
+	"seed", "verify_runtime", "verify_app", "drift", "marker",
 }
 
 // Options is the parsed bootstrap command.
@@ -40,6 +40,7 @@ type Options struct {
 	Policy         PolicyReconciler
 	Plugins        PluginReconciler
 	Tree           TreeReconciler
+	ACIs           ACIReconciler
 	RequireSASL    []string
 	Log            *slog.Logger
 	Now            func() time.Time
@@ -218,6 +219,28 @@ func Run(ctx context.Context, opt Options, stdout, stderr io.Writer) (Summary, e
 			return nil, e
 		}
 		return map[string]int{"created": len(res.Created), "matched": len(res.Matched)}, nil
+	})
+	if err != nil {
+		sum.Phases = rep.phases
+		return sum, err
+	}
+
+	err = rep.run("aci", func() (map[string]int, error) {
+		if opt.ACIs == nil {
+			return nil, phaseErr("aci", "server_reject", "ACI reconciler is not configured")
+		}
+		pw, e := readPasswordFile(opt.PasswordFile)
+		if e != nil {
+			return nil, e
+		}
+		res, e := opt.ACIs.ReconcileACIs(ctx, ACIRequest{
+			TreeRequest: treeRequestFrom(compiled, opt, pw, write),
+			ACIs:        compiled.Data.ACIs,
+		})
+		if e != nil {
+			return nil, e
+		}
+		return map[string]int{"applied": len(res.Applied), "matched": len(res.Matched)}, nil
 	})
 	sum.Phases = rep.phases
 	if err != nil {

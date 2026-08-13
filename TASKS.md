@@ -398,16 +398,16 @@ Acceptance:
 - [x] Runtime account can bind over verified TLS.
 - [x] Runtime account is not automatically placed in application groups.
 
-## [ ] T-034 Apply, read back, and compare generated ACIs
+## [x] T-034 Apply, read back, and compare generated ACIs
 
 Priority: P0 | Size: L | Depends on: T-018, T-033
 
 Deliverables: LDAP ACI writer, ownership and update rules, read-back canonical comparison, and raw-ACI gate enforcement.
 
 Acceptance:
-- [ ] Named ACIs apply deterministically.
-- [ ] Server rejection identifies ACL ID and safe diagnostic.
-- [ ] ACI changes do not grant runtime access outside managed suffix.
+- [x] Named ACIs apply deterministically.
+- [x] Server rejection identifies ACL ID and safe diagnostic.
+- [x] ACI changes do not grant runtime access outside managed suffix.
 
 ## [ ] T-035 Apply baseline users, raw entries, groups, and memberships
 

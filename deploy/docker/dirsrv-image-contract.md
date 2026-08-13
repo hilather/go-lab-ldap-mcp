@@ -75,6 +75,10 @@ Unknown compiled plugin names are `plugin_missing`. Failed MemberOf fix-up is `f
 
 `dsconf backend create --create-suffix` creates the suffix root as `objectClass: top, domain` with no children. Re-adding an existing entry returns LDAP 68. People/groups containers are `organizationalUnit`. The runtime account is `inetOrgPerson` under `ou=people` (`uid=<id>,ou=people,<suffix>`). It is not placed in any group.
 
+## ACIs (observed, T-034)
+
+`--create-suffix` installs an unmanaged `Enable anyone domain read` ACI on the suffix root. LabLDAP owns only `aci` values whose `acl "..."` name starts with `labldap:`. Adding an identical value again returns LDAP 20. A malformed ACI returns LDAP 21 (`ACL Syntax Error`). Read-back is compared after collapsing whitespace.
+
 ## Environment (subset)
 
 - `DS_DM_PASSWORD` — set Directory Manager password after first start

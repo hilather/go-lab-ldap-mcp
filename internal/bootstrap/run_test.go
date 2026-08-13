@@ -61,6 +61,22 @@ func (f *fakeTree) ReconcileTree(ctx context.Context, req TreeRequest) (TreeResu
 	return TreeResult{Created: []string{req.PeopleDN}}, nil
 }
 
+type fakeACIs struct {
+	err    error
+	called int
+	req    ACIRequest
+}
+
+func (f *fakeACIs) ReconcileACIs(ctx context.Context, req ACIRequest) (ACIResult, error) {
+	_ = ctx
+	f.called++
+	f.req = req
+	if f.err != nil {
+		return ACIResult{}, f.err
+	}
+	return ACIResult{Applied: []string{"labldap:runtime-suffix-read"}}, nil
+}
+
 type fakeTLS struct {
 	err    error
 	called int
@@ -173,6 +189,7 @@ func TestApplyLoadThenWaitOK(t *testing.T) {
 	fp := &fakePolicy{}
 	fg := &fakePlugins{}
 	fr := &fakeTree{}
+	fa := &fakeACIs{}
 	sum, err := Run(t.Context(), Options{
 		Command:      "apply",
 		ConfigPath:   cfg,
@@ -183,14 +200,15 @@ func TestApplyLoadThenWaitOK(t *testing.T) {
 		Policy:       fp,
 		Plugins:      fg,
 		Tree:         fr,
+		ACIs:         fa,
 		LDAPURL:      "ldaps://127.0.0.1:3636",
 		CAFile:       "/tmp/ca.crt",
 	}, ioDiscard(), ioDiscard())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !sum.OK || fw.called != 1 || fb.called != 1 || ft.called != 1 || fp.called != 1 || fg.called != 1 || fr.called != 1 {
-		t.Fatalf("sum=%+v wait=%d backend=%d tls=%d policy=%d plugins=%d tree=%d", sum, fw.called, fb.called, ft.called, fp.called, fg.called, fr.called)
+	if !sum.OK || fw.called != 1 || fb.called != 1 || ft.called != 1 || fp.called != 1 || fg.called != 1 || fr.called != 1 || fa.called != 1 {
+		t.Fatalf("sum=%+v wait=%d backend=%d tls=%d policy=%d plugins=%d tree=%d aci=%d", sum, fw.called, fb.called, ft.called, fp.called, fg.called, fr.called, fa.called)
 	}
 	if !fb.req.Write {
 		t.Fatal("apply merge must write backend")
@@ -204,13 +222,16 @@ func TestApplyLoadThenWaitOK(t *testing.T) {
 	if !fr.req.Write {
 		t.Fatal("apply merge must write tree")
 	}
+	if !fa.req.Write {
+		t.Fatal("apply merge must write ACIs")
+	}
 	if fw.req.Password.Reveal() != "dm-secret" {
 		t.Fatal("password not loaded from file")
 	}
 	if fw.req.LDAPURL != "ldaps://127.0.0.1:3636" {
 		t.Fatalf("url = %s", fw.req.LDAPURL)
 	}
-	if len(sum.Phases) != 7 || sum.Phases[6].Phase != "tree" || !sum.Phases[6].OK {
+	if len(sum.Phases) != 8 || sum.Phases[7].Phase != "aci" || !sum.Phases[7].OK {
 		t.Fatalf("phases = %+v", sum.Phases)
 	}
 	if len(sum.Remaining) == 0 {
@@ -223,7 +244,7 @@ func TestTlsRequestUsesCompiledLDAPSPort(t *testing.T) {
 	ft := &fakeTLS{}
 	_, err := Run(t.Context(), Options{
 		Command: "apply", ConfigPath: cfg, PasswordFile: pw,
-		Waiter: &fakeWaiter{}, Backend: &fakeBackend{}, TLS: ft, Policy: &fakePolicy{}, Plugins: &fakePlugins{}, Tree: &fakeTree{},
+		Waiter: &fakeWaiter{}, Backend: &fakeBackend{}, TLS: ft, Policy: &fakePolicy{}, Plugins: &fakePlugins{}, Tree: &fakeTree{}, ACIs: &fakeACIs{},
 	}, ioDiscard(), ioDiscard())
 	if err != nil {
 		t.Fatal(err)
@@ -243,7 +264,7 @@ func TestApplyWaitBindFailure(t *testing.T) {
 	cfg, pw := testConfigDir(t)
 	fw := &fakeWaiter{err: PhaseError("wait", "bind", "Directory Manager bind failed")}
 	sum, err := Run(t.Context(), Options{
-		Command: "apply", ConfigPath: cfg, PasswordFile: pw, Waiter: fw, Backend: &fakeBackend{}, TLS: &fakeTLS{}, Policy: &fakePolicy{}, Plugins: &fakePlugins{}, Tree: &fakeTree{},
+		Command: "apply", ConfigPath: cfg, PasswordFile: pw, Waiter: fw, Backend: &fakeBackend{}, TLS: &fakeTLS{}, Policy: &fakePolicy{}, Plugins: &fakePlugins{}, Tree: &fakeTree{}, ACIs: &fakeACIs{},
 	}, ioDiscard(), ioDiscard())
 	if err == nil {
 		t.Fatal("expected bind failure")
@@ -288,13 +309,14 @@ spec:
 	fp := &fakePolicy{}
 	fg := &fakePlugins{}
 	fr := &fakeTree{}
+	fa := &fakeACIs{}
 	_, err := Run(t.Context(), Options{
-		Command: "apply", ConfigPath: cfg, PasswordFile: pw, Waiter: &fakeWaiter{}, Backend: fb, TLS: ft, Policy: fp, Plugins: fg, Tree: fr,
+		Command: "apply", ConfigPath: cfg, PasswordFile: pw, Waiter: &fakeWaiter{}, Backend: fb, TLS: ft, Policy: fp, Plugins: fg, Tree: fr, ACIs: fa,
 	}, ioDiscard(), ioDiscard())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if fb.req.Write || ft.req.Write || fp.req.Write || fg.req.Write || fr.req.Write {
+	if fb.req.Write || ft.req.Write || fp.req.Write || fg.req.Write || fr.req.Write || fa.req.Write {
 		t.Fatal("startupMode validate must not write")
 	}
 }
@@ -306,16 +328,17 @@ func TestValidateSubcommandDoesNotWrite(t *testing.T) {
 	fp := &fakePolicy{}
 	fg := &fakePlugins{}
 	fr := &fakeTree{}
+	fa := &fakeACIs{}
 	sum, err := Run(t.Context(), Options{
-		Command: "validate", ConfigPath: cfg, PasswordFile: pw, Waiter: &fakeWaiter{}, Backend: fb, TLS: ft, Policy: fp, Plugins: fg, Tree: fr,
+		Command: "validate", ConfigPath: cfg, PasswordFile: pw, Waiter: &fakeWaiter{}, Backend: fb, TLS: ft, Policy: fp, Plugins: fg, Tree: fr, ACIs: fa,
 	}, ioDiscard(), ioDiscard())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if fb.req.Write || ft.req.Write || fp.req.Write || fg.req.Write || fr.req.Write {
+	if fb.req.Write || ft.req.Write || fp.req.Write || fg.req.Write || fr.req.Write || fa.req.Write {
 		t.Fatal("validate subcommand must not write")
 	}
-	if !sum.OK || sum.Phases[len(sum.Phases)-1].Phase != "tree" {
+	if !sum.OK || sum.Phases[len(sum.Phases)-1].Phase != "aci" {
 		t.Fatalf("%+v", sum)
 	}
 }
@@ -331,7 +354,7 @@ func TestApplyInvalidConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 	sum, err := Run(t.Context(), Options{
-		Command: "apply", ConfigPath: path, PasswordFile: pw, Waiter: &fakeWaiter{}, Backend: &fakeBackend{}, TLS: &fakeTLS{}, Policy: &fakePolicy{}, Plugins: &fakePlugins{}, Tree: &fakeTree{},
+		Command: "apply", ConfigPath: path, PasswordFile: pw, Waiter: &fakeWaiter{}, Backend: &fakeBackend{}, TLS: &fakeTLS{}, Policy: &fakePolicy{}, Plugins: &fakePlugins{}, Tree: &fakeTree{}, ACIs: &fakeACIs{},
 	}, ioDiscard(), ioDiscard())
 	if err == nil {
 		t.Fatal("expected load failure")
