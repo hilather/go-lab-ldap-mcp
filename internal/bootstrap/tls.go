@@ -14,6 +14,7 @@ type TLSRequest struct {
 	Instance       string
 	LDAPURL        string
 	LDAPAddr       string
+	LDAPSAddr      string
 	CAFile         string
 	Host           string
 	UseLDAPS       bool

@@ -232,11 +232,16 @@ func tlsRequestFrom(c *config.Compiled, opt Options, pw observability.Secret, wr
 	if ldapPort == 0 {
 		ldapPort = 3389
 	}
+	ldapsPort := pub.Spec.Transport.LDAPS.Port
+	if ldapsPort == 0 {
+		ldapsPort = 3636
+	}
 	return TLSRequest{
 		PasswordFile:   opt.PasswordFile,
 		Instance:       opt.DSConfInstance,
 		LDAPURL:        opt.LDAPURL,
 		LDAPAddr:       net.JoinHostPort(dialHost, fmt.Sprintf("%d", ldapPort)),
+		LDAPSAddr:      net.JoinHostPort(dialHost, fmt.Sprintf("%d", ldapsPort)),
 		CAFile:         opt.CAFile,
 		Host:           opt.DirectoryHost,
 		UseLDAPS:       pub.Spec.Transport.LDAPS.Enabled,

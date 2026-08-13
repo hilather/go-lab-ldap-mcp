@@ -3,7 +3,6 @@ package ds389
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net"
 	"strings"
 	"time"
@@ -145,7 +144,10 @@ func ldapsDialAddr(req bootstrap.TLSRequest) string {
 	if req.LDAPURL != "" {
 		return req.LDAPURL
 	}
-	return fmt.Sprintf("ldaps://%s", req.LDAPAddr)
+	if req.LDAPSAddr != "" {
+		return withScheme(req.LDAPSAddr, "ldaps")
+	}
+	return "ldaps://127.0.0.1:3636"
 }
 
 func ldapDialAddr(req bootstrap.TLSRequest) string {

@@ -155,6 +155,27 @@ func TestApplyLoadThenWaitOK(t *testing.T) {
 	}
 }
 
+func TestTlsRequestUsesCompiledLDAPSPort(t *testing.T) {
+	cfg, pw := testConfigDir(t)
+	ft := &fakeTLS{}
+	_, err := Run(t.Context(), Options{
+		Command: "apply", ConfigPath: cfg, PasswordFile: pw,
+		Waiter: &fakeWaiter{}, Backend: &fakeBackend{}, TLS: ft,
+	}, ioDiscard(), ioDiscard())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ft.req.LDAPURL != "" {
+		t.Fatalf("expected empty LDAPURL, got %q", ft.req.LDAPURL)
+	}
+	if !strings.HasSuffix(ft.req.LDAPAddr, ":3389") {
+		t.Fatalf("LDAPAddr = %q, want :3389", ft.req.LDAPAddr)
+	}
+	if !strings.HasSuffix(ft.req.LDAPSAddr, ":3636") {
+		t.Fatalf("LDAPSAddr = %q, want compiled LDAPS :3636, not LDAP port", ft.req.LDAPSAddr)
+	}
+}
+
 func TestApplyWaitBindFailure(t *testing.T) {
 	cfg, pw := testConfigDir(t)
 	fw := &fakeWaiter{err: PhaseError("wait", "bind", "Directory Manager bind failed")}

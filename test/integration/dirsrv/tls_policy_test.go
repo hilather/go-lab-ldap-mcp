@@ -40,6 +40,29 @@ func TestShippedApplyTLSAndCleartextReject(t *testing.T) {
 	}
 }
 
+func TestShippedApplyTLSWithoutLDAPURL(t *testing.T) {
+	inst := Start(t)
+	_, guest := stageApply(t, inst, "dc=example,dc=test")
+	args := []string{
+		"exec", inst.Name, guest.Bin, "apply",
+		"--config", guest.Config,
+		"--directory-manager-password-file", guest.PW,
+		"--directory-ca-file", guest.CA,
+		"--directory-host", inst.Hostname(t),
+		"--dsconf-instance", "localhost",
+	}
+	out, err := exec.Command("docker", args...).CombinedOutput()
+	if err != nil {
+		t.Fatalf("apply without --ldap-url: %v\n%s", err, out)
+	}
+	if !strings.Contains(string(out), `"phase": "tls"`) && !strings.Contains(string(out), `"phase":"tls"`) {
+		t.Fatalf("missing phase.tls:\n%s", out)
+	}
+	if !strings.Contains(string(out), `"ok": true`) {
+		t.Fatalf("apply not ok:\n%s", out)
+	}
+}
+
 func TestShippedValidateDetectsCleartext(t *testing.T) {
 	inst := Start(t)
 	_, guest := stageApply(t, inst, "dc=example,dc=test")

@@ -13,6 +13,7 @@ import (
 
 type tlsScript struct {
 	calls    []string
+	addrs    []string
 	sasl     string
 	dialErrs map[string]error
 }
@@ -29,7 +30,8 @@ func (s *tlsScript) exec(_ context.Context, _ string, args []string) ([]byte, []
 	return []byte(`{"ok":true}`), nil, nil
 }
 
-func (s *tlsScript) dial(_ context.Context, mode, _ string, _ bootstrap.TLSRequest) error {
+func (s *tlsScript) dial(_ context.Context, mode, addr string, _ bootstrap.TLSRequest) error {
+	s.addrs = append(s.addrs, mode+"="+addr)
 	if s.dialErrs == nil {
 		return nil
 	}
@@ -45,6 +47,25 @@ func baseTLSReq() bootstrap.TLSRequest {
 		UseLDAPS:     true,
 		Password:     observability.Secret("x"),
 		Write:        true,
+	}
+}
+
+func TestReconcileTLSDialsCompiledLDAPSPort(t *testing.T) {
+	sc := &tlsScript{dialErrs: map[string]error{"ldap": errors.New("confidentiality required")}}
+	eng := Engine{Runner: Runner{Exec: sc.exec}, Dial: sc.dial}
+	req := baseTLSReq()
+	req.LDAPURL = ""
+	req.LDAPAddr = "127.0.0.1:3389"
+	req.LDAPSAddr = "127.0.0.1:3636"
+	if _, err := eng.ReconcileTLS(t.Context(), req); err != nil {
+		t.Fatal(err)
+	}
+	joined := strings.Join(sc.addrs, " ")
+	if !strings.Contains(joined, "ldaps=ldaps://127.0.0.1:3636") {
+		t.Fatalf("LDAPS probe used wrong addr: %v", sc.addrs)
+	}
+	if strings.Contains(joined, "ldaps=ldaps://127.0.0.1:3389") {
+		t.Fatal("LDAPS probe incorrectly used LDAP port 3389")
 	}
 }
 
