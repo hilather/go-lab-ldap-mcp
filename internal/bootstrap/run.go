@@ -20,7 +20,7 @@ import (
 )
 
 var laterPhases = []string{
-	"inspect", "plugins",
+	"inspect",
 	"tree", "aci", "seed", "verify_runtime", "verify_app", "drift", "marker",
 }
 
@@ -38,6 +38,7 @@ type Options struct {
 	Backend        BackendReconciler
 	TLS            TLSReconciler
 	Policy         PolicyReconciler
+	Plugins        PluginReconciler
 	RequireSASL    []string
 	Log            *slog.Logger
 	Now            func() time.Time
@@ -170,6 +171,27 @@ func Run(ctx context.Context, opt Options, stdout, stderr io.Writer) (Summary, e
 			PasswordFile: opt.PasswordFile,
 			Instance:     opt.DSConfInstance,
 			Policy:       compiled.Normalized.Policy,
+			Write:        write,
+		})
+		if e != nil {
+			return nil, e
+		}
+		return map[string]int{"applied": len(res.Applied)}, nil
+	})
+	if err != nil {
+		sum.Phases = rep.phases
+		return sum, err
+	}
+
+	err = rep.run("plugins", func() (map[string]int, error) {
+		if opt.Plugins == nil {
+			return nil, phaseErr("plugins", "plugin_missing", "plugin reconciler is not configured")
+		}
+		res, e := opt.Plugins.ReconcilePlugins(ctx, PluginRequest{
+			PasswordFile: opt.PasswordFile,
+			Instance:     opt.DSConfInstance,
+			Suffix:       compiled.Engine.Suffix,
+			Plugins:      compiled.Engine.Plugins,
 			Write:        write,
 		})
 		if e != nil {

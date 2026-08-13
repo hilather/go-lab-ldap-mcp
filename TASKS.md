@@ -376,16 +376,16 @@ Acceptance:
 - [x] Minimum length, history, maximum age configuration, and lockout behavior have real-engine tests.
 - [x] Passwords are never passed on command lines or logged.
 
-## [ ] T-032 Configure MemberOf, referential integrity, and account disablement
+## [x] T-032 Configure MemberOf, referential integrity, and account disablement
 
 Priority: P0 | Size: L | Depends on: T-029
 
 Deliverables: plugin inspection, enablement, scope configuration, fix-up invocation, referential behavior, and adapter-selected account disable mechanism.
 
 Acceptance:
-- [ ] Membership changes update `memberOf` as documented.
-- [ ] User deletion removes or repairs group references.
-- [ ] Administrative disablement prevents bind without deleting the entry.
+- [x] Membership changes update `memberOf` as documented.
+- [x] User deletion removes or repairs group references.
+- [x] Administrative disablement prevents bind without deleting the entry.
 
 ## [ ] T-033 Create base tree and runtime service account
 

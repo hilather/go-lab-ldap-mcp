@@ -56,11 +56,12 @@ spec:
 		Backend:       stubBackend{},
 		TLS:           stubTLS{},
 		Policy:        stubPolicy{},
+		Plugins:       stubPlugins{},
 	}, ioDiscard(), ioDiscard())
 	if err != nil {
 		t.Fatalf("apply wait: %v summary=%+v", err, sum)
 	}
-	if !sum.OK || len(sum.Phases) != 5 {
+	if !sum.OK || len(sum.Phases) != 6 {
 		t.Fatalf("%+v", sum)
 	}
 
@@ -75,6 +76,7 @@ spec:
 		Backend:       stubBackend{},
 		TLS:           stubTLS{},
 		Policy:        stubPolicy{},
+		Plugins:       stubPlugins{},
 		Deadline:      2 * time.Second,
 	}, ioDiscard(), ioDiscard())
 	if err == nil {
@@ -97,6 +99,7 @@ spec:
 		Backend:       stubBackend{},
 		TLS:           stubTLS{},
 		Policy:        stubPolicy{},
+		Plugins:       stubPlugins{},
 		Deadline:      3 * time.Second,
 	}, ioDiscard(), ioDiscard())
 	if err == nil {
@@ -124,6 +127,12 @@ type stubPolicy struct{}
 
 func (stubPolicy) ReconcilePolicy(context.Context, bootstrap.PolicyRequest) (bootstrap.PolicyResult, error) {
 	return bootstrap.PolicyResult{Applied: []string{"storageScheme"}}, nil
+}
+
+type stubPlugins struct{}
+
+func (stubPlugins) ReconcilePlugins(context.Context, bootstrap.PluginRequest) (bootstrap.PluginResult, error) {
+	return bootstrap.PluginResult{Applied: []string{"memberof"}}, nil
 }
 
 func waitCode(err error) string {

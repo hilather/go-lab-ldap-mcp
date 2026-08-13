@@ -59,6 +59,18 @@ Default first-boot: `nsslapd-require-secure-binds: off`, `nsslapd-allow-anonymou
 
 `dsconf pwpolicy set/get` maps: `--pwdminlen` (2–512 only; 0/1 invalid), `--pwdhistory`/`--pwdhistorycount`, `--pwdexpire`/`--pwdmaxage` (maxage 0 invalid — disable via expire off), `--pwdwarning`, `--pwdlockout`/`--pwdmaxfailures`/`--pwdlockoutduration`, `--pwdscheme`. Canonical `PBKDF2-SHA256` is a native scheme. Compiled `minLength` outside 0 and 2–512 is `unsupported_field`. `minLength: 0` is left unset (does not clear a prior minimum). Applying `minLength` ≥ 2 turns `--pwdchecksyntax` on and sets `--pwdmincatagories 1` (range 1–5), `--pwdmintokenlen 64` (range 1–64; 0 is invalid, so 64 minimizes trivial-word matching), `--pwddictcheck off`, `--pwdpalindrome off` so the compiled minimum is the effective extra constraint.
 
+## Plugins (observed, T-032)
+
+Default first-boot: MemberOf and referential integrity are **off**. `dsctl` has no restart. Enabling them without a restart requires `dsconf config replace nsslapd-dynamic-plugins=on` **before** `plugin … enable`. `plugin memberof show -j` emits LDIF; use `plugin show "MemberOf Plugin"` / `plugin show "referential integrity postoperation"` for JSON.
+
+| Compiled name | Apply | Read-back |
+| --- | --- | --- |
+| `memberof` | enable; `set --attr memberOf --groupattr member --scope <suffix> --autoaddoc nsmemberof`; `fixup --wait <suffix>` | enabled on, `memberOf`/`member`, scope = suffix |
+| `referint` | enable; `set --update-delay 0 --membership-attr member --entry-scope/--container-scope <suffix>` | enabled on, watches `member` |
+| `account-disable` | not a dsconf plugin — `schema attributetypes query nsAccountLock` | attribute `nsAccountLock` present; bind with `nsAccountLock: true` returns LDAP 53, entry remains |
+
+Unknown compiled plugin names are `plugin_missing`. Failed MemberOf fix-up is `fixup_failed`. A second `plugin … set` with the same values exits 1 (`nothing to set`); apply treats that as success.
+
 ## Environment (subset)
 
 - `DS_DM_PASSWORD` — set Directory Manager password after first start

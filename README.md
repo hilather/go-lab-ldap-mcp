@@ -22,7 +22,7 @@ No distribution license file (OD-003). Local images only (OD-004).
 Milestone **M0** is in progress. First usable release is the README definition
 in the design package plus every P0 task in [`TASKS.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/TASKS.md).
 
-Completed: **T-001–T-031**. Next: **T-032** plugins (MemberOf, referential integrity, account disablement). Remaining-work design: [`docs/design/remaining-work-m1-m8.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/design/remaining-work-m1-m8.md).
+Completed: **T-001–T-032**. Next: **T-033** base tree and runtime service account. Remaining-work design: [`docs/design/remaining-work-m1-m8.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/design/remaining-work-m1-m8.md).
 
 ## Commands
 

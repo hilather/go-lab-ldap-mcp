@@ -29,6 +29,22 @@ func (f *fakePolicy) ReconcilePolicy(ctx context.Context, req PolicyRequest) (Po
 	return PolicyResult{Applied: []string{"storageScheme"}}, nil
 }
 
+type fakePlugins struct {
+	err    error
+	called int
+	req    PluginRequest
+}
+
+func (f *fakePlugins) ReconcilePlugins(ctx context.Context, req PluginRequest) (PluginResult, error) {
+	_ = ctx
+	f.called++
+	f.req = req
+	if f.err != nil {
+		return PluginResult{}, f.err
+	}
+	return PluginResult{Applied: []string{"memberof", "referint", "account-disable"}}, nil
+}
+
 type fakeTLS struct {
 	err    error
 	called int
@@ -139,6 +155,7 @@ func TestApplyLoadThenWaitOK(t *testing.T) {
 	fb := &fakeBackend{}
 	ft := &fakeTLS{}
 	fp := &fakePolicy{}
+	fg := &fakePlugins{}
 	sum, err := Run(t.Context(), Options{
 		Command:      "apply",
 		ConfigPath:   cfg,
@@ -147,14 +164,15 @@ func TestApplyLoadThenWaitOK(t *testing.T) {
 		Backend:      fb,
 		TLS:          ft,
 		Policy:       fp,
+		Plugins:      fg,
 		LDAPURL:      "ldaps://127.0.0.1:3636",
 		CAFile:       "/tmp/ca.crt",
 	}, ioDiscard(), ioDiscard())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !sum.OK || fw.called != 1 || fb.called != 1 || ft.called != 1 || fp.called != 1 {
-		t.Fatalf("sum=%+v wait=%d backend=%d tls=%d policy=%d", sum, fw.called, fb.called, ft.called, fp.called)
+	if !sum.OK || fw.called != 1 || fb.called != 1 || ft.called != 1 || fp.called != 1 || fg.called != 1 {
+		t.Fatalf("sum=%+v wait=%d backend=%d tls=%d policy=%d plugins=%d", sum, fw.called, fb.called, ft.called, fp.called, fg.called)
 	}
 	if !fb.req.Write {
 		t.Fatal("apply merge must write backend")
@@ -162,13 +180,16 @@ func TestApplyLoadThenWaitOK(t *testing.T) {
 	if !fp.req.Write {
 		t.Fatal("apply merge must write policy")
 	}
+	if !fg.req.Write {
+		t.Fatal("apply merge must write plugins")
+	}
 	if fw.req.Password.Reveal() != "dm-secret" {
 		t.Fatal("password not loaded from file")
 	}
 	if fw.req.LDAPURL != "ldaps://127.0.0.1:3636" {
 		t.Fatalf("url = %s", fw.req.LDAPURL)
 	}
-	if len(sum.Phases) != 5 || sum.Phases[4].Phase != "pwpolicy" || !sum.Phases[4].OK {
+	if len(sum.Phases) != 6 || sum.Phases[5].Phase != "plugins" || !sum.Phases[5].OK {
 		t.Fatalf("phases = %+v", sum.Phases)
 	}
 	if len(sum.Remaining) == 0 {
@@ -181,7 +202,7 @@ func TestTlsRequestUsesCompiledLDAPSPort(t *testing.T) {
 	ft := &fakeTLS{}
 	_, err := Run(t.Context(), Options{
 		Command: "apply", ConfigPath: cfg, PasswordFile: pw,
-		Waiter: &fakeWaiter{}, Backend: &fakeBackend{}, TLS: ft, Policy: &fakePolicy{},
+		Waiter: &fakeWaiter{}, Backend: &fakeBackend{}, TLS: ft, Policy: &fakePolicy{}, Plugins: &fakePlugins{},
 	}, ioDiscard(), ioDiscard())
 	if err != nil {
 		t.Fatal(err)
@@ -201,7 +222,7 @@ func TestApplyWaitBindFailure(t *testing.T) {
 	cfg, pw := testConfigDir(t)
 	fw := &fakeWaiter{err: PhaseError("wait", "bind", "Directory Manager bind failed")}
 	sum, err := Run(t.Context(), Options{
-		Command: "apply", ConfigPath: cfg, PasswordFile: pw, Waiter: fw, Backend: &fakeBackend{}, TLS: &fakeTLS{}, Policy: &fakePolicy{},
+		Command: "apply", ConfigPath: cfg, PasswordFile: pw, Waiter: fw, Backend: &fakeBackend{}, TLS: &fakeTLS{}, Policy: &fakePolicy{}, Plugins: &fakePlugins{},
 	}, ioDiscard(), ioDiscard())
 	if err == nil {
 		t.Fatal("expected bind failure")
@@ -244,13 +265,14 @@ spec:
 	fb := &fakeBackend{}
 	ft := &fakeTLS{}
 	fp := &fakePolicy{}
+	fg := &fakePlugins{}
 	_, err := Run(t.Context(), Options{
-		Command: "apply", ConfigPath: cfg, PasswordFile: pw, Waiter: &fakeWaiter{}, Backend: fb, TLS: ft, Policy: fp,
+		Command: "apply", ConfigPath: cfg, PasswordFile: pw, Waiter: &fakeWaiter{}, Backend: fb, TLS: ft, Policy: fp, Plugins: fg,
 	}, ioDiscard(), ioDiscard())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if fb.req.Write || ft.req.Write || fp.req.Write {
+	if fb.req.Write || ft.req.Write || fp.req.Write || fg.req.Write {
 		t.Fatal("startupMode validate must not write")
 	}
 }
@@ -260,16 +282,17 @@ func TestValidateSubcommandDoesNotWrite(t *testing.T) {
 	fb := &fakeBackend{res: BackendResult{Action: "matched", Name: "userroot", Suffix: "dc=example,dc=test"}}
 	ft := &fakeTLS{}
 	fp := &fakePolicy{}
+	fg := &fakePlugins{}
 	sum, err := Run(t.Context(), Options{
-		Command: "validate", ConfigPath: cfg, PasswordFile: pw, Waiter: &fakeWaiter{}, Backend: fb, TLS: ft, Policy: fp,
+		Command: "validate", ConfigPath: cfg, PasswordFile: pw, Waiter: &fakeWaiter{}, Backend: fb, TLS: ft, Policy: fp, Plugins: fg,
 	}, ioDiscard(), ioDiscard())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if fb.req.Write || ft.req.Write || fp.req.Write {
+	if fb.req.Write || ft.req.Write || fp.req.Write || fg.req.Write {
 		t.Fatal("validate subcommand must not write")
 	}
-	if !sum.OK || sum.Phases[len(sum.Phases)-1].Phase != "pwpolicy" {
+	if !sum.OK || sum.Phases[len(sum.Phases)-1].Phase != "plugins" {
 		t.Fatalf("%+v", sum)
 	}
 }
@@ -285,7 +308,7 @@ func TestApplyInvalidConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 	sum, err := Run(t.Context(), Options{
-		Command: "apply", ConfigPath: path, PasswordFile: pw, Waiter: &fakeWaiter{}, Backend: &fakeBackend{}, TLS: &fakeTLS{}, Policy: &fakePolicy{},
+		Command: "apply", ConfigPath: path, PasswordFile: pw, Waiter: &fakeWaiter{}, Backend: &fakeBackend{}, TLS: &fakeTLS{}, Policy: &fakePolicy{}, Plugins: &fakePlugins{},
 	}, ioDiscard(), ioDiscard())
 	if err == nil {
 		t.Fatal("expected load failure")
