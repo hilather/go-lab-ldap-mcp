@@ -365,16 +365,16 @@ Acceptance:
 - [x] Cleartext simple bind is rejected when disabled.
 - [x] Required unsupported SASL mechanisms fail bootstrap.
 
-## [ ] T-031 Reconcile and verify global password policy
+## [x] T-031 Reconcile and verify global password policy
 
 Priority: P0 | Size: L | Depends on: T-017, T-029
 
 Deliverables: versioned field mapping, `dsconf pwpolicy` application, read-back verification, and policy integration fixtures.
 
 Acceptance:
-- [ ] Every public policy field is either applied and verified or rejected as unsupported.
-- [ ] Minimum length, history, maximum age configuration, and lockout behavior have real-engine tests.
-- [ ] Passwords are never passed on command lines or logged.
+- [x] Every public policy field is either applied and verified or rejected as unsupported.
+- [x] Minimum length, history, maximum age configuration, and lockout behavior have real-engine tests.
+- [x] Passwords are never passed on command lines or logged.
 
 ## [ ] T-032 Configure MemberOf, referential integrity, and account disablement
 

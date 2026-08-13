@@ -55,6 +55,10 @@ Upstream docs often show 389/636. This container listens on **3389/3636**. Healt
 
 Default first-boot: `nsslapd-require-secure-binds: off`, `nsslapd-allow-anonymous-access: on`. LDAPS (3636) and StartTLS on 3389 both accept binds. After `dsconf security set --require-secure-authentication on`, a simple bind on `ldap://:3389` returns LDAP 13 (confidentiality required). SASL `get-mechs` includes EXTERNAL, GSSAPI, DIGEST-MD5, PLAIN, ANONYMOUS; there is no scenario YAML key for required SASL — `phase.tls` fails `sasl_missing` when `TLSRequest.RequiredSASL` names a mechanism not in that list.
 
+## Password policy (observed, T-031)
+
+`dsconf pwpolicy set/get` maps: `--pwdminlen` (2–512 only; 0/1 invalid), `--pwdhistory`/`--pwdhistorycount`, `--pwdexpire`/`--pwdmaxage` (maxage 0 invalid — disable via expire off), `--pwdwarning`, `--pwdlockout`/`--pwdmaxfailures`/`--pwdlockoutduration`, `--pwdscheme`. Canonical `PBKDF2-SHA256` is a native scheme. Compiled `minLength` outside 0 and 2–512 is `unsupported_field`. `minLength: 0` is left unset (does not clear a prior minimum). Applying `minLength` ≥ 2 turns `--pwdchecksyntax` on and sets `--pwdmincatagories 1` (range 1–5), `--pwdmintokenlen 64` (range 1–64; 0 is invalid, so 64 minimizes trivial-word matching), `--pwddictcheck off`, `--pwdpalindrome off` so the compiled minimum is the effective extra constraint.
+
 ## Environment (subset)
 
 - `DS_DM_PASSWORD` — set Directory Manager password after first start

@@ -55,11 +55,12 @@ spec:
 		Waiter:        ds389.Admin{},
 		Backend:       stubBackend{},
 		TLS:           stubTLS{},
+		Policy:        stubPolicy{},
 	}, ioDiscard(), ioDiscard())
 	if err != nil {
 		t.Fatalf("apply wait: %v summary=%+v", err, sum)
 	}
-	if !sum.OK || len(sum.Phases) != 4 {
+	if !sum.OK || len(sum.Phases) != 5 {
 		t.Fatalf("%+v", sum)
 	}
 
@@ -73,6 +74,7 @@ spec:
 		Waiter:        ds389.Admin{},
 		Backend:       stubBackend{},
 		TLS:           stubTLS{},
+		Policy:        stubPolicy{},
 		Deadline:      2 * time.Second,
 	}, ioDiscard(), ioDiscard())
 	if err == nil {
@@ -94,6 +96,7 @@ spec:
 		Waiter:        ds389.Admin{},
 		Backend:       stubBackend{},
 		TLS:           stubTLS{},
+		Policy:        stubPolicy{},
 		Deadline:      3 * time.Second,
 	}, ioDiscard(), ioDiscard())
 	if err == nil {
@@ -115,6 +118,12 @@ type stubTLS struct{}
 
 func (stubTLS) ReconcileTLS(context.Context, bootstrap.TLSRequest) (bootstrap.TLSResult, error) {
 	return bootstrap.TLSResult{Transports: []string{"ldaps"}}, nil
+}
+
+type stubPolicy struct{}
+
+func (stubPolicy) ReconcilePolicy(context.Context, bootstrap.PolicyRequest) (bootstrap.PolicyResult, error) {
+	return bootstrap.PolicyResult{Applied: []string{"storageScheme"}}, nil
 }
 
 func waitCode(err error) string {

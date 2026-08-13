@@ -20,7 +20,7 @@ import (
 )
 
 var laterPhases = []string{
-	"inspect", "pwpolicy", "plugins",
+	"inspect", "plugins",
 	"tree", "aci", "seed", "verify_runtime", "verify_app", "drift", "marker",
 }
 
@@ -37,6 +37,7 @@ type Options struct {
 	Waiter         Waiter
 	Backend        BackendReconciler
 	TLS            TLSReconciler
+	Policy         PolicyReconciler
 	RequireSASL    []string
 	Log            *slog.Logger
 	Now            func() time.Time
@@ -155,6 +156,26 @@ func Run(ctx context.Context, opt Options, stdout, stderr io.Writer) (Summary, e
 			return nil, e
 		}
 		return map[string]int{"transports": len(res.Transports), "sasl": len(res.SASL)}, nil
+	})
+	if err != nil {
+		sum.Phases = rep.phases
+		return sum, err
+	}
+
+	err = rep.run("pwpolicy", func() (map[string]int, error) {
+		if opt.Policy == nil {
+			return nil, phaseErr("pwpolicy", "readback_mismatch", "password policy reconciler is not configured")
+		}
+		res, e := opt.Policy.ReconcilePolicy(ctx, PolicyRequest{
+			PasswordFile: opt.PasswordFile,
+			Instance:     opt.DSConfInstance,
+			Policy:       compiled.Normalized.Policy,
+			Write:        write,
+		})
+		if e != nil {
+			return nil, e
+		}
+		return map[string]int{"applied": len(res.Applied)}, nil
 	})
 	sum.Phases = rep.phases
 	if err != nil {
