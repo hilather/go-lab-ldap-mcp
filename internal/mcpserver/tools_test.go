@@ -9,6 +9,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/hilather/go-lab-ldap-mcp/internal/app"
+	"github.com/hilather/go-lab-ldap-mcp/internal/auth"
 	"github.com/hilather/go-lab-ldap-mcp/internal/directory"
 )
 
@@ -243,5 +244,17 @@ func TestMutationsRegisterOnlyWhenEnabled(t *testing.T) {
 	want := registeredTools(flags)
 	if !equalSet(names, want) {
 		t.Fatalf("tools = %v want %v", names, want)
+	}
+}
+
+func TestPublicToolErrNamesRequiredScope(t *testing.T) {
+	t.Parallel()
+	err := auth.Require(nil, auth.ScopeLabReset)
+	got := publicToolErr(err)
+	if got == nil || !strings.Contains(got.Error(), auth.ScopeLabReset) {
+		t.Fatalf("missing required scope in %v", got)
+	}
+	if strings.Contains(got.Error(), "admin") {
+		t.Fatalf("leaked actor: %v", got)
 	}
 }

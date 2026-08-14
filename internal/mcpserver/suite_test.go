@@ -136,8 +136,12 @@ func TestEveryToolPositiveAndDeniedScope(t *testing.T) {
 		if !denied.IsError {
 			t.Fatalf("%s: missing-scope token %q was allowed", st.tool, st.deny)
 		}
-		if strings.Contains(toolErrText(denied), "admin") || strings.Contains(toolErrText(denied), testToken) {
-			t.Fatalf("%s leaked actor: %s", st.tool, toolErrText(denied))
+		text := toolErrText(denied)
+		if strings.Contains(text, "admin") || strings.Contains(text, testToken) {
+			t.Fatalf("%s leaked actor: %s", st.tool, text)
+		}
+		if d, ok := LookupTool(st.tool); ok && !strings.Contains(text, d.Scope) {
+			t.Fatalf("%s denied text missing required scope %s: %s", st.tool, d.Scope, text)
 		}
 		allowSess, _ := connectMCP(t, mux, st.allow, "")
 		allowed := callTool(t, allowSess, st.tool, st.args)

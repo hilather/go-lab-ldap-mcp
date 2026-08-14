@@ -426,6 +426,11 @@ func publicToolErr(err error) error {
 	var e *apperr.Error
 	if errors.As(err, &e) {
 		for _, f := range e.Fields() {
+			// Missing-scope errors name the required grant (Field.Message),
+			// never a token ID. REST returns the same field.
+			if (f.Path == "scope" || f.Code == "forbidden") && f.Message != "" {
+				return errors.New(msg + " (" + f.Message + ")")
+			}
 			if f.Code != "" {
 				return errors.New(msg + " (" + f.Code + ")")
 			}

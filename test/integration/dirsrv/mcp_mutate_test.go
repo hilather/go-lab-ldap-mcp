@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -118,27 +119,45 @@ func TestMCPUserVisibleViaRESTAndLDAP(t *testing.T) {
 	if err != nil || gcreated.IsError {
 		t.Fatalf("group: %+v %v", gcreated, err)
 	}
-	got, err := svc.Users.Get(t.Context(), app.Principal{
+	reader := app.Principal{
 		Kind: app.KindToken, ID: "admin", Scopes: directory.ScopeSet{auth.ScopeDirectoryRead},
-	}, "mcp-alice")
-	if err != nil {
-		t.Fatal(err)
 	}
-	found := false
-	for _, gid := range got.Groups {
-		if string(gid) == "mcp-staff" {
-			found = true
+	g, gerr := svc.Groups.Get(t.Context(), reader, "mcp-staff")
+	if gerr != nil || !hasMemberID(g.Members, "mcp-alice") {
+		t.Fatalf("REST membership %+v %v", g, gerr)
+	}
+	deadline := time.Now().Add(3 * time.Second)
+	for {
+		got, err := svc.Users.Get(t.Context(), reader, "mcp-alice")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if hasGroupID(got.Groups, "mcp-staff") {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("MemberOf not visible on user.groups: %+v", got.Groups)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+}
+
+func hasMemberID(members []directory.MemberRef, id string) bool {
+	for _, m := range members {
+		if m.ID == id {
+			return true
 		}
 	}
-	if !found && len(got.Groups) == 0 {
-		// MemberOf may be empty if plugin hasn't updated yet; REST group still has member.
-		g, gerr := svc.Groups.Get(t.Context(), app.Principal{
-			Kind: app.KindToken, ID: "admin", Scopes: directory.ScopeSet{auth.ScopeDirectoryRead},
-		}, "mcp-staff")
-		if gerr != nil || len(g.Members) == 0 {
-			t.Fatalf("membership %+v user.groups=%v", g, got.Groups)
+	return false
+}
+
+func hasGroupID(groups []directory.GroupID, id string) bool {
+	for _, g := range groups {
+		if string(g) == id {
+			return true
 		}
 	}
+	return false
 }
 
 type bearerRT struct {

@@ -81,6 +81,70 @@ func TestStdioActorAndScopesMatchHTTP(t *testing.T) {
 	}
 }
 
+type pipeWrite struct {
+	io.Writer
+	c io.Closer
+}
+
+func (w pipeWrite) Close() error { return w.c.Close() }
+
+func TestStdioIOTransportProtocolStaysOnStdout(t *testing.T) {
+	t.Parallel()
+	var logs, proto bytes.Buffer
+	svc := mutationServices(newFakeUsers(), newFakeGroups(), &fakeBind{})
+	s := mutationServer(t, svc, slog.New(slog.NewTextHandler(&logs, nil)))
+	s.SetActor(auth.Principal{
+		Kind:   auth.KindToken,
+		ID:     "admin",
+		Scopes: directory.ScopeSet{auth.ScopeDirectoryRead, auth.ScopeDirectoryWrite},
+	})
+
+	inR, inW := io.Pipe()
+	outR, outW := io.Pipe()
+	ctx, cancel := context.WithCancel(t.Context())
+	t.Cleanup(cancel)
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- s.Run(ctx, &mcp.IOTransport{
+			Reader: inR,
+			Writer: pipeWrite{Writer: io.MultiWriter(&proto, outW), c: outW},
+		})
+	}()
+
+	client := mcp.NewClient(&mcp.Implementation{Name: "labldap-stdio-io", Version: "v0.0.1"}, nil)
+	sess, err := client.Connect(ctx, &mcp.IOTransport{Reader: outR, Writer: inW}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = sess.Close() })
+
+	res, err := sess.CallTool(ctx, &mcp.CallToolParams{
+		Name:      ToolCreateUser,
+		Arguments: CreateUserInput{ID: "pipe", Password: mcpUserPass},
+	})
+	if err != nil || res.IsError {
+		t.Fatalf("create: %+v %v", res, err)
+	}
+
+	wire := proto.String()
+	if !strings.Contains(wire, `"jsonrpc"`) && !strings.Contains(wire, "jsonrpc") {
+		t.Fatalf("protocol stream missing JSON-RPC: %q", wire)
+	}
+	if strings.Contains(wire, "mcp tool") || strings.Contains(logs.String(), `"jsonrpc"`) {
+		t.Fatalf("log/protocol mixed: logs=%q proto=%q", logs.String(), wire)
+	}
+	if containsSecret(wire+logs.String(), mcpUserPass) {
+		t.Fatal("password leaked onto stdio pipes")
+	}
+
+	cancel()
+	select {
+	case <-errCh:
+	case <-time.After(3 * time.Second):
+		t.Fatal("stdio IO run did not stop")
+	}
+}
+
 func TestStdioMissingActorFailsSafely(t *testing.T) {
 	t.Parallel()
 	s := mutationServer(t, mutationServices(newFakeUsers(), newFakeGroups(), &fakeBind{}), nil)

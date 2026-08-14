@@ -87,7 +87,7 @@ func TestMCPResetRequiresConfirmRevisionAndScope(t *testing.T) {
 		t.Fatal(toolErrText(ok))
 	}
 	st := decodeStructured[app.ResetStatus](t, ok)
-	if st.State != string(reset.Ready) && st.ExpectedRevision != "aaa" {
+	if st.State != string(reset.Ready) || st.ExpectedRevision != "aaa" {
 		t.Fatalf("status %+v", st)
 	}
 }
