@@ -11,7 +11,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "node ./scripts/lint.mjs",
-    "test": "node --test ./scripts/build.test.mjs"
+    "test": "node --test ./scripts/build.test.mjs ./scripts/security.test.mjs && node --experimental-strip-types --test ./src/lib/session-model.test.ts ./src/lib/query.test.ts ./src/api/token.test.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "5.8.0",

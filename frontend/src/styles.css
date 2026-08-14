@@ -10,13 +10,225 @@ body {
   margin: 0;
 }
 
-main {
-  max-width: 40rem;
-  margin: 2rem auto;
-  padding: 0 1rem;
+a {
+  color: #0b3d91;
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible {
+  outline: 3px solid #0b3d91;
+  outline-offset: 2px;
+}
+
+.skip-link {
+  position: absolute;
+  left: 0.75rem;
+  top: -3rem;
+  background: #fff;
+  padding: 0.4rem 0.7rem;
+}
+
+.skip-link:focus {
+  top: 0.75rem;
+}
+
+.login,
+.app-shell main {
+  max-width: 52rem;
+  margin: 0 auto;
+  padding: 1.25rem 1rem 2rem;
+}
+
+.app-header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid #c8c8c2;
+  background: #fff;
+}
+
+.brand-name {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 650;
+}
+
+.brand-meta,
+.nav-restriction,
+.action-reason,
+.field-error {
+  margin: 0.15rem 0 0;
+  font-size: 0.95rem;
+}
+
+.header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.scope-list {
+  margin: 0;
+}
+
+.scope-list h2 {
+  margin: 0 0 0.25rem;
+  font-size: 0.95rem;
+}
+
+.scope-list ul,
+.app-nav ul,
+.action-list {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
+.app-body {
+  display: grid;
+  grid-template-columns: minmax(11rem, 14rem) 1fr;
+}
+
+@media (max-width: 48rem) {
+  .app-body {
+    grid-template-columns: 1fr;
+  }
+}
+
+.app-nav {
+  padding: 1rem 1.25rem;
+  border-right: 1px solid #c8c8c2;
+  background: #fff;
+}
+
+.app-nav a {
+  font-weight: 600;
+}
+
+.app-nav a[aria-current="page"] {
+  text-decoration: none;
+  border-bottom: 2px solid #1a1a1a;
+}
+
+.banner {
+  margin: 0;
+  padding: 0.75rem 1.25rem;
+  border-bottom: 1px solid #c8c8c2;
+}
+
+.banner-insecure,
+.banner-warning {
+  background: #fff4d6;
+}
+
+.status-card,
+.outage,
+.dashboard section {
+  margin-top: 1.25rem;
+  padding: 0.9rem 1rem;
+  background: #fff;
+  border: 1px solid #c8c8c2;
+}
+
+.status-line {
+  font-size: 1.15rem;
+  font-weight: 650;
+}
+
+.status-ready {
+  border-left: 6px solid #0a7a32;
+}
+
+.status-degraded {
+  border-left: 6px solid #8a5a00;
+}
+
+.status-outage {
+  border-left: 6px solid #8b1e1e;
+}
+
+h1,
+h2 {
+  margin: 0 0 0.5rem;
 }
 
 h1 {
   font-size: 1.5rem;
   font-weight: 650;
+}
+
+h2 {
+  font-size: 1.1rem;
+}
+
+.field {
+  margin: 1rem 0;
+}
+
+.field label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.3rem;
+}
+
+input[type="password"] {
+  width: min(28rem, 100%);
+  padding: 0.45rem 0.55rem;
+  font: inherit;
+}
+
+button {
+  font: inherit;
+  padding: 0.45rem 0.8rem;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+.action-disabled,
+.nav-disabled {
+  font-weight: 600;
+}
+
+dl {
+  display: grid;
+  gap: 0.45rem 1rem;
+  margin: 0;
+}
+
+dl div {
+  display: grid;
+  grid-template-columns: 11rem 1fr;
+}
+
+dt {
+  font-weight: 650;
+}
+
+dd {
+  margin: 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 0.35rem 0.5rem;
+  border-bottom: 1px solid #d7d7d1;
+  vertical-align: top;
+}
+
+caption {
+  text-align: left;
+  font-weight: 600;
+  margin-bottom: 0.4rem;
 }

@@ -16,7 +16,7 @@ async function walkFiles(dir) {
       out.push(...(await walkFiles(p)));
       continue;
     }
-    if (/\.(ts|tsx|js|mjs)$/.test(ent.name)) {
+    if (/\.(ts|tsx|js|mjs)$/.test(ent.name) && !ent.name.endsWith(".test.ts")) {
       out.push(p);
     }
   }

@@ -1090,27 +1090,27 @@ Acceptance:
 - [x] Go serves hashed assets with correct caching and index fallback.
 - [x] Frontend uses generated types rather than handwritten duplicate resource models.
 
-## [ ] T-096 Implement UI login, session validation, logout, and token-handling security
+## [x] T-096 Implement UI login, session validation, logout, and token-handling security
 
 Priority: P0 | Size: L | Depends on: T-062, T-064, T-095
 
 Deliverables: token form, session exchange, CSRF memory handling, session query, expiry redirect, logout, query-cache clear, and browser-storage security tests.
 
 Acceptance:
-- [ ] Token is absent from localStorage, sessionStorage, IndexedDB, URL, and retained component state after login.
-- [ ] Logout and expiry clear directory query data.
-- [ ] Login, invalid token, rate limit, and expired session states are accessible.
+- [x] Token is absent from localStorage, sessionStorage, IndexedDB, URL, and retained component state after login.
+- [x] Logout and expiry clear directory query data.
+- [x] Login, invalid token, rate limit, and expired session states are accessible.
 
-## [ ] T-097 Implement application shell, dashboard, scope display, and degraded state
+## [x] T-097 Implement application shell, dashboard, scope display, and degraded state
 
 Priority: P0 | Size: L | Depends on: T-064, T-073, T-095, T-096
 
 Deliverables: navigation, header, scenario status, engine, baseline, transport, insecurity banner, quick actions, recent audit, and directory-outage view.
 
 Acceptance:
-- [ ] Dashboard works when directory is ready and degraded.
-- [ ] Scope-restricted actions explain missing permission.
-- [ ] Status meaning is not conveyed by color alone.
+- [x] Dashboard works when directory is ready and degraded.
+- [x] Scope-restricted actions explain missing permission.
+- [x] Status meaning is not conveyed by color alone.
 
 ## [ ] T-098 Implement user list and create workflows
 

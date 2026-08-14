@@ -23,5 +23,6 @@
       "@labldap/openapi": ["../api/generated/typescript/schema.d.ts"]
     }
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": ["src/**/*.test.ts"]
 }
