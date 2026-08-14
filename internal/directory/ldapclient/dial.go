@@ -185,6 +185,37 @@ func (c *Conn) Ping(ctx context.Context) error {
 	return err
 }
 
+// SearchPage issues one Simple Paged Results page. next is empty on the last page.
+func (c *Conn) SearchPage(ctx context.Context, req *ldap.SearchRequest, pageSize uint32, cookie []byte) (*ldap.SearchResult, []byte, error) {
+	if pageSize == 0 {
+		pageSize = 50
+	}
+	var controls []ldap.Control
+	for _, ctl := range req.Controls {
+		if ctl == nil || ctl.GetControlType() == ldap.ControlTypePaging {
+			continue
+		}
+		controls = append(controls, ctl)
+	}
+	paging := ldap.NewControlPaging(pageSize)
+	if len(cookie) > 0 {
+		paging.SetCookie(cookie)
+	}
+	cp := *req
+	cp.Controls = append(controls, paging)
+	res, err := c.Search(ctx, &cp)
+	if err != nil {
+		return nil, nil, err
+	}
+	var next []byte
+	if ctl := ldap.FindControl(res.Controls, ldap.ControlTypePaging); ctl != nil {
+		if p, ok := ctl.(*ldap.ControlPaging); ok && len(p.Cookie) > 0 {
+			next = append([]byte(nil), p.Cookie...)
+		}
+	}
+	return res, next, nil
+}
+
 // Search runs an LDAP search and maps result codes.
 func (c *Conn) Search(ctx context.Context, req *ldap.SearchRequest) (*ldap.SearchResult, error) {
 	if c == nil || c.raw == nil {

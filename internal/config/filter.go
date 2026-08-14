@@ -12,6 +12,20 @@ type Filter struct {
 }
 
 func ParseFilter(s string, maxDepth, maxLen int) (Filter, error) {
+	f, err := ParseFilterLimits(s, maxDepth, maxLen)
+	if err != nil {
+		return Filter{}, err
+	}
+	if IsOverBroad(s) {
+		return Filter{}, apperr.New(apperr.CodeConfiguration, "search too broad").
+			WithField(apperr.Field{Path: "filter", Code: "over_broad", Message: "filter is over-broad"})
+	}
+	return f, nil
+}
+
+// ParseFilterLimits validates syntax, depth, length, NUL, and balance.
+// It does not apply the suffix+sub match-all over-broad conjunction (T-050).
+func ParseFilterLimits(s string, maxDepth, maxLen int) (Filter, error) {
 	if s == "" {
 		return Filter{}, fieldErr("filter", "empty", "filter is empty")
 	}
@@ -40,14 +54,15 @@ func ParseFilter(s string, maxDepth, maxLen int) (Filter, error) {
 	if depth != 0 {
 		return Filter{}, fieldErr("filter", "unbalanced", "filter parentheses are unbalanced")
 	}
-	if isOverBroad(s) {
-		return Filter{}, apperr.New(apperr.CodeConfiguration, "search too broad").
-			WithField(apperr.Field{Path: "filter", Code: "over_broad", Message: "filter is over-broad"})
-	}
 	return Filter{Raw: s}, nil
 }
 
-func isOverBroad(s string) bool {
-	t := strings.TrimSpace(s)
-	return t == "(objectClass=*)" || t == "objectClass=*" || t == "*"
+// IsOverBroad reports a match-all filter. T-050 rejects this only with suffix+sub.
+func IsOverBroad(s string) bool {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "(objectclass=*)", "objectclass=*", "*", "(&(objectclass=*))":
+		return true
+	default:
+		return false
+	}
 }

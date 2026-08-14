@@ -554,60 +554,60 @@ Acceptance:
 - [x] Directory restart recovers without process restart.
 - [x] Soak test shows no growing goroutine, file descriptor, or connection leak.
 
-## [ ] T-048 Implement user repository
+## [x] T-048 Implement user repository
 
 Priority: P0 | Size: L | Depends on: T-045 to T-047
 
 Deliverables: paged list, get by safe ID, add, modify, enable, disable, delete, password set, safe attribute filtering, and read-back.
 
 Acceptance:
-- [ ] All operations work using restricted runtime account against real 389 DS.
-- [ ] Schema-required and forbidden attributes are enforced.
-- [ ] Password values are never returned.
+- [x] All operations work using restricted runtime account against real 389 DS.
+- [x] Schema-required and forbidden attributes are enforced.
+- [x] Password values are never returned.
 
-## [ ] T-049 Implement group and membership repository
+## [x] T-049 Implement group and membership repository
 
 Priority: P0 | Size: L | Depends on: T-045 to T-047, T-032
 
 Deliverables: group list, get, add, modify, delete, member add, remove, replace, nested-group validation hook, and read-back.
 
 Acceptance:
-- [ ] Empty groups are rejected.
-- [ ] Membership operations are idempotent and return change summaries.
-- [ ] MemberOf and referential-integrity results are verified after writes.
+- [x] Empty groups are rejected.
+- [x] Membership operations are idempotent and return change summaries.
+- [x] MemberOf and referential-integrity results are verified after writes.
 
-## [ ] T-050 Implement constrained LDAP search repository
+## [x] T-050 Implement constrained LDAP search repository
 
 Priority: P0 | Size: L | Depends on: T-013, T-045 to T-047
 
 Deliverables: filter parser and limits, base boundary checks, scopes, attribute allow and deny rules, paging, timeout, and cursor state.
 
 Acceptance:
-- [ ] Search cannot escape configured roots.
-- [ ] Malformed, over-deep, over-long, and over-broad searches fail safely.
-- [ ] Server size and time limits are always applied.
+- [x] Search cannot escape configured roots.
+- [x] Malformed, over-deep, over-long, and over-broad searches fail safely.
+- [x] Server size and time limits are always applied.
 
-## [ ] T-051 Implement disposable bind-test operation
+## [x] T-051 Implement disposable bind-test operation
 
 Priority: P0 | Size: M | Depends on: T-046
 
 Deliverables: identity resolution, dedicated connection, selected transport, bind, safe account-state result, close, and generic invalid-credential category.
 
 Acceptance:
-- [ ] Bind-test connection is never returned to runtime pool.
-- [ ] Unknown user and wrong password are not distinguished externally by default.
-- [ ] Password is absent from logs, traces, and returned errors.
+- [x] Bind-test connection is never returned to runtime pool.
+- [x] Unknown user and wrong password are not distinguished externally by default.
+- [x] Password is absent from logs, traces, and returned errors.
 
-## [ ] T-052 Implement Root DSE and schema repositories
+## [x] T-052 Implement Root DSE and schema repositories
 
 Priority: P0 | Size: L | Depends on: T-045 to T-047
 
 Deliverables: Root DSE reader, subschema resolution, normalized object classes and attributes, safe cache with TTL, and invalidation.
 
 Acceptance:
-- [ ] Schema output is stable and contains no forbidden server secrets.
-- [ ] Cache expiry and directory reconnect work.
-- [ ] Capability service can consume normalized results.
+- [x] Schema output is stable and contains no forbidden server secrets.
+- [x] Cache expiry and directory reconnect work.
+- [x] Capability service can consume normalized results.
 
 ## [ ] T-053 Implement entry revisions, protected cursors, and assertion-control investigation
 
