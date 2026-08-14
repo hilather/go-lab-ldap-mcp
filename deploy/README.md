@@ -97,6 +97,8 @@ Existing secret files are not overwritten unless `--force` is set.
 All generated secret files are mode 0600 on the host. A one-shot
 `secret-prep` copies token/password files into a volume as uid 65532
 mode 0400 (Compose file secrets ignore uid/mode without Swarm).
+`make compose-up` / `compose-up-persistent` `--force-recreate` that
+one-shot after `setupsecrets --force` so `control-secrets` is not stale.
 Operator-provided PEMs can replace the generated files; import still
 uses `dsctl tls import-*` after first boot. A wrong CA or SAN fails
 closed at control/bootstrap TLS verify.

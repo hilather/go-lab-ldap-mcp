@@ -100,7 +100,10 @@ compose-up: image image-bootstrap compose-preflight compose-secrets setup-tls
 	LABLDAP_TLS_CA=$(COMPOSE_TLS)/instance-ca.crt $(COMPOSE) up -d --wait --remove-orphans directory
 	$(GO) run ./tools/setuptls publish --out $(COMPOSE_TLS)/instance-ca.crt --project labldap \
 		-f deploy/compose/compose.yaml -f deploy/compose/compose.ephemeral.yaml
-	LABLDAP_TLS_CA=$(COMPOSE_TLS)/instance-ca.crt $(COMPOSE) up -d --wait --remove-orphans
+	# Recreate secret-prep so setupsecrets --force copies into control-secrets.
+	LABLDAP_TLS_CA=$(COMPOSE_TLS)/instance-ca.crt $(COMPOSE) up -d --no-deps --force-recreate secret-prep
+	LABLDAP_TLS_CA=$(COMPOSE_TLS)/instance-ca.crt $(COMPOSE) wait secret-prep
+	LABLDAP_TLS_CA=$(COMPOSE_TLS)/instance-ca.crt $(COMPOSE) up -d --wait --remove-orphans --force-recreate control
 
 compose-up-persistent: image image-bootstrap compose-preflight compose-secrets setup-tls
 	LABLDAP_SCENARIO_FILE=deploy/compose/scenario.persistent.yaml \
@@ -110,7 +113,13 @@ compose-up-persistent: image image-bootstrap compose-preflight compose-secrets s
 		-f deploy/compose/compose.yaml -f deploy/compose/compose.persistent.yaml
 	LABLDAP_SCENARIO_FILE=deploy/compose/scenario.persistent.yaml \
 	LABLDAP_TLS_CA=$(COMPOSE_TLS)/ca.crt \
-		$(COMPOSE_PERSISTENT) up -d --wait --remove-orphans
+		$(COMPOSE_PERSISTENT) up -d --no-deps --force-recreate secret-prep
+	LABLDAP_SCENARIO_FILE=deploy/compose/scenario.persistent.yaml \
+	LABLDAP_TLS_CA=$(COMPOSE_TLS)/ca.crt \
+		$(COMPOSE_PERSISTENT) wait secret-prep
+	LABLDAP_SCENARIO_FILE=deploy/compose/scenario.persistent.yaml \
+	LABLDAP_TLS_CA=$(COMPOSE_TLS)/ca.crt \
+		$(COMPOSE_PERSISTENT) up -d --wait --remove-orphans --force-recreate control
 
 compose-down:
 	-$(COMPOSE) down --remove-orphans

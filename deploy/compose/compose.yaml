@@ -22,6 +22,7 @@ volumes:
 services:
   # Non-swarm Compose ignores secrets uid/gid/mode. Copy 0600 host files
   # into a volume owned by the control uid so they are 0400 inside.
+  # make compose-up --force-recreates this one-shot after secret rotation.
   secret-prep:
     image: labldap-control:dev
     user: "0:0"

@@ -210,6 +210,9 @@ func TestMakefileComposeResetIsReal(t *testing.T) {
 	if !strings.Contains(text, "scenario.persistent.yaml") {
 		t.Fatal("persistent compose-up must use scenario.persistent.yaml")
 	}
+	if !strings.Contains(text, "--force-recreate secret-prep") {
+		t.Fatal("compose-up must force-recreate secret-prep so rotated secrets reach control")
+	}
 }
 
 func TestOpenAPIHasNoHardReset(t *testing.T) {
