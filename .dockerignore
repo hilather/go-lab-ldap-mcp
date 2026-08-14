@@ -1,0 +1,17 @@
+# Build context for deploy/docker multi-stage images.
+# Do not send secrets, local Compose state, or generated caches.
+.git
+.compose-data
+secrets
+*.secret
+.env
+.env.*
+!.env.example
+*.log
+coverage.out
+coverage.html
+frontend/node_modules
+frontend/dist
+frontend/.vite
+**/*.test
+**/*.out

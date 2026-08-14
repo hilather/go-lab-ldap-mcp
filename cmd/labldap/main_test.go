@@ -51,11 +51,11 @@ func TestVersion(t *testing.T) {
 func TestUnknownCommand(t *testing.T) {
 	t.Setenv("LABLDAP_LOG_FORMAT", "text")
 	var stdout, stderr bytes.Buffer
-	code := run([]string{"serve"}, &stdout, &stderr)
+	code := run([]string{"widget"}, &stdout, &stderr)
 	if code != 2 {
 		t.Fatalf("exit %d, want 2", code)
 	}
-	if !strings.Contains(stderr.String(), `unknown command "serve"`) {
+	if !strings.Contains(stderr.String(), `unknown command "widget"`) {
 		t.Fatalf("stderr = %q", stderr.String())
 	}
 	if !strings.Contains(stderr.String(), "Usage:") {

@@ -16,6 +16,8 @@ Decision: OD-006 / T-024
 
 The immutable digest is also in `deploy/docker/dirsrv.digest`. Harness code must read that file. Do **not** put a floating `quay.io/389ds/dirsrv:<tag>` in Compose, Dockerfiles, or Makefile release paths.
 
+T-041 copies a static `labldap-bootstrap` onto this image (`labldap-bootstrap:dev`). `/etc/dirsrv/slapd-localhost` is a symlink to `/data/config`. A separate bootstrap container may mount `/data` **read-only** for the instance CA (`/data/config/ca.crt`) and the LDAPI socket used by `dsconf localhost`.
+
 ## Observed runtime contract
 
 | Item | Observation |
