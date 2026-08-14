@@ -326,3 +326,52 @@ caption {
   font-weight: 600;
   margin-bottom: 0.4rem;
 }
+
+.search-form fieldset,
+.schema-browser,
+.attr-choices {
+  margin: 1rem 0;
+}
+
+.attr-choices,
+.schema-browser {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+}
+
+.choice {
+  font-weight: 500;
+}
+
+.schema-browser section {
+  min-width: min(18rem, 100%);
+  flex: 1;
+}
+
+.schema-browser ul[role="listbox"] {
+  list-style: none;
+  margin: 0.4rem 0 0;
+  padding: 0;
+  max-height: 18rem;
+  overflow: auto;
+  border: 1px solid #c8c8c2;
+  background: #fff;
+}
+
+.schema-browser li button {
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+}
+
+.schema-browser li.is-active,
+.schema-browser li[aria-selected="true"] button {
+  background: #e8eef8;
+}
+
+details summary {
+  cursor: pointer;
+  font-weight: 600;
+}

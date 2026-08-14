@@ -1156,49 +1156,49 @@ Acceptance:
 - [x] Cycle errors are clear and non-destructive.
 - [x] User group views refresh after membership change.
 
-## [ ] T-102 Implement LDAP search console
+## [x] T-102 Implement LDAP search console
 
 Priority: P0 | Size: L | Depends on: T-069, T-095 to T-097
 
 Deliverables: base, scope, filter, attributes, page size form, explicit submit, expandable result table, next cursor, redaction indicators, and safe LDIF snippet copy.
 
 Acceptance:
-- [ ] Search does not auto-run on typing.
-- [ ] Filter and boundary errors are actionable.
-- [ ] Forbidden attributes cannot be requested through UI controls.
+- [x] Search does not auto-run on typing.
+- [x] Filter and boundary errors are actionable.
+- [x] Forbidden attributes cannot be requested through UI controls.
 
-## [ ] T-103 Implement authentication test and schema browser
+## [x] T-103 Implement authentication test and schema browser
 
 Priority: P0 | Size: L | Depends on: T-069, T-070, T-095 to T-097
 
 Deliverables: bind-test form and result, password clearing, rate-limit display, Root DSE summary, object-class and attribute searches and details.
 
 Acceptance:
-- [ ] Password never persists after the request.
-- [ ] Failure does not reveal unknown user versus wrong password.
-- [ ] Schema pages are read-only and keyboard navigable.
+- [x] Password never persists after the request.
+- [x] Failure does not reveal unknown user versus wrong password.
+- [x] Schema pages are read-only and keyboard navigable.
 
-## [ ] T-104 Implement audit page and event presentation
+## [x] T-104 Implement audit page and event presentation
 
 Priority: P1 | Size: M | Depends on: T-071, T-095 to T-097
 
 Deliverables: bounded audit list, filters, safe detail expansion, request ID copy, retention notice, and optional event refresh.
 
 Acceptance:
-- [ ] Actor and target display use non-secret identifiers.
-- [ ] No password, token, cookie, or authorization data is rendered.
-- [ ] Actor without `audit:read` sees an appropriate permission state.
+- [x] Actor and target display use non-secret identifiers.
+- [x] No password, token, cookie, or authorization data is rendered.
+- [x] Actor without `audit:read` sees an appropriate permission state.
 
-## [ ] T-105 Implement reset, export, operation status, and diagnostics UI
+## [x] T-105 Implement reset, export, operation status, and diagnostics UI
 
 Priority: P0 | Size: L | Depends on: T-081, T-083, T-097
 
 Deliverables: lifecycle overview, export options, authenticated download, reset explanation, exact confirmation, expected revision, operation polling, progress, cache clear, and diagnostics.
 
 Acceptance:
-- [ ] Reset cannot submit without scope, exact scenario, and current revision.
-- [ ] Duplicate submissions are prevented.
-- [ ] Completion refetches baseline, users, groups, capabilities, and audit.
+- [x] Reset cannot submit without scope, exact scenario, and current revision.
+- [x] Duplicate submissions are prevented.
+- [x] Completion refetches baseline, users, groups, capabilities, and audit.
 
 ## [ ] T-106 Implement shared errors, accessibility, CSP compatibility, and UI security tests
 

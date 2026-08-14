@@ -1,6 +1,6 @@
 # LabLDAP frontend
 
-React 19.2 / TypeScript / Vite administrative UI (T-095–T-101).
+React 19.2 / TypeScript / Vite administrative UI (T-095–T-105).
 Semantic HTML only — no large design system (OD-011).
 
 Pinned (see [docs/toolchain.md](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/toolchain.md)):
@@ -51,6 +51,28 @@ required initial member chosen through bounded server search. Empty
 detail supports add, remove, and replace membership with added / removed
 / unchanged / rejected summaries. Cycle errors leave the group unchanged.
 There is no group-attribute edit form (no `PATCH /groups/{id}`).
+
+## Search, bind test, schema, audit, reset, export
+
+`/search` is an explicit-submit console (base, scope, filter, attributes, page
+size). Typing does not run LDAP. Attribute controls are an allowlist;
+`userPassword` and other forbidden names cannot be requested. Results expand
+for a redacted LDIF snippet.
+
+`/auth-test` posts a bind diagnostic and clears the password field after the
+request. Failures do not distinguish unknown identity from a wrong password.
+`/schema` is a read-only, keyboard-navigable Root DSE and schema browser.
+
+`/audit` lists the in-memory ring with action/actor filters, request-ID copy,
+and a retention notice. Actor and target are non-secret identifiers; secret-
+looking values are replaced with `[redacted]`. Missing `audit:read` is a
+permission state.
+
+`/reset` requires `lab:reset`, the exact compiled scenario name, and the
+current revision. Duplicate submits are blocked while a reset is running.
+Completion invalidates baseline, users, groups, capabilities, and audit.
+`/export` downloads authenticated LDIF. `/diagnostics` is a secret-free
+status view.
 
 ```text
 corepack enable

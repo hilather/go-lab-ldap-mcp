@@ -154,6 +154,62 @@ test("group create requires an initial member from bounded server search", async
   assert.match(search, /type="button"/);
 });
 
+test("search console submits explicitly and cannot request forbidden attributes", async () => {
+  const page = await readFile(join(srcRoot, "routes/search/SearchPage.tsx"), "utf8");
+  assert.match(page, /Search does not run while you type/);
+  assert.match(page, /searchEntries\(searchBody/);
+  assert.match(page, /SEARCH_ALLOWED_ATTRS/);
+  assert.match(page, /type="submit"/);
+  assert.doesNotMatch(page, /useQuery\(/);
+  assert.match(page, /entryToLDIF/);
+  const model = await readFile(join(srcRoot, "lib/search-model.ts"), "utf8");
+  assert.match(model, /userpassword/);
+  assert.match(model, /isForbiddenSearchAttr/);
+});
+
+test("bind test clears the password and does not distinguish unknown user", async () => {
+  const page = await readFile(join(srcRoot, "routes/auth-test/AuthTestPage.tsx"), "utf8");
+  assert.match(page, /type="password"/);
+  assert.match(page, /setValue\("password", ""\)/);
+  assert.match(page, /bindOutcomePresentation/);
+  assert.match(page, /bindRateLimitMessage/);
+  assert.match(page, /createAuthTest/);
+  const model = await readFile(join(srcRoot, "lib/ops-model.ts"), "utf8");
+  assert.match(model, /does not distinguish an unknown identity/);
+});
+
+test("schema browser is read-only and keyboard navigable", async () => {
+  const page = await readFile(join(srcRoot, "routes/schema/SchemaPage.tsx"), "utf8");
+  assert.match(page, /role="listbox"/);
+  assert.match(page, /ArrowDown/);
+  assert.match(page, /getRootDSE/);
+  assert.match(page, /getSchema/);
+  assert.doesNotMatch(page, /api\.POST|api\.PATCH|api\.DELETE/);
+});
+
+test("audit page uses non-secret identifiers and hides secret-looking fields", async () => {
+  const page = await readFile(join(srcRoot, "routes/audit/AuditPage.tsx"), "utf8");
+  assert.match(page, /safeAuditField/);
+  assert.match(page, /AUDIT_RETENTION_NOTICE/);
+  assert.match(page, /Copy request ID/);
+  assert.match(page, /SCOPE_AUDIT_READ/);
+  assert.doesNotMatch(page, /event\.(password|token|cookie|authorization)/i);
+});
+
+test("reset requires scope, exact scenario name, and current revision", async () => {
+  const page = await readFile(join(srcRoot, "routes/reset/ResetPage.tsx"), "utf8");
+  assert.match(page, /canSubmitReset/);
+  assert.match(page, /startReset\(\{ name:/);
+  assert.match(page, /expectedRevision: revision/);
+  assert.match(page, /invalidateAfterReset/);
+  assert.match(page, /disabled=\{!gate\.ok \|\| submitting\}/);
+  const exp = await readFile(join(srcRoot, "routes/export/ExportPage.tsx"), "utf8");
+  assert.match(exp, /downloadExport/);
+  assert.match(exp, /omitSecrets/);
+  const diag = await readFile(join(srcRoot, "routes/diagnostics/DiagnosticsPage.tsx"), "utf8");
+  assert.match(diag, /getDiagnostics/);
+});
+
 test("group detail has membership summaries, cycle errors, and no attribute PATCH", async () => {
   const detail = await readFile(join(srcRoot, "routes/groups/GroupDetailPage.tsx"), "utf8");
   assert.match(detail, /addGroupMembers/);

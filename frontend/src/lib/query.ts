@@ -16,6 +16,11 @@ export const queryKeys = {
     baseline: [...directoryQueryKey, "baseline"] as const,
     version: [...directoryQueryKey, "version"] as const,
     audit: [...directoryQueryKey, "audit"] as const,
+    auditList: (q: { pageSize: number; action?: string; actor?: string; cursor?: string }) =>
+      [...directoryQueryKey, "audit", "list", q] as const,
+    schema: [...directoryQueryKey, "schema"] as const,
+    rootdse: [...directoryQueryKey, "rootdse"] as const,
+    reset: [...directoryQueryKey, "reset"] as const,
   },
   users: {
     all: usersQueryKey,
@@ -56,6 +61,10 @@ export function invalidateUsersAndGroups(client: QueryClient): Promise<void> {
     client.invalidateQueries({ queryKey: usersQueryKey }),
     client.invalidateQueries({ queryKey: groupsQueryKey }),
   ]).then(() => undefined);
+}
+
+export function invalidateAfterReset(client: QueryClient): Promise<void> {
+  return client.invalidateQueries({ queryKey: directoryQueryKey }).then(() => undefined);
 }
 
 export function clearDirectoryQueryData(client: QueryClient): void {
