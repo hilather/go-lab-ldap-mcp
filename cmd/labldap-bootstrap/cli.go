@@ -28,6 +28,8 @@ func runBootstrap(cmd string, args []string, stdout, stderr io.Writer, logger *s
 	opt.Tree = eng
 	opt.ACIs = eng
 	opt.Seed = eng
+	opt.VerifyRuntime = eng
+	opt.VerifyApp = eng
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()

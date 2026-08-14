@@ -71,7 +71,7 @@ func sampleRuntimeACIs() []config.NamedACI {
 		{ID: "labldap:runtime-suffix-read", Target: "dc=example,dc=test",
 			Text: `(target="ldap:///dc=example,dc=test")(targetattr!="userPassword")(version 3.0; acl "labldap:runtime-suffix-read"; allow (read,search,compare) userdn="ldap:///uid=rt,ou=people,dc=example,dc=test";)`},
 		{ID: "labldap:runtime-people-write", Target: "ou=people,dc=example,dc=test",
-			Text: `(target="ldap:///ou=people,dc=example,dc=test")(targetattr="*")(version 3.0; acl "labldap:runtime-people-write"; allow (add,delete,write,read,search,compare) userdn="ldap:///uid=rt,ou=people,dc=example,dc=test";)`},
+			Text: `(target="ldap:///ou=people,dc=example,dc=test")(targetattr!="aci")(version 3.0; acl "labldap:runtime-people-write"; allow (add,delete,write,read,search,compare) userdn="ldap:///uid=rt,ou=people,dc=example,dc=test";)`},
 	}
 }
 

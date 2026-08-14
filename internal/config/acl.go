@@ -73,8 +73,8 @@ func managedRuntimeACIs(n *Normalized) []NamedACI {
 	who := `userdn="ldap:///` + aciEscape(n.Runtime.DN) + `"`
 	return []NamedACI{
 		namedRuntime("runtime-suffix-read", suf, who, []string{"read", "search", "compare"}, "*", "userPassword"),
-		namedRuntime("runtime-people-write", people, who, []string{"add", "delete", "write", "read", "search", "compare"}, "*", ""),
-		namedRuntime("runtime-groups-write", groups, who, []string{"add", "delete", "write", "read", "search", "compare"}, "*", ""),
+		namedRuntime("runtime-people-write", people, who, []string{"add", "delete", "write", "read", "search", "compare"}, "*", "aci"),
+		namedRuntime("runtime-groups-write", groups, who, []string{"add", "delete", "write", "read", "search", "compare"}, "*", "aci"),
 		namedRuntime("runtime-password", people, who, []string{"write"}, "userPassword", ""),
 	}
 }

@@ -520,6 +520,9 @@ func hasAllObjectClasses(e *ldap.Entry, want []string) bool {
 }
 
 func accountLocked(e *ldap.Entry) bool {
+	if e == nil {
+		return false
+	}
 	return hasValue(e, "nsAccountLock", "true")
 }
 

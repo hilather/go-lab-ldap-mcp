@@ -345,7 +345,7 @@ func assertRemainingAfterSeed(t *testing.T, out string) {
 	if err := decodeSummary(out, &sum); err != nil {
 		t.Fatalf("summary: %v\n%s", err, out)
 	}
-	want := []string{"verify_runtime", "verify_app", "drift", "marker"}
+	want := []string{"drift", "marker"}
 	if strings.Join(sum.Remaining, ",") != strings.Join(want, ",") {
 		t.Fatalf("remaining = %v, want %v", sum.Remaining, want)
 	}

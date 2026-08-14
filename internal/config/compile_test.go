@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/hilather/go-lab-ldap-mcp/internal/apperr"
 	"github.com/hilather/go-lab-ldap-mcp/internal/config"
 	"github.com/hilather/go-lab-ldap-mcp/internal/config/v1alpha1"
 )
@@ -304,6 +305,41 @@ spec:
 	if ca.Revisions.Directory != cb.Revisions.Directory {
 		t.Fatal("map order changed directory revision")
 	}
+}
+
+func TestManagedRuntimeACIsDenyACI(t *testing.T) {
+	c, err := config.Compile(t.Context(), exampleYAML(t), "example-lab.yaml", config.LoadOptions{
+		Caller:  config.CallerCLI,
+		Secrets: fixtureSecrets(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var b strings.Builder
+	for _, a := range c.Data.ACIs {
+		if !strings.HasPrefix(a.ID, "labldap:runtime-") {
+			continue
+		}
+		b.WriteString(a.ID)
+		b.WriteByte('\t')
+		b.WriteString(a.Target)
+		b.WriteByte('\t')
+		b.WriteString(a.Text)
+		b.WriteByte('\n')
+		switch a.ID {
+		case "labldap:runtime-people-write", "labldap:runtime-groups-write":
+			if !strings.Contains(a.Text, `targetattr!="aci"`) {
+				t.Fatalf("%s missing deny aci: %s", a.ID, a.Text)
+			}
+			if strings.Contains(a.Text, `targetattr="*"`) {
+				t.Fatalf("%s still allows all attributes: %s", a.ID, a.Text)
+			}
+		}
+	}
+	if config.CompilerContract != "labldap.config.v1alpha1.3" {
+		t.Fatalf("CompilerContract = %q, KD-R23 must not bump it", config.CompilerContract)
+	}
+	apperr.EqualGolden(t, "runtime-acis.txt", []byte(b.String()))
 }
 
 func TestInvalidFixtureFiles(t *testing.T) {

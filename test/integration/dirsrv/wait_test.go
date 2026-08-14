@@ -60,11 +60,13 @@ spec:
 		Tree:          stubTree{},
 		ACIs:          stubACIs{},
 		Seed:          stubSeed{},
+		VerifyRuntime: stubRuntime{},
+		VerifyApp:     stubApp{},
 	}, ioDiscard(), ioDiscard())
 	if err != nil {
 		t.Fatalf("apply wait: %v summary=%+v", err, sum)
 	}
-	if !sum.OK || len(sum.Phases) != 9 {
+	if !sum.OK || len(sum.Phases) != 11 {
 		t.Fatalf("%+v", sum)
 	}
 
@@ -160,6 +162,18 @@ type stubSeed struct{}
 
 func (stubSeed) ReconcileSeed(context.Context, bootstrap.SeedRequest) (bootstrap.SeedResult, error) {
 	return bootstrap.SeedResult{}, nil
+}
+
+type stubRuntime struct{}
+
+func (stubRuntime) VerifyRuntime(context.Context, bootstrap.VerifyRequest) (bootstrap.VerifyResult, error) {
+	return bootstrap.VerifyResult{Allowed: 1, Denied: 1}, nil
+}
+
+type stubApp struct{}
+
+func (stubApp) VerifyApp(context.Context, bootstrap.VerifyRequest) (bootstrap.VerifyResult, error) {
+	return bootstrap.VerifyResult{Binds: 1, SkippedLockout: 1}, nil
 }
 
 func waitCode(err error) string {

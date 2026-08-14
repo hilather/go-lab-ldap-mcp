@@ -19,11 +19,13 @@ import (
 	"github.com/hilather/go-lab-ldap-mcp/internal/observability"
 )
 
-// remainingAfterSeed is the not-yet-run suffix after phase.seed.
-// inspect is validate-only and must not appear as leftover apply work.
-var remainingAfterSeed = []string{
-	"verify_runtime", "verify_app", "drift", "marker",
-}
+// remainingAfterVerify is the not-yet-run apply suffix after verify_app.
+// remainingAfterValidate is the not-yet-run validate suffix after seed
+// (write-probe verifiers are not planned on validate).
+var (
+	remainingAfterVerify   = []string{"drift", "marker"}
+	remainingAfterValidate = []string{"inspect", "drift"}
+)
 
 // Options is the parsed bootstrap command.
 type Options struct {
@@ -43,6 +45,8 @@ type Options struct {
 	Tree           TreeReconciler
 	ACIs           ACIReconciler
 	Seed           SeedReconciler
+	VerifyRuntime  RuntimeVerifier
+	VerifyApp      AppVerifier
 	RequireSASL    []string
 	Log            *slog.Logger
 	Now            func() time.Time
@@ -268,11 +272,61 @@ func Run(ctx context.Context, opt Options, stdout, stderr io.Writer) (Summary, e
 			"deleted": len(res.Deleted),
 		}, nil
 	})
-	sum.Phases = rep.phases
 	if err != nil {
+		sum.Phases = rep.phases
 		return sum, err
 	}
-	sum.Remaining = append([]string(nil), remainingAfterSeed...)
+
+	if write {
+		err = rep.run("verify_runtime", func() (map[string]int, error) {
+			if opt.VerifyRuntime == nil {
+				return nil, phaseErr("verify_runtime", "allow_failed", "runtime verifier is not configured")
+			}
+			pw, e := readPasswordFile(opt.PasswordFile)
+			if e != nil {
+				return nil, e
+			}
+			res, e := opt.VerifyRuntime.VerifyRuntime(ctx, verifyRequestFrom(compiled, opt, pw, write))
+			if e != nil {
+				return nil, e
+			}
+			return map[string]int{
+				"allowed": res.Allowed,
+				"denied":  res.Denied,
+				"skipped": res.Skipped,
+			}, nil
+		})
+		if err != nil {
+			sum.Phases = rep.phases
+			return sum, err
+		}
+		err = rep.run("verify_app", func() (map[string]int, error) {
+			if opt.VerifyApp == nil {
+				return nil, phaseErr("verify_app", "bind", "application verifier is not configured")
+			}
+			pw, e := readPasswordFile(opt.PasswordFile)
+			if e != nil {
+				return nil, e
+			}
+			res, e := opt.VerifyApp.VerifyApp(ctx, verifyRequestFrom(compiled, opt, pw, write))
+			if e != nil {
+				return nil, e
+			}
+			return map[string]int{
+				"binds":           res.Binds,
+				"groups":          res.Groups,
+				"skipped_lockout": res.SkippedLockout,
+			}, nil
+		})
+		if err != nil {
+			sum.Phases = rep.phases
+			return sum, err
+		}
+		sum.Remaining = append([]string(nil), remainingAfterVerify...)
+	} else {
+		sum.Remaining = append([]string(nil), remainingAfterValidate...)
+	}
+	sum.Phases = rep.phases
 	sum.OK = true
 	return sum, nil
 }
@@ -399,6 +453,26 @@ func seedRequestFrom(c *config.Compiled, opt Options, dm observability.Secret, w
 		Groups:      c.Normalized.Groups,
 		StartupMode: c.Normalized.StartupMode,
 		Preserve:    append([]string(nil), c.Data.Preserve...),
+	}
+}
+
+func verifyRequestFrom(c *config.Compiled, opt Options, dm observability.Secret, write bool) VerifyRequest {
+	size := 8
+	if n := c.Public.Spec.Limits.SearchSizeLimit; n > 0 && n < size {
+		size = n
+	}
+	limit := 5 * time.Second
+	if d, err := time.ParseDuration(c.Public.Spec.Limits.SearchTimeLimit); err == nil && d > 0 {
+		limit = d
+	}
+	return VerifyRequest{
+		TreeRequest: treeRequestFrom(c, opt, dm, write),
+		Users:       c.Normalized.Users,
+		Groups:      c.Normalized.Groups,
+		Policy:      c.Normalized.Policy,
+		MarkerDN:    c.Data.Marker,
+		SizeLimit:   size,
+		TimeLimit:   limit,
 	}
 }
 

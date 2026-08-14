@@ -420,27 +420,27 @@ Acceptance:
 - [x] Groups and memberships match normalized plan.
 - [x] Password-operation failure triggers compensation or explicit partial failure.
 
-## [ ] T-036 Verify runtime service-account allowed and denied operations
+## [x] T-036 Verify runtime service-account allowed and denied operations
 
 Priority: P0 | Size: L | Depends on: T-034, T-035
 
 Deliverables: representative read, add, modify, delete, password, schema, metadata, and `cn=config` probes using runtime identity.
 
 Acceptance:
-- [ ] Every required runtime operation succeeds.
-- [ ] `cn=config`, backend, plugin, and Directory Manager modifications fail.
-- [ ] Verification failure prevents marker commit and bootstrap success.
+- [x] Every required runtime operation succeeds.
+- [x] `cn=config`, backend, plugin, and Directory Manager modifications fail.
+- [x] Verification failure prevents marker commit and bootstrap success.
 
-## [ ] T-037 Verify application bind, password policy, and group behavior
+## [x] T-037 Verify application bind, password policy, and group behavior
 
 Priority: P0 | Size: L | Depends on: T-031, T-032, T-035
 
 Deliverables: test user binds, invalid bind, lockout sequence, disablement, group search, and MemberOf checks.
 
 Acceptance:
-- [ ] Configured successful and failed authentication behavior is proven.
-- [ ] Lockout test cleans up or uses isolated state.
-- [ ] Verification output does not expose passwords.
+- [x] Configured successful and failed authentication behavior is proven.
+- [x] Lockout test cleans up or uses isolated state.
+- [x] Verification output does not expose passwords.
 
 ## [ ] T-038 Implement bootstrap `validate`, `merge`, and `reset` modes
 

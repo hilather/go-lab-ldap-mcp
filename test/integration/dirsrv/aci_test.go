@@ -37,9 +37,15 @@ func TestShippedApplyACIReadback(t *testing.T) {
 	if !strings.Contains(people, `acl "labldap:runtime-people-write"`) || !strings.Contains(people, `acl "labldap:runtime-password"`) {
 		t.Fatalf("missing people ACIs:\n%s", people)
 	}
+	if !strings.Contains(compactACI(people), `targetattr!="aci"`) {
+		t.Fatalf("people-write must deny aci:\n%s", people)
+	}
 	groups := ldapSearch(t, inst, "ou=groups,dc=example,dc=test", "aci")
 	if !strings.Contains(groups, `acl "labldap:runtime-groups-write"`) {
 		t.Fatalf("missing groups ACI:\n%s", groups)
+	}
+	if !strings.Contains(compactACI(groups), `targetattr!="aci"`) {
+		t.Fatalf("groups-write must deny aci:\n%s", groups)
 	}
 	out2, err := execApply(t, inst, guest, nil)
 	if err != nil {
@@ -151,6 +157,10 @@ func TestShippedACIRuntimeCannotEscapeSuffix(t *testing.T) {
 	if before != after {
 		t.Fatalf("validate mutated ACIs\nbefore=%s\nafter=%s", before, after)
 	}
+}
+
+func compactACI(s string) string {
+	return strings.Join(strings.Fields(s), " ")
 }
 
 func aciField(err error, code string) bool {

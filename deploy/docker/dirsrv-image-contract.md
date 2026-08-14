@@ -79,6 +79,8 @@ Unknown compiled plugin names are `plugin_missing`. Failed MemberOf fix-up is `f
 
 `--create-suffix` installs an unmanaged `Enable anyone domain read` ACI on the suffix root. LabLDAP owns only `aci` values whose `acl "..."` name starts with `labldap:`. Adding an identical value again returns LDAP 20. A malformed ACI returns LDAP 21 (`ACL Syntax Error`). Read-back is compared after collapsing whitespace.
 
+`targetattr!="aci"` on `labldap:runtime-people-write` / `labldap:runtime-groups-write` (KD-R23) is accepted by 2.4.6 and denies runtime ACI rewrite (LDAP 50). Runtime people-write still grants read of hashed `userPassword` on people entries; suffix-read deny is `targetattr!="userPassword"` on the suffix/marker. `nsAccountLock: true` bind is LDAP 53. Password lockout is confirmed when the correct password also fails after `pwdmaxfailures`.
+
 ## Environment (subset)
 
 - `DS_DM_PASSWORD` — set Directory Manager password after first start
