@@ -17,6 +17,7 @@ import (
 	"github.com/hilather/go-lab-ldap-mcp/internal/auth"
 	"github.com/hilather/go-lab-ldap-mcp/internal/config"
 	"github.com/hilather/go-lab-ldap-mcp/internal/directory/ds389"
+	"github.com/hilather/go-lab-ldap-mcp/internal/mcpserver"
 	"github.com/hilather/go-lab-ldap-mcp/internal/observability"
 )
 
@@ -82,7 +83,7 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 			fmt.Fprintf(stderr, "labldap serve: %v\n", err)
 			return 1
 		}
-		handler = srv.Handler()
+		handler = mountTransports(srv.Handler(), mcpserver.Disabled())
 		readTO, writeTO, idleTO, stopTO = srv.Timeouts(30*time.Second, 15*time.Second)
 	} else {
 		built, err := compileControl(ctx, configPath)
@@ -103,7 +104,12 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 			fmt.Fprintf(stderr, "labldap serve: %v\n", err)
 			return 1
 		}
-		handler = srv.Handler()
+		mcpH, err := mcpHandlerFromCompiled(built, opt.Registry, log)
+		if err != nil {
+			fmt.Fprintf(stderr, "labldap serve: %v\n", err)
+			return 1
+		}
+		handler = mountTransports(srv.Handler(), mcpH)
 		listen = built.Public.Spec.Management.Listen
 		reqTO, err := time.ParseDuration(built.Public.Spec.Limits.RequestTimeout)
 		if err != nil {
@@ -189,6 +195,42 @@ func serverOptionsFromCompiled(c *config.Compiled, log *slog.Logger) (api.Option
 	}, nil
 }
 
+func mountTransports(rest, mcp http.Handler) http.Handler {
+	mux := http.NewServeMux()
+	if mcp == nil {
+		mcp = mcpserver.Disabled()
+	}
+	mux.Handle(mcpserver.MountPath, mcp)
+	mux.Handle("/", rest)
+	return mux
+}
+
+func mcpHandlerFromCompiled(c *config.Compiled, reg *auth.Registry, log *slog.Logger) (http.Handler, error) {
+	if c == nil || c.Public == nil || (c.Public.Spec.Management.MCP.Enabled != nil && !*c.Public.Spec.Management.MCP.Enabled) {
+		return mcpserver.Disabled(), nil
+	}
+	mcpCfg := c.Public.Spec.Management.MCP
+	s, err := mcpserver.New(mcpserver.Options{
+		Registry: reg,
+		// Application services attach when the runtime pool lands (T-073).
+		// Nil keeps tool handlers returning directory unavailable, not panic.
+		Services:       nil,
+		Logger:         log,
+		AllowedOrigins: append([]string(nil), c.Public.Spec.Management.CORS.AllowedOrigins...),
+		MaxBody:        c.Public.Spec.Limits.MaxRequestBodyBytes,
+		Flags: mcpserver.RegisterFlags{
+			Mutations: mcpCfg.RegisterMutations,
+			Password:  mcpCfg.RegisterPassword,
+			Reset:     mcpCfg.RegisterReset,
+			Export:    mcpCfg.RegisterExport,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	return s.Handler(), nil
+}
+
 func runtimeConfigFromCompiled(c *config.Compiled) ds389.RuntimeConfig {
 	n := c.Normalized
 	return ds389.RuntimeConfig{
@@ -210,8 +252,8 @@ const serveUsage = `Usage:
   labldap serve --config FILE
   labldap serve --placeholder
 
-serve starts the management HTTP listener (REST, later MCP and UI).
+serve starts the management HTTP listener (REST, MCP, and later UI).
 --placeholder listens on LABLDAP_LISTEN (default 127.0.0.1:8443) without
 loading a scenario or contacting LDAP. GET /health is live; GET /health/ready
-is 503 until the directory is ready.
+is 503 until the directory is ready. POST /mcp is 501 until a scenario enables MCP.
 `

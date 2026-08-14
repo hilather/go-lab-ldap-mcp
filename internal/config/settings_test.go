@@ -61,6 +61,9 @@ spec:
 	if p.Public.Spec.Management.Metrics.Enabled == nil || !*p.Public.Spec.Management.Metrics.Enabled {
 		t.Fatal("metrics.enabled should default true")
 	}
+	if p.Public.Spec.Management.MCP.Enabled == nil || !*p.Public.Spec.Management.MCP.Enabled {
+		t.Fatal("mcp.enabled should default true")
+	}
 }
 
 func TestSettingsHonorMetricsDisabled(t *testing.T) {
@@ -87,5 +90,32 @@ spec:
 	}
 	if p.Public.Spec.Management.Metrics.Enabled == nil || *p.Public.Spec.Management.Metrics.Enabled {
 		t.Fatal("explicit metrics.enabled: false was overridden")
+	}
+}
+
+func TestSettingsHonorMCPDisabled(t *testing.T) {
+	src := []byte(`
+apiVersion: labldap.dev/v1alpha1
+kind: LabScenario
+metadata:
+  name: x
+spec:
+  directory:
+    suffix: dc=example,dc=test
+  transport:
+    ldaps: { enabled: true, port: 3636 }
+  management:
+    mcp:
+      enabled: false
+  runtimeAccount:
+    id: rt
+    passwordFile: /run/secrets/runtime-ldap
+`)
+	p, err := config.Load(t.Context(), src, "nomcp.yaml", config.LoadOptions{Caller: config.CallerControl})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Public.Spec.Management.MCP.Enabled == nil || *p.Public.Spec.Management.MCP.Enabled {
+		t.Fatal("explicit mcp.enabled: false was overridden")
 	}
 }

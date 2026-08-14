@@ -58,6 +58,10 @@ func applyDefaults(f *v1alpha1.File) {
 		t := true
 		mg.Metrics.Enabled = &t
 	}
+	if mg.MCP.Enabled == nil {
+		t := true
+		mg.MCP.Enabled = &t
+	}
 	lim := &f.Spec.Limits
 	if lim.RequestTimeout == "" {
 		lim.RequestTimeout = "30s"

@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 )
@@ -75,5 +77,23 @@ func TestServeRequiresFlag(t *testing.T) {
 	}
 	if !strings.Contains(stderr.String(), "--placeholder") {
 		t.Fatalf("stderr = %q", stderr.String())
+	}
+}
+
+func TestMountTransportsMCPDisabled(t *testing.T) {
+	rest := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("rest"))
+	})
+	h := mountTransports(rest, nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/mcp", nil))
+	if rec.Code != http.StatusNotImplemented {
+		t.Fatalf("/mcp disabled = %d %s", rec.Code, rec.Body.String())
+	}
+	live := httptest.NewRecorder()
+	h.ServeHTTP(live, httptest.NewRequest(http.MethodGet, "/health", nil))
+	if live.Code != http.StatusOK || live.Body.String() != "rest" {
+		t.Fatalf("rest = %d %s", live.Code, live.Body.String())
 	}
 }
