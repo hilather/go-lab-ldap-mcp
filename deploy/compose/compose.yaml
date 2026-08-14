@@ -1,0 +1,73 @@
+# Dev topology (T-042): directory healthy → bootstrap one-shot → placeholder control.
+# Directory Manager arrives only via the gitignored env_file (KD-R20) and a
+# password-file mount on bootstrap. Control never receives DM.
+name: labldap
+
+services:
+  directory:
+    image: quay.io/389ds/dirsrv@sha256:f2851654c5df545cd893d84bea8d08c28dc25f0930493fbfed1d8a6eacf657f7
+    hostname: directory
+    env_file:
+      - path: ${LABLDAP_DIRECTORY_ENVFILE:-../../secrets/directory.env}
+        required: true
+    volumes:
+      - directory-data:/data
+    ports:
+      - "127.0.0.1:3389:3389"
+      - "127.0.0.1:3636:3636"
+    healthcheck:
+      test: ["CMD", "/bin/sh", "-c", "test -f /data/config/container.inf && test -S /data/run/slapd-localhost.socket"]
+      interval: 2s
+      timeout: 5s
+      retries: 60
+      start_period: 10s
+
+  bootstrap:
+    image: labldap-bootstrap:dev
+    hostname: bootstrap
+    depends_on:
+      directory:
+        condition: service_healthy
+    volumes:
+      # Read-only /data: instance CA + LDAPI socket for dsconf localhost.
+      # Bootstrap must not write engine state (architecture §4).
+      - directory-data:/data:ro
+      - ${LABLDAP_SCENARIO_DIR:-../../test/fixtures/config/valid}:/config:ro
+      - ${LABLDAP_DM_PASSWORD_FILE:-../../secrets/dm.pw}:/run/secrets/dm.pw:ro
+    command:
+      - apply
+      - --config
+      - /config/minimal.yaml
+      - --directory-manager-password-file
+      - /run/secrets/dm.pw
+      - --ldap-url
+      - ldaps://directory:3636
+      - --directory-host
+      - directory
+      - --directory-ca-file
+      - /data/config/ca.crt
+      - --dsconf-instance
+      - localhost
+    restart: "no"
+
+  control:
+    image: labldap-control:placeholder
+    hostname: control
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+    environment:
+      # Bind all container interfaces so Docker DNAT to eth0 works.
+      # Host publish stays loopback-only (KD-R19 host-facing address).
+      LABLDAP_LISTEN: 0.0.0.0:8443
+    ports:
+      - "127.0.0.1:8443:8443"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8443/health"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+      start_period: 2s
+
+volumes:
+  directory-data:

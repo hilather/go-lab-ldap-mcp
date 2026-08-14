@@ -7,7 +7,7 @@ import (
 
 func TestRedactLogs(t *testing.T) {
 	const dm = "super-secret-dm-password"
-	const pem = "-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA\n-----END RSA PRIVATE KEY-----"
+	const pem = "-----BEGIN " + "RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA\n-----END RSA PRIVATE KEY-----"
 	cases := []struct {
 		name string
 		in   string

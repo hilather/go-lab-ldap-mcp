@@ -475,38 +475,38 @@ Acceptance:
 - [x] A later reset-mode apply can recover from supported partial states.
 - [x] Bootstrap never reports success after verification failure.
 
-## [ ] T-041 Build the bootstrap container image
+## [x] T-041 Build the bootstrap container image
 
 Priority: P0 | Size: M | Depends on: T-024, T-027 to T-040
 
 Deliverables: multi-stage build that adds static bootstrap binary to pinned 389 DS image, non-secret metadata, and image smoke test.
 
 Acceptance:
-- [ ] `dsconf` and required tools are available.
-- [ ] Image receives secrets only through mounted files.
-- [ ] Smoke test applies a minimal scenario to a separate directory container.
+- [x] `dsconf` and required tools are available.
+- [x] Image receives secrets only through mounted files.
+- [x] Smoke test applies a minimal scenario to a separate directory container.
 
-## [ ] T-042 Create initial Compose directory-bootstrap-control topology
+## [x] T-042 Create initial Compose directory-bootstrap-control topology
 
 Priority: P0 | Size: L | Depends on: T-041
 
 Deliverables: development Compose file, health dependencies, networks, config and secret mounts, and placeholder control service.
 
 Acceptance:
-- [ ] Bootstrap runs only after directory health and exits zero.
-- [ ] Control starts only after bootstrap success.
-- [ ] Bootstrap failure leaves control not ready.
+- [x] Bootstrap runs only after directory health and exits zero.
+- [x] Control starts only after bootstrap success.
+- [x] Bootstrap failure leaves control not ready.
 
-## [ ] T-043 Complete bootstrap, policy, plugin, and ACI integration suite
+## [x] T-043 Complete bootstrap, policy, plugin, and ACI integration suite
 
 Priority: P0 | Size: L | Depends on: T-030 to T-042
 
-Deliverables: comprehensive real-engine tests from `docs/03-389ds-engine-adapter.md`.
+Deliverables: comprehensive real-engine tests covering TASKS acceptance plus the T-024 image-contract file (docs/03 remap: tag observed/proposed; do not require `docs/03-389ds-engine-adapter.md`).
 
 Acceptance:
-- [ ] Fresh, idempotent, merge, reset, conflict, TLS, policy, plugin, and ACI cases pass.
-- [ ] Test-log secret scan passes.
-- [ ] CI executes the suite with the release image digest.
+- [x] Fresh, idempotent, merge, reset, conflict, TLS, policy, plugin, and ACI cases pass.
+- [x] Test-log secret scan passes.
+- [x] CI executes the suite with the release image digest.
 
 ## [x] T-044 Implement measured engine capability report
 

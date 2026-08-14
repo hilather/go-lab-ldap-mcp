@@ -59,9 +59,9 @@ Pain this document removes:
 | --- | --- |
 | Workspace | `/home/mbrewer/projects/go-lab-ldap-mcp` |
 | Module | `github.com/hilather/go-lab-ldap-mcp` (`go 1.26`, `toolchain go1.26.5`) |
-| TASKS status | T-001–T-034 `[x]`; T-035–T-120 `[ ]` (86 remaining) |
-| Milestones | M0 complete; M1 complete; M2 in progress (T-024–T-040, T-044 done; T-041–T-043 remain); M3–M8 not started |
-| `cmd/labldap` | `help`, `version`, `validate`, `normalize`, `plan`. No-args is help/exit 0. `serve` is unknown/exit 2 |
+| TASKS status | T-001–T-044 `[x]`; T-045–T-120 `[ ]` remaining |
+| Milestones | M0 complete; M1 complete; M2 complete (T-024–T-044); M3–M8 not started |
+| `cmd/labldap` | `help`, `version`, `validate`, `normalize`, `plan`, `serve --placeholder`. No-args is help/exit 0 |
 | `cmd/labldap-bootstrap` | `apply` / `validate` / `plan` via `bootstrap.ParseArgs` + `bootstrap.Run`; wires `ds389.Admin` and `ds389.Engine` |
 | `internal/config` | Full compiler: `Load` → `*Parsed`; `Compile` → `*Compiled` (Normalized, EnginePlan, DataPlan, Revisions) |
 | Compiler contract | `labldap.config.v1alpha1.3` (`config.CompilerContract`) |
@@ -76,7 +76,7 @@ Pain this document removes:
 | Container ports | **3389** LDAP, **3636** LDAPS (not 389/636) |
 | Frontend | placeholder `pnpm@10.14.0`; React is T-095 |
 | `api/openapi.yaml` | not present; `api/generated/` reserved |
-| Make pending | `test-e2e` (T-107), `compose-*` (T-042 / T-110), `image` (T-041 / T-108). `test-integration` is real |
+| Make pending | `test-e2e` (T-107), `compose-reset` (T-110), `image` (T-108). `compose-up`/`down` and `image-bootstrap` are real |
 | Import-boundary | `internal/config` ↛ directory / go-ldap / transports; only `ds389` may import go-ldap today; only `cmd/labldap-bootstrap` + tests may import `ds389` |
 | Missing source-package docs | still 18 (`00`, `02`–`09`, `11`, `12`, ADR bodies). Title-only stubs are **not** accepted ADRs |
 

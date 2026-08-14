@@ -1,7 +1,7 @@
 # LabLDAP continuous integration (T-004, T-007 wiring).
 #
 # Required PR gate: static, unit, frontend, security, integration.
-# image remains continue-on-error until T-041/T-108.
+# image-bootstrap is required. make image stays PENDING:control-image until T-108.
 #
 # Caches are only the Go module/build cache and the pnpm store.
 # Do not add cache paths that include /secrets, .env, or credential files.
@@ -193,19 +193,18 @@ jobs:
       - name: Integration tests
         run: make test-integration
 
-  # Placeholder until T-041/T-108 (bootstrap/control images). Not a required
-  # PR gate in M0. After image targets land, remove continue-on-error so
-  # main can require this job.
   image:
     name: image
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    continue-on-error: true
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           persist-credentials: false
 
-      - name: Image build (placeholder)
+      - name: Bootstrap image
+        run: make image-bootstrap
+
+      - name: Control image remains pending
         run: make image

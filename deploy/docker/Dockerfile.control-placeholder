@@ -1,0 +1,20 @@
+# labldap-control:placeholder is a thin T-042 image, not T-108.
+# Do not tag this labldap-control:dev. Do not push (OD-004).
+
+ARG GO_IMAGE=golang:1.26.5
+ARG ALPINE_IMAGE=alpine:3.21
+FROM ${GO_IMAGE} AS build
+WORKDIR /src
+ENV CGO_ENABLED=0
+ENV GOTOOLCHAIN=go1.26.5
+COPY go.mod go.sum ./
+RUN go mod download
+COPY cmd ./cmd
+COPY internal ./internal
+RUN go build -trimpath -ldflags="-s -w" -o /out/labldap ./cmd/labldap
+
+FROM ${ALPINE_IMAGE}
+COPY --from=build /out/labldap /usr/local/bin/labldap
+USER nobody
+ENTRYPOINT ["/usr/local/bin/labldap"]
+CMD ["serve", "--placeholder"]

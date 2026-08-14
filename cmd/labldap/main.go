@@ -24,7 +24,7 @@ Commands:
   validate   Compile a scenario YAML (exit 0 if valid)
   normalize  Print redacted normalized JSON
   plan       Print a redacted engine/data plan (JSON)
-  serve      Start the management HTTP listener
+  serve      Start the management HTTP listener (or --placeholder)
 
 Structured logs go to stderr. Set LABLDAP_LOG_FORMAT=json for JSON logs.
 

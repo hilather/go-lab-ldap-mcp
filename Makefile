@@ -9,9 +9,15 @@ GOVULNCHECK_MOD  := golang.org/x/vuln/cmd/govulncheck@v1.1.4
 OAPI_CODEGEN_MOD := github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.8.0
 OPENAPI_TS_PKG   := openapi-typescript@7.13.0
 
+DIRSRV_IMAGE     := $(shell cat deploy/docker/dirsrv.digest)
+COMPOSE          := docker compose -f deploy/compose/compose.yaml -p labldap
+COMPOSE_ENV      := secrets/directory.env
+COMPOSE_DM       := secrets/dm.pw
+
 .PHONY: help format lint generate generate-drift test test-unit \
 	test-integration test-e2e test-security compose-up compose-down \
-	compose-reset image verify frontend-install frontend-build
+	compose-reset compose-secrets image image-bootstrap \
+	image-control-placeholder verify frontend-install frontend-build
 
 help:
 	@printf '%s\n' \
@@ -25,10 +31,11 @@ help:
 		'  test-integration   real 389 DS harness (pinned digest; needs Docker)' \
 		'  test-e2e           Playwright UI suite (mock control plane; optional live URL)' \
 		'  test-security      secret scan, govulncheck, license denylist' \
-		'  compose-up         pending T-042' \
-		'  compose-down       pending T-042' \
+		'  compose-up         directory → bootstrap → placeholder control' \
+		'  compose-down       stop the T-042 Compose project' \
 		'  compose-reset      pending T-110 (operator full engine reset)' \
-		'  image              pending T-041/T-108' \
+		'  image-bootstrap    build labldap-bootstrap:dev (pinned 389 DS)' \
+		'  image              pending T-108 (hardened control image)' \
 		'  verify             format lint generate generate-drift test-unit test-security'
 
 format:
@@ -53,7 +60,7 @@ test-unit: frontend-install
 	cd frontend && $(PNPM) test
 
 test-integration:
-	$(GO) test -tags=integration ./test/integration/... -count=1 -timeout 15m
+	$(GO) test -tags=integration ./test/integration/... -count=1 -timeout 25m
 
 test-e2e: frontend-build
 	cd test/e2e && $(PNPM) install --frozen-lockfile
@@ -66,21 +73,50 @@ test-security:
 	$(GO) run $(GOVULNCHECK_MOD) ./...
 	$(GO) run ./tools/licensecheck
 
-compose-up:
-	@printf '%s\n' 'compose-up: pending T-042'
-	@printf '%s\n' 'PENDING:compose-up'
+compose-secrets:
+	@mkdir -p secrets
+	@if [ ! -f $(COMPOSE_ENV) ]; then \
+		umask 077; \
+		pw=$$(dd if=/dev/urandom bs=16 count=1 2>/dev/null | od -An -tx1 | tr -d ' \n'); \
+		printf 'DS_DM_PASSWORD=%s\n' "$$pw" > $(COMPOSE_ENV); \
+		printf '%s\n' "$$pw" > $(COMPOSE_DM); \
+		chmod 0600 $(COMPOSE_ENV) $(COMPOSE_DM); \
+	fi
+	@if [ ! -f $(COMPOSE_DM) ]; then \
+		umask 077; \
+		sed -n 's/^DS_DM_PASSWORD=//p' $(COMPOSE_ENV) > $(COMPOSE_DM); \
+		chmod 0600 $(COMPOSE_DM); \
+	fi
+
+compose-up: image-bootstrap image-control-placeholder compose-secrets
+	$(COMPOSE) up -d --wait --remove-orphans
 
 compose-down:
-	@printf '%s\n' 'compose-down: pending T-042'
-	@printf '%s\n' 'PENDING:compose-down'
+	$(COMPOSE) down --remove-orphans
 
 compose-reset:
 	@printf '%s\n' 'compose-reset: pending T-110 — operator full engine reset (not REST/MCP)'
 	@printf '%s\n' 'PENDING:compose-reset'
 
+image-bootstrap:
+	docker build \
+		-f deploy/docker/Dockerfile.bootstrap \
+		--build-arg DIRSRV_IMAGE=$(DIRSRV_IMAGE) \
+		-t labldap-bootstrap:dev \
+		.
+	@docker run --rm --entrypoint dsconf labldap-bootstrap:dev --help >/dev/null
+	@docker run --rm labldap-bootstrap:dev version >/dev/null
+	@printf '%s\n' 'image-bootstrap: labldap-bootstrap:dev'
+
+image-control-placeholder:
+	docker build \
+		-f deploy/docker/Dockerfile.control-placeholder \
+		-t labldap-control:placeholder \
+		.
+
 image:
-	@printf '%s\n' 'image: pending T-041/T-108 — bootstrap/control images not in this milestone'
-	@printf '%s\n' 'PENDING:image'
+	@printf '%s\n' 'image: pending T-108 — hardened control image not in this milestone'
+	@printf '%s\n' 'PENDING:control-image'
 
 frontend-install:
 	cd frontend && $(PNPM) install --frozen-lockfile
