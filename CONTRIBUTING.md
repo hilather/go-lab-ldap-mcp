@@ -23,7 +23,7 @@ make verify
 
 `make verify` is the release gate. It runs `format`, `lint`, `generate`, `generate-drift`, `test-unit`, and `test-security`.
 
-Other stable targets: `make test-integration` (real 389 DS harness; needs Docker), `make test-e2e`, `make image-bootstrap`, `make image` (control image pending T-108), `make frontend-build`, `make compose-up` / `compose-down`. e2e and `compose-reset` still print `PENDING:` until those land.
+Other stable targets: `make test-integration` (real 389 DS harness; needs Docker), `make test-e2e`, `make image-bootstrap`, `make image` (hardened `labldap-control:dev`), `make frontend-build`, `make compose-up` / `compose-down`. `compose-reset` still prints `PENDING:` until T-110.
 
 Critical vulnerability, secret, and license policy is documented in [docs/security/dependency-policy.md](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/security/dependency-policy.md) and enforced by `make test-security` (CI `security` job).
 

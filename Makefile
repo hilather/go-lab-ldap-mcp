@@ -10,9 +10,18 @@ OAPI_CODEGEN_MOD := github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.
 OPENAPI_TS_PKG   := openapi-typescript@7.13.0
 
 DIRSRV_IMAGE     := $(shell cat deploy/docker/dirsrv.digest)
+GO_IMAGE         := $(shell cat deploy/docker/golang.digest)
+NODE_IMAGE       := $(shell cat deploy/docker/node.digest)
+ALPINE_IMAGE     := $(shell cat deploy/docker/alpine.digest)
 COMPOSE          := docker compose -f deploy/compose/compose.yaml -p labldap
 COMPOSE_ENV      := secrets/directory.env
 COMPOSE_DM       := secrets/dm.pw
+
+VERSION          ?= $(shell git describe --tags --always --dirty 2>/dev/null || printf 'dev')
+REVISION         ?= $(shell git rev-parse --short=12 HEAD 2>/dev/null || printf 'unknown')
+BUILT_AT         ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+IMAGE_LDFLAGS    := -s -w -X github.com/hilather/go-lab-ldap-mcp/internal/observability.version=$(VERSION) -X github.com/hilather/go-lab-ldap-mcp/internal/observability.revision=$(REVISION) -X github.com/hilather/go-lab-ldap-mcp/internal/observability.builtAt=$(BUILT_AT)
+IMAGE_BUILD_ARGS := --build-arg VERSION=$(VERSION) --build-arg REVISION=$(REVISION) --build-arg BUILT_AT=$(BUILT_AT)
 
 .PHONY: help format lint generate generate-drift test test-unit \
 	test-integration test-e2e test-security compose-up compose-down \
@@ -35,7 +44,7 @@ help:
 		'  compose-down       stop the T-042 Compose project' \
 		'  compose-reset      pending T-110 (operator full engine reset)' \
 		'  image-bootstrap    build labldap-bootstrap:dev (pinned 389 DS)' \
-		'  image              pending T-108 (hardened control image)' \
+		'  image              build labldap-control:dev (hardened; matching version)' \
 		'  verify             format lint generate generate-drift test-unit test-security'
 
 format:
@@ -102,11 +111,14 @@ image-bootstrap:
 	docker build \
 		-f deploy/docker/Dockerfile.bootstrap \
 		--build-arg DIRSRV_IMAGE=$(DIRSRV_IMAGE) \
+		--build-arg GO_IMAGE=$(GO_IMAGE) \
+		$(IMAGE_BUILD_ARGS) \
 		-t labldap-bootstrap:dev \
 		.
 	@docker run --rm --entrypoint dsconf labldap-bootstrap:dev --help >/dev/null
+	@docker run --rm --entrypoint dsctl labldap-bootstrap:dev --help >/dev/null
 	@docker run --rm labldap-bootstrap:dev version >/dev/null
-	@printf '%s\n' 'image-bootstrap: labldap-bootstrap:dev'
+	@printf '%s\n' 'image-bootstrap: labldap-bootstrap:dev version=$(VERSION)'
 
 image-control-placeholder:
 	docker build \
@@ -115,8 +127,27 @@ image-control-placeholder:
 		.
 
 image:
-	@printf '%s\n' 'image: pending T-108 — hardened control image not in this milestone'
-	@printf '%s\n' 'PENDING:control-image'
+	docker build \
+		-f deploy/docker/Dockerfile.control \
+		--build-arg GO_IMAGE=$(GO_IMAGE) \
+		--build-arg NODE_IMAGE=$(NODE_IMAGE) \
+		--build-arg ALPINE_IMAGE=$(ALPINE_IMAGE) \
+		$(IMAGE_BUILD_ARGS) \
+		-t labldap-control:dev \
+		.
+	@docker run --rm labldap-control:dev version >/dev/null
+	@cid=$$(docker run -d --read-only --cap-drop=ALL --security-opt no-new-privileges:true \
+		--tmpfs /tmp:uid=65532,gid=65532,mode=1777,size=16m \
+		-e LABLDAP_LISTEN=127.0.0.1:8443 \
+		labldap-control:dev serve --placeholder); \
+	ok=0; \
+	for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do \
+		if docker exec "$$cid" wget -q -O - http://127.0.0.1:8443/health >/dev/null 2>&1; then ok=1; break; fi; \
+		sleep 0.4; \
+	done; \
+	docker rm -f "$$cid" >/dev/null; \
+	if [ "$$ok" != 1 ]; then printf '%s\n' 'image: hardened /health smoke failed'; exit 1; fi
+	@printf '%s\n' 'image: labldap-control:dev version=$(VERSION)'
 
 frontend-install:
 	cd frontend && $(PNPM) install --frozen-lockfile

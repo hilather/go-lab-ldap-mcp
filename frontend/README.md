@@ -84,7 +84,9 @@ pnpm build
 pnpm test
 ```
 
-`pnpm build` writes hashed assets to `frontend/dist`. The Go control
-plane embeds `internal/web/dist` (placeholder until the T-108 image
-build copies this production output) and serves hashed files with
-immutable cache headers plus `index.html` SPA fallback.
+`pnpm build` writes hashed assets to `frontend/dist`. The T-108
+`labldap-control:dev` image copies that production output over
+`internal/web/dist` before `go build` so the binary embeds the hashed
+UI. Local `go test` still uses the committed placeholder `index.html`.
+Hashed files are served with immutable cache headers plus `index.html`
+SPA fallback.

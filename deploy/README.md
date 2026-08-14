@@ -1,18 +1,25 @@
 # Deployment
 
 Dev Compose (T-042) is directory → bootstrap one-shot → placeholder control.
-Release images and ephemeral/persistent profiles land in M8. Release files
-must pin the 389 DS image by digest, never a floating tag.
+Hardened `labldap-control:dev` (T-108) and matching-version bootstrap (T-109)
+are built by `make image` / `make image-bootstrap`. Ephemeral/persistent
+Compose profiles land in T-110/T-111. Release files must pin images by
+digest, never a floating tag.
 
 ## Images
 
 | Image | Make target | Notes |
 | --- | --- | --- |
-| `labldap-bootstrap:dev` | `make image-bootstrap` | Static `labldap-bootstrap` on the pinned 389 DS digest. Do not push (OD-004). |
-| `labldap-control:placeholder` | `make image-control-placeholder` | Thin T-042 process (`labldap serve --placeholder`). Not T-108. |
-| `labldap-control:dev` | `make image` | Prints `PENDING:control-image` until T-108. |
+| `labldap-bootstrap:dev` | `make image-bootstrap` | Static `labldap-bootstrap` on the pinned 389 DS digest, same VERSION as control. Do not push (OD-004). |
+| `labldap-control:placeholder` | `make image-control-placeholder` | Thin T-042 process (`labldap serve --placeholder`). Not used by `make image`. |
+| `labldap-control:dev` | `make image` | Hardened multi-stage frontend+Go image. Non-root, CA bundle, HEALTHCHECK `/health`. |
 
-The bootstrap image keeps `dsconf` / `dsctl`. Secrets are mounts only.
+Builder pins: [`deploy/docker/builder-images.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/deploy/docker/builder-images.md).
+Control contract: [`deploy/docker/control-image.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/deploy/docker/control-image.md).
+
+The bootstrap image keeps `dsconf` / `dsctl`. Secrets are mounts only. Both
+images stamp `internal/observability` version/revision so `version` output
+is comparable. Compose still uses the T-042 placeholder until T-110.
 
 ## Compose
 

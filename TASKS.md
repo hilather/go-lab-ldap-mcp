@@ -1224,27 +1224,27 @@ Acceptance:
 
 # M8 - Deployment, operations, and release
 
-## [ ] T-108 Build hardened control Docker image
+## [x] T-108 Build hardened control Docker image
 
 Priority: P0 | Size: L | Depends on: T-074, T-095, T-107
 
 Deliverables: multi-stage frontend and Go build, embedded assets, non-root runtime, CA support, read-only operation, health metadata, and smoke test.
 
 Acceptance:
-- [ ] Container runs with read-only root, dropped capabilities, and no-new-privileges.
-- [ ] Only documented tmpfs paths are writable.
-- [ ] Image contains no source, package manager cache, test secret, or Directory Manager credential.
+- [x] Container runs with read-only root, dropped capabilities, and no-new-privileges.
+- [x] Only documented tmpfs paths are writable.
+- [x] Image contains no source, package manager cache, test secret, or Directory Manager credential.
 
-## [ ] T-109 Build and pin the release bootstrap image
+## [x] T-109 Build and pin the release bootstrap image
 
 Priority: P0 | Size: M | Depends on: T-041, T-108
 
 Deliverables: matching-version bootstrap image, pinned 389 DS base digest, labels, SBOM-ready build, and cold-start smoke test.
 
 Acceptance:
-- [ ] Bootstrap and control report compatible versions.
-- [ ] Required 389 tools remain functional.
-- [ ] Release manifests reference immutable digest.
+- [x] Bootstrap and control report compatible versions.
+- [x] Required 389 tools remain functional.
+- [x] Release manifests reference immutable digest.
 
 ## [ ] T-110 Create and verify ephemeral Compose deployment
 

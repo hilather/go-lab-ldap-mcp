@@ -3,21 +3,35 @@
 # available. Secrets are never baked; pass them as mounts only.
 
 # FROM-time ARGs must be declared before the first FROM (legacy builder).
-ARG GO_IMAGE=golang:1.26.5
+ARG GO_IMAGE=docker.io/library/golang:1.26.5@sha256:705e964a93a2fd2e75c7d59bb7d781b57e30f12293ffde5175c69229e18fb678
 ARG DIRSRV_IMAGE=quay.io/389ds/dirsrv@sha256:f2851654c5df545cd893d84bea8d08c28dc25f0930493fbfed1d8a6eacf657f7
 FROM ${GO_IMAGE} AS build
 WORKDIR /src
 ENV CGO_ENABLED=0
 ENV GOTOOLCHAIN=go1.26.5
+ARG VERSION=dev
+ARG REVISION=unknown
+ARG BUILT_AT=unknown
 COPY go.mod go.sum ./
 RUN go mod download
 COPY cmd ./cmd
 COPY internal ./internal
-RUN go build -trimpath -ldflags="-s -w" -o /out/labldap-bootstrap ./cmd/labldap-bootstrap
+RUN go build -trimpath \
+	-ldflags="-s -w -X github.com/hilather/go-lab-ldap-mcp/internal/observability.version=${VERSION} -X github.com/hilather/go-lab-ldap-mcp/internal/observability.revision=${REVISION} -X github.com/hilather/go-lab-ldap-mcp/internal/observability.builtAt=${BUILT_AT}" \
+	-o /out/labldap-bootstrap ./cmd/labldap-bootstrap
 
 # Default matches deploy/docker/dirsrv.digest. Release files must stay digest-pinned.
 FROM ${DIRSRV_IMAGE}
+ARG VERSION=dev
+ARG REVISION=unknown
+ARG BUILT_AT=unknown
 COPY --from=build /out/labldap-bootstrap /usr/local/bin/labldap-bootstrap
+LABEL org.opencontainers.image.title="labldap-bootstrap" \
+	org.opencontainers.image.description="LabLDAP one-shot bootstrap on pinned 389 DS. Do not push (OD-004)." \
+	org.opencontainers.image.version="${VERSION}" \
+	org.opencontainers.image.revision="${REVISION}" \
+	org.opencontainers.image.created="${BUILT_AT}" \
+	org.opencontainers.image.source="https://github.com/hilather/go-lab-ldap-mcp"
 # Override the dirsrv first-boot command so a bare run cannot start a second instance.
 ENTRYPOINT ["/usr/local/bin/labldap-bootstrap"]
 CMD ["--help"]

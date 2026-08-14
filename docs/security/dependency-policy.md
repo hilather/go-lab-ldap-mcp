@@ -22,4 +22,5 @@ The first release is privately owned (OD-003). Do not add dependencies whose lic
 
 ## Container scanning
 
-Image scans land with T-108. `make image` is a pending gate until then.
+Image scans / SBOM land with T-118. `make image` builds the hardened
+`labldap-control:dev` image (T-108) from pinned builder digests.

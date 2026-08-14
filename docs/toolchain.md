@@ -11,6 +11,9 @@ Recorded 2026-08-12 against the LabLDAP design baseline.
 | React | 19.2 | `19.2.8` (T-095) | `frontend/package.json`, `frontend/pnpm-lock.yaml` |
 | MCP Go SDK | v1.7.0+ / spec 2026-07-28 | not yet (T-085) | — |
 | 389 DS image | pin by digest | `quay.io/389ds/dirsrv@sha256:f2851654c5df545cd893d84bea8d08c28dc25f0930493fbfed1d8a6eacf657f7` | `deploy/docker/dirsrv.digest`, `deploy/docker/dirsrv-image-contract.md` |
+| Go builder image | pin by digest | `golang:1.26.5@sha256:705e964a93a2fd2e75c7d59bb7d781b57e30f12293ffde5175c69229e18fb678` | `deploy/docker/golang.digest` |
+| Node builder image | pin by digest | `node:22.14.0-bookworm@sha256:e5ddf893cc6aeab0e5126e4edae35aa43893e2836d1d246140167ccc2616f5d7` | `deploy/docker/node.digest` |
+| Control runtime image | pin by digest | `alpine:3.21@sha256:48b0309ca019d89d40f670aa1bc06e426dc0931948452e8491e3d65087abc07d` | `deploy/docker/alpine.digest` |
 | LDAP client | `github.com/go-ldap/ldap/v3` | `v3.4.14` (T-028 bootstrap DM helper; T-046 runtime) | `go.mod`; only `internal/directory/ds389` and `internal/directory/ldapclient` may import it |
 | OpenAPI Go generator | oapi-codegen (OD-009) | `v2.8.0` | `Makefile` `OAPI_CODEGEN_MOD`; models only |
 | OpenAPI TypeScript types | openapi-typescript (OD-009) | `7.13.0` | `Makefile` `OPENAPI_TS_PKG` |
