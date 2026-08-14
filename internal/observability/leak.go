@@ -24,9 +24,9 @@ var leakRules = []struct {
 	id string
 	re *regexp.Regexp
 }{
-	{id: "authorization-bearer", re: regexp.MustCompile(`(?i)authorization:\s*bearer\s+\S+`)},
-	{id: "cookie-header", re: regexp.MustCompile(`(?i)(?:^|[\s;])cookie:\s*\S+`)},
-	{id: "set-cookie-header", re: regexp.MustCompile(`(?i)set-cookie:\s*\S+`)},
+	{id: "authorization-bearer", re: regexp.MustCompile(`(?i)authorization:\s*bearer\s+(\S+)`)},
+	{id: "cookie-header", re: regexp.MustCompile(`(?i)(?:^|[\s;])cookie:\s*(\S+)`)},
+	{id: "set-cookie-header", re: regexp.MustCompile(`(?i)set-cookie:\s*(\S+)`)},
 	{id: "canary-secret", re: regexp.MustCompile(regexp.QuoteMeta(CanarySecret))},
 }
 
@@ -52,9 +52,14 @@ func ScanReader(r io.Reader, secrets ...string) ([]Finding, error) {
 		line++
 		text := sc.Text()
 		for _, rule := range leakRules {
-			if rule.re.MatchString(text) {
-				out = append(out, Finding{Line: line, Rule: rule.id})
+			m := rule.re.FindStringSubmatch(text)
+			if m == nil {
+				continue
 			}
+			if rule.id != "canary-secret" && len(m) > 1 && strings.EqualFold(m[1], redactedHeader) {
+				continue
+			}
+			out = append(out, Finding{Line: line, Rule: rule.id})
 		}
 		for i, re := range extra {
 			if re.MatchString(text) {

@@ -56,3 +56,30 @@ func TestLDAPClientConfigFromExample(t *testing.T) {
 		t.Fatal("runtime password missing")
 	}
 }
+
+func TestServeWiresCompiledRateLimits(t *testing.T) {
+	path := filepath.Join("..", "..", "config", "examples", "example-lab.yaml")
+	built, err := compileControl(context.Background(), path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	opt, closer, err := serverOptionsFromCompiled(built, serveFlags{ldapURL: "ldaps://127.0.0.1:1", caFile: "/tmp/ca.pem"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if closer != nil {
+		t.Cleanup(closer)
+	}
+	if opt.Limiter == nil {
+		t.Fatal("HTTP limiter unset")
+	}
+	// Compiled bind-test budget is 10/min; the 11th identical key must deny.
+	for i := 0; i < 10; i++ {
+		if !opt.Limiter.Allow("bind:actor:admin") {
+			t.Fatalf("allowed key denied at %d", i)
+		}
+	}
+	if opt.Limiter.Allow("bind:actor:admin") {
+		t.Fatal("compiled bind-test budget not enforced")
+	}
+}

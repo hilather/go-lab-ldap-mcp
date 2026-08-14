@@ -1,13 +1,16 @@
 package api
 
 import (
+	"encoding/json"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/hilather/go-lab-ldap-mcp/internal/app"
+	"github.com/hilather/go-lab-ldap-mcp/internal/audit"
 	"github.com/hilather/go-lab-ldap-mcp/internal/auth"
 	"github.com/hilather/go-lab-ldap-mcp/internal/directory"
 	"github.com/hilather/go-lab-ldap-mcp/internal/observability"
@@ -170,4 +173,134 @@ func suiteRequest(tc suiteCase, token string) *http.Request {
 		req.Header.Set("If-Match", `"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"`)
 	}
 	return req
+}
+
+func TestSessionAuthnCSRFAndReadOnlyLogin(t *testing.T) {
+	t.Parallel()
+	s, _, _ := directoryServer(t)
+	h := s.Handler()
+
+	unauthGet := httptest.NewRequest(http.MethodGet, "/api/v1/session", nil)
+	ug := httptest.NewRecorder()
+	h.ServeHTTP(ug, unauthGet)
+	if ug.Code != http.StatusUnauthorized {
+		t.Fatalf("get unauth %d %s", ug.Code, ug.Body.String())
+	}
+
+	unauthDel := httptest.NewRequest(http.MethodDelete, "/api/v1/session", nil)
+	ud := httptest.NewRecorder()
+	h.ServeHTTP(ud, unauthDel)
+	if ud.Code != http.StatusUnauthorized {
+		t.Fatalf("delete unauth %d %s", ud.Code, ud.Body.String())
+	}
+
+	login := httptest.NewRequest(http.MethodPost, "/api/v1/session", strings.NewReader(`{"token":"`+readOnlyToken+`"}`))
+	login.Header.Set("Content-Type", "application/json")
+	lr := httptest.NewRecorder()
+	h.ServeHTTP(lr, login)
+	if lr.Code != http.StatusOK {
+		t.Fatalf("read-only login %d %s", lr.Code, lr.Body.String())
+	}
+	c := cookieNamed(lr.Result(), auth.CookieName)
+	if c == nil {
+		t.Fatal("cookie")
+	}
+	var created sessionCreatedBody
+	if err := json.Unmarshal(lr.Body.Bytes(), &created); err != nil {
+		t.Fatal(err)
+	}
+
+	missingCSRF := httptest.NewRequest(http.MethodDelete, "/api/v1/session", nil)
+	missingCSRF.Host = "127.0.0.1:8443"
+	missingCSRF.Header.Set("Origin", "http://127.0.0.1:8443")
+	missingCSRF.AddCookie(auth.NewSessionCookie(c.Value, false, 0))
+	mr := httptest.NewRecorder()
+	h.ServeHTTP(mr, missingCSRF)
+	if mr.Code != http.StatusForbidden {
+		t.Fatalf("missing csrf %d %s", mr.Code, mr.Body.String())
+	}
+
+	del := httptest.NewRequest(http.MethodDelete, "/api/v1/session", nil)
+	del.Host = "127.0.0.1:8443"
+	del.Header.Set("Origin", "http://127.0.0.1:8443")
+	del.Header.Set(auth.CSRFHeader, created.CSRFToken)
+	del.AddCookie(auth.NewSessionCookie(c.Value, false, 0))
+	dr := httptest.NewRecorder()
+	h.ServeHTTP(dr, del)
+	if dr.Code != http.StatusNoContent {
+		t.Fatalf("logout %d %s", dr.Code, dr.Body.String())
+	}
+	assertNoSecret(t, lr.Body.String()+dr.Body.String(), readOnlyToken, testToken, c.Value)
+}
+
+func TestRepresentativeHandlerLogsHaveNoSecrets(t *testing.T) {
+	t.Parallel()
+	users := newMemUsers()
+	groups := newMemGroups()
+	logs := &captureHandler{}
+	svc := app.New(app.Deps{
+		Users:            users,
+		Groups:           groups,
+		Search:           newMemSearch(),
+		Bind:             newMemBind(),
+		Schema:           newMemSchema(),
+		Caps:             stubCaps{caps: testCaps()},
+		Marker:           stubMarker{m: directory.BaselineMarker{AppliedRevision: "aaa"}},
+		ExpectedRevision: "aaa",
+	})
+	reg, err := auth.NewRegistry([]auth.Token{
+		{ID: "admin", Scopes: []string{auth.ScopeDirectoryRead, auth.ScopeDirectoryWrite, auth.ScopeDirectoryPassword, auth.ScopeAuditRead}, Secret: observability.Secret(testToken)},
+		{ID: "reader", Scopes: []string{auth.ScopeDirectoryRead}, Secret: observability.Secret(readOnlyToken)},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := New(Options{
+		Registry:  reg,
+		Sessions:  auth.NewStore(auth.DefaultSessionConfig()),
+		Users:     svc.Users,
+		Groups:    svc.Groups,
+		Query:     svc.Query,
+		System:    svc.Query,
+		Logger:    slog.New(logs),
+		AuditHook: &audit.Memory{},
+		CursorKey: mustCursorKey(t),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := s.Handler()
+
+	login := httptest.NewRequest(http.MethodPost, "/api/v1/session", strings.NewReader(`{"token":"`+testToken+`"}`))
+	login.Header.Set("Content-Type", "application/json")
+	login.Header.Set("Authorization", "Bearer "+testToken)
+	lr := httptest.NewRecorder()
+	h.ServeHTTP(lr, login)
+	cookie := ""
+	if c := cookieNamed(lr.Result(), auth.CookieName); c != nil {
+		cookie = c.Value
+	}
+
+	create := httptest.NewRequest(http.MethodPost, "/api/v1/users", strings.NewReader(`{"id":"loguser","password":"`+userPass+`"}`))
+	create.Header.Set("Authorization", "Bearer "+testToken)
+	create.Header.Set("Content-Type", "application/json")
+	h.ServeHTTP(httptest.NewRecorder(), create)
+
+	bind := httptest.NewRequest(http.MethodPost, "/api/v1/auth-tests", strings.NewReader(`{"identity":"loguser","password":"`+userPass+`","transport":"ldaps"}`))
+	bind.Header.Set("Authorization", "Bearer "+testToken)
+	bind.Header.Set("Content-Type", "application/json")
+	h.ServeHTTP(httptest.NewRecorder(), bind)
+
+	deny := httptest.NewRequest(http.MethodPost, "/api/v1/users", strings.NewReader(`{"id":"x","password":"`+userPass+`"}`))
+	deny.Header.Set("Authorization", "Bearer "+readOnlyToken)
+	deny.Header.Set("Content-Type", "application/json")
+	h.ServeHTTP(httptest.NewRecorder(), deny)
+
+	findings, err := observability.ScanReader(strings.NewReader(logs.String()), testToken, readOnlyToken, userPass, cookie)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(findings) != 0 {
+		t.Fatalf("handler logs leaked: %s\n%s", observability.ReportFindings(findings), logs.String())
+	}
 }

@@ -135,6 +135,30 @@ func (w *statusRecorder) WriteHeader(code int) {
 	w.ResponseWriter.WriteHeader(code)
 }
 
+func (s *Server) accessLog(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		next.ServeHTTP(w, r)
+		if s == nil || s.log == nil {
+			return
+		}
+		// Production caller of SanitizeHeaders. Sensitive names are omitted
+		// entirely so logs never contain Cookie/Authorization even as
+		// "[redacted]".
+		safe := observability.SanitizeHeaders(r.Header)
+		for name := range safe {
+			if observability.SensitiveHeaderName(name) {
+				delete(safe, name)
+			}
+		}
+		s.log.Debug("http",
+			slog.String("method", r.Method),
+			slog.String("route", observability.RouteTemplate(r.Method, r.URL.Path)),
+			slog.String("request_id", observability.RequestID(r.Context())),
+			slog.Int("headers", len(safe)),
+		)
+	})
+}
+
 func (s *Server) metricsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if s == nil || s.metrics == nil {

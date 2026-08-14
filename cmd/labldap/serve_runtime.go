@@ -223,6 +223,7 @@ func attachDirectory(opt *apiOptionsBuilder) error {
 		Marker:           rt,
 		Audit:            app.HookAuditor{Hook: sink},
 		Gate:             gate,
+		Limit:            opt.limit,
 		ExpectedRevision: opt.compiled.Revisions.Directory,
 		ControlRevision:  opt.compiled.Revisions.Control,
 		PeopleDN:         opt.compiled.Normalized.PeopleDN.String(),
@@ -239,9 +240,6 @@ func attachDirectory(opt *apiOptionsBuilder) error {
 		ResetState:  func() string { return string(gate.State()) },
 		Pool: func() app.PoolView {
 			st := pool.Stats()
-			if opt.metrics != nil {
-				opt.metrics.SetLDAPPool(st.Active, st.Idle, st.Max, st.Waiters)
-			}
 			return app.PoolView{Active: st.Active, Idle: st.Idle, Max: st.Max}
 		},
 	}
@@ -263,6 +261,7 @@ type apiOptionsBuilder struct {
 	flags     serveFlags
 	log       *slog.Logger
 	metrics   *observability.Registry
+	limit     *app.Window
 	pool      *ldapclient.Pool
 	probe     *app.Probe
 	users     *app.Users

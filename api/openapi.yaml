@@ -460,6 +460,8 @@ paths:
           $ref: "#/components/responses/NotFound"
         "412":
           $ref: "#/components/responses/PreconditionFailed"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
   /api/v1/users/{id}/enable:
     post:
       operationId: enableUser
@@ -870,6 +872,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
   /api/v1/rootdse:
     get:
       operationId: getRootDSE
@@ -1196,6 +1200,12 @@ components:
               requestId: 00000000000000000000000000000000
     Forbidden:
       description: Missing scope, CSRF, or Origin
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    TooManyRequests:
+      description: Password or bind-test rate limit exceeded
       content:
         application/problem+json:
           schema:

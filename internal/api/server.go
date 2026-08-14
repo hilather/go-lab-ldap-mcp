@@ -19,7 +19,7 @@ const (
 	defaultMaxBody  = 1 << 20
 )
 
-// Limiter is the T-063 rate-limit framework. T-074 fills real buckets.
+// Limiter is the HTTP bind-test / request bucket.
 type Limiter interface {
 	Allow(key string) bool
 }
@@ -28,6 +28,16 @@ type Limiter interface {
 type NopLimiter struct{}
 
 func (NopLimiter) Allow(string) bool { return true }
+
+// FuncLimiter adapts a function (typically *app.Window.AllowKey).
+type FuncLimiter func(string) bool
+
+func (f FuncLimiter) Allow(key string) bool {
+	if f == nil {
+		return true
+	}
+	return f(key)
+}
 
 // Options configure the net/http management plane.
 type Options struct {
@@ -188,6 +198,7 @@ func (s *Server) Handler() http.Handler {
 	h = s.securityHeaders(h)
 	h = s.bodyLimit(h)
 	h = s.metricsMiddleware(h)
+	h = s.accessLog(h)
 	h = s.requestID(h)
 	h = s.recoverPanic(h)
 	return h

@@ -173,6 +173,31 @@ func TestAuditCursorAndSessionEvents(t *testing.T) {
 	}
 }
 
+func TestRequireScopeEmitsAuthzDeny(t *testing.T) {
+	t.Parallel()
+	s, sink := auditServer(t)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/audit", nil)
+	req.Header.Set("Authorization", "Bearer "+readOnlyToken)
+	rec := httptest.NewRecorder()
+	s.Handler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("%d %s", rec.Code, rec.Body.String())
+	}
+	page, err := sink.List(t.Context(), audit.ListQuery{Action: audit.ActionAuthzDeny, PageSize: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var saw bool
+	for _, ev := range page.Items {
+		if ev.Actor == "token:reader" && ev.Target == auth.ScopeAuditRead {
+			saw = true
+		}
+	}
+	if !saw {
+		t.Fatalf("missing authz.deny: %+v", page.Items)
+	}
+}
+
 func TestAuditPageJSONKeys(t *testing.T) {
 	t.Parallel()
 	s, sink := auditServer(t)

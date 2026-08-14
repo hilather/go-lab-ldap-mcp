@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/hilather/go-lab-ldap-mcp/internal/app"
+	"github.com/hilather/go-lab-ldap-mcp/internal/audit"
 	"github.com/hilather/go-lab-ldap-mcp/internal/auth"
 	"github.com/hilather/go-lab-ldap-mcp/internal/directory"
 	"github.com/hilather/go-lab-ldap-mcp/internal/observability"
@@ -68,6 +69,7 @@ func (s *Server) requireScope(w http.ResponseWriter, r *http.Request, scope stri
 		return app.Principal{}, false
 	}
 	if err := auth.Require(p.Scopes, scope); err != nil {
+		s.emitAudit(r, audit.ActionAuthzDeny, appActor(p.Kind, p.ID), scope, audit.ResultFailure)
 		writeProblem(w, r, err)
 		return app.Principal{}, false
 	}

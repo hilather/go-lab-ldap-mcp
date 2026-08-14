@@ -73,6 +73,18 @@ func TestCleanLogsHaveNoGeneratedSecrets(t *testing.T) {
 	}
 }
 
+func TestScanAllowsRedactedHeaderPlaceholders(t *testing.T) {
+	t.Parallel()
+	body := "Authorization: Bearer [redacted]\nCookie: [redacted]\nSet-Cookie: [redacted]\n"
+	findings, err := observability.ScanReader(strings.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(findings) != 0 {
+		t.Fatalf("redacted headers must not fail the scan: %+v", findings)
+	}
+}
+
 func TestScanDetectsSuppliedSecret(t *testing.T) {
 	t.Parallel()
 	secret := "lab-scan-detect-me-32-characters!"

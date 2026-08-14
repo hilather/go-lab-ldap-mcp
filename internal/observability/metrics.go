@@ -33,6 +33,9 @@ type Registry struct {
 
 	resetInProgress atomic.Int64
 
+	snapLDAP  func() (active, idle, max, waiters int)
+	snapReset func() bool
+
 	build BuildInfo
 }
 
@@ -164,15 +167,38 @@ func (r *Registry) ObserveLDAPEvict(reason string) {
 func (r *Registry) ObserveLDAPAcquire(time.Duration) {}
 func (r *Registry) ObserveLDAPRelease()              {}
 
+// SetSnapshots installs live LDAP pool and reset-state readers. WritePrometheus
+// calls them so /metrics does not depend on a prior /health/ready scrape.
+func (r *Registry) SetSnapshots(ldap func() (active, idle, max, waiters int), reset func() bool) {
+	if r == nil {
+		return
+	}
+	r.mu.Lock()
+	r.snapLDAP = ldap
+	r.snapReset = reset
+	r.mu.Unlock()
+}
+
+func (r *Registry) applySnapshots() {
+	r.mu.Lock()
+	ldap := r.snapLDAP
+	rst := r.snapReset
+	r.mu.Unlock()
+	if ldap != nil {
+		a, idle, max, waiters := ldap()
+		r.SetLDAPPool(a, idle, max, waiters)
+	}
+	if rst != nil {
+		r.SetResetInProgress(rst())
+	}
+}
+
 // WritePrometheus emits Prometheus 0.0.4 text. Identity labels are forbidden.
 func (r *Registry) WritePrometheus(w io.Writer) {
 	if r == nil || w == nil {
 		return
 	}
-	fmt.Fprintln(w, "# HELP labldap_http_requests_total HTTP requests by route template and status class")
-	fmt.Fprintln(w, "# TYPE labldap_http_requests_total counter")
-	fmt.Fprintln(w, "# HELP labldap_http_request_duration_seconds_sum HTTP request duration sum")
-	fmt.Fprintln(w, "# TYPE labldap_http_request_duration_seconds_sum counter")
+	r.applySnapshots()
 	r.mu.Lock()
 	httpKeys := make([]httpKey, 0, len(r.http))
 	for k := range r.http {
@@ -188,9 +214,16 @@ func (r *Registry) WritePrometheus(w io.Writer) {
 		}
 		return a.class < b.class
 	})
+	fmt.Fprintln(w, "# HELP labldap_http_requests_total HTTP requests by route template and status class")
+	fmt.Fprintln(w, "# TYPE labldap_http_requests_total counter")
 	for _, k := range httpKeys {
 		acc := r.http[k]
 		fmt.Fprintf(w, "labldap_http_requests_total{method=%q,route=%q,status_class=%q} %d\n", k.method, k.route, k.class, acc.count)
+	}
+	fmt.Fprintln(w, "# HELP labldap_http_request_duration_seconds_sum HTTP request duration sum")
+	fmt.Fprintln(w, "# TYPE labldap_http_request_duration_seconds_sum counter")
+	for _, k := range httpKeys {
+		acc := r.http[k]
 		fmt.Fprintf(w, "labldap_http_request_duration_seconds_sum{method=%q,route=%q,status_class=%q} %.6f\n", k.method, k.route, k.class, float64(acc.sumNS)/1e9)
 	}
 

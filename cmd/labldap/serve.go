@@ -169,7 +169,9 @@ func serverOptionsFromCompiled(c *config.Compiled, flags serveFlags, log *slog.L
 	}
 	build := observability.CurrentBuild("labldap")
 	metrics := observability.NewRegistry(build)
-	b := &apiOptionsBuilder{compiled: c, flags: flags, log: log, metrics: metrics}
+	rl := c.Public.Spec.Limits.RateLimit
+	win := app.NewWindow(rl.PasswordPerMinute, rl.BindTestPerMinute, rl.RequestsPerMinute, rl.ResetPerHour)
+	b := &apiOptionsBuilder{compiled: c, flags: flags, log: log, metrics: metrics, limit: win}
 	// Composition root (KD-R15): attach the live pool and app services.
 	// Construction failure leaves handlers unwired and readiness false;
 	// liveness still serves.
@@ -182,17 +184,23 @@ func serverOptionsFromCompiled(c *config.Compiled, flags serveFlags, log *slog.L
 		ready = func() bool {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
-			ok := b.probe.Ready(ctx)
-			if b.gate != nil && metrics != nil {
-				metrics.SetResetInProgress(b.gate.State() != reset.Ready)
-			}
-			return ok
+			return b.probe.Ready(ctx)
 		}
 		diag = func() app.Diagnostics {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			return b.probe.Evaluate(ctx)
 		}
+	}
+	if b.pool != nil {
+		pool := b.pool
+		gate := b.gate
+		metrics.SetSnapshots(func() (int, int, int, int) {
+			st := pool.Stats()
+			return st.Active, st.Idle, st.Max, st.Waiters
+		}, func() bool {
+			return gate != nil && gate.State() != reset.Ready
+		})
 	}
 	opt := api.Options{
 		Registry:        reg,
@@ -205,6 +213,7 @@ func serverOptionsFromCompiled(c *config.Compiled, flags serveFlags, log *slog.L
 		MetricsAuth:     c.Public.Spec.Management.Metrics.RequireAuth,
 		MetricsEnabled:  c.Public.Spec.Management.Metrics.Enabled == nil || *c.Public.Spec.Management.Metrics.Enabled,
 		Metrics:         metrics,
+		Limiter:         api.FuncLimiter(win.AllowKey),
 		System:          b.system,
 		Users:           b.users,
 		Groups:          b.groups,
