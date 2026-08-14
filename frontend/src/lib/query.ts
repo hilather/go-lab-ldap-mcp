@@ -3,6 +3,9 @@ import { QueryClient } from "@tanstack/react-query";
 export const sessionQueryKey = ["session"] as const;
 export const directoryQueryKey = ["directory"] as const;
 
+const usersQueryKey = [...directoryQueryKey, "users"] as const;
+const groupsQueryKey = [...directoryQueryKey, "groups"] as const;
+
 export const queryKeys = {
   session: sessionQueryKey,
   directory: {
@@ -13,6 +16,17 @@ export const queryKeys = {
     baseline: [...directoryQueryKey, "baseline"] as const,
     version: [...directoryQueryKey, "version"] as const,
     audit: [...directoryQueryKey, "audit"] as const,
+  },
+  users: {
+    all: usersQueryKey,
+    list: (q: { pageSize: number; q?: string; cursor?: string }) => [...usersQueryKey, "list", q] as const,
+    detail: (id: string) => [...usersQueryKey, "detail", id] as const,
+    groups: (id: string) => [...usersQueryKey, "groups", id] as const,
+  },
+  groups: {
+    all: groupsQueryKey,
+    list: (q: { pageSize: number; q?: string; cursor?: string }) => [...groupsQueryKey, "list", q] as const,
+    detail: (id: string) => [...groupsQueryKey, "detail", id] as const,
   },
 };
 
@@ -35,6 +49,13 @@ export function createAppQueryClient(): QueryClient {
       },
     },
   });
+}
+
+export function invalidateUsersAndGroups(client: QueryClient): Promise<void> {
+  return Promise.all([
+    client.invalidateQueries({ queryKey: usersQueryKey }),
+    client.invalidateQueries({ queryKey: groupsQueryKey }),
+  ]).then(() => undefined);
 }
 
 export function clearDirectoryQueryData(client: QueryClient): void {

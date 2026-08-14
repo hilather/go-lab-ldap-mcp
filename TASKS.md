@@ -1112,49 +1112,49 @@ Acceptance:
 - [x] Scope-restricted actions explain missing permission.
 - [x] Status meaning is not conveyed by color alone.
 
-## [ ] T-098 Implement user list and create workflows
+## [x] T-098 Implement user list and create workflows
 
 Priority: P0 | Size: L | Depends on: T-066, T-067, T-095 to T-097
 
 Deliverables: paginated list, search, sort, empty state, create form, password policy hints, advanced allowlisted attributes, and success navigation.
 
 Acceptance:
-- [ ] Read-only actor cannot submit create.
-- [ ] Password fields clear after success and failure.
-- [ ] Server field errors attach to accessible controls.
+- [x] Read-only actor cannot submit create.
+- [x] Password fields clear after success and failure.
+- [x] Server field errors attach to accessible controls.
 
-## [ ] T-099 Implement user detail, edit, enable, disable, password, and delete workflows
+## [x] T-099 Implement user detail, edit, enable, disable, password, and delete workflows
 
 Priority: P0 | Size: L | Depends on: T-066, T-067, T-098
 
 Deliverables: overview, attributes, groups, auth state, edit form, revision conflict dialog, password dialog, enablement, delete confirmation, and cache invalidation.
 
 Acceptance:
-- [ ] All mutations send current revision where required.
-- [ ] Conflict offers refresh without silent overwrite.
-- [ ] Delete requires exact user ID confirmation.
+- [x] All mutations send current revision where required.
+- [x] Conflict offers refresh without silent overwrite.
+- [x] Delete requires exact user ID confirmation.
 
-## [ ] T-100 Implement group list and create workflows
+## [x] T-100 Implement group list and create workflows
 
 Priority: P0 | Size: L | Depends on: T-068, T-095 to T-097
 
 Deliverables: paginated list, search, create form, required initial-member selector, attribute form, and empty-group explanation.
 
 Acceptance:
-- [ ] Group cannot be submitted without a valid initial member.
-- [ ] Member selector uses bounded server search.
-- [ ] Permission and validation states are accessible.
+- [x] Group cannot be submitted without a valid initial member.
+- [x] Member selector uses bounded server search.
+- [x] Permission and validation states are accessible.
 
-## [ ] T-101 Implement group detail and membership workflows
+## [x] T-101 Implement group detail and membership workflows
 
 Priority: P0 | Size: L | Depends on: T-068, T-100
 
 Deliverables: group overview, attributes, direct members, add, remove, replace, nested kind display, revision conflicts, delete, and cache invalidation.
 
 Acceptance:
-- [ ] Membership changes display added, removed, unchanged, and rejected results.
-- [ ] Cycle errors are clear and non-destructive.
-- [ ] User group views refresh after membership change.
+- [x] Membership changes display added, removed, unchanged, and rejected results.
+- [x] Cycle errors are clear and non-destructive.
+- [x] User group views refresh after membership change.
 
 ## [ ] T-102 Implement LDAP search console
 

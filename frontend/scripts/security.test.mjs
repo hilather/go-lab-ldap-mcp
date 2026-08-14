@@ -98,3 +98,65 @@ test("dashboard covers ready, degraded, outage, and missing scopes", async () =>
   assert.match(dash, /status\.symbol/);
   assert.match(dash, /status\.label/);
 });
+
+test("user list and create cover search, sort, empty, and read-only create", async () => {
+  const list = await readFile(join(srcRoot, "routes/users/UserListPage.tsx"), "utf8");
+  assert.match(list, /emptyListMessage/);
+  assert.match(list, /sortUsers/);
+  assert.match(list, /aria-sort/);
+  assert.match(list, /Create user/);
+  assert.match(list, /directory:write|createGate/);
+
+  const create = await readFile(join(srcRoot, "routes/users/UserCreatePage.tsx"), "utf8");
+  assert.match(create, /type="password"/);
+  assert.match(create, /clearedPasswordFields|setValue\("password", ""\)/);
+  assert.match(create, /passwordPolicyHints/);
+  assert.match(create, /ALLOWED_USER_ATTRS/);
+  assert.match(create, /createUser/);
+  assert.match(create, /aria-invalid/);
+  assert.match(create, /FormError/);
+  const field = await readFile(join(srcRoot, "routes/shared/ResourcePage.tsx"), "utf8");
+  assert.match(field, /role="alert"/);
+  assert.match(create, /disabled=\{!gate\.ok/);
+  assert.doesNotMatch(create, /localStorage|sessionStorage|indexedDB/i);
+});
+
+test("user detail mutations send revision and require exact ID delete", async () => {
+  const detail = await readFile(join(srcRoot, "routes/users/UserDetailPage.tsx"), "utf8");
+  assert.match(detail, /updateUser\(user\.id, patch, user\.revision\)/);
+  assert.match(detail, /enableUser\(user\.id, user\.revision\)/);
+  assert.match(detail, /disableUser\(user\.id, user\.revision\)/);
+  assert.match(detail, /setUserPassword\(user\.id, password, user\.revision\)/);
+  assert.match(detail, /deleteUser\(user\.id, user\.revision\)/);
+  assert.match(detail, /revisionConflict/);
+  assert.match(detail, /ConflictRefresh/);
+  assert.match(detail, /ConfirmDelete/);
+  assert.match(detail, /resourceId=\{user\.id\}/);
+  assert.match(detail, /invalidateUsersAndGroups/);
+});
+
+test("group create requires an initial member from bounded server search", async () => {
+  const create = await readFile(join(srcRoot, "routes/groups/GroupCreatePage.tsx"), "utf8");
+  assert.match(create, /canSubmitGroupCreate/);
+  assert.match(create, /MemberSearch/);
+  assert.match(create, /emptyGroupExplanation/);
+  assert.match(create, /disabled=\{!writeGate\.ok \|\| !memberGate\.ok/);
+  const search = await readFile(join(srcRoot, "routes/shared/MemberSearch.tsx"), "utf8");
+  assert.match(search, /MEMBER_SEARCH_PAGE_SIZE/);
+  assert.match(search, /listUsers/);
+  assert.match(search, /listGroups/);
+  assert.match(search, /does not\s+run until you submit/);
+});
+
+test("group detail has membership summaries, cycle errors, and no attribute PATCH", async () => {
+  const detail = await readFile(join(srcRoot, "routes/groups/GroupDetailPage.tsx"), "utf8");
+  assert.match(detail, /addGroupMembers/);
+  assert.match(detail, /removeGroupMembers/);
+  assert.match(detail, /replaceGroupMembers/);
+  assert.match(detail, /membershipSummaryLabels/);
+  assert.match(detail, /cycleErrorMessage/);
+  assert.match(detail, /invalidateUsersAndGroups/);
+  assert.match(detail, /no PATCH for groups/);
+  assert.doesNotMatch(detail, /api\.PATCH\("\/api\/v1\/groups/);
+  assert.match(detail, /deleteGroup\(group\.id, group\.revision\)/);
+});

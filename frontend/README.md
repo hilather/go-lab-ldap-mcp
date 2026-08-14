@@ -1,6 +1,6 @@
 # LabLDAP frontend
 
-React 19.2 / TypeScript / Vite administrative UI (T-095–T-097).
+React 19.2 / TypeScript / Vite administrative UI (T-095–T-101).
 Semantic HTML only — no large design system (OD-011).
 
 Pinned (see [docs/toolchain.md](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/toolchain.md)):
@@ -34,7 +34,23 @@ not treated as a successful logout.
 banner when the tab is not a secure context or cleartext LDAP is
 advertised, scope-aware quick actions, recent audit events, and a
 directory-outage view. Status uses a symbol plus a text label, not color
-alone. User and group CRUD pages are later tasks.
+alone.
+
+## Users and groups
+
+`/users`, `/users/new`, and `/users/:id` list, create, edit, enable,
+disable, set password, and delete users. Mutations send the current
+revision (`If-Match` quoted hex, or `revision` on the password body).
+A 412 conflict offers refresh and does not overwrite. Delete requires
+typing the exact user ID. Read-only sessions cannot submit create.
+Password fields clear after success and failure.
+
+`/groups`, `/groups/new`, and `/groups/:id` list and create groups with a
+required initial member chosen through bounded server search. Empty
+`groupOfNames` is rejected; the UI does not insert a fake member. Group
+detail supports add, remove, and replace membership with added / removed
+/ unchanged / rejected summaries. Cycle errors leave the group unchanged.
+There is no group-attribute edit form (no `PATCH /groups/{id}`).
 
 ```text
 corepack enable

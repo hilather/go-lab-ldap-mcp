@@ -16,7 +16,8 @@ a {
 
 a:focus-visible,
 button:focus-visible,
-input:focus-visible {
+input:focus-visible,
+select:focus-visible {
   outline: 3px solid #0b3d91;
   outline-offset: 2px;
 }
@@ -178,10 +179,99 @@ h2 {
   margin-bottom: 0.3rem;
 }
 
-input[type="password"] {
+input[type="password"],
+input[type="text"],
+input:not([type]),
+select {
   width: min(28rem, 100%);
   padding: 0.45rem 0.55rem;
   font: inherit;
+}
+
+input[type="checkbox"] {
+  width: auto;
+}
+
+.resource-page section {
+  margin-top: 1.25rem;
+  padding: 0.9rem 1rem;
+  background: #fff;
+  border: 1px solid #c8c8c2;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  align-items: flex-end;
+  margin: 1rem 0;
+}
+
+.toolbar .field {
+  margin: 0;
+}
+
+.pager,
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 1rem;
+}
+
+.button-link {
+  display: inline-block;
+  font-weight: 600;
+  padding: 0.45rem 0.8rem;
+  border: 1px solid #0b3d91;
+  background: #fff;
+  text-decoration: none;
+}
+
+.field-hint,
+.hint-list {
+  margin: 0.25rem 0 0;
+  font-size: 0.95rem;
+}
+
+.attr-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  align-items: flex-end;
+  margin: 0.6rem 0;
+}
+
+.attr-row input,
+.attr-row select {
+  width: min(16rem, 100%);
+}
+
+.member-search,
+.confirm-dialog {
+  margin: 1rem 0;
+  padding: 0.9rem 1rem;
+  background: #fff;
+  border: 1px solid #c8c8c2;
+}
+
+.member-results,
+.member-selected {
+  margin: 0.5rem 0 0;
+  padding-left: 1.2rem;
+}
+
+.member-results li,
+.member-selected li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+  margin: 0.3rem 0;
+}
+
+.confirm-dialog {
+  max-width: 32rem;
 }
 
 button {

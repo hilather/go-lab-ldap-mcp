@@ -5,12 +5,12 @@ import { clearDirectoryQueryData, clearSessionQueryData, createAppQueryClient, q
 test("logout and expiry clear directory query data", () => {
   const client = createAppQueryClient();
   client.setQueryData(queryKeys.directory.baseline, { match: true });
-  client.setQueryData([...queryKeys.directory.all, "users"], [{ id: "alice" }]);
+  client.setQueryData(queryKeys.users.detail("alice"), { id: "alice" });
   client.setQueryData(queryKeys.session, { id: "sess-1" });
 
   clearDirectoryQueryData(client);
   assert.equal(client.getQueryData(queryKeys.directory.baseline), undefined);
-  assert.equal(client.getQueryData([...queryKeys.directory.all, "users"]), undefined);
+  assert.equal(client.getQueryData(queryKeys.users.detail("alice")), undefined);
   assert.deepEqual(client.getQueryData(queryKeys.session), { id: "sess-1" });
 
   clearSessionQueryData(client);

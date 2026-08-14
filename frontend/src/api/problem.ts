@@ -33,6 +33,43 @@ export class ApiError extends Error {
     return this.status === 502 || this.status === 503 || this.status === 504;
   }
 
+  get revisionConflict(): boolean {
+    if (this.status === 412) {
+      return true;
+    }
+    return (
+      this.problem?.errors?.some(
+        (field) => field.code === "conflict" && (field.path === "revision" || field.path === "If-Match"),
+      ) === true
+    );
+  }
+
+  get cycle(): boolean {
+    return this.problem?.errors?.some((field) => field.code === "cycle") === true;
+  }
+
+  fieldErrors(): { path: string; code?: string; message: string }[] {
+    const fields = this.problem?.errors;
+    if (fields === undefined) {
+      return [];
+    }
+    const out: { path: string; code?: string; message: string }[] = [];
+    for (const field of fields) {
+      if (field.path === undefined || field.message === undefined) {
+        continue;
+      }
+      const item: { path: string; code?: string; message: string } = {
+        path: field.path,
+        message: field.message,
+      };
+      if (field.code !== undefined) {
+        item.code = field.code;
+      }
+      out.push(item);
+    }
+    return out;
+  }
+
   requiredScope(): string | undefined {
     const fields = this.problem?.errors;
     if (fields === undefined) {
