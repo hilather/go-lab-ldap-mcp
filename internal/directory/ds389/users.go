@@ -179,6 +179,13 @@ func (r *Runtime) Modify(ctx context.Context, id directory.UserID, patch directo
 			if (key == "cn" || key == "sn") && strings.TrimSpace(val) == "" {
 				return cfgErr("attributes."+name, "required", "schema-required attribute cannot be empty")
 			}
+			if strings.TrimSpace(val) == "" {
+				// Empty value is the UserPatch delete signal (omit = leave).
+				if live.GetAttributeValue(name) != "" {
+					mod.Delete(name, nil)
+				}
+				continue
+			}
 			mod.Replace(name, []string{val})
 		}
 		if len(mod.Changes) > 0 {

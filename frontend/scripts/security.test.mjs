@@ -113,6 +113,8 @@ test("user list and create cover search, sort, empty, and read-only create", asy
   assert.match(create, /passwordPolicyHints/);
   assert.match(create, /ALLOWED_USER_ATTRS/);
   assert.match(create, /createUser/);
+  assert.match(create, /reservedCreateIdMessage/);
+  assert.match(create, /mappedFormErrors/);
   assert.match(create, /aria-invalid/);
   assert.match(create, /FormError/);
   const field = await readFile(join(srcRoot, "routes/shared/ResourcePage.tsx"), "utf8");
@@ -133,6 +135,8 @@ test("user detail mutations send revision and require exact ID delete", async ()
   assert.match(detail, /ConfirmDelete/);
   assert.match(detail, /resourceId=\{user\.id\}/);
   assert.match(detail, /invalidateUsersAndGroups/);
+  assert.match(detail, /userPatchAttributes/);
+  assert.match(detail, /applyMutation/);
 });
 
 test("group create requires an initial member from bounded server search", async () => {
@@ -146,6 +150,8 @@ test("group create requires an initial member from bounded server search", async
   assert.match(search, /listUsers/);
   assert.match(search, /listGroups/);
   assert.match(search, /does not\s+run until you submit/);
+  assert.doesNotMatch(search, /<form/);
+  assert.match(search, /type="button"/);
 });
 
 test("group detail has membership summaries, cycle errors, and no attribute PATCH", async () => {

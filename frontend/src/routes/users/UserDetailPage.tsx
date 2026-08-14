@@ -16,15 +16,15 @@ import {
 import { useSession } from "../../auth/SessionGate";
 import {
   ALLOWED_USER_ATTRS,
-  attributeMapFromRows,
   attributeRowsFromPairs,
   canSubmitMutation,
   canSubmitPassword,
   clearedPasswordFields,
   firstForbiddenAttr,
-  formFieldFromProblemPath,
+  mappedFormErrors,
   passwordPolicyHints,
   passwordsMatch,
+  userPatchAttributes,
 } from "../../lib/directory-model";
 import { useForm, z, zodResolver } from "../../lib/form";
 import { invalidateUsersAndGroups, queryKeys } from "../../lib/query";
@@ -100,7 +100,7 @@ export function UserDetailPage() {
     await queryClient.invalidateQueries({ queryKey: queryKeys.users.groups(id) });
   };
 
-  const runMutation = async (work: () => Promise<unknown>): Promise<void> => {
+  const applyMutation = async (work: () => Promise<unknown>): Promise<void> => {
     setNotice(undefined);
     try {
       await work();
@@ -112,8 +112,12 @@ export function UserDetailPage() {
         return;
       }
       setNotice(isApiError(err) ? err.message : "The change was not applied.");
+      throw err;
     }
   };
+
+  const runMutation = (work: () => Promise<unknown>): Promise<void> =>
+    applyMutation(work).catch(() => undefined);
 
   return (
     <ResourcePage title={user === undefined ? "User" : `User ${user.id}`}>
@@ -211,7 +215,7 @@ export function UserDetailPage() {
           <UserEditForm
             user={user}
             gate={writeGate}
-            onSave={(patch) => runMutation(() => updateUser(user.id, patch, user.revision))}
+            onSave={(patch) => applyMutation(() => updateUser(user.id, patch, user.revision))}
           />
 
           <section aria-labelledby="user-actions-heading">
@@ -348,20 +352,23 @@ function UserEditForm({
             return;
           }
           const patch: UserPatch = { enabled: values.enabled };
-          const attributesMap = attributeMapFromRows(values.attributes);
+          const attributesMap = userPatchAttributes(user.attributes, values.attributes);
           if (attributesMap !== undefined) {
             patch.attributes = attributesMap;
           }
           try {
             await onSave(patch);
           } catch (err) {
-            if (isApiError(err)) {
-              for (const field of err.fieldErrors()) {
-                const name = formFieldFromProblemPath(field.path);
-                if (name === "attributes") {
-                  form.setError("attributes", { type: "server", message: field.message });
-                }
-              }
+            if (!isApiError(err) || err.revisionConflict) {
+              return;
+            }
+            const mapped = mappedFormErrors(err.fieldErrors(), ["attributes"]);
+            if (mapped.length === 0) {
+              form.setError("attributes", { type: "server", message: err.message });
+              return;
+            }
+            for (const field of mapped) {
+              form.setError("attributes", { type: "server", message: field.message });
             }
           }
         })}

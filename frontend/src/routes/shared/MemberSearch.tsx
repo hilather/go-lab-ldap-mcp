@@ -31,33 +31,29 @@ export function MemberSearch({
   const [status, setStatus] = useState<string | undefined>();
   const [searching, setSearching] = useState(false);
 
+  const runSearch = async (): Promise<void> => {
+    setSearching(true);
+    setStatus(undefined);
+    try {
+      const found = await searchMembers(kind, q);
+      setResults(found);
+      setStatus(found.length === 0 ? "No matching directory members." : undefined);
+    } catch (err) {
+      setResults([]);
+      setStatus(isApiError(err) ? err.message : "Member search failed.");
+    } finally {
+      setSearching(false);
+    }
+  };
+
   return (
     <fieldset className="member-search" disabled={disabled}>
       <legend>{legend}</legend>
       <p>
         Search is bounded to {MEMBER_SEARCH_PAGE_SIZE} server results. It does not
-        run until you submit.
+        run until you submit Search.
       </p>
-      <form
-        className="toolbar"
-        onSubmit={(event) => {
-          event.preventDefault();
-          void (async () => {
-            setSearching(true);
-            setStatus(undefined);
-            try {
-              const found = await searchMembers(kind, q);
-              setResults(found);
-              setStatus(found.length === 0 ? "No matching directory members." : undefined);
-            } catch (err) {
-              setResults([]);
-              setStatus(isApiError(err) ? err.message : "Member search failed.");
-            } finally {
-              setSearching(false);
-            }
-          })();
-        }}
-      >
+      <div className="toolbar">
         <div className="field">
           <label htmlFor="member-kind">Kind</label>
           <select
@@ -77,12 +73,18 @@ export function MemberSearch({
             autoComplete="off"
             spellCheck={false}
             onChange={(event) => setQ(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                void runSearch();
+              }
+            }}
           />
         </div>
-        <button type="submit" disabled={searching}>
+        <button type="button" disabled={searching} onClick={() => void runSearch()}>
           {searching ? "Searching…" : "Search"}
         </button>
-      </form>
+      </div>
       {status !== undefined ? <p role="status">{status}</p> : null}
       {results.length > 0 ? (
         <ul className="member-results">

@@ -98,6 +98,10 @@ func (m *memUsers) Modify(_ context.Context, id directory.UserID, patch director
 		attrs[a.Name] = a.Value
 	}
 	for k, v := range patch.Attributes {
+		if strings.TrimSpace(v) == "" {
+			delete(attrs, k)
+			continue
+		}
 		attrs[k] = v
 	}
 	u.Attributes = nil

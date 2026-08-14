@@ -109,6 +109,10 @@ func (f *fakeUsers) Modify(_ context.Context, id directory.UserID, patch directo
 		attrs[a.Name] = a.Value
 	}
 	for k, v := range patch.Attributes {
+		if strings.TrimSpace(v) == "" {
+			delete(attrs, k)
+			continue
+		}
 		attrs[k] = v
 	}
 	u.Attributes = kvFromMap(attrs)

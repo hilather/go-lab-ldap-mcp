@@ -168,6 +168,51 @@ export function attributeMapFromRows(rows: readonly AttrRow[]): Record<string, s
   return attrs;
 }
 
+// UserPatch is merge-only. Names present on the loaded user but missing from
+// the submitted rows must be sent as "" so the server Replace/delete runs.
+export function userPatchAttributes(
+  current: readonly { name: string; value: string }[],
+  rows: readonly AttrRow[],
+): Record<string, string> | undefined {
+  const attrs = attributeMapFromRows(rows) ?? {};
+  const submitted = new Set(Object.keys(attrs).map((name) => name.toLowerCase()));
+  for (const pair of current) {
+    const name = pair.name.trim();
+    if (name === "" || isForbiddenUserAttr(name)) {
+      continue;
+    }
+    if (!submitted.has(name.toLowerCase())) {
+      attrs[name] = "";
+    }
+  }
+  if (Object.keys(attrs).length === 0) {
+    return undefined;
+  }
+  return attrs;
+}
+
+export function reservedCreateIdMessage(id: string): string | undefined {
+  if (id.trim().toLowerCase() === "new") {
+    return 'The ID "new" is reserved for the create page.';
+  }
+  return undefined;
+}
+
+export function mappedFormErrors(
+  fields: readonly { path: string; message: string }[],
+  allowed: readonly string[],
+): { name: string; message: string }[] {
+  const allow = new Set(allowed);
+  const out: { name: string; message: string }[] = [];
+  for (const field of fields) {
+    const name = formFieldFromProblemPath(field.path);
+    if (allow.has(name)) {
+      out.push({ name, message: field.message });
+    }
+  }
+  return out;
+}
+
 export function firstForbiddenAttr(rows: readonly AttrRow[]): string | undefined {
   for (const row of rows) {
     const name = row.name.trim();

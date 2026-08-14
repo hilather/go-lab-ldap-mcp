@@ -8,7 +8,8 @@ import {
   canSubmitGroupCreate,
   canSubmitMutation,
   emptyGroupExplanation,
-  formFieldFromProblemPath,
+  mappedFormErrors,
+  reservedCreateIdMessage,
   type MemberChoice,
 } from "../../lib/directory-model";
 import { useForm, z, zodResolver } from "../../lib/form";
@@ -18,7 +19,13 @@ import { MemberSearch, toMemberRefs } from "../shared/MemberSearch";
 import { describedBy, FormError, ResourcePage } from "../shared/ResourcePage";
 
 const createSchema = z.object({
-  id: z.string().trim().min(1, "Enter a group ID."),
+  id: z
+    .string()
+    .trim()
+    .min(1, "Enter a group ID.")
+    .refine((value) => reservedCreateIdMessage(value) === undefined, {
+      message: reservedCreateIdMessage("new") ?? 'The ID "new" is reserved.',
+    }),
 });
 
 type CreateValues = z.infer<typeof createSchema>;
@@ -68,16 +75,23 @@ export function GroupCreatePage() {
               setMemberError("Group create failed.");
               return;
             }
-            for (const field of err.fieldErrors()) {
-              const name = formFieldFromProblemPath(field.path);
-              if (name === "id") {
+            const mapped = mappedFormErrors(err.fieldErrors(), ["id", "members"]);
+            if (mapped.length === 0) {
+              form.setError("id", { type: "server", message: err.message });
+              return;
+            }
+            let attached = false;
+            for (const field of mapped) {
+              if (field.name === "id") {
                 form.setError("id", { type: "server", message: field.message });
+                attached = true;
               }
-              if (name === "members") {
+              if (field.name === "members") {
                 setMemberError(field.message);
+                attached = true;
               }
             }
-            if (err.fieldErrors().length === 0) {
+            if (!attached) {
               form.setError("id", { type: "server", message: err.message });
             }
           }

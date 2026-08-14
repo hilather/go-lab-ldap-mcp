@@ -27,8 +27,11 @@ import {
   quoteETag,
   sortGroups,
   sortUsers,
+  mappedFormErrors,
+  reservedCreateIdMessage,
   toUserSpecBody,
   uniqueMembers,
+  userPatchAttributes,
   wouldEmptyGroup,
 } from "./directory-model.ts";
 
@@ -126,6 +129,45 @@ test("allowlisted attributes reject operational and password names", () => {
   assert.deepEqual(attributeMapFromRows([{ name: "sn", value: "Example" }, { name: "userPassword", value: "nope" }]), {
     sn: "Example",
   });
+});
+
+test("edit patch sends empty values for attributes removed from the form", () => {
+  const patch = userPatchAttributes(
+    [
+      { name: "mail", value: "a@example.test" },
+      { name: "sn", value: "Example" },
+      { name: "telephoneNumber", value: "1" },
+    ],
+    [
+      { name: "sn", value: "Example" },
+      { name: "title", value: "Lab" },
+    ],
+  );
+  assert.deepEqual(patch, {
+    sn: "Example",
+    title: "Lab",
+    mail: "",
+    telephoneNumber: "",
+  });
+  assert.equal(userPatchAttributes([], []), undefined);
+});
+
+test("create IDs cannot be the reserved route segment new", () => {
+  assert.equal(reservedCreateIdMessage("new"), 'The ID "new" is reserved for the create page.');
+  assert.equal(reservedCreateIdMessage("NEW"), 'The ID "new" is reserved for the create page.');
+  assert.equal(reservedCreateIdMessage("alice"), undefined);
+});
+
+test("unmapped server fields still produce a form error", () => {
+  const mapped = mappedFormErrors(
+    [
+      { path: "attributes.sn", message: "sn is required" },
+      { path: "scope", message: "directory:write" },
+    ],
+    ["id", "uid", "password", "attributes"],
+  );
+  assert.deepEqual(mapped, [{ name: "attributes", message: "sn is required" }]);
+  assert.deepEqual(mappedFormErrors([{ path: "limit", message: "too many" }], ["id", "members"]), []);
 });
 
 test("create body omits empty optional fields and never includes password aliases", () => {

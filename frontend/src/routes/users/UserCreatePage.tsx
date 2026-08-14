@@ -8,9 +8,10 @@ import {
   ALLOWED_USER_ATTRS,
   canSubmitMutation,
   firstForbiddenAttr,
-  formFieldFromProblemPath,
+  mappedFormErrors,
   passwordPolicyHints,
   passwordsMatch,
+  reservedCreateIdMessage,
   toUserSpecBody,
   type AttrRow,
 } from "../../lib/directory-model";
@@ -21,7 +22,13 @@ import { describedBy, FormError, ResourcePage } from "../shared/ResourcePage";
 
 const createSchema = z
   .object({
-    id: z.string().trim().min(1, "Enter a user ID."),
+    id: z
+      .string()
+      .trim()
+      .min(1, "Enter a user ID.")
+      .refine((value) => reservedCreateIdMessage(value) === undefined, {
+        message: reservedCreateIdMessage("new") ?? 'The ID "new" is reserved.',
+      }),
     uid: z.string(),
     enabled: z.boolean(),
     password: z.string().min(1, "Enter a password."),
@@ -222,15 +229,14 @@ function applyCreateErrors(
     setError("id", { type: "server", message: "User create failed." });
     return;
   }
-  const fields = err.fieldErrors();
-  if (fields.length === 0) {
+  const mapped = mappedFormErrors(err.fieldErrors(), ["id", "uid", "password", "attributes"]);
+  if (mapped.length === 0) {
     setError("id", { type: "server", message: err.message });
     return;
   }
-  for (const field of fields) {
-    const name = formFieldFromProblemPath(field.path);
-    if (name === "id" || name === "uid" || name === "password" || name === "attributes") {
-      setError(name, { type: "server", message: field.message });
+  for (const field of mapped) {
+    if (field.name === "id" || field.name === "uid" || field.name === "password" || field.name === "attributes") {
+      setError(field.name, { type: "server", message: field.message });
     }
   }
 }
