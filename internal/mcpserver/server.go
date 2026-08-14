@@ -67,7 +67,7 @@ func New(opt Options) (*Server, error) {
 		Version:     impl.Version,
 		Description: "LabLDAP directory control plane (Streamable HTTP, spec " + ProtocolVersion + ", Stateless)",
 	}, nil)
-	s.registerReadTools(ms)
+	s.registerTools(ms)
 	s.registerResources(ms)
 	s.inner = mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server {
 		return ms

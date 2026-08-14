@@ -85,6 +85,75 @@ type GetEntryInput struct {
 	Attributes []string `json:"attributes,omitempty"`
 }
 
+// CreateUserInput matches POST /api/v1/users. Password is never returned.
+type CreateUserInput struct {
+	ID         string            `json:"id"`
+	UID        string            `json:"uid,omitempty"`
+	Enabled    *bool             `json:"enabled,omitempty"`
+	Password   string            `json:"password"`
+	Attributes map[string]string `json:"attributes,omitempty"`
+}
+
+// UpdateUserInput is PATCH /api/v1/users/{id} plus revision (no If-Match header).
+type UpdateUserInput struct {
+	ID         string            `json:"id"`
+	Enabled    *bool             `json:"enabled,omitempty"`
+	Attributes map[string]string `json:"attributes,omitempty"`
+	Revision   string            `json:"revision"`
+}
+
+// DeleteInput is a destructive user/group delete. confirm must be true.
+type DeleteInput struct {
+	ID       string `json:"id"`
+	Revision string `json:"revision"`
+	Confirm  bool   `json:"confirm"`
+}
+
+// SetPasswordInput matches POST /api/v1/users/{id}/password.
+type SetPasswordInput struct {
+	ID       string `json:"id"`
+	Password string `json:"password"`
+	Revision string `json:"revision"`
+}
+
+// IDResult is the structured result for delete and set-password.
+type IDResult struct {
+	ID string `json:"id"`
+}
+
+// MembersInput is add/remove/replace members. Arrays cannot be a tool input root.
+type MembersInput struct {
+	ID       string                `json:"id"`
+	Members  []directory.MemberRef `json:"members"`
+	Revision string                `json:"revision"`
+}
+
+// BindTestInput matches POST /api/v1/auth-tests.
+type BindTestInput struct {
+	Identity  string `json:"identity"`
+	Password  string `json:"password"`
+	Transport string `json:"transport,omitempty"`
+}
+
+// ResetSuffixInput is the destructive soft-reset tool (T-092).
+type ResetSuffixInput struct {
+	Name             string `json:"name"`
+	ExpectedRevision string `json:"expectedRevision"`
+	Confirm          bool   `json:"confirm"`
+}
+
+// ExportLDIFInput is the small inline export (T-092).
+type ExportLDIFInput struct {
+	OmitSecrets *bool `json:"omitSecrets,omitempty"`
+}
+
+// ExportLDIFOutput is either inline LDIF or a REST handoff when over the ceiling.
+type ExportLDIFOutput struct {
+	LDIF    string `json:"ldif,omitempty"`
+	Handoff string `json:"handoff,omitempty"`
+	Bytes   int    `json:"bytes,omitempty"`
+}
+
 // emptyInput is the OpenAPI-empty object for tools with no fields.
 type emptyInput struct{}
 
@@ -156,24 +225,26 @@ func Catalog() []ToolDef {
 			Description: "Create a user. Input matches POST /api/v1/users (UserSpec).",
 			Scope:       auth.ScopeDirectoryWrite, Flag: flagMutations,
 			SensitiveInputs: []string{"password"},
-			Input:           directory.UserSpec{}, Output: directory.User{},
+			Input:           CreateUserInput{}, Output: directory.User{},
 		},
 		{
 			Name: ToolUpdateUser, Contract: ContractProposed, Task: "T-089",
 			Description: "Update a user. Input matches PATCH /api/v1/users/{id} plus revision.",
 			Scope:       auth.ScopeDirectoryWrite, Flag: flagMutations, Idempotent: true,
-			Input: app.UpdateUser{}, Output: directory.User{},
+			Input: UpdateUserInput{}, Output: directory.User{},
 		},
 		{
 			Name: ToolDeleteUser, Contract: ContractProposed, Task: "T-089",
-			Description: "Delete a user. Requires confirmation and revision.",
+			Description: "Delete a user. Requires confirm:true and revision.",
 			Scope:       auth.ScopeDirectoryWrite, Destructive: true, Flag: flagMutations,
+			Input: DeleteInput{}, Output: IDResult{},
 		},
 		{
 			Name: ToolSetPassword, Contract: ContractProposed, Task: "T-089",
 			Description: "Set a user password. Input matches POST /api/v1/users/{id}/password.",
 			Scope:       auth.ScopeDirectoryPassword, Flag: flagPassword,
 			SensitiveInputs: []string{"password"},
+			Input:           SetPasswordInput{}, Output: IDResult{},
 		},
 		{
 			Name: ToolCreateGroup, Contract: ContractProposed, Task: "T-090",
@@ -183,43 +254,46 @@ func Catalog() []ToolDef {
 		},
 		{
 			Name: ToolDeleteGroup, Contract: ContractProposed, Task: "T-090",
-			Description: "Delete a group. Requires confirmation and revision.",
+			Description: "Delete a group. Requires confirm:true and revision.",
 			Scope:       auth.ScopeDirectoryWrite, Destructive: true, Flag: flagMutations,
+			Input: DeleteInput{}, Output: IDResult{},
 		},
 		{
 			Name: ToolAddMembers, Contract: ContractProposed, Task: "T-090",
 			Description: "Add group members. Idempotent for already-present members.",
 			Scope:       auth.ScopeDirectoryWrite, Flag: flagMutations, Idempotent: true,
-			Input: []directory.MemberRef{}, Output: directory.MembershipSummary{},
+			Input: MembersInput{}, Output: directory.MembershipSummary{},
 		},
 		{
 			Name: ToolRemoveMembers, Contract: ContractProposed, Task: "T-090",
 			Description: "Remove group members.",
 			Scope:       auth.ScopeDirectoryWrite, Flag: flagMutations, Idempotent: true,
-			Input: []directory.MemberRef{}, Output: directory.MembershipSummary{},
+			Input: MembersInput{}, Output: directory.MembershipSummary{},
 		},
 		{
 			Name: ToolReplaceMembers, Contract: ContractProposed, Task: "T-090",
 			Description: "Replace group members. Empty replacement is empty_group.",
 			Scope:       auth.ScopeDirectoryWrite, Flag: flagMutations, Idempotent: true,
-			Input: []directory.MemberRef{}, Output: directory.MembershipSummary{},
+			Input: MembersInput{}, Output: directory.MembershipSummary{},
 		},
 		{
 			Name: ToolBindTest, Contract: ContractProposed, Task: "T-091",
 			Description: "Bind-test diagnostic. Unknown user and wrong password are indistinguishable.",
 			Scope:       auth.ScopeDirectoryPassword, Flag: flagPassword, OpenWorld: false,
 			SensitiveInputs: []string{"password"},
-			Output:          directory.BindTestResult{},
+			Input:           BindTestInput{}, Output: directory.BindTestResult{},
 		},
 		{
 			Name: ToolResetSuffix, Contract: ContractProposed, Task: "T-092",
 			Description: "Soft-reset the managed suffix. Requires lab:reset, revision, and exact confirmation.",
 			Scope:       auth.ScopeLabReset, Destructive: true, Flag: flagReset,
+			Input: ResetSuffixInput{}, Output: app.ResetStatus{},
 		},
 		{
 			Name: ToolExportLDIF, Contract: ContractProposed, Task: "T-092",
 			Description: "Export a small LDIF snapshot. Large exports should use authenticated REST.",
 			Scope:       auth.ScopeLabExport, ReadOnly: true, Flag: flagExport,
+			Input: ExportLDIFInput{}, Output: ExportLDIFOutput{},
 		},
 	}
 }
@@ -365,9 +439,13 @@ func RedactArgs(tool string, args map[string]any) map[string]any {
 }
 
 func registeredReadTools() []string {
+	return registeredTools(RegisterFlags{})
+}
+
+func registeredTools(flags RegisterFlags) []string {
 	var names []string
 	for _, d := range Catalog() {
-		if d.Flag == "" {
+		if d.ShouldRegister(flags) {
 			names = append(names, d.Name)
 		}
 	}

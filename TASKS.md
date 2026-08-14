@@ -1011,38 +1011,38 @@ Acceptance:
 - [x] Search paging and cursors match application semantics.
 - [x] Resources enforce scopes and attribute restrictions.
 
-## [ ] T-089 Implement MCP user tools
+## [x] T-089 Implement MCP user tools
 
 Priority: P0 | Size: L | Depends on: T-054, T-087
 
 Deliverables: create, update, delete, and set-password tools with revisions, confirmations, structured results, and audit.
 
 Acceptance:
-- [ ] User created through MCP is visible through REST and direct LDAP.
-- [ ] Delete requires confirmation and revision.
-- [ ] Password input is absent from output and logs.
+- [x] User created through MCP is visible through REST and direct LDAP.
+- [x] Delete requires confirmation and revision.
+- [x] Password input is absent from output and logs.
 
-## [ ] T-090 Implement MCP group and membership tools
+## [x] T-090 Implement MCP group and membership tools
 
 Priority: P0 | Size: L | Depends on: T-055, T-087
 
 Deliverables: group create, update, delete, add, remove, replace tools and change summaries.
 
 Acceptance:
-- [ ] Empty group and cycle validation match REST.
-- [ ] Idempotent membership behavior is preserved.
-- [ ] New membership is visible through MemberOf and REST.
+- [x] Empty group and cycle validation match REST.
+- [x] Idempotent membership behavior is preserved.
+- [x] New membership is visible through MemberOf and REST.
 
-## [ ] T-091 Implement MCP bind-test tool
+## [x] T-091 Implement MCP bind-test tool
 
 Priority: P0 | Size: M | Depends on: T-051, T-056, T-087
 
 Deliverables: sensitive input mapping, rate limits, generic invalid result, transport selection, and audit.
 
 Acceptance:
-- [ ] Tool requires `directory:password`.
-- [ ] Unknown user and wrong password remain indistinguishable externally.
-- [ ] Dedicated LDAP connection closes in success, failure, and cancellation paths.
+- [x] Tool requires `directory:password`.
+- [x] Unknown user and wrong password remain indistinguishable externally.
+- [x] Dedicated LDAP connection closes in success, failure, and cancellation paths.
 
 ## [ ] T-092 Implement MCP reset and export tools
 

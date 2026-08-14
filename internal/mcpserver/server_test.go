@@ -21,18 +21,30 @@ import (
 )
 
 const (
-	testToken = "lab-test-static-token-value-32ch"
-	readToken = "lab-test-reader-token-value-32ch"
-	schemaTok = "lab-test-schema-token-value-32ch"
-	badSecret = "not-the-token-value-xxxxxxxxxxxxxxx"
+	testToken     = "lab-test-static-token-value-32ch"
+	readToken     = "lab-test-reader-token-value-32ch"
+	schemaTok     = "lab-test-schema-token-value-32ch"
+	writeToken    = "lab-test-writer-token-value-32ch"
+	passwordToken = "lab-test-password-token-value-32"
+	resetToken    = "lab-test-reset-token-value-32xxxx"
+	exportToken   = "lab-test-export-token-value-32xxx"
+	badSecret     = "not-the-token-value-xxxxxxxxxxxxxxx"
+	mcpUserPass   = "unit-mcp-user-pass-12"
 )
 
 func testRegistry(t *testing.T) *auth.Registry {
 	t.Helper()
 	reg, err := auth.NewRegistry([]auth.Token{
-		{ID: "admin", Scopes: []string{auth.ScopeDirectoryRead, auth.ScopeDirectoryWrite, auth.ScopeSchemaRead}, Secret: observability.Secret(testToken)},
+		{ID: "admin", Scopes: []string{
+			auth.ScopeDirectoryRead, auth.ScopeDirectoryWrite, auth.ScopeDirectoryPassword,
+			auth.ScopeSchemaRead, auth.ScopeLabReset, auth.ScopeLabExport,
+		}, Secret: observability.Secret(testToken)},
 		{ID: "reader", Scopes: []string{auth.ScopeDirectoryRead}, Secret: observability.Secret(readToken)},
 		{ID: "schema", Scopes: []string{auth.ScopeSchemaRead}, Secret: observability.Secret(schemaTok)},
+		{ID: "writer", Scopes: []string{auth.ScopeDirectoryWrite}, Secret: observability.Secret(writeToken)},
+		{ID: "password", Scopes: []string{auth.ScopeDirectoryPassword}, Secret: observability.Secret(passwordToken)},
+		{ID: "resetter", Scopes: []string{auth.ScopeLabReset}, Secret: observability.Secret(resetToken)},
+		{ID: "exporter", Scopes: []string{auth.ScopeLabExport}, Secret: observability.Secret(exportToken)},
 	})
 	if err != nil {
 		t.Fatal(err)

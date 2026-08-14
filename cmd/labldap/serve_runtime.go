@@ -266,6 +266,7 @@ func attachDirectory(opt *apiOptionsBuilder) error {
 	}
 	opt.pool = pool
 	opt.probe = probe
+	opt.svc = svc
 	opt.users = svc.Users
 	opt.groups = svc.Groups
 	opt.query = svc.Query
@@ -287,6 +288,7 @@ type apiOptionsBuilder struct {
 	limit     *app.Window
 	pool      *ldapclient.Pool
 	probe     *app.Probe
+	svc       *app.Services
 	users     *app.Users
 	groups    *app.Groups
 	query     *app.Query

@@ -214,12 +214,13 @@ func TestMissingReadScopeDenied(t *testing.T) {
 	}
 }
 
-func TestMutationsNotRegisteredWhenFlagSetWithoutHandler(t *testing.T) {
+func TestMutationsRegisterOnlyWhenEnabled(t *testing.T) {
 	t.Parallel()
+	flags := RegisterFlags{Mutations: true, Password: true}
 	s, err := New(Options{
 		Registry: testRegistry(t),
 		Services: testServices(&fakeSearch{}, fakeCaps{}, fakeMarker{}, fakeSchema{}),
-		Flags:    RegisterFlags{Mutations: true, Password: true, Reset: true, Export: true},
+		Flags:    flags,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -227,12 +228,23 @@ func TestMutationsNotRegisteredWhenFlagSetWithoutHandler(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.Handle(MountPath, s.Handler())
 	sess, _ := connectMCP(t, mux, testToken, "")
+	var names []string
 	for tool, err := range sess.Tools(t.Context(), nil) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if tool.Name == ToolCreateUser || tool.Name == ToolResetSuffix {
-			t.Fatalf("T-089+ tool registered without handler: %s", tool.Name)
+		names = append(names, tool.Name)
+		if tool.Name == ToolDeleteUser || tool.Name == ToolDeleteGroup {
+			if tool.Annotations == nil || tool.Annotations.DestructiveHint == nil || !*tool.Annotations.DestructiveHint {
+				t.Fatalf("%s missing destructive hint", tool.Name)
+			}
 		}
+		if tool.Name == ToolResetSuffix || tool.Name == ToolExportLDIF {
+			t.Fatalf("T-092 tool registered before handlers: %s", tool.Name)
+		}
+	}
+	want := registeredTools(flags)
+	if !equalSet(names, want) {
+		t.Fatalf("tools = %v want %v", names, want)
 	}
 }

@@ -81,7 +81,7 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 			printConfigError(stderr, err)
 			return 1
 		}
-		opt, closer, err := serverOptionsFromCompiled(built, flags, log)
+		opt, svc, closer, err := serverOptionsFromCompiled(built, flags, log)
 		if err != nil {
 			fmt.Fprintf(stderr, "labldap serve: %v\n", err)
 			return 1
@@ -94,7 +94,7 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 			fmt.Fprintf(stderr, "labldap serve: %v\n", err)
 			return 1
 		}
-		mcpH, err := mcpHandlerFromCompiled(built, opt.Registry, log)
+		mcpH, err := mcpHandlerFromCompiled(built, opt.Registry, svc, log)
 		if err != nil {
 			fmt.Fprintf(stderr, "labldap serve: %v\n", err)
 			return 1
@@ -153,14 +153,14 @@ func compileControl(ctx context.Context, path string) (*config.Compiled, error) 
 	})
 }
 
-func serverOptionsFromCompiled(c *config.Compiled, flags serveFlags, log *slog.Logger) (api.Options, func(), error) {
+func serverOptionsFromCompiled(c *config.Compiled, flags serveFlags, log *slog.Logger) (api.Options, *app.Services, func(), error) {
 	tokens := make([]auth.Token, 0, len(c.Normalized.Tokens))
 	for _, t := range c.Normalized.Tokens {
 		tokens = append(tokens, auth.Token{ID: t.ID, Scopes: t.Scopes, Secret: t.Secret.Value})
 	}
 	reg, err := auth.NewRegistry(tokens)
 	if err != nil {
-		return api.Options{}, nil, err
+		return api.Options{}, nil, nil, err
 	}
 	sessCfg := auth.DefaultSessionConfig()
 	if d, err := time.ParseDuration(c.Public.Spec.Management.Session.IdleTimeout); err == nil && d > 0 {
@@ -238,7 +238,7 @@ func serverOptionsFromCompiled(c *config.Compiled, flags serveFlags, log *slog.L
 			_ = b.pool.Close()
 		}
 	}
-	return opt, closer, nil
+	return opt, b.svc, closer, nil
 }
 
 func mountTransports(rest, mcp http.Handler) http.Handler {
@@ -251,16 +251,14 @@ func mountTransports(rest, mcp http.Handler) http.Handler {
 	return mux
 }
 
-func mcpHandlerFromCompiled(c *config.Compiled, reg *auth.Registry, log *slog.Logger) (http.Handler, error) {
+func mcpHandlerFromCompiled(c *config.Compiled, reg *auth.Registry, svc *app.Services, log *slog.Logger) (http.Handler, error) {
 	if c == nil || c.Public == nil || (c.Public.Spec.Management.MCP.Enabled != nil && !*c.Public.Spec.Management.MCP.Enabled) {
 		return mcpserver.Disabled(reg), nil
 	}
 	mcpCfg := c.Public.Spec.Management.MCP
 	s, err := mcpserver.New(mcpserver.Options{
-		Registry: reg,
-		// Application services attach when the runtime pool lands (T-073).
-		// Nil keeps tool handlers returning directory unavailable, not panic.
-		Services:       nil,
+		Registry:       reg,
+		Services:       svc,
 		Logger:         log,
 		AllowedOrigins: append([]string(nil), c.Public.Spec.Management.CORS.AllowedOrigins...),
 		AllowedHosts:   mcpserver.HostsFromListen(c.Public.Spec.Management.Listen),
