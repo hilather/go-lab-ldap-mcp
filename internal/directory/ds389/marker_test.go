@@ -170,3 +170,49 @@ func TestInspectDriftExtraAndMissing(t *testing.T) {
 		t.Fatal("missing marker should have empty revision")
 	}
 }
+
+func TestInspectApplyOmitsMarkerMismatch(t *testing.T) {
+	mem := &seedMem{entries: baseEntries()}
+	mem.entries["uid=alice,ou=people,dc=example,dc=test"] = &ldap.Entry{DN: "uid=alice,ou=people,dc=example,dc=test"}
+	mem.entries["cn=staff,ou=groups,dc=example,dc=test"] = &ldap.Entry{DN: "cn=staff,ou=groups,dc=example,dc=test"}
+	mem.entries["dc=example,dc=test"].Attributes = []*ldap.EntryAttribute{
+		{Name: "aci", Values: []string{`(targetattr!="userPassword")(version 3.0; acl "labldap:runtime-suffix-read"; allow (read) userdn="ldap:///anyone";)`}},
+	}
+	req := bootstrap.DriftRequest{
+		TreeRequest: bootstrap.TreeRequest{
+			Suffix:    "dc=example,dc=test",
+			PeopleDN:  "ou=people,dc=example,dc=test",
+			GroupsDN:  "ou=groups,dc=example,dc=test",
+			RuntimeDN: "uid=rt,ou=people,dc=example,dc=test",
+		},
+		Users:  []config.NormalizedUser{{ID: "alice", UID: "alice", DN: "uid=alice,ou=people,dc=example,dc=test"}},
+		Groups: []config.NormalizedGroup{{ID: "staff", DN: "cn=staff,ou=groups,dc=example,dc=test"}},
+		ACIs: []config.NamedACI{{
+			ID:     "labldap:runtime-suffix-read",
+			Target: "dc=example,dc=test",
+			Text:   `(targetattr!="userPassword")(version 3.0; acl "labldap:runtime-suffix-read"; allow (read) userdn="ldap:///anyone";)`,
+		}},
+		MarkerDN:          "cn=labldap-baseline,dc=example,dc=test",
+		DirectoryRevision: "abc123",
+		Preserve:          []string{"uid=rt,ou=people,dc=example,dc=test"},
+	}
+	eng := Engine{TreeDial: func(context.Context, bootstrap.TreeRequest) (treeConn, error) { return mem, nil }}
+	applyRep, err := eng.Inspect(t.Context(), req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if applyRep.Differ {
+		t.Fatalf("apply leftover must not treat missing marker as drift: %+v", applyRep)
+	}
+	if applyRep.MarkerRevision != "" || applyRep.ExpectedRevision != "abc123" {
+		t.Fatalf("revision fields = %+v", applyRep)
+	}
+	req.CompareMarker = true
+	valRep, err := eng.Inspect(t.Context(), req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !valRep.Differ {
+		t.Fatal("validate must treat missing marker as drift")
+	}
+}

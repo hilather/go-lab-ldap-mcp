@@ -18,9 +18,9 @@ func TestResetRecoversPartialStates(t *testing.T) {
 		t.Fatalf("apply: %v\n%s", err, redactLogs(out, seedCanary, inst.password))
 	}
 
-	ldapDelete(t, inst, "uid=alice,ou=people,dc=example,dc=test")
 	addExtraPerson(t, inst, "uid=runtime-extra,ou=people,dc=example,dc=test")
-	ldapDelete(t, inst, "cn=staff,ou=groups,dc=example,dc=test")
+	replaceGroupMembers(t, inst, "cn=staff,ou=groups,dc=example,dc=test", "uid=runtime-extra,ou=people,dc=example,dc=test")
+	ldapDelete(t, inst, "uid=alice,ou=people,dc=example,dc=test")
 	ldapDelete(t, inst, "cn=labldap-baseline,dc=example,dc=test")
 	deleteNamedACI(t, inst, "ou=people,dc=example,dc=test", "labldap:runtime-people-write")
 
@@ -47,6 +47,9 @@ func TestResetRecoversPartialStates(t *testing.T) {
 	if !strings.Contains(staff, "uid=alice,ou=people,dc=example,dc=test") {
 		t.Fatalf("staff after reset:\n%s", staff)
 	}
+	if strings.Contains(staff, "uid=runtime-extra") {
+		t.Fatalf("staff still half-seeded after reset:\n%s", staff)
+	}
 	marker := ldapSearch(t, inst, "cn=labldap-baseline,dc=example,dc=test", "dn")
 	if !strings.Contains(marker, "cn=labldap-baseline,dc=example,dc=test") {
 		t.Fatalf("marker missing after reset:\n%s", marker)
@@ -58,6 +61,25 @@ func TestResetRecoversPartialStates(t *testing.T) {
 	rt := ldapSearch(t, inst, "uid=rt,ou=people,dc=example,dc=test", "dn")
 	if !strings.Contains(rt, "uid=rt,ou=people,dc=example,dc=test") {
 		t.Fatal("reset deleted runtime")
+	}
+}
+
+func replaceGroupMembers(t *testing.T, inst *Instance, dn string, members ...string) {
+	t.Helper()
+	ldif := "dn: " + dn + `
+changetype: modify
+replace: member
+`
+	for _, m := range members {
+		ldif += "member: " + m + "\n"
+	}
+	cmd := exec.Command("docker", "exec", "-i", inst.Name,
+		"ldapmodify", "-x", "-H", "ldaps://127.0.0.1:3636", "-o", "tls_reqcert=never",
+		"-D", "cn=Directory Manager", "-w", inst.Password().Reveal())
+	cmd.Stdin = strings.NewReader(ldif)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("replace members %s: %v\n%s", dn, err, out)
 	}
 }
 

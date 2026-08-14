@@ -155,8 +155,10 @@ func (e Engine) Inspect(ctx context.Context, req bootstrap.DriftRequest) (bootst
 	}
 	rep.Differ = len(rep.ExtraUsers) > 0 || len(rep.MissingUsers) > 0 ||
 		len(rep.ExtraGroups) > 0 || len(rep.MissingGroups) > 0 ||
-		len(rep.ExtraACIs) > 0 || len(rep.MissingACIs) > 0 ||
-		rep.MarkerRevision != rep.ExpectedRevision
+		len(rep.ExtraACIs) > 0 || len(rep.MissingACIs) > 0
+	if req.CompareMarker && rep.MarkerRevision != rep.ExpectedRevision {
+		rep.Differ = true
+	}
 	return rep, nil
 }
 

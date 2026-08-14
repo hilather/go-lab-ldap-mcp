@@ -397,8 +397,9 @@ func Run(ctx context.Context, opt Options, stdout, stderr io.Writer) (Summary, e
 		}
 	}
 
-	after("marker")
-	if !write {
+	if write {
+		after("marker")
+	} else {
 		after("drift")
 	}
 	sum.OK = true
@@ -617,7 +618,7 @@ func driftRequestFrom(c *config.Compiled, opt Options, dm observability.Secret, 
 		MarkerDN:          c.Data.Marker,
 		DirectoryRevision: c.Revisions.Directory,
 		Preserve:          append([]string(nil), c.Data.Preserve...),
-		FailOnDifference:  !write,
+		CompareMarker:     !write,
 	}
 }
 

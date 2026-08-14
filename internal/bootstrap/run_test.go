@@ -395,8 +395,8 @@ func TestApplyLoadThenWaitOK(t *testing.T) {
 	if len(sum.Remaining) != 0 {
 		t.Fatalf("remaining = %v, want empty", sum.Remaining)
 	}
-	if fd.req.FailOnDifference {
-		t.Fatal("apply drift must be leftover-only")
+	if fd.req.CompareMarker {
+		t.Fatal("apply drift must not treat the pre-write marker as leftover")
 	}
 	if fm.req.DN == "" || !strings.HasPrefix(fm.req.ApplyVersion, "labldap-bootstrap/") {
 		t.Fatalf("marker req = %+v", fm.req)
@@ -493,8 +493,8 @@ spec:
 	if fd.called != 1 || fc.called != 1 {
 		t.Fatalf("validate inspect/drift calls: drift=%d caps=%d", fd.called, fc.called)
 	}
-	if !fd.req.FailOnDifference {
-		t.Fatal("validate drift must fail on difference")
+	if !fd.req.CompareMarker {
+		t.Fatal("validate drift must compare the marker revision")
 	}
 	if len(sum.Remaining) != 0 {
 		t.Fatalf("remaining = %v", sum.Remaining)
@@ -531,7 +531,7 @@ func TestValidateSubcommandDoesNotWrite(t *testing.T) {
 	if len(sum.Remaining) != 0 {
 		t.Fatalf("remaining = %v", sum.Remaining)
 	}
-	if !fd.req.FailOnDifference {
+	if !fd.req.CompareMarker {
 		t.Fatal("validate subcommand must ignore YAML merge for drift exit codes")
 	}
 }

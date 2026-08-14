@@ -34,8 +34,8 @@ type CapabilityInspector interface {
 	Capabilities(ctx context.Context, req CapabilityRequest) (Capabilities, error)
 }
 
-// DriftRequest is a read-only inventory compare. FailOnDifference is
-// true for validate; apply uses a leftover report that never fails.
+// DriftRequest is a read-only inventory compare. Exit policy lives in
+// bootstrap.Run: validate fails on Differ, apply leftover never fails.
 type DriftRequest struct {
 	TreeRequest
 	Users             []config.NormalizedUser
@@ -44,7 +44,10 @@ type DriftRequest struct {
 	MarkerDN          string
 	DirectoryRevision string
 	Preserve          []string
-	FailOnDifference  bool
+	// CompareMarker includes marker revision mismatch in Differ.
+	// Validate sets this. Apply leftover reports keep the revision
+	// fields but do not treat a soon-to-be-written marker as drift.
+	CompareMarker bool
 }
 
 // DriftReport is secret-free JSON attached to Summary.drift.
