@@ -26,8 +26,8 @@ func TestAGENTSImportBoundaries(t *testing.T) {
 		rel := strings.TrimPrefix(pkg, "github.com/hilather/go-lab-ldap-mcp/")
 		hasAPI := hasImportPrefix(imps, "github.com/hilather/go-lab-ldap-mcp/internal/api")
 		hasMCP := hasImportPrefix(imps, "github.com/hilather/go-lab-ldap-mcp/internal/mcpserver")
-		if hasAPI && hasMCP && rel != "cmd/labldap" {
-			t.Errorf("%s imports both internal/api and internal/mcpserver; only cmd/labldap may wire both transports", rel)
+		if hasAPI && hasMCP && rel != "cmd/labldap" && !strings.HasPrefix(rel, "test/") {
+			t.Errorf("%s imports both internal/api and internal/mcpserver; only cmd/labldap and tests may wire both transports", rel)
 		}
 		if strings.HasPrefix(rel, "internal/web") && hasImportPrefix(imps, "github.com/hilather/go-lab-ldap-mcp/internal/app") {
 			t.Errorf("%s must not import internal/app (embed/static helpers only)", rel)

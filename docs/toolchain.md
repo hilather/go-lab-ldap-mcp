@@ -9,7 +9,7 @@ Recorded 2026-08-12 against the LabLDAP design baseline.
 | Node.js | 22.12 or later | `22.14.0` (host LTS; `>=22.12.0` engines) | `.node-version`, `.nvmrc`, `frontend/package.json` |
 | pnpm | exact packageManager + lockfile | `pnpm@10.14.0` | `frontend/package.json` `packageManager`, `frontend/pnpm-lock.yaml` |
 | React | 19.2 | `19.2.8` (T-095) | `frontend/package.json`, `frontend/pnpm-lock.yaml` |
-| MCP Go SDK | v1.7.0+ / spec 2026-07-28 | not yet (T-085) | — |
+| MCP Go SDK | v1.7.0+ / spec 2026-07-28 | `v1.7.0` (`StreamableHTTPOptions.Stateless=true`) | `go.mod`; `internal/mcpserver` |
 | 389 DS image | pin by digest | `quay.io/389ds/dirsrv@sha256:f2851654c5df545cd893d84bea8d08c28dc25f0930493fbfed1d8a6eacf657f7` | `deploy/docker/dirsrv.digest`, `deploy/docker/dirsrv-image-contract.md` |
 | Go builder image | pin by digest | `golang:1.26.5@sha256:705e964a93a2fd2e75c7d59bb7d781b57e30f12293ffde5175c69229e18fb678` | `deploy/docker/golang.digest` |
 | Node builder image | pin by digest | `node:22.14.0-bookworm@sha256:e5ddf893cc6aeab0e5126e4edae35aa43893e2836d1d246140167ccc2616f5d7` | `deploy/docker/node.digest` |

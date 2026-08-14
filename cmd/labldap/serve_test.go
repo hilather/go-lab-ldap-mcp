@@ -75,7 +75,7 @@ func TestServeWiresCompiledRateLimits(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	opt, closer, err := serverOptionsFromCompiled(built, serveFlags{ldapURL: "ldaps://127.0.0.1:1", caFile: "/tmp/ca.pem"}, nil)
+	opt, _, closer, err := serverOptionsFromCompiled(built, serveFlags{ldapURL: "ldaps://127.0.0.1:1", caFile: "/tmp/ca.pem"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -115,7 +115,7 @@ func TestLoopbackListenWiresHostAllowList(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	opt, closer, err := serverOptionsFromCompiled(built, serveFlags{ldapURL: "ldaps://127.0.0.1:1", caFile: "/tmp/ca.pem"}, nil)
+	opt, _, closer, err := serverOptionsFromCompiled(built, serveFlags{ldapURL: "ldaps://127.0.0.1:1", caFile: "/tmp/ca.pem"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

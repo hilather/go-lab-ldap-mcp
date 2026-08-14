@@ -80,11 +80,13 @@ type Session struct {
 }
 
 type MCP struct {
-	Enabled           bool `json:"enabled" yaml:"enabled"`
-	RegisterMutations bool `json:"registerMutations" yaml:"registerMutations"`
-	RegisterPassword  bool `json:"registerPassword" yaml:"registerPassword"`
-	RegisterReset     bool `json:"registerReset" yaml:"registerReset"`
-	RegisterExport    bool `json:"registerExport" yaml:"registerExport"`
+	// Enabled defaults to true when omitted (applyDefaults). Pointer so
+	// enabled: false is distinct from an absent key (OD-016).
+	Enabled           *bool `json:"enabled" yaml:"enabled"`
+	RegisterMutations bool  `json:"registerMutations" yaml:"registerMutations"`
+	RegisterPassword  bool  `json:"registerPassword" yaml:"registerPassword"`
+	RegisterReset     bool  `json:"registerReset" yaml:"registerReset"`
+	RegisterExport    bool  `json:"registerExport" yaml:"registerExport"`
 }
 
 type Metrics struct {

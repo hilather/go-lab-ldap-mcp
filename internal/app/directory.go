@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 
+	"github.com/hilather/go-lab-ldap-mcp/internal/apperr"
 	"github.com/hilather/go-lab-ldap-mcp/internal/config"
 	"github.com/hilather/go-lab-ldap-mcp/internal/directory"
 	"github.com/hilather/go-lab-ldap-mcp/internal/observability"
@@ -34,6 +35,30 @@ func (s *Query) Search(ctx context.Context, p Principal, q directory.SearchQuery
 	}
 	page.Entries = redactEntries(page.Entries)
 	return page, nil
+}
+
+// GetEntry is a base-scope read by DN. The match-all filter stays here so
+// transports do not build LDAP filters (KD-R8).
+func (s *Query) GetEntry(ctx context.Context, p Principal, dn string, attributes []string) (directory.SearchEntry, error) {
+	dn = strings.TrimSpace(dn)
+	if dn == "" {
+		return directory.SearchEntry{}, apperr.New(apperr.CodeConfiguration, "dn is required").
+			WithField(apperr.Field{Path: "dn", Code: "required", Message: "dn is required"})
+	}
+	page, err := s.Search(ctx, p, directory.SearchQuery{
+		Base:       dn,
+		Scope:      directory.SearchScopeBase,
+		Filter:     "(objectClass=*)",
+		Attributes: attributes,
+		PageSize:   1,
+	})
+	if err != nil {
+		return directory.SearchEntry{}, err
+	}
+	if len(page.Entries) == 0 {
+		return directory.SearchEntry{}, directory.Error("entry", directory.FieldNotFound, "directory entry not found")
+	}
+	return page.Entries[0], nil
 }
 
 func (s *Query) BindTest(ctx context.Context, p Principal, identity string, password observability.Secret, transport directory.Transport) (directory.BindTestResult, error) {

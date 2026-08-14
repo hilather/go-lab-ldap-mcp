@@ -967,115 +967,115 @@ Acceptance:
 
 # M6 - MCP
 
-## [ ] T-085 Pin official MCP Go SDK and scaffold Streamable HTTP server
+## [x] T-085 Pin official MCP Go SDK and scaffold Streamable HTTP server
 
 Priority: P0 | Size: M | Depends on: T-002, T-063
 
 Deliverables: official SDK dependency, supported protocol record, server implementation metadata, `/mcp` mount, and initialization test.
 
 Acceptance:
-- [ ] Official SDK client initializes and negotiates a supported version.
-- [ ] Current Streamable HTTP POST behavior is used.
-- [ ] No legacy unauthenticated HTTP+SSE endpoint is exposed.
+- [x] Official SDK client initializes and negotiates a supported version.
+- [x] Current Streamable HTTP POST behavior is used.
+- [x] No legacy unauthenticated HTTP+SSE endpoint is exposed.
 
-## [ ] T-086 Integrate MCP bearer authorization, request IDs, limits, and cancellation
+## [x] T-086 Integrate MCP bearer authorization, request IDs, limits, and cancellation
 
 Priority: P0 | Size: L | Depends on: T-061, T-063, T-085
 
 Deliverables: MCP-aware middleware integration, every-request auth, request context principal, body limits, Host and Origin checks, and cancellation propagation.
 
 Acceptance:
-- [ ] Every HTTP MCP request requires valid bearer authorization.
-- [ ] Request ID appears in application and tool results.
-- [ ] Cancelled SDK request cancels downstream operation within tested bounds.
+- [x] Every HTTP MCP request requires valid bearer authorization.
+- [x] Request ID appears in application and tool results.
+- [x] Cancelled SDK request cancels downstream operation within tested bounds.
 
-## [ ] T-087 Implement central MCP tool catalog and schema validation
+## [x] T-087 Implement central MCP tool catalog and schema validation
 
 Priority: P0 | Size: L | Depends on: T-057, T-085, T-086
 
 Deliverables: table-driven definitions, scope metadata, read-only and destructive hints, input and output types, registration validation, and docs generator.
 
 Acceptance:
-- [ ] Tool names are unique and match design.
-- [ ] Every tool has scopes, description, schemas, and behavior metadata.
-- [ ] Sensitive input fields have redaction coverage.
+- [x] Tool names are unique and match design.
+- [x] Every tool has scopes, description, schemas, and behavior metadata.
+- [x] Sensitive input fields have redaction coverage.
 
-## [ ] T-088 Implement MCP read tools and resources
+## [x] T-088 Implement MCP read tools and resources
 
 Priority: P0 | Size: L | Depends on: T-056, T-087
 
 Deliverables: capabilities, baseline, search, get-entry tools and optional capabilities, baseline, Root DSE, schema, and entry resources.
 
 Acceptance:
-- [ ] Read-only token can call all intended read operations.
-- [ ] Search paging and cursors match application semantics.
-- [ ] Resources enforce scopes and attribute restrictions.
+- [x] Read-only token can call all intended read operations.
+- [x] Search paging and cursors match application semantics.
+- [x] Resources enforce scopes and attribute restrictions.
 
-## [ ] T-089 Implement MCP user tools
+## [x] T-089 Implement MCP user tools
 
 Priority: P0 | Size: L | Depends on: T-054, T-087
 
 Deliverables: create, update, delete, and set-password tools with revisions, confirmations, structured results, and audit.
 
 Acceptance:
-- [ ] User created through MCP is visible through REST and direct LDAP.
-- [ ] Delete requires confirmation and revision.
-- [ ] Password input is absent from output and logs.
+- [x] User created through MCP is visible through REST and direct LDAP.
+- [x] Delete requires confirmation and revision.
+- [x] Password input is absent from output and logs.
 
-## [ ] T-090 Implement MCP group and membership tools
+## [x] T-090 Implement MCP group and membership tools
 
 Priority: P0 | Size: L | Depends on: T-055, T-087
 
 Deliverables: group create, update, delete, add, remove, replace tools and change summaries.
 
 Acceptance:
-- [ ] Empty group and cycle validation match REST.
-- [ ] Idempotent membership behavior is preserved.
-- [ ] New membership is visible through MemberOf and REST.
+- [x] Empty group and cycle validation match REST.
+- [x] Idempotent membership behavior is preserved.
+- [x] New membership is visible through MemberOf and REST.
 
-## [ ] T-091 Implement MCP bind-test tool
+## [x] T-091 Implement MCP bind-test tool
 
 Priority: P0 | Size: M | Depends on: T-051, T-056, T-087
 
 Deliverables: sensitive input mapping, rate limits, generic invalid result, transport selection, and audit.
 
 Acceptance:
-- [ ] Tool requires `directory:password`.
-- [ ] Unknown user and wrong password remain indistinguishable externally.
-- [ ] Dedicated LDAP connection closes in success, failure, and cancellation paths.
+- [x] Tool requires `directory:password`.
+- [x] Unknown user and wrong password remain indistinguishable externally.
+- [x] Dedicated LDAP connection closes in success, failure, and cancellation paths.
 
-## [ ] T-092 Implement MCP reset and export tools
+## [x] T-092 Implement MCP reset and export tools
 
 Priority: P0 | Size: L | Depends on: T-079, T-083, T-087
 
 Deliverables: destructive reset tool, operation status result, small direct LDIF export or authenticated REST handoff, progress support where stable.
 
 Acceptance:
-- [ ] Reset requires `lab:reset`, revision, and exact confirmation.
-- [ ] Export requires `lab:export` and follows direct-output byte ceiling.
-- [ ] Tool metadata marks destructive behavior accurately.
+- [x] Reset requires `lab:reset`, revision, and exact confirmation.
+- [x] Export requires `lab:export` and follows direct-output byte ceiling.
+- [x] Tool metadata marks destructive behavior accurately.
 
-## [ ] T-093 Implement optional MCP stdio command
+## [x] T-093 Implement optional MCP stdio command
 
 Priority: P1 | Size: M | Depends on: T-085, T-087 to T-092
 
 Deliverables: stdio server mode, credential loading, stderr logging, graceful shutdown, and local usage docs.
 
 Acceptance:
-- [ ] Protocol stdout contains no log lines.
-- [ ] Missing credentials fail safely.
-- [ ] Tool behavior and scopes match HTTP mode.
+- [x] Protocol stdout contains no log lines.
+- [x] Missing credentials fail safely.
+- [x] Tool behavior and scopes match HTTP mode.
 
-## [ ] T-094 Complete MCP protocol, scope, concurrency, and real-engine suite
+## [x] T-094 Complete MCP protocol, scope, concurrency, and real-engine suite
 
 Priority: P0 | Size: L | Depends on: T-085 to T-093
 
 Deliverables: official SDK client tests, route auth, scope matrix, schema invalid input, tool errors, cancellation, concurrency, stdio, and real-engine mutations.
 
 Acceptance:
-- [ ] Every tool has positive and denied-scope tests.
-- [ ] Concurrent clients do not share actor state.
-- [ ] One independent real MCP client smoke test is documented for release.
+- [x] Every tool has positive and denied-scope tests.
+- [x] Concurrent clients do not share actor state.
+- [x] One independent real MCP client smoke test is documented for release.
 
 # M7 - Reactive web UI
 
