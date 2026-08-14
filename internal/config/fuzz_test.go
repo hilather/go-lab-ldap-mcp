@@ -1,8 +1,10 @@
 package config
 
 import (
+	"bytes"
 	"strings"
 	"testing"
+	"time"
 )
 
 func FuzzParseYAML(f *testing.F) {
@@ -47,5 +49,20 @@ func FuzzCursor(f *testing.F) {
 		}
 		_, _ = DecodeCursor(s)
 		_, _ = DecodeCursor(string(in))
+	})
+}
+
+func FuzzProtectCursor(f *testing.F) {
+	key := CursorKey(bytes.Repeat([]byte{0x11}, 32))
+	exp := time.Unix(2_000_000_000, 0)
+	now := time.Unix(1_900_000_000, 0)
+	f.Add([]byte("users||2"))
+	f.Fuzz(func(t *testing.T, in []byte) {
+		tok, err := ProtectCursor(key, Cursor{Query: string(in), Page: "00"}, exp)
+		if err != nil {
+			return
+		}
+		_, _ = UnprotectCursor(key, tok, now)
+		_, _ = UnprotectCursor(key, string(in), now)
 	})
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/go-ldap/ldap/v3"
 
 	"github.com/hilather/go-lab-ldap-mcp/internal/apperr"
+	"github.com/hilather/go-lab-ldap-mcp/internal/config"
 	"github.com/hilather/go-lab-ldap-mcp/internal/directory"
 	"github.com/hilather/go-lab-ldap-mcp/internal/directory/ldapclient"
 	"github.com/hilather/go-lab-ldap-mcp/internal/observability"
@@ -380,6 +381,68 @@ func TestRefuseRuntimeAccountMutations(t *testing.T) {
 	}
 	if err := rt.refuseRuntimeMutation(dn, directory.UserPatch{Attributes: map[string]string{"sn": "x"}}); err != nil {
 		t.Fatalf("attr-only patch: %v", err)
+	}
+}
+
+func TestProtectedCursorQueryAndTamper(t *testing.T) {
+	t.Parallel()
+	rt := testRuntime(t)
+	rt.now = func() time.Time { return time.Unix(1_700_000_000, 0) }
+	tok, err := rt.encodePageCursor("users||2", []byte{0x01, 0x02})
+	if err != nil || tok == "" {
+		t.Fatalf("encode: %q %v", tok, err)
+	}
+	got, err := rt.decodePageCursor(tok, "users||2")
+	if err != nil || string(got) != string([]byte{0x01, 0x02}) {
+		t.Fatalf("decode: %x %v", got, err)
+	}
+	if _, err := rt.decodePageCursor(tok, "users|other|2"); err == nil || !hasField(err, "cursor", "invalid") {
+		t.Fatalf("query mismatch: %v", err)
+	}
+	if _, err := rt.decodePageCursor(tok[:len(tok)-1]+"B", "users||2"); err == nil || !hasField(err, "cursor", "invalid") {
+		t.Fatalf("tamper: %v", err)
+	}
+	inner, err := config.EncodeCursor(config.Cursor{Query: "users||2", Page: "0102"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := rt.decodePageCursor(inner, "users||2"); err == nil || !hasField(err, "cursor", "invalid") {
+		t.Fatalf("unsigned cursor: %v", err)
+	}
+	rt.now = func() time.Time { return time.Unix(1_700_000_000, 0).Add(rt.cfg.CursorTTL + time.Second) }
+	if _, err := rt.decodePageCursor(tok, "users||2"); err == nil || !hasField(err, "cursor", "invalid") {
+		t.Fatalf("expired: %v", err)
+	}
+}
+
+func TestAssertionFilterUsesOperationalAttrs(t *testing.T) {
+	t.Parallel()
+	if assertionFilter(nil) != "" {
+		t.Fatal("nil entry")
+	}
+	e := &ldap.Entry{Attributes: []*ldap.EntryAttribute{
+		{Name: "entryCSN", Values: []string{"20240101000000.000000Z#000000#000#000000"}},
+		{Name: "cn", Values: []string{"Alice"}},
+	}}
+	got := assertionFilter(e)
+	if got != "(entryCSN=20240101000000.000000Z#000000#000#000000)" {
+		t.Fatalf("filter %q", got)
+	}
+	off := false
+	rt := testRuntime(t)
+	rt.cfg.Assertion = &off
+	if rt.assertionControl(t.Context(), e) != nil {
+		t.Fatal("disabled assertion still attached")
+	}
+	on := true
+	rt.cfg.Assertion = &on
+	if rt.assertionControl(t.Context(), e) == nil {
+		t.Fatal("enabled assertion missing")
+	}
+	for _, name := range operationalReadAttrs() {
+		if skipReturnedAttr(name) != true {
+			t.Fatalf("%s must not appear on API attributes", name)
+		}
 	}
 }
 

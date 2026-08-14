@@ -609,16 +609,16 @@ Acceptance:
 - [x] Cache expiry and directory reconnect work.
 - [x] Capability service can consume normalized results.
 
-## [ ] T-053 Implement entry revisions, protected cursors, and assertion-control investigation
+## [x] T-053 Implement entry revisions, protected cursors, and assertion-control investigation
 
 Priority: P0 | Size: L | Depends on: T-048 to T-052
 
 Deliverables: canonical revision hash, operational-attribute reads, opaque cursor with integrity and expiry, and documented assertion-control result.
 
 Acceptance:
-- [ ] Attribute changes alter revision and unchanged reads do not.
-- [ ] Cursor cannot be reused with a different query or after tampering.
-- [ ] If assertion control is supported, it has a real-engine atomic update test; otherwise residual race is documented.
+- [x] Attribute changes alter revision and unchanged reads do not.
+- [x] Cursor cannot be reused with a different query or after tampering.
+- [x] If assertion control is supported, it has a real-engine atomic update test; otherwise residual race is documented.
 
 ## [ ] T-054 Implement user application service
 

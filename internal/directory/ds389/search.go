@@ -35,7 +35,7 @@ func (r *Runtime) Search(ctx context.Context, q directory.SearchQuery) (director
 				Attributes: filterEntryAttrs(e, allow),
 			})
 		}
-		cur, e := encodePageCursor(queryKey, next)
+		cur, e := r.encodePageCursor(queryKey, next)
 		if e != nil {
 			return e
 		}
@@ -90,7 +90,7 @@ func (r *Runtime) buildSearch(q directory.SearchQuery) (*ldap.SearchRequest, str
 	_, attrs := r.allowSet(q.Attributes)
 	page := r.pageSize(q.PageSize)
 	queryKey := searchCursorKey(base, scopeName, q.Filter, attrs, page)
-	cookie, err := decodePageCursor(q.Cursor, queryKey)
+	cookie, err := r.decodePageCursor(q.Cursor, queryKey)
 	if err != nil {
 		return nil, "", nil, false, err
 	}

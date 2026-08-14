@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-ldap/ldap/v3"
+
 	"github.com/hilather/go-lab-ldap-mcp/internal/apperr"
 	"github.com/hilather/go-lab-ldap-mcp/internal/directory"
 	"github.com/hilather/go-lab-ldap-mcp/internal/directory/ds389"
@@ -74,6 +76,8 @@ func TestRuntimeRepositories(t *testing.T) {
 	t.Run("search", func(t *testing.T) { testRuntimeSearch(t, env) })
 	t.Run("bindtest", func(t *testing.T) { testRuntimeBindTest(t, env) })
 	t.Run("schema", func(t *testing.T) { testRuntimeSchema(t, env) })
+	t.Run("revisions", func(t *testing.T) { testRuntimeRevisionsAndCursors(t, env) })
+	t.Run("assertion", func(t *testing.T) { testRuntimeAssertionControl(t, env) })
 }
 
 func testRuntimeUsers(t *testing.T, env *runtimeEnv) {
@@ -635,6 +639,115 @@ func hasOC(s directory.Schema, name string) bool {
 		}
 	}
 	return false
+}
+
+func testRuntimeRevisionsAndCursors(t *testing.T, env *runtimeEnv) {
+	users := env.rt.Users()
+	u, err := users.Add(t.Context(), directory.UserSpec{
+		ID: "rev-a", Password: observability.Secret(repoUserPass),
+		Attributes: map[string]string{"sn": "Rev", "description": "one"},
+	})
+	if err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	again, err := users.Get(t.Context(), "rev-a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if again.Revision != u.Revision || again.Revision == "" {
+		t.Fatalf("unchanged read revision %q vs %q", again.Revision, u.Revision)
+	}
+	for _, a := range again.Attributes {
+		switch strings.ToLower(a.Name) {
+		case "entrycsn", "modifytimestamp", "entryuuid", "userpassword":
+			t.Fatalf("operational/secret attr leaked: %+v", a)
+		}
+	}
+	patched, err := users.Modify(t.Context(), "rev-a", directory.UserPatch{Attributes: map[string]string{"description": "two"}})
+	if err != nil {
+		t.Fatalf("modify: %v", err)
+	}
+	if patched.Revision == "" || patched.Revision == u.Revision {
+		t.Fatalf("attribute change must alter revision: before=%q after=%q", u.Revision, patched.Revision)
+	}
+
+	for i := 0; i < 3; i++ {
+		id := "cur-" + string(rune('a'+i))
+		if _, err := users.Add(t.Context(), directory.UserSpec{
+			ID: id, Password: observability.Secret(repoUserPass),
+			Attributes: map[string]string{"sn": "C"},
+		}); err != nil {
+			t.Fatalf("seed %s: %v", id, err)
+		}
+	}
+	page, err := users.List(t.Context(), directory.UserListQuery{PageSize: 1, Q: "cur-"})
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if page.NextCursor == "" {
+		t.Fatal("expected protected next cursor")
+	}
+	if _, err := users.List(t.Context(), directory.UserListQuery{PageSize: 1, Q: "other", Cursor: page.NextCursor}); err == nil {
+		t.Fatal("cursor reused with a different query")
+	} else {
+		assertField(t, err, "cursor", "invalid")
+	}
+	tampered := page.NextCursor[:len(page.NextCursor)-1] + "A"
+	if _, err := users.List(t.Context(), directory.UserListQuery{PageSize: 1, Q: "cur-", Cursor: tampered}); err == nil {
+		t.Fatal("tampered cursor accepted")
+	} else {
+		assertField(t, err, "cursor", "invalid")
+	}
+	next, err := users.List(t.Context(), directory.UserListQuery{PageSize: 1, Q: "cur-", Cursor: page.NextCursor})
+	if err != nil {
+		t.Fatalf("valid cursor: %v", err)
+	}
+	if len(next.Items) == 0 {
+		t.Fatal("expected next page")
+	}
+}
+
+func testRuntimeAssertionControl(t *testing.T, env *runtimeEnv) {
+	caps, err := env.rt.Capabilities(t.Context())
+	if err != nil {
+		t.Fatalf("capabilities: %v", err)
+	}
+	users := env.rt.Users()
+	u, err := users.Add(t.Context(), directory.UserSpec{
+		ID: "assert-a", Password: observability.Secret(repoUserPass),
+		Attributes: map[string]string{"sn": "Assert"},
+	})
+	if err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	if err := env.pool.Do(t.Context(), func(c *ldapclient.Conn) error {
+		mod := ldap.NewModifyRequest(u.DN, nil)
+		mod.Replace("userPassword", []string{repoUserPass + "x"})
+		return c.Modify(t.Context(), mod)
+	}); err != nil {
+		t.Fatalf("direct password write: %v", err)
+	}
+	afterPW, err := users.Get(t.Context(), "assert-a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if afterPW.Revision != u.Revision {
+		t.Fatalf("password is not API-exposed; revision changed %q -> %q", u.Revision, afterPW.Revision)
+	}
+	_, err = users.SetEnabled(t.Context(), "assert-a", false, afterPW.Revision)
+	if !caps.HasAssertionControl() {
+		t.Logf("assertion control %s absent from Controls=%v; residual TOCTOU race documented (KD-R24)", directory.ControlAssertionOID, caps.Controls)
+		if err != nil {
+			t.Fatalf("without assertion, revision-matched SetEnabled should proceed: %v", err)
+		}
+		return
+	}
+	if err == nil {
+		t.Fatal("assertion control advertised but concurrent password write was not detected")
+	}
+	if fieldCode(err) != directory.FieldConflict {
+		t.Fatalf("assertion fail: %v", err)
+	}
 }
 
 func hasAT(s directory.Schema, name string) bool {

@@ -2,9 +2,7 @@ package ds389
 
 import (
 	"context"
-	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"sort"
 	"strings"
@@ -54,6 +52,12 @@ type RuntimeConfig struct {
 	SchemaTTL       time.Duration
 	AllowedAttrs    []string
 
+	// CursorKey is the process-local HMAC key. Empty → generated in NewRuntime.
+	CursorKey config.CursorKey
+	CursorTTL time.Duration
+	// Assertion, if set, overrides Root DSE supportedControl for OID 1.3.6.1.1.12.
+	Assertion *bool
+
 	// Client is the unbound-capable LDAP config for disposable bind-test.
 	Client ldapclient.Config
 	// Connect, if set, replaces ldapclient.Connect (tests).
@@ -101,6 +105,12 @@ func (c *RuntimeConfig) applyDefaults() {
 	}
 	if len(c.AllowedAttrs) == 0 {
 		c.AllowedAttrs = append([]string(nil), defaultAllowedAttrs...)
+	}
+	if len(c.CursorKey) == 0 {
+		c.CursorKey = config.NewCursorKey()
+	}
+	if c.CursorTTL <= 0 {
+		c.CursorTTL = config.DefaultCursorTTL
 	}
 }
 
@@ -248,22 +258,29 @@ func forbiddenWriteAttr(name string) bool {
 func skipReturnedAttr(name string) bool {
 	switch config.CanonicalAttr(name) {
 	case "userpassword", "aci", "nsslapd-rootpw", "nsslapd-rootpwstoragescheme",
-		"nsmultiplexorbindcred", "nsmultiplexorcredentials":
+		"nsmultiplexorbindcred", "nsmultiplexorcredentials",
+		"entrycsn", "modifytimestamp", "entryuuid", "nsuniqueid",
+		"createtimestamp", "creatorsname", "modifiersname",
+		"entrydn", "numsubordinates":
 		return true
 	default:
 		return false
 	}
 }
 
+func operationalReadAttrs() []string {
+	return []string{"entryCSN", "modifyTimestamp", "entryUUID"}
+}
+
 func runtimeUserReadAttrs() []string {
-	return []string{
+	return append([]string{
 		"objectClass", "uid", "cn", "sn", "givenName", "mail", "displayName",
 		"description", "nsAccountLock", "memberOf",
-	}
+	}, operationalReadAttrs()...)
 }
 
 func groupReadAttrs() []string {
-	return []string{"objectClass", "cn", "member", "uniqueMember"}
+	return append([]string{"objectClass", "cn", "member", "uniqueMember"}, operationalReadAttrs()...)
 }
 
 func searchBaseConn(ctx context.Context, c *ldapclient.Conn, dn string, attrs []string, size, seconds int) (*ldap.Entry, error) {
@@ -322,15 +339,6 @@ func hasField(err error, path, code string) bool {
 	return false
 }
 
-func revisionHash(v any) directory.Revision {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return ""
-	}
-	sum := sha256.Sum256(b)
-	return directory.Revision(hex.EncodeToString(sum[:]))
-}
-
 func sortAttrKV(in []directory.AttrKV) []directory.AttrKV {
 	out := append([]directory.AttrKV(nil), in...)
 	sort.Slice(out, func(i, j int) bool {
@@ -350,21 +358,21 @@ func sortCI(in []string) []string {
 	return out
 }
 
-func encodePageCursor(query string, cookie []byte) (string, error) {
+func (r *Runtime) encodePageCursor(query string, cookie []byte) (string, error) {
 	if len(cookie) == 0 {
 		return "", nil
 	}
-	return config.EncodeCursor(config.Cursor{
+	return config.ProtectCursor(r.cfg.CursorKey, config.Cursor{
 		Query: query,
 		Page:  hex.EncodeToString(cookie),
-	})
+	}, r.now().Add(r.cfg.CursorTTL))
 }
 
-func decodePageCursor(raw, query string) ([]byte, error) {
+func (r *Runtime) decodePageCursor(raw, query string) ([]byte, error) {
 	if raw == "" {
 		return nil, nil
 	}
-	c, err := config.DecodeCursor(raw)
+	c, err := config.UnprotectCursor(r.cfg.CursorKey, raw, r.now())
 	if err != nil {
 		return nil, err
 	}
@@ -379,6 +387,65 @@ func decodePageCursor(raw, query string) ([]byte, error) {
 		return nil, cfgErr("cursor", "invalid", "cursor is malformed")
 	}
 	return b, nil
+}
+
+// assertionEnabled is true when T-044 Controls listed 1.3.6.1.1.12, or a test override.
+func (r *Runtime) assertionEnabled(ctx context.Context) bool {
+	if r.cfg.Assertion != nil {
+		return *r.cfg.Assertion
+	}
+	dse, err := r.RootDSE(ctx)
+	if err != nil {
+		return false
+	}
+	return directory.Capabilities{Controls: dse.SupportedControls}.HasAssertionControl()
+}
+
+func assertionFilter(e *ldap.Entry) string {
+	if e == nil {
+		return ""
+	}
+	if v := e.GetAttributeValue("entryCSN"); v != "" {
+		return "(entryCSN=" + ldapclient.EscapeFilter(v) + ")"
+	}
+	if v := e.GetAttributeValue("modifyTimestamp"); v != "" {
+		return "(modifyTimestamp=" + ldapclient.EscapeFilter(v) + ")"
+	}
+	if v := e.GetAttributeValue("entryUUID"); v != "" {
+		return "(entryUUID=" + ldapclient.EscapeFilter(v) + ")"
+	}
+	return ""
+}
+
+func (r *Runtime) assertionControl(ctx context.Context, live *ldap.Entry) ldap.Control {
+	if live == nil || !r.assertionEnabled(ctx) {
+		return nil
+	}
+	filter := assertionFilter(live)
+	if filter == "" {
+		return nil
+	}
+	ctl, err := ldapclient.NewControlAssertion(filter)
+	if err != nil {
+		return nil
+	}
+	return ctl
+}
+
+func newModify(ctx context.Context, r *Runtime, dn string, live *ldap.Entry) *ldap.ModifyRequest {
+	var controls []ldap.Control
+	if ctl := r.assertionControl(ctx, live); ctl != nil {
+		controls = append(controls, ctl)
+	}
+	return ldap.NewModifyRequest(dn, controls)
+}
+
+func newDelete(ctx context.Context, r *Runtime, dn string, live *ldap.Entry) *ldap.DelRequest {
+	var controls []ldap.Control
+	if ctl := r.assertionControl(ctx, live); ctl != nil {
+		controls = append(controls, ctl)
+	}
+	return ldap.NewDelRequest(dn, controls)
 }
 
 func filterEntryAttrs(e *ldap.Entry, allow map[string]struct{}) []directory.AttrKV {

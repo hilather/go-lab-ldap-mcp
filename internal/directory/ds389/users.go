@@ -19,7 +19,7 @@ func (r *Runtime) List(ctx context.Context, q directory.UserListQuery) (director
 	size, seconds := r.searchLimits()
 	page := r.pageSize(q.PageSize)
 	queryKey := "users|" + q.Q + "|" + strconv.Itoa(page)
-	cookie, err := decodePageCursor(q.Cursor, queryKey)
+	cookie, err := r.decodePageCursor(q.Cursor, queryKey)
 	if err != nil {
 		return directory.UserPage{}, err
 	}
@@ -45,7 +45,7 @@ func (r *Runtime) List(ctx context.Context, q directory.UserListQuery) (director
 		for _, e := range res.Entries {
 			pageOut.Items = append(pageOut.Items, userFromEntry(e, r.cfg.GroupsDN))
 		}
-		cur, e := encodePageCursor(queryKey, next)
+		cur, e := r.encodePageCursor(queryKey, next)
 		if e != nil {
 			return e
 		}
@@ -156,7 +156,7 @@ func (r *Runtime) Modify(ctx context.Context, id directory.UserID, patch directo
 		if err := r.refuseRuntimeMutation(dn, patch); err != nil {
 			return err
 		}
-		mod := ldap.NewModifyRequest(dn, nil)
+		mod := newModify(ctx, r, dn, live)
 		if patch.Enabled != nil {
 			applyEnabled(mod, live, *patch.Enabled)
 		}
@@ -214,7 +214,7 @@ func (r *Runtime) SetEnabled(ctx context.Context, id directory.UserID, enabled b
 			out = cur
 			return nil
 		}
-		mod := ldap.NewModifyRequest(dn, nil)
+		mod := newModify(ctx, r, dn, live)
 		if applyEnabled(mod, live, enabled) {
 			if e := c.Modify(ctx, mod); e != nil {
 				return e
@@ -247,7 +247,7 @@ func (r *Runtime) Delete(ctx context.Context, id directory.UserID, rev directory
 		if e := checkRev(userFromEntry(live, r.cfg.GroupsDN).Revision, rev); e != nil {
 			return e
 		}
-		if e := c.Del(ctx, ldap.NewDelRequest(dn, nil)); e != nil {
+		if e := c.Del(ctx, newDelete(ctx, r, dn, live)); e != nil {
 			return e
 		}
 		return r.verifyUserRemovedFromGroups(ctx, c, dn)
@@ -274,13 +274,17 @@ func (r *Runtime) SetPassword(ctx context.Context, id directory.UserID, password
 		if e := checkRev(userFromEntry(live, r.cfg.GroupsDN).Revision, rev); e != nil {
 			return e
 		}
-		return replaceUserPassword(ctx, c, dn, password)
+		var controls []ldap.Control
+		if ctl := r.assertionControl(ctx, live); ctl != nil {
+			controls = append(controls, ctl)
+		}
+		return replaceUserPassword(ctx, c, dn, password, controls...)
 	})
 	return redactSecrets(err, password)
 }
 
-func replaceUserPassword(ctx context.Context, c *ldapclient.Conn, dn string, password observability.Secret) error {
-	mod := ldap.NewModifyRequest(dn, nil)
+func replaceUserPassword(ctx context.Context, c *ldapclient.Conn, dn string, password observability.Secret, controls ...ldap.Control) error {
+	mod := ldap.NewModifyRequest(dn, controls)
 	mod.Replace("userPassword", []string{password.Reveal()})
 	return c.Modify(ctx, mod)
 }
@@ -375,7 +379,7 @@ func userFromEntry(e *ldap.Entry, groupsDN string) directory.User {
 		Attributes:    sortAttrKV(attrs),
 		Groups:        memberOfGroupIDs(e, groupsDN),
 	}
-	u.Revision = revisionOfUser(u)
+	u.Revision = directory.RevisionOfUser(u)
 	return u
 }
 
@@ -405,14 +409,7 @@ func memberOfGroupIDs(e *ldap.Entry, groupsDN string) []directory.GroupID {
 }
 
 func revisionOfUser(u directory.User) directory.Revision {
-	return revisionHash(struct {
-		ID            string
-		UID           string
-		Enabled       bool
-		ObjectClasses []string
-		Attributes    []directory.AttrKV
-		Groups        []directory.GroupID
-	}{u.ID, u.UID, u.Enabled, u.ObjectClasses, u.Attributes, u.Groups})
+	return directory.RevisionOfUser(u)
 }
 
 func (r *Runtime) verifyUserRemovedFromGroups(ctx context.Context, c *ldapclient.Conn, userDN string) error {

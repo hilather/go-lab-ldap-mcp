@@ -49,6 +49,8 @@ func mapLDAP(le *ldap.Error) error {
 		return directory.Error("entry", directory.FieldNotFound, "directory entry not found").Wrap(le)
 	case ldap.LDAPResultEntryAlreadyExists, ldap.LDAPResultAttributeOrValueExists:
 		return directory.Error("entry", directory.FieldConflict, "directory entry already exists").Wrap(le)
+	case ldap.LDAPResultAssertionFailed:
+		return directory.Error("revision", directory.FieldConflict, "directory entry revision does not match").Wrap(le)
 	case ldap.LDAPResultInvalidCredentials, ldap.LDAPResultInappropriateAuthentication:
 		return directory.Error("bind", directory.FieldInvalidCredentials, "invalid credentials").Wrap(le)
 	case ldap.LDAPResultConstraintViolation, ldap.LDAPResultObjectClassViolation,

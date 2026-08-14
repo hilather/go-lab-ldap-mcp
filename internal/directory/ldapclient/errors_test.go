@@ -20,6 +20,7 @@ func TestMapErrorLDAPCategories(t *testing.T) {
 	}{
 		{ldap.LDAPResultNoSuchObject, directory.FieldNotFound, false},
 		{ldap.LDAPResultEntryAlreadyExists, directory.FieldConflict, false},
+		{ldap.LDAPResultAssertionFailed, directory.FieldConflict, false},
 		{ldap.LDAPResultInvalidCredentials, directory.FieldInvalidCredentials, false},
 		{ldap.LDAPResultConstraintViolation, directory.FieldConstraint, false},
 		{ldap.LDAPResultInsufficientAccessRights, directory.FieldForbidden, false},

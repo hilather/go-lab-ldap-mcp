@@ -79,6 +79,18 @@ func TestSearchQueryShape(t *testing.T) {
 	}
 }
 
+func TestCapabilitiesAssertionControl(t *testing.T) {
+	t.Parallel()
+	var empty directory.Capabilities
+	if empty.HasAssertionControl() {
+		t.Fatal("empty controls must document residual race, not claim assertion")
+	}
+	c := directory.Capabilities{Controls: []string{"1.2.840.113556.1.4.319", directory.ControlAssertionOID}}
+	if !c.HasAssertionControl() {
+		t.Fatal("1.3.6.1.1.12 present")
+	}
+}
+
 func TestCapabilitiesJSON(t *testing.T) {
 	t.Parallel()
 	c := directory.Capabilities{

@@ -16,7 +16,7 @@ func (r *Runtime) listGroups(ctx context.Context, q directory.GroupListQuery) (d
 	size, seconds := r.searchLimits()
 	page := r.pageSize(q.PageSize)
 	queryKey := "groups|" + q.Q + "|" + strconv.Itoa(page)
-	cookie, err := decodePageCursor(q.Cursor, queryKey)
+	cookie, err := r.decodePageCursor(q.Cursor, queryKey)
 	if err != nil {
 		return directory.GroupPage{}, err
 	}
@@ -42,7 +42,7 @@ func (r *Runtime) listGroups(ctx context.Context, q directory.GroupListQuery) (d
 		for _, e := range res.Entries {
 			pageOut.Items = append(pageOut.Items, groupFromEntry(e, r.cfg.PeopleDN, r.cfg.GroupsDN))
 		}
-		cur, e := encodePageCursor(queryKey, next)
+		cur, e := r.encodePageCursor(queryKey, next)
 		if e != nil {
 			return e
 		}
@@ -127,7 +127,7 @@ func (r *Runtime) deleteGroup(ctx context.Context, id directory.GroupID, rev dir
 			return e
 		}
 		members := append([]directory.MemberRef(nil), g.Members...)
-		if e := c.Del(ctx, ldap.NewDelRequest(dn, nil)); e != nil {
+		if e := c.Del(ctx, newDelete(ctx, r, dn, live)); e != nil {
 			return e
 		}
 		return r.verifyMembership(ctx, c, dn, nil, members)
@@ -182,7 +182,7 @@ func (r *Runtime) mutateMembers(ctx context.Context, id directory.GroupID, membe
 			sum.Revision = cur.Revision
 			return nil
 		}
-		mod := ldap.NewModifyRequest(dn, nil)
+		mod := newModify(ctx, r, dn, live)
 		switch op {
 		case memberReplace:
 			want := finalMembers(cur.Members, sum)
@@ -483,7 +483,7 @@ func groupFromEntry(e *ldap.Entry, peopleDN, groupsDN string) directory.Group {
 		DN:      e.DN,
 		Members: membersFromEntry(e, peopleDN, groupsDN),
 	}
-	g.Revision = revisionOfGroup(g)
+	g.Revision = directory.RevisionOfGroup(g)
 	return g
 }
 
@@ -509,14 +509,7 @@ func membersFromEntry(e *ldap.Entry, peopleDN, groupsDN string) []directory.Memb
 }
 
 func revisionOfGroup(g directory.Group) directory.Revision {
-	ids := make([]string, 0, len(g.Members))
-	for _, m := range g.Members {
-		ids = append(ids, m.Kind+":"+dnKey(m.DN))
-	}
-	return revisionHash(struct {
-		ID      string
-		Members []string
-	}{g.ID, sortCI(ids)})
+	return directory.RevisionOfGroup(g)
 }
 
 // UserRepository and GroupRepository both define List/Get/Add/Delete.
