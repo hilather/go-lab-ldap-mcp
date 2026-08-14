@@ -136,6 +136,44 @@ func readFile(t *testing.T, path string) string {
 	return string(b)
 }
 
+func TestPublishRefusesLabCAPath(t *testing.T) {
+	dir := t.TempDir()
+	var out bytes.Buffer
+	if err := generate(dir, "directory", false, false, &out); err != nil {
+		t.Fatal(err)
+	}
+	if !overwritesLabCA(filepath.Join(dir, "ca.crt")) {
+		t.Fatal("ca.crt + ca.key must be treated as lab CA")
+	}
+	if overwritesLabCA(filepath.Join(dir, "instance-ca.crt")) {
+		t.Fatal("instance-ca.crt is not the lab CA")
+	}
+	err := publishInstanceCA(t.Context(), filepath.Join(dir, "ca.crt"), "x", "directory", nil, &out)
+	if err == nil || !strings.Contains(err.Error(), "refusing to overwrite lab CA") {
+		t.Fatalf("err=%v", err)
+	}
+}
+
+func TestImportDefaultsToPersistentOverlay(t *testing.T) {
+	got := defaultImportComposeFiles()
+	joined := strings.Join(got, " ")
+	if !strings.Contains(joined, "compose.persistent.yaml") {
+		t.Fatalf("import default files = %v", got)
+	}
+	if strings.Contains(joined, "compose.ephemeral.yaml") {
+		t.Fatal("import must not default to the ephemeral overlay")
+	}
+}
+
+func TestVolumeOptsDetectTmpfs(t *testing.T) {
+	if !volumeOptsAreTmpfs(map[string]string{"type": "tmpfs"}) {
+		t.Fatal("tmpfs")
+	}
+	if volumeOptsAreTmpfs(map[string]string{"type": "ext4"}) || volumeOptsAreTmpfs(nil) {
+		t.Fatal("non-tmpfs")
+	}
+}
+
 func TestLeafLoadsAsTLSCert(t *testing.T) {
 	dir := t.TempDir()
 	var out bytes.Buffer

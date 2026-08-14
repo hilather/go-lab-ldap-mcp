@@ -9,6 +9,16 @@ import (
 	"github.com/hilather/go-lab-ldap-mcp/internal/directory"
 )
 
+func TestGeneratedManagementCertificate(t *testing.T) {
+	cert, err := generatedManagementCertificate()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cert.Certificate) == 0 {
+		t.Fatal("empty cert")
+	}
+}
+
 func TestParseServeFlags(t *testing.T) {
 	t.Setenv("LABLDAP_LDAP_URL", "")
 	t.Setenv("LABLDAP_DIRECTORY_CA_FILE", "")

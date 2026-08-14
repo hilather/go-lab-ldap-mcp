@@ -18,10 +18,11 @@ const (
 	usageText     = `labldap-setup-secrets — generate lab secret files
 
 Writes Directory Manager env_file (KD-R20), bootstrap password file, runtime
-LDAP password, seed user password, and management token. DM files are 0600.
-Files bind-mounted into the non-root control image are 0644 so uid 65532 can
-read them. Existing files are left unchanged unless --force is set. Secret
-values are not printed unless --print is set.
+LDAP password, seed user password, and management token. All files are 0600.
+Control reads them via Compose secrets (uid 65532, mode 0400), not world-
+readable bind mounts. Existing files are left unchanged unless --force is
+set. Secret values are not printed unless --print is set. The KD-R20 pair
+directory.env + dm.pw must both exist or both be missing.
 
 Usage:
   labldap-setup-secrets [--dir secrets] [--force] [--print]
@@ -90,16 +91,14 @@ func generate(dir string, force, printVals bool, stdout io.Writer) ([]string, er
 	}
 	written = append(written, dm...)
 
-	// Control runs as uid 65532 and bind-mounts these files. 0600 owned by
-	// the host user is unreadable inside the container.
 	for _, item := range []struct {
 		path string
 		n    int
 		mode os.FileMode
 	}{
-		{out.RuntimeLDAP, passwordBytes, 0o644},
-		{out.UserAlice, passwordBytes, 0o644},
-		{out.TokenAdmin, tokenBytes, 0o644},
+		{out.RuntimeLDAP, passwordBytes, 0o600},
+		{out.UserAlice, passwordBytes, 0o600},
+		{out.TokenAdmin, tokenBytes, 0o600},
 	} {
 		ok, err := writeSecretFile(item.path, item.n, item.mode, force, printVals, stdout)
 		if err != nil {
@@ -116,39 +115,28 @@ func ensurePasswordPair(envPath, dmPath string, force, printVals bool, stdout io
 	var written []string
 	envExists := fileExists(envPath)
 	dmExists := fileExists(dmPath)
+	if envExists != dmExists && !force {
+		return nil, fmt.Errorf("KD-R20 pair split: %s and %s must both exist or both be missing (use --force to replace both)", envPath, dmPath)
+	}
 	if envExists && dmExists && !force {
 		fmt.Fprintf(stdout, "skipped %s (exists)\n", envPath)
 		fmt.Fprintf(stdout, "skipped %s (exists)\n", dmPath)
 		return nil, nil
 	}
-	var pw string
-	if envExists && !force {
-		v, err := readEnvPassword(envPath)
-		if err != nil {
-			return nil, err
-		}
-		pw = v
-	} else {
-		v, err := randomHex(passwordBytes)
-		if err != nil {
-			return nil, err
-		}
-		pw = v
-		if err := writeFile(envPath, []byte("DS_DM_PASSWORD="+pw+"\n"), 0o600); err != nil {
-			return nil, err
-		}
-		reportWrite(stdout, envPath, pw, printVals)
-		written = append(written, envPath)
+	pw, err := randomHex(passwordBytes)
+	if err != nil {
+		return nil, err
 	}
-	if !dmExists || force {
-		if err := writeFile(dmPath, []byte(pw+"\n"), 0o600); err != nil {
-			return nil, err
-		}
-		reportWrite(stdout, dmPath, pw, printVals)
-		written = append(written, dmPath)
-	} else {
-		fmt.Fprintf(stdout, "skipped %s (exists)\n", dmPath)
+	if err := writeFile(envPath, []byte("DS_DM_PASSWORD="+pw+"\n"), 0o600); err != nil {
+		return nil, err
 	}
+	reportWrite(stdout, envPath, pw, printVals)
+	written = append(written, envPath)
+	if err := writeFile(dmPath, []byte(pw+"\n"), 0o600); err != nil {
+		return nil, err
+	}
+	reportWrite(stdout, dmPath, pw, printVals)
+	written = append(written, dmPath)
 	return written, nil
 }
 

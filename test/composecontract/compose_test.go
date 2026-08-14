@@ -123,6 +123,18 @@ func TestReleaseComposeTopology(t *testing.T) {
 		if strings.Contains(v, "docker.sock") {
 			t.Fatal("control must not mount docker.sock")
 		}
+		if strings.Contains(v, "token-admin") || strings.Contains(v, "runtime-ldap") {
+			t.Fatalf("control must use Compose secrets, not bind-mount %s", v)
+		}
+	}
+	if !strings.Contains(strings.Join(vols, " "), "control-secrets:/run/secrets") {
+		t.Fatalf("control must mount the prepared secret volume, got %v", vols)
+	}
+	if _, ok := doc.Services["secret-prep"]; !ok {
+		t.Fatal("missing secret-prep service")
+	}
+	if _, ok := doc.Volumes["control-secrets"]; !ok {
+		t.Fatal("missing control-secrets volume")
 	}
 }
 
@@ -168,8 +180,15 @@ func TestComposeScenarioListensAllInterfaces(t *testing.T) {
 	if !strings.Contains(text, `listen: "0.0.0.0:8443"`) {
 		t.Fatal("compose scenario must listen on 0.0.0.0 inside the container")
 	}
+	if !strings.Contains(text, "storageMode: ephemeral") {
+		t.Fatal("default scenario must be ephemeral")
+	}
 	if !strings.Contains(text, "/run/secrets/runtime-ldap") || !strings.Contains(text, "/run/secrets/token-admin") {
 		t.Fatal("compose scenario must use container secret paths")
+	}
+	persist := string(read(t, filepath.Join(root, "deploy", "compose", "scenario.persistent.yaml")))
+	if !strings.Contains(persist, "storageMode: persistent") {
+		t.Fatal("persistent scenario must set storageMode: persistent")
 	}
 }
 
@@ -184,6 +203,12 @@ func TestMakefileComposeResetIsReal(t *testing.T) {
 	}
 	if !strings.Contains(text, "tools/setupsecrets") || !strings.Contains(text, "tools/setuptls") {
 		t.Fatal("compose-up must use the secret and TLS helpers")
+	}
+	if !strings.Contains(text, "instance-ca.crt") {
+		t.Fatal("ephemeral compose-up must publish instance-ca.crt")
+	}
+	if !strings.Contains(text, "scenario.persistent.yaml") {
+		t.Fatal("persistent compose-up must use scenario.persistent.yaml")
 	}
 }
 

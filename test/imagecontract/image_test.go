@@ -56,6 +56,9 @@ func TestControlDockerfileHardening(t *testing.T) {
 	if strings.Contains(text, "labldap-control:placeholder") {
 		t.Fatal("hardened image is labldap-control:dev, not placeholder")
 	}
+	if !strings.Contains(text, `CMD ["serve", "--help"]`) {
+		t.Fatal("default CMD must be serve --help, not --placeholder")
+	}
 }
 
 func TestBootstrapDockerfilePinsAndVersion(t *testing.T) {

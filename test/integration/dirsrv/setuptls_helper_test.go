@@ -29,26 +29,10 @@ func TestSetupTLSHelperLDAPSAndStartTLS(t *testing.T) {
 	}
 
 	inst := Start(t)
-	copies := [][2]string{
-		{filepath.Join(dir, "ca.crt"), inst.Name + ":/tmp/labldap-ca.crt"},
-		{filepath.Join(dir, "directory.crt"), inst.Name + ":/tmp/labldap-server.crt"},
-		{filepath.Join(dir, "directory.key"), inst.Name + ":/tmp/labldap-server.key"},
-	}
-	for _, c := range copies {
-		if out, err := exec.Command("docker", "cp", c[0], c[1]).CombinedOutput(); err != nil {
-			t.Fatalf("docker cp: %v\n%s", err, redactLogs(string(out), inst.password))
-		}
-	}
-	for _, args := range [][]string{
-		{"dsctl", "localhost", "tls", "import-ca", "/tmp/labldap-ca.crt", "LabLDAP-Lab-CA"},
-		{"dsctl", "localhost", "tls", "import-server-key-cert", "/tmp/labldap-server.crt", "/tmp/labldap-server.key"},
-	} {
-		if out, err := exec.Command("docker", append([]string{"exec", inst.Name}, args...)...).CombinedOutput(); err != nil {
-			t.Fatalf("%s: %v\n%s", args[0], err, redactLogs(string(out), inst.password))
-		}
-	}
-	if out, err := exec.Command("docker", "restart", inst.Name).CombinedOutput(); err != nil {
-		t.Fatalf("restart: %v\n%s", err, redactLogs(string(out), inst.password))
+	imp := exec.Command("go", "run", "./tools/setuptls", "import", "--dir", dir, "--container", inst.Name)
+	imp.Dir = root
+	if out, err := imp.CombinedOutput(); err != nil {
+		t.Fatalf("import: %v\n%s", err, redactLogs(string(out), inst.password))
 	}
 	ldapPort, err := hostPort(inst.Name, "3389/tcp")
 	if err != nil {

@@ -55,4 +55,4 @@ LABEL org.opencontainers.image.title="labldap-control" \
 HEALTHCHECK --interval=5s --timeout=3s --start-period=3s --retries=10 \
 	CMD wget -q -O - http://127.0.0.1:8443/health || exit 1
 ENTRYPOINT ["/usr/local/bin/labldap"]
-CMD ["serve", "--placeholder"]
+CMD ["serve", "--help"]

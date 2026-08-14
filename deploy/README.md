@@ -1,7 +1,7 @@
 # Deployment
 
-Compose topology: directory (pinned 389 DS) → lab TLS import after first
-boot → bootstrap one-shot → hardened `labldap-control:dev`.
+Compose topology: directory (pinned 389 DS) → CA publish or lab TLS import
+→ bootstrap one-shot → hardened `labldap-control:dev`.
 
 Release files pin images by digest, never a floating tag. Control never
 receives Directory Manager and never mounts the Docker socket.
@@ -30,15 +30,18 @@ make compose-down
 make compose-reset           # operator hard reset: down -v, then compose-up
 ```
 
-`make compose-up` generates gitignored secrets (`tools/setupsecrets`, KD-R20)
-and a lab CA (`tools/setuptls generate`), starts directory, publishes the
-**instance CA** for bootstrap/control trust, then starts bootstrap and
-control. Ephemeral tmpfs `/data` remounts empty on container restart, so
-`dsctl tls import-*` cannot survive a restart there.
+`make compose-up` (ephemeral) generates gitignored secrets and a lab CA,
+starts directory, publishes the **instance CA** to
+`secrets/tls/instance-ca.crt` (it does **not** overwrite `ca.crt`), then
+starts bootstrap and control. Ephemeral tmpfs `/data` remounts empty on
+container restart, so `dsctl tls import-*` is refused on that volume.
 
-`make compose-up-persistent` imports the generated lab CA/server cert with
-`dsctl tls import-*` after first boot and restarts directory so NSS
-reloads. That path is the T-113 generated-PKI deployment.
+`make compose-up-persistent` uses `scenario.persistent.yaml`
+(`storageMode: persistent`), imports the generated lab CA/server cert with
+`dsctl tls import-*` after first boot, restarts directory so NSS reloads,
+and points bootstrap/control at `secrets/tls/ca.crt`. That is the T-113
+generated-PKI path. `import` without `-f` defaults to the persistent overlay
+and fails if `/data` is tmpfs-backed.
 
 The directory service uses `secrets/directory.env`. Bootstrap uses
 `--directory-manager-password-file`. Control never receives Directory
@@ -52,6 +55,9 @@ Host publishes are loopback-only:
 - `127.0.0.1:3636` LDAPS
 
 In-container control listens on `0.0.0.0:8443` so Docker DNAT works.
+`labldap serve --config` terminates TLS (`tls.mode: generated` uses an
+ephemeral self-signed management cert). Probe with
+`wget --no-check-certificate https://127.0.0.1:8443/health`.
 `GET /health` is liveness. `GET /health/ready` requires runtime bind and
 baseline match.
 
@@ -82,14 +88,15 @@ go run ./tools/setupsecrets --dir secrets --force   # rotate
 go run ./tools/setupsecrets --dir secrets --print   # print values (off by default)
 go run ./tools/setuptls generate --dir secrets/tls --host directory
 go run ./tools/setuptls generate --dir secrets/tls --management
-go run ./tools/setuptls publish --out secrets/tls/ca.crt   # ephemeral: instance CA
-go run ./tools/setuptls import --dir secrets/tls --project labldap  # persistent: lab CA
+go run ./tools/setuptls publish --out secrets/tls/instance-ca.crt
+go run ./tools/setuptls import --dir secrets/tls --project labldap
 go run ./tools/composepreflight
 ```
 
 Existing secret files are not overwritten unless `--force` is set.
-Directory Manager files are mode 0600. Secrets bind-mounted into
-`labldap-control` are 0644 so the non-root uid 65532 can read them.
+All generated secret files are mode 0600 on the host. A one-shot
+`secret-prep` copies token/password files into a volume as uid 65532
+mode 0400 (Compose file secrets ignore uid/mode without Swarm).
 Operator-provided PEMs can replace the generated files; import still
 uses `dsctl tls import-*` after first boot. A wrong CA or SAN fails
 closed at control/bootstrap TLS verify.

@@ -32,13 +32,8 @@ func TestGenerateNoOverwriteNoPrint(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		want := os.FileMode(0o644)
-		switch filepath.Base(p) {
-		case "directory.env", "dm.pw":
-			want = 0o600
-		}
-		if info.Mode().Perm() != want {
-			t.Fatalf("%s mode %o want %o", p, info.Mode().Perm(), want)
+		if info.Mode().Perm() != 0o600 {
+			t.Fatalf("%s mode %o", p, info.Mode().Perm())
 		}
 		raw, err := os.ReadFile(p)
 		if err != nil {
@@ -100,6 +95,40 @@ func TestGeneratePrintAndForce(t *testing.T) {
 	}
 	if strings.TrimSpace(readFile(t, defaultFiles(dir).TokenAdmin)) == tok {
 		t.Fatal("--force must rotate token")
+	}
+}
+
+func TestHalfPairRefused(t *testing.T) {
+	dir := t.TempDir()
+	files := defaultFiles(dir)
+	if err := os.WriteFile(files.DMPassword, []byte("old-dm-password-value\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	if _, err := generate(dir, false, false, &out); err == nil {
+		t.Fatal("expected KD-R20 pair-split error")
+	} else if !strings.Contains(err.Error(), "pair split") {
+		t.Fatalf("err=%v", err)
+	}
+	if strings.TrimSpace(readFile(t, files.DMPassword)) != "old-dm-password-value" {
+		t.Fatal("existing dm.pw must be left unchanged")
+	}
+	if fileExists(files.DirectoryEnv) {
+		t.Fatal("must not write directory.env when dm.pw is the only half")
+	}
+
+	if err := os.Remove(files.DMPassword); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(files.DirectoryEnv, []byte("DS_DM_PASSWORD=only-env-password\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	out.Reset()
+	if _, err := generate(dir, false, false, &out); err == nil {
+		t.Fatal("expected pair-split when only directory.env exists")
+	}
+	if fileExists(files.DMPassword) {
+		t.Fatal("must not write dm.pw from a half pair")
 	}
 }
 

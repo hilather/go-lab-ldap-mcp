@@ -8,8 +8,8 @@
 # (ns-slapd never writes container.inf). UID/GID 389 match the dirsrv user.
 #
 # docker compose restart remounts this volume empty. Lab CA import
-# (dsctl tls import-* + NSS reload) therefore belongs on the persistent
-# overlay. Ephemeral compose-up publishes the instance CA instead.
+# (dsctl tls import-* + NSS reload) is refused on tmpfs /data.
+# Ephemeral compose-up publishes the instance CA to instance-ca.crt.
 #
 # Host swap can still persist tmpfs pages unless the host is configured
 # otherwise (non-negotiable 7). Do not treat ephemeral as forensic wipe.

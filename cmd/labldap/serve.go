@@ -2,10 +2,18 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
 	"log/slog"
+	"math/big"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -17,6 +25,7 @@ import (
 	"github.com/hilather/go-lab-ldap-mcp/internal/app"
 	"github.com/hilather/go-lab-ldap-mcp/internal/auth"
 	"github.com/hilather/go-lab-ldap-mcp/internal/config"
+	"github.com/hilather/go-lab-ldap-mcp/internal/config/v1alpha1"
 	"github.com/hilather/go-lab-ldap-mcp/internal/directory/ds389"
 	"github.com/hilather/go-lab-ldap-mcp/internal/observability"
 )
@@ -54,6 +63,9 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 		writeTO time.Duration
 		idleTO  time.Duration
 		stopTO  time.Duration
+		tlsMode string
+		tlsCert string
+		tlsKey  string
 	)
 	if flags.placeholder {
 		listen = os.Getenv("LABLDAP_LISTEN")
@@ -104,6 +116,9 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 			shutTO = 15 * time.Second
 		}
 		readTO, writeTO, idleTO, stopTO = srv.Timeouts(reqTO, shutTO)
+		tlsMode = built.Public.Spec.Management.TLS.Mode
+		tlsCert = built.Public.Spec.Management.TLS.CertFile
+		tlsKey = built.Public.Spec.Management.TLS.KeyFile
 	}
 
 	httpSrv := &http.Server{
@@ -116,7 +131,7 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 	}
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- httpSrv.ListenAndServe()
+		errCh <- serveListener(httpSrv, tlsMode, tlsCert, tlsKey)
 	}()
 	select {
 	case <-ctx.Done():
@@ -134,6 +149,58 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 		}
 		return 0
 	}
+}
+
+func serveListener(srv *http.Server, mode, certFile, keyFile string) error {
+	switch mode {
+	case "", v1alpha1.TLSDisabled:
+		return srv.ListenAndServe()
+	case v1alpha1.TLSFiles:
+		if certFile == "" || keyFile == "" {
+			return fmt.Errorf("tls.mode=files requires certFile and keyFile")
+		}
+		return srv.ListenAndServeTLS(certFile, keyFile)
+	case v1alpha1.TLSGenerated:
+		cert, err := generatedManagementCertificate()
+		if err != nil {
+			return err
+		}
+		if srv.TLSConfig == nil {
+			srv.TLSConfig = &tls.Config{MinVersion: tls.VersionTLS12}
+		}
+		srv.TLSConfig.Certificates = []tls.Certificate{cert}
+		return srv.ListenAndServeTLS("", "")
+	default:
+		return fmt.Errorf("unknown tls.mode %q", mode)
+	}
+}
+
+func generatedManagementCertificate() (tls.Certificate, error) {
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return tls.Certificate{}, err
+	}
+	serial, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 62))
+	if err != nil {
+		return tls.Certificate{}, err
+	}
+	tmpl := &x509.Certificate{
+		SerialNumber: serial,
+		Subject:      pkix.Name{CommonName: "labldap-control", Organization: []string{"LabLDAP"}},
+		NotBefore:    time.Now().Add(-time.Hour),
+		NotAfter:     time.Now().Add(24 * time.Hour),
+		KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		DNSNames:     []string{"localhost", "control"},
+		IPAddresses:  []net.IP{net.ParseIP("127.0.0.1")},
+	}
+	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
+	if err != nil {
+		return tls.Certificate{}, err
+	}
+	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})
+	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)})
+	return tls.X509KeyPair(certPEM, keyPEM)
 }
 
 func compileControl(ctx context.Context, path string) (*config.Compiled, error) {
@@ -258,7 +325,8 @@ const serveUsage = `Usage:
   labldap serve --config FILE [--ldap-url URL] [--directory-ca-file FILE] [--directory-host NAME]
   labldap serve --placeholder
 
-serve starts the management HTTP listener (REST, later MCP, and embedded UI).
+serve starts the management listener (REST, later MCP, and embedded UI).
+Compiled tls.mode generated|files terminates TLS; disabled is HTTP.
 GET /health is process liveness and never consults LDAP.
 GET /health/ready requires runtime bind, marker, Directory revision match,
 required capabilities, and no reset.

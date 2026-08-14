@@ -17,8 +17,30 @@ networks:
 
 volumes:
   directory-data:
+  control-secrets:
 
 services:
+  # Non-swarm Compose ignores secrets uid/gid/mode. Copy 0600 host files
+  # into a volume owned by the control uid so they are 0400 inside.
+  secret-prep:
+    image: labldap-control:dev
+    user: "0:0"
+    network_mode: none
+    volumes:
+      - ${LABLDAP_SECRETS_DIR:-../../secrets}/runtime-ldap:/in/runtime-ldap:ro
+      - ${LABLDAP_SECRETS_DIR:-../../secrets}/token-admin:/in/token-admin:ro
+      - ${LABLDAP_SECRETS_DIR:-../../secrets}/user-alice:/in/user-alice:ro
+      - control-secrets:/out
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+        for f in runtime-ldap token-admin user-alice; do
+          cp "/in/$$f" "/out/$$f"
+          chown 65532:65532 "/out/$$f"
+          chmod 0400 "/out/$$f"
+        done
+    restart: "no"
   directory:
     image: quay.io/389ds/dirsrv@sha256:f2851654c5df545cd893d84bea8d08c28dc25f0930493fbfed1d8a6eacf657f7
     hostname: directory
@@ -77,6 +99,8 @@ services:
     depends_on:
       bootstrap:
         condition: service_completed_successfully
+      secret-prep:
+        condition: service_completed_successfully
     user: "65532:65532"
     read_only: true
     cap_drop:
@@ -91,9 +115,7 @@ services:
       LABLDAP_DIRECTORY_CA_FILE: /run/tls/ca.crt
     volumes:
       - ${LABLDAP_SCENARIO_FILE:-./scenario.yaml}:/config/scenario.yaml:ro
-      - ${LABLDAP_SECRETS_DIR:-../../secrets}/runtime-ldap:/run/secrets/runtime-ldap:ro
-      - ${LABLDAP_SECRETS_DIR:-../../secrets}/token-admin:/run/secrets/token-admin:ro
-      - ${LABLDAP_SECRETS_DIR:-../../secrets}/user-alice:/run/secrets/user-alice:ro
+      - control-secrets:/run/secrets:ro
       - ${LABLDAP_TLS_CA:-../../secrets/tls/ca.crt}:/run/tls/ca.crt:ro
     command:
       - serve
@@ -108,7 +130,7 @@ services:
     ports:
       - "127.0.0.1:8443:8443"
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8443/health"]
+      test: ["CMD", "wget", "-q", "--no-check-certificate", "-O", "-", "https://127.0.0.1:8443/health"]
       interval: 2s
       timeout: 3s
       retries: 20

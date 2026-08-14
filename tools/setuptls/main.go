@@ -34,12 +34,13 @@ first boot.
 Usage:
   labldap-setup-tls generate [--dir secrets/tls] [--host directory] [--force] [--management]
   labldap-setup-tls import   [--dir secrets/tls] [--project labldap] [--service directory] [-f FILE]...
-  labldap-setup-tls publish  [--out secrets/tls/ca.crt] [--project labldap] [--service directory] [-f FILE]...
+  labldap-setup-tls import   --container NAME [--dir secrets/tls]
+  labldap-setup-tls publish  [--out secrets/tls/instance-ca.crt] [--project labldap] [--service directory] [-f FILE]...
 
-import runs dsctl tls import-* after first boot and restarts the directory
-container so NSS reloads. A tmpfs /data volume remounts empty on container
-restart — use publish (instance CA) on the ephemeral overlay, and import on
-the persistent named volume.
+import defaults to the persistent Compose overlay. It refuses a tmpfs-backed
+/data (restart remounts empty) and checks dsctl show-server-cert after
+restart. publish writes the instance CA to instance-ca.crt and refuses to
+overwrite ca.crt when ca.key is present.
 `
 )
 
@@ -215,6 +216,7 @@ func runImport(args []string, stdout, stderr io.Writer) int {
 	dir := fs.String("dir", "secrets/tls", "certificate directory")
 	project := fs.String("project", "labldap", "Compose project name")
 	service := fs.String("service", "directory", "directory service name")
+	container := fs.String("container", "", "raw docker container (skips Compose)")
 	var files multiFlag
 	fs.Var(&files, "f", "Compose file (repeatable)")
 	if err := fs.Parse(args); err != nil {
@@ -225,15 +227,25 @@ func runImport(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 	if len(files) == 0 {
-		files = []string{"deploy/compose/compose.yaml", "deploy/compose/compose.ephemeral.yaml"}
+		files = defaultImportComposeFiles()
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
-	if err := importTLS(ctx, *dir, *project, *service, files, stdout); err != nil {
+	var err error
+	if *container != "" {
+		err = importTLSContainer(ctx, *dir, *container, stdout)
+	} else {
+		err = importTLS(ctx, *dir, *project, *service, files, stdout)
+	}
+	if err != nil {
 		fmt.Fprintf(stderr, "setuptls import: %v\n", err)
 		return 1
 	}
 	return 0
+}
+
+func defaultImportComposeFiles() []string {
+	return []string{"deploy/compose/compose.yaml", "deploy/compose/compose.persistent.yaml"}
 }
 
 func importTLS(ctx context.Context, dir, project, service string, composeFiles []string, stdout io.Writer) error {
@@ -251,43 +263,162 @@ func importTLS(ctx context.Context, dir, project, service string, composeFiles [
 	if err := waitFirstBoot(ctx, compose, service); err != nil {
 		return err
 	}
-	copies := [][2]string{
-		{p.CACert, "/tmp/labldap-ca.crt"},
-		{p.DirectoryCert, "/tmp/labldap-server.crt"},
-		{p.DirectoryKey, "/tmp/labldap-server.key"},
+	cid, err := dockerOutput(ctx, append(compose, "ps", "-q", service)...)
+	if err != nil {
+		return err
 	}
-	for _, c := range copies {
-		if err := runDocker(ctx, append(compose, "cp", c[0], service+":"+c[1])...); err != nil {
-			return err
-		}
+	if err := refuseTmpfsData(ctx, strings.TrimSpace(string(cid))); err != nil {
+		return err
 	}
-	cmds := [][]string{
-		{"dsctl", "localhost", "tls", "import-ca", "/tmp/labldap-ca.crt", caName},
-		{"dsctl", "localhost", "tls", "import-server-key-cert", "/tmp/labldap-server.crt", "/tmp/labldap-server.key"},
-		{"rm", "-f", "/tmp/labldap-ca.crt", "/tmp/labldap-server.crt", "/tmp/labldap-server.key"},
+	if err := copyImportPEMs(ctx, p, func(src, dest string) error {
+		return runDocker(ctx, append(compose, "cp", src, service+":"+dest)...)
+	}); err != nil {
+		return err
 	}
-	for _, args := range cmds {
-		if err := runDocker(ctx, append(append(compose, "exec", "-T", service), args...)...); err != nil {
-			return err
-		}
+	if err := runImportCommands(ctx, func(args ...string) error {
+		return runDocker(ctx, append(append(compose, "exec", "-T", service), args...)...)
+	}); err != nil {
+		return err
 	}
-	// NSS only serves the imported Server-Cert after ns-slapd restarts.
-	// docker compose restart remounts a tmpfs /data empty — callers must
-	// use a persistent volume (or accept first-boot again).
 	if err := runDocker(ctx, append(compose, "restart", service)...); err != nil {
 		return err
 	}
 	if err := waitFirstBoot(ctx, compose, service); err != nil {
 		return err
 	}
+	if err := verifyImportedServerCert(ctx, func(args ...string) ([]byte, error) {
+		return dockerOutput(ctx, append(append(compose, "exec", "-T", service), args...)...)
+	}); err != nil {
+		return err
+	}
 	fmt.Fprintln(stdout, "imported lab CA and directory certificate; directory restarted")
 	return nil
+}
+
+func importTLSContainer(ctx context.Context, dir, container string, stdout io.Writer) error {
+	p := paths(dir)
+	for _, f := range []string{p.CACert, p.DirectoryCert, p.DirectoryKey} {
+		if !fileExists(f) {
+			return fmt.Errorf("missing %s (run generate first)", f)
+		}
+	}
+	if fileExists(p.CAKey) {
+		fmt.Fprintf(stdout, "ca private key stays on host: %s\n", p.CAKey)
+	}
+	if err := refuseTmpfsData(ctx, container); err != nil {
+		return err
+	}
+	if err := copyImportPEMs(ctx, p, func(src, dest string) error {
+		return runDocker(ctx, "cp", src, container+":"+dest)
+	}); err != nil {
+		return err
+	}
+	if err := runImportCommands(ctx, func(args ...string) error {
+		return runDocker(ctx, append([]string{"exec", container}, args...)...)
+	}); err != nil {
+		return err
+	}
+	if err := runDocker(ctx, "restart", container); err != nil {
+		return err
+	}
+	deadline := time.Now().Add(90 * time.Second)
+	for time.Now().Before(deadline) {
+		if runDocker(ctx, "exec", container, "test", "-f", "/data/config/container.inf") == nil &&
+			runDocker(ctx, "exec", container, "test", "-S", "/data/run/slapd-localhost.socket") == nil {
+			break
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(500 * time.Millisecond):
+		}
+	}
+	if err := verifyImportedServerCert(ctx, func(args ...string) ([]byte, error) {
+		return dockerOutput(ctx, append([]string{"exec", container}, args...)...)
+	}); err != nil {
+		return err
+	}
+	fmt.Fprintln(stdout, "imported lab CA and directory certificate; directory restarted")
+	return nil
+}
+
+func copyImportPEMs(ctx context.Context, p material, cp func(src, dest string) error) error {
+	_ = ctx
+	for _, c := range [][2]string{
+		{p.CACert, "/tmp/labldap-ca.crt"},
+		{p.DirectoryCert, "/tmp/labldap-server.crt"},
+		{p.DirectoryKey, "/tmp/labldap-server.key"},
+	} {
+		if err := cp(c[0], c[1]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func runImportCommands(ctx context.Context, execFn func(args ...string) error) error {
+	_ = ctx
+	cmds := [][]string{
+		{"dsctl", "localhost", "tls", "import-ca", "/tmp/labldap-ca.crt", caName},
+		{"dsctl", "localhost", "tls", "import-server-key-cert", "/tmp/labldap-server.crt", "/tmp/labldap-server.key"},
+		{"rm", "-f", "/tmp/labldap-ca.crt", "/tmp/labldap-server.crt", "/tmp/labldap-server.key"},
+	}
+	for _, args := range cmds {
+		if err := execFn(args...); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func verifyImportedServerCert(ctx context.Context, execFn func(args ...string) ([]byte, error)) error {
+	_ = ctx
+	out, err := execFn("dsctl", "localhost", "tls", "show-server-cert")
+	if err != nil {
+		return fmt.Errorf("show-server-cert after restart: %w", err)
+	}
+	if !strings.Contains(string(out), caName) {
+		return fmt.Errorf("after restart, server cert is not issued by %s (tmpfs remount or failed NSS reload)", caName)
+	}
+	return nil
+}
+
+func refuseTmpfsData(ctx context.Context, container string) error {
+	typ, err := dockerOutput(ctx, "inspect", "-f",
+		`{{range .Mounts}}{{if eq .Destination "/data"}}{{.Type}}{{end}}{{end}}`, container)
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(string(typ)) == "tmpfs" {
+		return fmt.Errorf("refusing import: %s has a container-local tmpfs /data (restart remounts empty)", container)
+	}
+	name, err := dockerOutput(ctx, "inspect", "-f",
+		`{{range .Mounts}}{{if eq .Destination "/data"}}{{.Name}}{{end}}{{end}}`, container)
+	if err != nil {
+		return err
+	}
+	vol := strings.TrimSpace(string(name))
+	if vol == "" {
+		return nil
+	}
+	opts, err := dockerOutput(ctx, "volume", "inspect", "-f", `{{index .Options "type"}}`, vol)
+	if err != nil {
+		return err
+	}
+	if volumeOptsAreTmpfs(map[string]string{"type": strings.TrimSpace(string(opts))}) {
+		return fmt.Errorf("refusing import: volume %s is tmpfs-backed (restart remounts empty); use the persistent overlay", vol)
+	}
+	return nil
+}
+
+func volumeOptsAreTmpfs(opts map[string]string) bool {
+	return strings.EqualFold(strings.TrimSpace(opts["type"]), "tmpfs")
 }
 
 func runPublish(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("publish", flag.ContinueOnError)
 	fs.SetOutput(stderr)
-	out := fs.String("out", "secrets/tls/ca.crt", "host path for the instance CA")
+	out := fs.String("out", "secrets/tls/instance-ca.crt", "host path for the instance CA")
 	project := fs.String("project", "labldap", "Compose project name")
 	service := fs.String("service", "directory", "directory service name")
 	var files multiFlag
@@ -312,6 +443,9 @@ func runPublish(args []string, stdout, stderr io.Writer) int {
 }
 
 func publishInstanceCA(ctx context.Context, dest, project, service string, composeFiles []string, stdout io.Writer) error {
+	if overwritesLabCA(dest) {
+		return fmt.Errorf("refusing to overwrite lab CA %s while %s exists; use --out instance-ca.crt", dest, labCAKeyFor(dest))
+	}
 	if err := os.MkdirAll(filepath.Dir(dest), 0o700); err != nil {
 		return err
 	}
@@ -391,6 +525,18 @@ func randomSerial() (*big.Int, error) {
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
+}
+
+func labCAKeyFor(dest string) string {
+	if filepath.Base(dest) != "ca.crt" {
+		return ""
+	}
+	return filepath.Join(filepath.Dir(dest), "ca.key")
+}
+
+func overwritesLabCA(dest string) bool {
+	key := labCAKeyFor(dest)
+	return key != "" && fileExists(key)
 }
 
 type multiFlag []string

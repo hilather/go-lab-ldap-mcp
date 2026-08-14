@@ -44,8 +44,8 @@ help:
 		'  test-integration   real 389 DS harness (pinned digest; needs Docker)' \
 		'  test-e2e           Playwright UI suite (mock control plane; optional live URL)' \
 		'  test-security      secret scan, govulncheck, license denylist' \
-		'  compose-up         ephemeral tmpfs /data; directory → TLS import → bootstrap → control' \
-		'  compose-up-persistent  named volume /data (restart keeps runtime entries)' \
+		'  compose-up         ephemeral tmpfs /data; publish instance CA; bootstrap → control' \
+		'  compose-up-persistent  named volume /data; dsctl tls import lab CA' \
 		'  compose-down       stop the Compose project' \
 		'  compose-reset      operator hard reset: down -v then compose-up (not REST/MCP)' \
 		'  image-bootstrap    build labldap-bootstrap:dev (pinned 389 DS)' \
@@ -97,16 +97,20 @@ setup-tls:
 	$(GO) run ./tools/setuptls generate --dir $(COMPOSE_TLS) --host directory
 
 compose-up: image image-bootstrap compose-preflight compose-secrets setup-tls
-	$(COMPOSE) up -d --wait --remove-orphans directory
-	$(GO) run ./tools/setuptls publish --out $(COMPOSE_TLS)/ca.crt --project labldap \
+	LABLDAP_TLS_CA=$(COMPOSE_TLS)/instance-ca.crt $(COMPOSE) up -d --wait --remove-orphans directory
+	$(GO) run ./tools/setuptls publish --out $(COMPOSE_TLS)/instance-ca.crt --project labldap \
 		-f deploy/compose/compose.yaml -f deploy/compose/compose.ephemeral.yaml
-	$(COMPOSE) up -d --wait --remove-orphans
+	LABLDAP_TLS_CA=$(COMPOSE_TLS)/instance-ca.crt $(COMPOSE) up -d --wait --remove-orphans
 
 compose-up-persistent: image image-bootstrap compose-preflight compose-secrets setup-tls
-	$(COMPOSE_PERSISTENT) up -d --wait --remove-orphans directory
+	LABLDAP_SCENARIO_FILE=deploy/compose/scenario.persistent.yaml \
+	LABLDAP_TLS_CA=$(COMPOSE_TLS)/ca.crt \
+		$(COMPOSE_PERSISTENT) up -d --wait --remove-orphans directory
 	$(GO) run ./tools/setuptls import --dir $(COMPOSE_TLS) --project labldap \
 		-f deploy/compose/compose.yaml -f deploy/compose/compose.persistent.yaml
-	$(COMPOSE_PERSISTENT) up -d --wait --remove-orphans
+	LABLDAP_SCENARIO_FILE=deploy/compose/scenario.persistent.yaml \
+	LABLDAP_TLS_CA=$(COMPOSE_TLS)/ca.crt \
+		$(COMPOSE_PERSISTENT) up -d --wait --remove-orphans
 
 compose-down:
 	-$(COMPOSE) down --remove-orphans

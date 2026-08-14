@@ -4,6 +4,7 @@ package compose
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -174,15 +175,17 @@ func controlStarted(ps string) bool {
 }
 
 type labEnv struct {
-	envFile   string
-	dmFile    string
-	secrets   []string
-	secretDir string
-	tlsDir    string
-	caFile    string
-	scenario  string
-	files     []string
-	token     string
+	envFile    string
+	dmFile     string
+	secrets    []string
+	secretDir  string
+	tlsDir     string
+	caFile     string
+	labCA      string
+	instanceCA string
+	scenario   string
+	files      []string
+	token      string
 }
 
 func composeProject(t *testing.T, kind string) string {
@@ -239,14 +242,16 @@ func writeLabMaterial(t *testing.T, root, dir string) labEnv {
 	token := strings.TrimSpace(readFile(t, filepath.Join(secretDir, "token-admin")))
 	dm := strings.TrimSpace(readFile(t, filepath.Join(secretDir, "dm.pw")))
 	return labEnv{
-		envFile:   filepath.Join(secretDir, "directory.env"),
-		dmFile:    filepath.Join(secretDir, "dm.pw"),
-		secrets:   []string{token, dm},
-		secretDir: secretDir,
-		tlsDir:    tlsDir,
-		caFile:    filepath.Join(tlsDir, "ca.crt"),
-		scenario:  filepath.Join(root, "deploy", "compose", "scenario.yaml"),
-		token:     token,
+		envFile:    filepath.Join(secretDir, "directory.env"),
+		dmFile:     filepath.Join(secretDir, "dm.pw"),
+		secrets:    []string{token, dm},
+		secretDir:  secretDir,
+		tlsDir:     tlsDir,
+		labCA:      filepath.Join(tlsDir, "ca.crt"),
+		instanceCA: filepath.Join(tlsDir, "instance-ca.crt"),
+		caFile:     filepath.Join(tlsDir, "instance-ca.crt"),
+		scenario:   filepath.Join(root, "deploy", "compose", "scenario.yaml"),
+		token:      token,
 	}
 }
 
@@ -260,6 +265,14 @@ func overlayFiles(root string, persistent bool) []string {
 
 func bindEnv(env *labEnv, root string, persistent bool) {
 	env.files = overlayFiles(root, persistent)
+	if persistent {
+		env.caFile = env.labCA
+		if env.scenario == filepath.Join(root, "deploy", "compose", "scenario.yaml") {
+			env.scenario = filepath.Join(root, "deploy", "compose", "scenario.persistent.yaml")
+		}
+		return
+	}
+	env.caFile = env.instanceCA
 }
 
 func upStack(t *testing.T, root, proj string, env labEnv, persistent bool) {
@@ -286,7 +299,7 @@ func importTLS(t *testing.T, root, proj string, env labEnv, persistent bool) {
 func publishCA(t *testing.T, root, proj string, env labEnv, persistent bool) {
 	t.Helper()
 	bindEnv(&env, root, persistent)
-	args := []string{"run", "./tools/setuptls", "publish", "--out", env.caFile, "--project", proj,
+	args := []string{"run", "./tools/setuptls", "publish", "--out", env.instanceCA, "--project", proj,
 		"-f", env.files[0], "-f", env.files[1]}
 	runTool(t, root, args)
 }
@@ -296,7 +309,7 @@ func waitControl(t *testing.T, root, proj string, env labEnv, persistent bool) {
 	deadline := time.Now().Add(2 * time.Minute)
 	var last string
 	for time.Now().Before(deadline) {
-		res, err := tryHostGet(root, proj, env, persistent, "/health")
+		res, err := tryHostGet(root, proj, env, persistent, "/health/ready")
 		if err == nil && res.status == http.StatusOK {
 			return
 		}
@@ -307,7 +320,7 @@ func waitControl(t *testing.T, root, proj string, env labEnv, persistent bool) {
 		}
 		time.Sleep(500 * time.Millisecond)
 	}
-	t.Fatalf("control /health not ready: %s", redactLogs(last, env.secrets...))
+	t.Fatalf("control /health/ready not ready: %s", redactLogs(last, env.secrets...))
 }
 
 func composeArgs(root, proj string, env labEnv, persistent bool) []string {
@@ -372,14 +385,14 @@ func tryHostGet(root, proj string, env labEnv, persistent bool, path string) (ht
 	if pub == "" {
 		return httpResult{}, errNoPort
 	}
-	return httpDo(http.MethodGet, "http://"+pub+path, "", nil)
+	return httpDo(http.MethodGet, "https://"+pub+path, "", nil)
 }
 
 func hostJSON(t *testing.T, root, proj string, env labEnv, method, path string, body any) httpResult {
 	t.Helper()
 	pub := published(root, proj, env, strings.Contains(proj, "-per-"))
 	raw, _ := json.Marshal(body)
-	res, err := httpDo(method, "http://"+pub+path, env.token, raw)
+	res, err := httpDo(method, "https://"+pub+path, env.token, raw)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -468,7 +481,12 @@ func httpDo(method, url, token string, body []byte) (httpResult, error) {
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
-	client := &http.Client{Timeout: 10 * time.Second}
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // generated lab management cert
+		},
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		return httpResult{}, err

@@ -10,7 +10,8 @@ spec:
     nestedGroups: false
     allowRawACI: false
   lifecycle:
-    storageMode: ephemeral
+    storageMode: persistent
+    # Named-volume Compose overlay (compose.persistent.yaml).
     startupMode: merge
     softReset: true
   transport:

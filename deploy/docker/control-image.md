@@ -29,7 +29,7 @@ Builder digest files: `deploy/docker/{golang,node,alpine}.digest`. 389 DS remain
 | Docker socket | never mounted |
 | Secrets | mounts only; `.dockerignore` excludes `/secrets` and fixture passwords |
 
-HEALTHCHECK is `GET /health` (liveness; not LDAP). Compose healthcheck must stay on `/health`, not `/health/ready`.
+Default `CMD` is `serve --help`. Compose and `make image` smoke pass `serve --config` or `serve --placeholder`. HEALTHCHECK is `GET /health` (liveness; not LDAP). Compose healthcheck stays on `/health`, not `/health/ready`.
 
 ## Smoke
 
