@@ -14,9 +14,10 @@ ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 RUN corepack enable && corepack prepare pnpm@10.14.0 --activate
 COPY frontend/package.json frontend/pnpm-lock.yaml /src/frontend/
 COPY api/generated/typescript /src/api/generated/typescript
-COPY frontend /src/frontend
 WORKDIR /src/frontend
-RUN pnpm install --frozen-lockfile && pnpm build
+RUN pnpm install --frozen-lockfile
+COPY frontend /src/frontend
+RUN pnpm build
 
 FROM ${GO_IMAGE} AS build
 WORKDIR /src

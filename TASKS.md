@@ -1246,49 +1246,49 @@ Acceptance:
 - [x] Required 389 tools remain functional.
 - [x] Release manifests reference immutable digest.
 
-## [ ] T-110 Create and verify ephemeral Compose deployment
+## [x] T-110 Create and verify ephemeral Compose deployment
 
 Priority: P0 | Size: L | Depends on: T-042, T-108, T-109
 
 Deliverables: release ephemeral Compose file, tmpfs `/data`, loopback port defaults, secret mounts, networks, health dependencies, resource guidance, and acceptance test.
 
 Acceptance:
-- [ ] Runtime entries disappear after container recreation and baseline is reapplied.
-- [ ] Control has no DM secret and no Docker socket.
-- [ ] tmpfs UID, GID, mode, and size work with pinned image.
+- [x] Runtime entries disappear after container recreation and baseline is reapplied.
+- [x] Control has no DM secret and no Docker socket.
+- [x] tmpfs UID, GID, mode, and size work with pinned image.
 
-## [ ] T-111 Create and verify persistent Compose deployment
+## [x] T-111 Create and verify persistent Compose deployment
 
 Priority: P0 | Size: L | Depends on: T-108 to T-110
 
 Deliverables: named-volume override, merge-mode example, reset behavior, restart test, and volume safety documentation.
 
 Acceptance:
-- [ ] Runtime entry survives ordinary restart.
-- [ ] Soft reset removes runtime entry and preserves engine state.
-- [ ] Volume removal is not exposed through API and is documented as destructive operator action.
+- [x] Runtime entry survives ordinary restart.
+- [x] Soft reset removes runtime entry and preserves engine state.
+- [x] Volume removal is not exposed through API and is documented as destructive operator action.
 
-## [ ] T-112 Implement secret setup helper
+## [x] T-112 Implement secret setup helper
 
 Priority: P0 | Size: M | Depends on: T-014, T-019, T-110
 
 Deliverables: cryptographic secret generation, directory permissions, no-overwrite default, token and password file names, `.gitignore`, and safe output.
 
 Acceptance:
-- [ ] Generated tokens meet entropy requirement.
-- [ ] Secret values are not printed without an explicit option.
-- [ ] Existing files are not overwritten silently.
+- [x] Generated tokens meet entropy requirement.
+- [x] Secret values are not printed without an explicit option.
+- [x] Existing files are not overwritten silently.
 
-## [ ] T-113 Implement lab CA and TLS setup helper
+## [x] T-113 Implement lab CA and TLS setup helper
 
 Priority: P0 | Size: L | Depends on: T-026, T-110
 
 Deliverables: CA and directory certificate generation, SAN configuration, optional management cert, safe permissions, trust instructions, and operator-provided PKI path.
 
 Acceptance:
-- [ ] Generated deployment passes LDAPS and StartTLS verification.
-- [ ] Private CA key is not mounted into runtime services after signing unless explicitly needed.
-- [ ] Wrong SAN or CA produces clear startup failure.
+- [x] Generated deployment passes LDAPS and StartTLS verification.
+- [x] Private CA key is not mounted into runtime services after signing unless explicitly needed.
+- [x] Wrong SAN or CA produces clear startup failure.
 
 ## [ ] T-114 Verify deployment hardening, secret separation, and network exposure
 

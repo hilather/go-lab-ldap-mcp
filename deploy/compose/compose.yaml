@@ -1,12 +1,28 @@
-# Dev topology (T-042): directory healthy → bootstrap one-shot → placeholder control.
-# Directory Manager arrives only via the gitignored env_file (KD-R20) and a
-# password-file mount on bootstrap. Control never receives DM.
+# LabLDAP Compose (T-110+). Default overlay is ephemeral tmpfs-backed /data.
+# Persistent: docker compose -f compose.yaml -f compose.persistent.yaml
+#
+# Control is labldap-control:dev. It never receives Directory Manager and
+# never mounts the Docker socket. Host publishes bind loopback only.
+#
+# Resource guidance (not enforced on all Compose implementations):
+#   directory  512Mi / 1 CPU
+#   control    256Mi
+#   bootstrap  256Mi (one-shot)
+#
+# Minimum: Docker Engine 24+ and Compose v2.24+ (OD-020).
 name: labldap
+
+networks:
+  lab:
+
+volumes:
+  directory-data:
 
 services:
   directory:
     image: quay.io/389ds/dirsrv@sha256:f2851654c5df545cd893d84bea8d08c28dc25f0930493fbfed1d8a6eacf657f7
     hostname: directory
+    networks: [lab]
     env_file:
       - path: ${LABLDAP_DIRECTORY_ENVFILE:-../../secrets/directory.env}
         required: true
@@ -25,19 +41,23 @@ services:
   bootstrap:
     image: labldap-bootstrap:dev
     hostname: bootstrap
+    networks: [lab]
     depends_on:
       directory:
         condition: service_healthy
     volumes:
-      # Read-only /data: instance CA + LDAPI socket for dsconf localhost.
-      # Bootstrap must not write engine state (architecture §4).
+      # Shared /data is read-only. Bootstrap must not write engine state.
       - directory-data:/data:ro
-      - ${LABLDAP_SCENARIO_DIR:-../../test/fixtures/config/valid}:/config:ro
+      - ${LABLDAP_SCENARIO_FILE:-./scenario.yaml}:/config/scenario.yaml:ro
+      - ${LABLDAP_SECRETS_DIR:-../../secrets}/runtime-ldap:/run/secrets/runtime-ldap:ro
+      - ${LABLDAP_SECRETS_DIR:-../../secrets}/token-admin:/run/secrets/token-admin:ro
+      - ${LABLDAP_SECRETS_DIR:-../../secrets}/user-alice:/run/secrets/user-alice:ro
       - ${LABLDAP_DM_PASSWORD_FILE:-../../secrets/dm.pw}:/run/secrets/dm.pw:ro
+      - ${LABLDAP_TLS_CA:-../../secrets/tls/ca.crt}:/run/tls/ca.crt:ro
     command:
       - apply
       - --config
-      - /config/minimal.yaml
+      - /config/scenario.yaml
       - --directory-manager-password-file
       - /run/secrets/dm.pw
       - --ldap-url
@@ -45,29 +65,51 @@ services:
       - --directory-host
       - directory
       - --directory-ca-file
-      - /data/config/ca.crt
+      - /run/tls/ca.crt
       - --dsconf-instance
       - localhost
     restart: "no"
 
   control:
-    image: labldap-control:placeholder
+    image: labldap-control:dev
     hostname: control
+    networks: [lab]
     depends_on:
       bootstrap:
         condition: service_completed_successfully
+    user: "65532:65532"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:uid=65532,gid=65532,mode=1777,size=16m
     environment:
-      # Bind all container interfaces so Docker DNAT to eth0 works.
-      # Host publish stays loopback-only (KD-R19 host-facing address).
-      LABLDAP_LISTEN: 0.0.0.0:8443
+      LABLDAP_LDAP_URL: ldaps://directory:3636
+      LABLDAP_DIRECTORY_HOST: directory
+      LABLDAP_DIRECTORY_CA_FILE: /run/tls/ca.crt
+    volumes:
+      - ${LABLDAP_SCENARIO_FILE:-./scenario.yaml}:/config/scenario.yaml:ro
+      - ${LABLDAP_SECRETS_DIR:-../../secrets}/runtime-ldap:/run/secrets/runtime-ldap:ro
+      - ${LABLDAP_SECRETS_DIR:-../../secrets}/token-admin:/run/secrets/token-admin:ro
+      - ${LABLDAP_SECRETS_DIR:-../../secrets}/user-alice:/run/secrets/user-alice:ro
+      - ${LABLDAP_TLS_CA:-../../secrets/tls/ca.crt}:/run/tls/ca.crt:ro
+    command:
+      - serve
+      - --config
+      - /config/scenario.yaml
+      - --ldap-url
+      - ldaps://directory:3636
+      - --directory-ca-file
+      - /run/tls/ca.crt
+      - --directory-host
+      - directory
     ports:
       - "127.0.0.1:8443:8443"
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8443/health"]
       interval: 2s
       timeout: 3s
-      retries: 15
-      start_period: 2s
-
-volumes:
-  directory-data:
+      retries: 20
+      start_period: 5s

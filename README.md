@@ -22,7 +22,7 @@ No distribution license file (OD-003). Local images only (OD-004).
 Milestones **M0–M2** are complete. First usable release is the README definition
 in the design package plus every P0 task in [`TASKS.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/TASKS.md).
 
-Completed: **T-001–T-109**. Next: **T-110** ephemeral Compose. Remaining-work design: [`docs/design/remaining-work-t035-t120.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/design/remaining-work-t035-t120.md).
+Completed: **T-001–T-113**. Next: **T-114** inspect/SBOM/release package. Remaining-work design: [`docs/design/remaining-work-t035-t120.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/design/remaining-work-t035-t120.md).
 
 ## Commands
 
@@ -35,6 +35,7 @@ make verify
 make image
 make image-bootstrap
 make compose-up
+make compose-reset
 ```
 
 Structured logs go to stderr. `LABLDAP_LOG_FORMAT=json` selects JSON.
@@ -48,9 +49,11 @@ the listener to loopback or restrict it with network policy, or set
 `LABLDAP_DIRECTORY_CA_FILE`, `LABLDAP_DIRECTORY_HOST`).
 
 See `docs/toolchain.md` for version pins. `make test-integration` starts the
-pinned 389 DS image (Docker required). `make image` builds `labldap-control:dev`
-(T-108). `make image-bootstrap` builds the matching-version bootstrap image
-(T-109). Compose profiles remain T-110.
+pinned 389 DS image (Docker required). `make image` builds `labldap-control:dev`.
+`make compose-up` is ephemeral tmpfs-backed `/data`; `make compose-up-persistent`
+uses a named volume. `make compose-reset` is the operator hard reset (volume
+removal). Host swap can still persist tmpfs pages — ephemeral is not a
+forensic wipe.
 
 ## Layout
 

@@ -1,17 +1,17 @@
 # Deployment
 
-Dev Compose (T-042) is directory → bootstrap one-shot → placeholder control.
-Hardened `labldap-control:dev` (T-108) and matching-version bootstrap (T-109)
-are built by `make image` / `make image-bootstrap`. Ephemeral/persistent
-Compose profiles land in T-110/T-111. Release files must pin images by
-digest, never a floating tag.
+Compose topology: directory (pinned 389 DS) → lab TLS import after first
+boot → bootstrap one-shot → hardened `labldap-control:dev`.
+
+Release files pin images by digest, never a floating tag. Control never
+receives Directory Manager and never mounts the Docker socket.
 
 ## Images
 
 | Image | Make target | Notes |
 | --- | --- | --- |
 | `labldap-bootstrap:dev` | `make image-bootstrap` | Static `labldap-bootstrap` on the pinned 389 DS digest, same VERSION as control. Do not push (OD-004). |
-| `labldap-control:placeholder` | `make image-control-placeholder` | Thin T-042 process (`labldap serve --placeholder`). Not used by `make image`. |
+| `labldap-control:placeholder` | `make image-control-placeholder` | Thin T-042 process. Not used by `make compose-up`. |
 | `labldap-control:dev` | `make image` | Hardened multi-stage frontend+Go image. Non-root, CA bundle, HEALTHCHECK `/health`. |
 
 Builder pins: [`deploy/docker/builder-images.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/deploy/docker/builder-images.md).
@@ -19,21 +19,89 @@ Control contract: [`deploy/docker/control-image.md`](https://github.com/hilather
 
 The bootstrap image keeps `dsconf` / `dsctl`. Secrets are mounts only. Both
 images stamp `internal/observability` version/revision so `version` output
-is comparable. Compose still uses the T-042 placeholder until T-110.
+is comparable.
 
 ## Compose
 
 ```text
-make compose-up
+make compose-up              # ephemeral tmpfs-backed /data (default)
+make compose-up-persistent   # named volume
 make compose-down
+make compose-reset           # operator hard reset: down -v, then compose-up
 ```
 
-`make compose-up` writes `secrets/directory.env` and `secrets/dm.pw` (mode 0600)
-if they are missing (KD-R20). The directory service uses the env_file;
-bootstrap uses `--directory-manager-password-file`; control never receives
-Directory Manager.
+`make compose-up` generates gitignored secrets (`tools/setupsecrets`, KD-R20)
+and a lab CA (`tools/setuptls generate`), starts directory, publishes the
+**instance CA** for bootstrap/control trust, then starts bootstrap and
+control. Ephemeral tmpfs `/data` remounts empty on container restart, so
+`dsctl tls import-*` cannot survive a restart there.
 
-Placeholder control binds `0.0.0.0:8443` inside the container so Docker can
-forward to eth0. The host publish is loopback-only (`127.0.0.1:8443:8443`).
-`GET /health` is liveness. `GET /health/ready` returns 503. `make compose-reset`
-stays pending until T-110.
+`make compose-up-persistent` imports the generated lab CA/server cert with
+`dsctl tls import-*` after first boot and restarts directory so NSS
+reloads. That path is the T-113 generated-PKI deployment.
+
+The directory service uses `secrets/directory.env`. Bootstrap uses
+`--directory-manager-password-file`. Control never receives Directory
+Manager. The private CA key stays on the host under `secrets/tls/ca.key`
+and is not mounted into any runtime service.
+
+Host publishes are loopback-only:
+
+- `127.0.0.1:8443` management (control)
+- `127.0.0.1:3389` LDAP
+- `127.0.0.1:3636` LDAPS
+
+In-container control listens on `0.0.0.0:8443` so Docker DNAT works.
+`GET /health` is liveness. `GET /health/ready` requires runtime bind and
+baseline match.
+
+### Ephemeral vs persistent
+
+Ephemeral (`compose.ephemeral.yaml`) uses a **tmpfs-backed Docker volume**
+for `/data` so bootstrap can still mount it read-only (LDAPI). UID 389,
+GID 389, mode 0750, size **2GiB** (the pinned 389 DS 2.4.6 first-boot
+fails on a 512Mi tmpfs). Runtime entries disappear after volume unmount
+or `compose-reset`. Ordinary container recreate that keeps the volume
+object may remount an empty tmpfs.
+
+**Host swap can still persist tmpfs pages** unless the host is configured
+otherwise. Ephemeral mode is not a forensic wipe (non-negotiable 7).
+
+Persistent (`compose.persistent.yaml`) uses a named volume. Ordinary
+restart keeps runtime entries. Soft reset (`POST /api/v1/reset` with
+`lab:reset`) restores the compiled baseline and does **not** remove the
+volume. Volume removal is a destructive operator action
+(`make compose-reset` / `docker compose down -v`) and is not exposed
+through REST or MCP.
+
+### Helpers
+
+```text
+go run ./tools/setupsecrets --dir secrets
+go run ./tools/setupsecrets --dir secrets --force   # rotate
+go run ./tools/setupsecrets --dir secrets --print   # print values (off by default)
+go run ./tools/setuptls generate --dir secrets/tls --host directory
+go run ./tools/setuptls generate --dir secrets/tls --management
+go run ./tools/setuptls publish --out secrets/tls/ca.crt   # ephemeral: instance CA
+go run ./tools/setuptls import --dir secrets/tls --project labldap  # persistent: lab CA
+go run ./tools/composepreflight
+```
+
+Existing secret files are not overwritten unless `--force` is set.
+Directory Manager files are mode 0600. Secrets bind-mounted into
+`labldap-control` are 0644 so the non-root uid 65532 can read them.
+Operator-provided PEMs can replace the generated files; import still
+uses `dsctl tls import-*` after first boot. A wrong CA or SAN fails
+closed at control/bootstrap TLS verify.
+
+### Resource guidance
+
+Directory ≈ 512Mi / 1 CPU. Control ≈ 256Mi. Bootstrap ≈ 256Mi (one-shot).
+
+### Minimum versions (OD-020)
+
+Docker Engine **24+** and Compose **v2.24+** (secrets/`env_file`, health
+dependencies, tmpfs uid/gid/mode/size, `service_completed_successfully`,
+read-only + `cap_drop` + `no-new-privileges`). `make compose-up` runs
+`tools/composepreflight`. Observed on this work: Engine 29.1.3, Compose
+v2.40.3.

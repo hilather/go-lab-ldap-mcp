@@ -1,0 +1,9 @@
+# Persistent /data (T-111). Merge with compose.yaml:
+#   docker compose -f compose.yaml -f compose.persistent.yaml up
+#
+# Ordinary restart keeps runtime entries. Soft reset (REST/MCP lab:reset)
+# restores the compiled baseline and does not remove the volume.
+# Volume removal is a destructive operator action (make compose-reset /
+# docker compose down -v). It is not exposed through REST or MCP.
+volumes:
+  directory-data:

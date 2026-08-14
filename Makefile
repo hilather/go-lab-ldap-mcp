@@ -13,9 +13,12 @@ DIRSRV_IMAGE     := $(shell cat deploy/docker/dirsrv.digest)
 GO_IMAGE         := $(shell cat deploy/docker/golang.digest)
 NODE_IMAGE       := $(shell cat deploy/docker/node.digest)
 ALPINE_IMAGE     := $(shell cat deploy/docker/alpine.digest)
-COMPOSE          := docker compose -f deploy/compose/compose.yaml -p labldap
-COMPOSE_ENV      := secrets/directory.env
-COMPOSE_DM       := secrets/dm.pw
+COMPOSE_EPHEMERAL  := docker compose -f deploy/compose/compose.yaml -f deploy/compose/compose.ephemeral.yaml -p labldap
+COMPOSE_PERSISTENT := docker compose -f deploy/compose/compose.yaml -f deploy/compose/compose.persistent.yaml -p labldap
+COMPOSE            := $(COMPOSE_EPHEMERAL)
+COMPOSE_ENV        := secrets/directory.env
+COMPOSE_DM         := secrets/dm.pw
+COMPOSE_TLS        := secrets/tls
 
 VERSION          ?= $(shell git describe --tags --always --dirty 2>/dev/null || printf 'dev')
 REVISION         ?= $(shell git rev-parse --short=12 HEAD 2>/dev/null || printf 'unknown')
@@ -25,7 +28,8 @@ IMAGE_BUILD_ARGS := --build-arg VERSION=$(VERSION) --build-arg REVISION=$(REVISI
 
 .PHONY: help format lint generate generate-drift test test-unit \
 	test-integration test-e2e test-security compose-up compose-down \
-	compose-reset compose-secrets image image-bootstrap \
+	compose-up-persistent compose-reset compose-secrets compose-preflight \
+	setup-tls image image-bootstrap \
 	image-control-placeholder verify frontend-install frontend-build
 
 help:
@@ -40,9 +44,10 @@ help:
 		'  test-integration   real 389 DS harness (pinned digest; needs Docker)' \
 		'  test-e2e           Playwright UI suite (mock control plane; optional live URL)' \
 		'  test-security      secret scan, govulncheck, license denylist' \
-		'  compose-up         directory → bootstrap → placeholder control' \
-		'  compose-down       stop the T-042 Compose project' \
-		'  compose-reset      pending T-110 (operator full engine reset)' \
+		'  compose-up         ephemeral tmpfs /data; directory → TLS import → bootstrap → control' \
+		'  compose-up-persistent  named volume /data (restart keeps runtime entries)' \
+		'  compose-down       stop the Compose project' \
+		'  compose-reset      operator hard reset: down -v then compose-up (not REST/MCP)' \
 		'  image-bootstrap    build labldap-bootstrap:dev (pinned 389 DS)' \
 		'  image              build labldap-control:dev (hardened; matching version)' \
 		'  verify             format lint generate generate-drift test-unit test-security'
@@ -82,30 +87,35 @@ test-security:
 	$(GO) run $(GOVULNCHECK_MOD) ./...
 	$(GO) run ./tools/licensecheck
 
-compose-secrets:
-	@mkdir -p secrets
-	@if [ ! -f $(COMPOSE_ENV) ]; then \
-		umask 077; \
-		pw=$$(dd if=/dev/urandom bs=16 count=1 2>/dev/null | od -An -tx1 | tr -d ' \n'); \
-		printf 'DS_DM_PASSWORD=%s\n' "$$pw" > $(COMPOSE_ENV); \
-		printf '%s\n' "$$pw" > $(COMPOSE_DM); \
-		chmod 0600 $(COMPOSE_ENV) $(COMPOSE_DM); \
-	fi
-	@if [ ! -f $(COMPOSE_DM) ]; then \
-		umask 077; \
-		sed -n 's/^DS_DM_PASSWORD=//p' $(COMPOSE_ENV) > $(COMPOSE_DM); \
-		chmod 0600 $(COMPOSE_DM); \
-	fi
+compose-preflight:
+	$(GO) run ./tools/composepreflight
 
-compose-up: image-bootstrap image-control-placeholder compose-secrets
+compose-secrets:
+	$(GO) run ./tools/setupsecrets --dir secrets
+
+setup-tls:
+	$(GO) run ./tools/setuptls generate --dir $(COMPOSE_TLS) --host directory
+
+compose-up: image image-bootstrap compose-preflight compose-secrets setup-tls
+	$(COMPOSE) up -d --wait --remove-orphans directory
+	$(GO) run ./tools/setuptls publish --out $(COMPOSE_TLS)/ca.crt --project labldap \
+		-f deploy/compose/compose.yaml -f deploy/compose/compose.ephemeral.yaml
 	$(COMPOSE) up -d --wait --remove-orphans
 
+compose-up-persistent: image image-bootstrap compose-preflight compose-secrets setup-tls
+	$(COMPOSE_PERSISTENT) up -d --wait --remove-orphans directory
+	$(GO) run ./tools/setuptls import --dir $(COMPOSE_TLS) --project labldap \
+		-f deploy/compose/compose.yaml -f deploy/compose/compose.persistent.yaml
+	$(COMPOSE_PERSISTENT) up -d --wait --remove-orphans
+
 compose-down:
-	$(COMPOSE) down --remove-orphans
+	-$(COMPOSE) down --remove-orphans
+	-$(COMPOSE_PERSISTENT) down --remove-orphans
 
 compose-reset:
-	@printf '%s\n' 'compose-reset: pending T-110 — operator full engine reset (not REST/MCP)'
-	@printf '%s\n' 'PENDING:compose-reset'
+	-$(COMPOSE) down --remove-orphans -v
+	-$(COMPOSE_PERSISTENT) down --remove-orphans -v
+	$(MAKE) compose-up
 
 image-bootstrap:
 	docker build \
@@ -135,7 +145,17 @@ image:
 		$(IMAGE_BUILD_ARGS) \
 		-t labldap-control:dev \
 		.
-	@docker run --rm labldap-control:dev version >/dev/null
+	@cver=$$(docker run --rm labldap-control:dev version); \
+	printf '%s\n' "$$cver"; \
+	if docker image inspect labldap-bootstrap:dev >/dev/null 2>&1; then \
+		bver=$$(docker run --rm labldap-bootstrap:dev version); \
+		cfield=$$(printf '%s\n' "$$cver" | sed -n 's/.*version=//p' | awk '{print $$1}'); \
+		bfield=$$(printf '%s\n' "$$bver" | sed -n 's/.*version=//p' | awk '{print $$1}'); \
+		if [ "$$cfield" != "$$bfield" ]; then \
+			printf '%s\n' "image: version mismatch control=$$cfield bootstrap=$$bfield"; \
+			exit 1; \
+		fi; \
+	fi
 	@cid=$$(docker run -d --read-only --cap-drop=ALL --security-opt no-new-privileges:true \
 		--tmpfs /tmp:uid=65532,gid=65532,mode=1777,size=16m \
 		-e LABLDAP_LISTEN=127.0.0.1:8443 \

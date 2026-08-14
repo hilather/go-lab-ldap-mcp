@@ -33,7 +33,7 @@ The design is sufficiently complete to begin implementation. This ledger identif
 | OD-017 | Agent default | TLS for local labs. | Support generated development certificates and user-supplied certificates. Do not present generated certificates as production trust. LDAPS and StartTLS tests must validate trust explicitly. | T-029 through T-033. |
 | OD-018 | Verification | Empty-group representation. | Reject empty groups in `v1alpha1` when using `groupOfNames`. Do not insert a fake member. A different object class or group strategy requires an ADR and compatibility tests. | T-016, T-050, and future versioning work. |
 | OD-019 | Agent default | Full engine reset. | Keep full reset as an operator-side Compose command that replaces `/data`. REST and MCP expose only suffix-scoped soft reset. | T-076 through T-083 and deployment scripts. |
-| OD-020 | Verification | Minimum Docker and Compose versions. | Determine the minimum versions required by secrets, health dependencies, profiles, read-only mounts, and tmpfs syntax; enforce them in documentation and preflight checks. | T-108 through T-111. |
+| OD-020 | Verification | Minimum Docker and Compose versions. | **Accepted default (T-110):** Docker Engine 24+ and Compose v2.24+ (`env_file`, health `depends_on`, tmpfs volume `uid`/`gid`/`mode`/`size`, `service_completed_successfully`, `read_only` + `cap_drop` + `no-new-privileges`). Enforced by `tools/composepreflight` and `make compose-up`. Observed: Engine 29.1.3, Compose v2.40.3 on linux/amd64. | T-108 through T-111. |
 | OD-021 | Agent default | Metrics export. | Provide bounded Prometheus-compatible metrics without DNs, usernames, filters, tokens, or passwords as labels. Metrics may be disabled by configuration. | T-073 and T-114. |
 | OD-022 | Owner | Whether anonymous LDAP bind is enabled in shipped examples. | Keep anonymous bind disabled in the default example. Add a clearly labeled compatibility example only when required by a lab scenario. | Before example publication. |
 
@@ -77,4 +77,17 @@ Observed behavior: ...
 Security implications: ...
 Result: accepted default | ADR required
 Related tasks: ...
+```
+
+### OD-020 record
+
+```text
+Decision ID: OD-020
+Pinned component/version/digest: Docker Engine 24.0+ / Compose v2.24+ (preferred default). Observed Engine 29.1.3, Compose v2.40.3.
+Environment tested: linux/amd64
+Commands or tests: tools/composepreflight; test/composecontract; make compose-up (tmpfs uid/gid/mode/size, env_file, service_completed_successfully, read_only/cap_drop/no-new-privileges)
+Observed behavior: Compose v2.24+ accepts tmpfs volume driver_opts (uid=389,gid=389,mode=0750,size=2147483648). The pinned 389 DS 2.4.6 first-boot fails when tmpfs size is 512Mi (ns-slapd never writes container.inf); 2GiB succeeds. env_file, health dependencies, and control hardening fields work.
+Security implications: Older Compose may ignore tmpfs options or health conditions and leave /data world-writable or start control before bootstrap.
+Result: accepted default
+Related tasks: T-108 T-109 T-110 T-111
 ```

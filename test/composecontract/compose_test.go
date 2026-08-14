@@ -9,31 +9,29 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func TestDevComposeTopology(t *testing.T) {
+func TestReleaseComposeTopology(t *testing.T) {
 	root := repoRoot(t)
-	raw, err := os.ReadFile(filepath.Join(root, "deploy", "compose", "compose.yaml"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	raw := read(t, filepath.Join(root, "deploy", "compose", "compose.yaml"))
 	text := string(raw)
-	if strings.Contains(text, "labldap-control:dev") {
-		t.Fatal("T-042 must not tag the placeholder as labldap-control:dev")
+	if strings.Contains(text, "labldap-control:placeholder") {
+		t.Fatal("T-110+ must use labldap-control:dev, not the T-042 placeholder")
 	}
 	if strings.Contains(text, "docker.sock") {
 		t.Fatal("compose must not mount the Docker socket")
 	}
-
-	pin, err := os.ReadFile(filepath.Join(root, "deploy", "docker", "dirsrv.digest"))
-	if err != nil {
-		t.Fatal(err)
+	if strings.Contains(text, "ca.key") {
+		t.Fatal("compose must not mount the private CA key")
 	}
-	digest := strings.TrimSpace(string(pin))
-	if !strings.Contains(digest, "@sha256:") {
-		t.Fatalf("dirsrv.digest is not a digest pin: %s", digest)
+
+	pin := strings.TrimSpace(string(read(t, filepath.Join(root, "deploy", "docker", "dirsrv.digest"))))
+	if !strings.Contains(pin, "@sha256:") {
+		t.Fatalf("dirsrv.digest is not a digest pin: %s", pin)
 	}
 
 	var doc struct {
 		Services map[string]map[string]any `yaml:"services"`
+		Volumes  map[string]any            `yaml:"volumes"`
+		Networks map[string]any            `yaml:"networks"`
 	}
 	if err := yaml.Unmarshal(raw, &doc); err != nil {
 		t.Fatal(err)
@@ -43,18 +41,16 @@ func TestDevComposeTopology(t *testing.T) {
 			t.Fatalf("missing service %s", name)
 		}
 	}
+	if _, ok := doc.Networks["lab"]; !ok {
+		t.Fatal("missing lab network")
+	}
+	if _, ok := doc.Volumes["directory-data"]; !ok {
+		t.Fatal("missing directory-data volume")
+	}
 
 	dir := doc.Services["directory"]
-	df, err := os.ReadFile(filepath.Join(root, "deploy", "docker", "Dockerfile.bootstrap"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(string(df), "ARG DIRSRV_IMAGE="+digest) {
-		t.Fatalf("Dockerfile.bootstrap default DIRSRV_IMAGE must match dirsrv.digest %s", digest)
-	}
-
-	if img, _ := dir["image"].(string); img != digest {
-		t.Fatalf("directory image %q, want pinned %q", img, digest)
+	if img, _ := dir["image"].(string); img != pin {
+		t.Fatalf("directory image %q, want pinned %q", img, pin)
 	}
 	if _, ok := dir["env_file"]; !ok {
 		t.Fatal("directory must use env_file (KD-R20)")
@@ -63,6 +59,10 @@ func TestDevComposeTopology(t *testing.T) {
 		if _, ok := env["DS_DM_PASSWORD"]; ok {
 			t.Fatal("directory must not inline DS_DM_PASSWORD")
 		}
+	}
+	ports := flatten(dir["ports"])
+	if !containsExact(ports, "127.0.0.1:3389:3389") || !containsExact(ports, "127.0.0.1:3636:3636") {
+		t.Fatalf("directory host ports must be loopback: %v", ports)
 	}
 
 	boot := doc.Services["bootstrap"]
@@ -80,18 +80,33 @@ func TestDevComposeTopology(t *testing.T) {
 	}
 
 	ctl := doc.Services["control"]
-	if img, _ := ctl["image"].(string); img != "labldap-control:placeholder" {
+	if img, _ := ctl["image"].(string); img != "labldap-control:dev" {
 		t.Fatalf("control image = %q", img)
 	}
 	assertDepends(t, ctl, "bootstrap", "service_completed_successfully")
-	env, _ := ctl["environment"].(map[string]any)
-	if env["LABLDAP_LISTEN"] != "0.0.0.0:8443" {
-		t.Fatalf("LABLDAP_LISTEN = %v (in-container bind must be 0.0.0.0 so host DNAT works)", env["LABLDAP_LISTEN"])
+	if ctl["read_only"] != true {
+		t.Fatal("control must be read_only")
 	}
+	if ctl["user"] != "65532:65532" {
+		t.Fatalf("control user = %v", ctl["user"])
+	}
+	caps := flatten(ctl["cap_drop"])
+	if !containsExact(caps, "ALL") {
+		t.Fatalf("control cap_drop = %v", caps)
+	}
+	sec := flatten(ctl["security_opt"])
+	if !containsExact(sec, "no-new-privileges:true") {
+		t.Fatalf("control security_opt = %v", sec)
+	}
+	tmp := flatten(ctl["tmpfs"])
+	if !strings.Contains(strings.Join(tmp, " "), "/tmp") {
+		t.Fatalf("control must tmpfs /tmp: %v", tmp)
+	}
+	env, _ := ctl["environment"].(map[string]any)
 	if _, ok := env["DS_DM_PASSWORD"]; ok {
 		t.Fatal("control must not receive DS_DM_PASSWORD")
 	}
-	ports := flatten(ctl["ports"])
+	ports = flatten(ctl["ports"])
 	if !containsExact(ports, "127.0.0.1:8443:8443") {
 		t.Fatalf("control host publish must be 127.0.0.1:8443:8443, got %v", ports)
 	}
@@ -99,6 +114,86 @@ func TestDevComposeTopology(t *testing.T) {
 	test := flatten(hc["test"])
 	if !strings.Contains(strings.Join(test, " "), "/health") || strings.Contains(strings.Join(test, " "), "/health/ready") {
 		t.Fatalf("control healthcheck must be GET /health only: %v", test)
+	}
+	vols := flatten(ctl["volumes"])
+	for _, v := range vols {
+		if strings.Contains(v, "dm.pw") || strings.Contains(v, "directory.env") || strings.Contains(v, "ca.key") {
+			t.Fatalf("control must not mount DM or CA key: %s", v)
+		}
+		if strings.Contains(v, "docker.sock") {
+			t.Fatal("control must not mount docker.sock")
+		}
+	}
+}
+
+func TestEphemeralTmpfsVolumeOptions(t *testing.T) {
+	root := repoRoot(t)
+	raw := read(t, filepath.Join(root, "deploy", "compose", "compose.ephemeral.yaml"))
+	text := string(raw)
+	if !strings.Contains(text, "type: tmpfs") {
+		t.Fatal("ephemeral overlay must use a tmpfs-backed volume")
+	}
+	if !strings.Contains(text, "uid=389") || !strings.Contains(text, "gid=389") {
+		t.Fatal("tmpfs must set uid/gid 389 (dirsrv)")
+	}
+	if !strings.Contains(text, "mode=0750") {
+		t.Fatal("tmpfs must set mode=0750")
+	}
+	if !strings.Contains(text, "size=2147483648") {
+		t.Fatal("tmpfs must set a 2GiB size (512Mi is too small for 389 DS first-boot)")
+	}
+	if !strings.Contains(text, "host swap") && !strings.Contains(text, "Host swap") {
+		t.Fatal("ephemeral overlay must document the host-swap caveat")
+	}
+}
+
+func TestPersistentVolumeOverride(t *testing.T) {
+	root := repoRoot(t)
+	raw := read(t, filepath.Join(root, "deploy", "compose", "compose.persistent.yaml"))
+	text := string(raw)
+	if strings.Contains(text, "tmpfs") {
+		t.Fatal("persistent overlay must not use tmpfs")
+	}
+	if !strings.Contains(text, "directory-data") {
+		t.Fatal("persistent overlay must keep the named volume")
+	}
+	if !strings.Contains(text, "not exposed") && !strings.Contains(strings.ToLower(text), "not exposed") {
+		t.Fatal("persistent overlay must document that volume removal is not an API")
+	}
+}
+
+func TestComposeScenarioListensAllInterfaces(t *testing.T) {
+	root := repoRoot(t)
+	text := string(read(t, filepath.Join(root, "deploy", "compose", "scenario.yaml")))
+	if !strings.Contains(text, `listen: "0.0.0.0:8443"`) {
+		t.Fatal("compose scenario must listen on 0.0.0.0 inside the container")
+	}
+	if !strings.Contains(text, "/run/secrets/runtime-ldap") || !strings.Contains(text, "/run/secrets/token-admin") {
+		t.Fatal("compose scenario must use container secret paths")
+	}
+}
+
+func TestMakefileComposeResetIsReal(t *testing.T) {
+	root := repoRoot(t)
+	text := string(read(t, filepath.Join(root, "Makefile")))
+	if strings.Contains(text, "PENDING:compose-reset") {
+		t.Fatal("make compose-reset must no longer be pending")
+	}
+	if !strings.Contains(text, "down --remove-orphans -v") {
+		t.Fatal("compose-reset must remove volumes (operator hard reset)")
+	}
+	if !strings.Contains(text, "tools/setupsecrets") || !strings.Contains(text, "tools/setuptls") {
+		t.Fatal("compose-up must use the secret and TLS helpers")
+	}
+}
+
+func TestOpenAPIHasNoHardReset(t *testing.T) {
+	root := repoRoot(t)
+	text := string(read(t, filepath.Join(root, "api", "openapi.yaml")))
+	for _, banned := range []string{"compose-reset", "volume-remove", "/hard-reset", "docker.sock"} {
+		if strings.Contains(text, banned) {
+			t.Fatalf("OpenAPI must not expose %q", banned)
+		}
 	}
 }
 
@@ -143,6 +238,15 @@ func flatten(v any) []string {
 	default:
 		return nil
 	}
+}
+
+func read(t *testing.T, path string) []byte {
+	t.Helper()
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return b
 }
 
 func repoRoot(t *testing.T) string {
