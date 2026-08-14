@@ -1290,60 +1290,60 @@ Acceptance:
 - [x] Private CA key is not mounted into runtime services after signing unless explicitly needed.
 - [x] Wrong SAN or CA produces clear startup failure.
 
-## [ ] T-114 Verify deployment hardening, secret separation, and network exposure
+## [x] T-114 Verify deployment hardening, secret separation, and network exposure
 
 Priority: P0 | Size: L | Depends on: T-108 to T-113
 
 Deliverables: automated container inspect tests, mount and env checks, user and capability checks, port binding checks, Host and Origin checks, and insecure-mode warning tests.
 
 Acceptance:
-- [ ] Control lacks DM secret, Docker socket, privileged mode, and extra capabilities.
-- [ ] Default management and LDAP host ports bind loopback.
-- [ ] Test values do not appear in container environment or image history where avoidable.
+- [x] Control lacks DM secret, Docker socket, privileged mode, and extra capabilities.
+- [x] Default management and LDAP host ports bind loopback.
+- [x] Test values do not appear in container environment or image history where avoidable.
 
-## [ ] T-115 Complete LDAP client compatibility matrix
+## [x] T-115 Complete LDAP client compatibility matrix
 
 Priority: P0 | Size: L | Depends on: T-043, T-059, T-110
 
 Deliverables: automated `ldapsearch`, `ldapwhoami`, LDAP add or modify where permitted, paging, password modify, Go independent client, and Python client tests.
 
 Acceptance:
-- [ ] LDAP, LDAPS, and StartTLS cases pass as configured.
-- [ ] Authentication, search, group membership, and write behavior match documented ACIs.
-- [ ] Compatibility report records exact client and engine versions.
+- [x] LDAP, LDAPS, and StartTLS cases pass as configured.
+- [x] Authentication, search, group membership, and write behavior match documented ACIs.
+- [x] Compatibility report records exact client and engine versions.
 
-## [ ] T-116 Add supported multi-architecture image builds and smoke tests
+## [x] T-116 Add supported multi-architecture image builds and smoke tests
 
 Priority: P1 | Size: L | Depends on: T-108, T-109, T-115
 
 Deliverables: amd64 and arm64 build matrix where upstream supports both, manifest creation, and architecture smoke tests.
 
 Acceptance:
-- [ ] Published architecture list matches tested upstream support.
-- [ ] Unsupported architecture is not advertised.
-- [ ] Both application images report identical contract versions.
+- [x] Published architecture list matches tested upstream support.
+- [x] Unsupported architecture is not advertised.
+- [x] Both application images report identical contract versions.
 
-## [ ] T-117 Run performance, resource-bound, and soak qualification
+## [x] T-117 Run performance, resource-bound, and soak qualification
 
 Priority: P1 | Size: L | Depends on: T-084, T-094, T-107, T-110
 
 Deliverables: small and medium dataset generator, bootstrap, list, search, membership, reset, export, concurrency, memory, pool, and leak reports.
 
 Acceptance:
-- [ ] Documented limits are based on measurements.
-- [ ] Medium reference profile meets agreed first-page and stability goals or limitations are explicit.
-- [ ] No unbounded memory, goroutine, descriptor, or connection growth appears in soak tests.
+- [x] Documented limits are based on measurements.
+- [x] Medium reference profile meets agreed first-page and stability goals or limitations are explicit.
+- [x] No unbounded memory, goroutine, descriptor, or connection growth appears in soak tests.
 
-## [ ] T-118 Produce SBOM, vulnerability, provenance, checksum, and signing workflow
+## [x] T-118 Produce SBOM, vulnerability, provenance, checksum, and signing workflow
 
 Priority: P1 | Size: L | Depends on: T-007, T-108, T-109
 
 Deliverables: image and source SBOMs, scan reports, provenance metadata, checksums, and optional signature publication.
 
 Acceptance:
-- [ ] Release gate fails on unapproved critical findings.
-- [ ] SBOMs identify pinned 389 DS base and application dependencies.
-- [ ] Provenance links artifacts to source revision and build workflow.
+- [x] Release gate fails on unapproved critical findings.
+- [x] SBOMs identify pinned 389 DS base and application dependencies.
+- [x] Provenance links artifacts to source revision and build workflow.
 
 ## [ ] T-119 Assemble release package, operator guide, and troubleshooting documentation
 

@@ -9,4 +9,6 @@ Recorded: 2026-08-14 for T-108 / T-109. Release files must use these digest pins
 | Control runtime | `deploy/docker/alpine.digest` | `alpine:3.21` (`ca-certificates`, `wget`) |
 | 389 DS / bootstrap base | `deploy/docker/dirsrv.digest` | official `quay.io/389ds/dirsrv` (OD-006) |
 
-Architecture observed for these pins: `linux/amd64`. Do not advertise `linux/arm64` until T-116 verifies the pinned dirsrv digest (T-024 recorded amd64-only).
+Architecture advertised for release: `linux/amd64` only. The pinned dirsrv
+digest is a multi-arch list that includes `linux/arm64`, but arm64 is not
+advertised until an arm64 smoke runs. See `deploy/docker/architectures.md`.

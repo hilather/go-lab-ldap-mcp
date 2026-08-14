@@ -45,6 +45,43 @@ func TestWildcardCredentialedCORSRejected(t *testing.T) {
 	}
 }
 
+func TestHostAllowListRejectsSpoof(t *testing.T) {
+	t.Parallel()
+	s := testServer(t, nil)
+	s.allowedHosts = []string{"127.0.0.1:8443"}
+	h := s.Handler()
+
+	ok := httptest.NewRequest(http.MethodGet, "http://127.0.0.1:8443/health", nil)
+	ok.Host = "127.0.0.1:8443"
+	or := httptest.NewRecorder()
+	h.ServeHTTP(or, ok)
+	if or.Code != http.StatusOK {
+		t.Fatalf("loopback host = %d %s", or.Code, or.Body.String())
+	}
+
+	bad := httptest.NewRequest(http.MethodGet, "http://evil.test/health", nil)
+	bad.Host = "evil.test"
+	br := httptest.NewRecorder()
+	h.ServeHTTP(br, bad)
+	if br.Code != http.StatusBadRequest {
+		t.Fatalf("spoofed host = %d %s", br.Code, br.Body.String())
+	}
+}
+
+func TestOriginPolicyRejectsCrossSitePreflight(t *testing.T) {
+	t.Parallel()
+	s := testServer(t, nil)
+	h := s.Handler()
+	req := httptest.NewRequest(http.MethodOptions, "http://127.0.0.1:8443/api/v1/users", nil)
+	req.Host = "127.0.0.1:8443"
+	req.Header.Set("Origin", "https://evil.test")
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, req)
+	if rr.Code != http.StatusForbidden {
+		t.Fatalf("cross-origin preflight = %d", rr.Code)
+	}
+}
+
 func TestLivenessDuringLDAPOutage(t *testing.T) {
 	t.Parallel()
 	s := testServer(t, func() bool { return false })

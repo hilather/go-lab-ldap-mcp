@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/hilather/go-lab-ldap-mcp/internal/directory"
@@ -91,5 +93,36 @@ func TestServeWiresCompiledRateLimits(t *testing.T) {
 	}
 	if opt.Limiter.Allow("bind:actor:admin") {
 		t.Fatal("compiled bind-test budget not enforced")
+	}
+}
+
+func TestWarnInsecureLab(t *testing.T) {
+	var buf strings.Builder
+	log := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelWarn}))
+	warnInsecureLab(log, false)
+	if buf.Len() != 0 {
+		t.Fatalf("unexpected warning: %s", buf.String())
+	}
+	warnInsecureLab(log, true)
+	if !strings.Contains(buf.String(), "insecureLabMode") {
+		t.Fatalf("missing warning: %s", buf.String())
+	}
+}
+
+func TestLoopbackListenWiresHostAllowList(t *testing.T) {
+	path := filepath.Join("..", "..", "config", "examples", "example-lab.yaml")
+	built, err := compileControl(context.Background(), path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	opt, closer, err := serverOptionsFromCompiled(built, serveFlags{ldapURL: "ldaps://127.0.0.1:1", caFile: "/tmp/ca.pem"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if closer != nil {
+		t.Cleanup(closer)
+	}
+	if len(opt.AllowedHosts) == 0 {
+		t.Fatal("example-lab listens on 127.0.0.1 and must set Host allow-list")
 	}
 }

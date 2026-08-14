@@ -9,7 +9,7 @@ Decision: OD-006 / T-024
 | --- | --- |
 | Reference | `quay.io/389ds/dirsrv@sha256:f2851654c5df545cd893d84bea8d08c28dc25f0930493fbfed1d8a6eacf657f7` |
 | Discovery tag (not for release files) | `quay.io/389ds/dirsrv:latest` pulled 2026-08-12 |
-| Architecture observed | `linux/amd64` |
+| Architecture observed | digest is a multi-arch list (`linux/amd64`, `linux/arm64`, `linux/ppc64le`, `linux/s390x`). **Advertised:** `linux/amd64` only (T-116). |
 | Package | `389-ds-base-2.4.6-1.fc39.x86_64` |
 | ns-slapd | `389-Directory/2.4.6 B2024.212.0000` |
 | Label `version` | `39` (Fedora 39 container) |

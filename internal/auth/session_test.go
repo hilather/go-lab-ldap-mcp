@@ -175,3 +175,26 @@ func TestOriginAllowedSameOrigin(t *testing.T) {
 		t.Fatal("allow-list rejected")
 	}
 }
+
+func TestHostAllowedAndLoopback(t *testing.T) {
+	t.Parallel()
+	if !HostAllowed("evil.test", nil) {
+		t.Fatal("empty allow-list must accept any Host")
+	}
+	if HostAllowed("evil.test:8443", []string{"127.0.0.1:8443"}) {
+		t.Fatal("spoofed Host accepted")
+	}
+	if HostAllowed("", []string{"127.0.0.1:8443"}) {
+		t.Fatal("empty Host accepted")
+	}
+	if !HostAllowed("127.0.0.1:8443", []string{"127.0.0.1:8443", "localhost:8443"}) {
+		t.Fatal("loopback Host rejected")
+	}
+	got := LoopbackHosts("127.0.0.1:8443")
+	if len(got) == 0 || !HostAllowed("localhost:8443", got) {
+		t.Fatalf("loopback hosts = %v", got)
+	}
+	if LoopbackHosts("0.0.0.0:8443") != nil {
+		t.Fatal("wildcard listen must not restrict Host")
+	}
+}

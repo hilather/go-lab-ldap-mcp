@@ -20,7 +20,27 @@ Do not commit Directory Manager passwords, API tokens, or session material. Lab 
 
 The first release is privately owned (OD-003). Do not add dependencies whose license is AGPL-3.0, SSPL, or another copyleft network-use license. Allowed: MIT, BSD, Apache-2.0, ISC, MPL-2.0, Unlicense, and the Go standard library.
 
-## Container scanning
+## Container scanning and SBOM (T-118)
 
-Image scans / SBOM land with T-118. `make image` builds the hardened
-`labldap-control:dev` image (T-108) from pinned builder digests.
+`make sbom` writes a CycloneDX source SBOM to `dist/sbom/source.cdx.json`.
+It names the pinned 389 DS digest (`deploy/docker/dirsrv.digest`) and the
+Go / frontend module graph. When `syft` is on PATH, operators may also
+run `syft labldap-control:dev -o cyclonedx-json` for an image SBOM; that
+step is optional and not required for `make verify`.
+
+`make scan` (`tools/imagescan`) fails the release gate on unapproved
+**critical** findings:
+
+- `govulncheck` (same pin as `make test-security`)
+- `grype` against `labldap-control:dev` and `labldap-bootstrap:dev` when
+  both the tool and the local images exist
+
+`make checksums` writes `dist/release/provenance.json` (source revision +
+image IDs + workflow path) and `dist/release/SHA256SUMS`. Signing
+(`cosign`) is optional and is not performed here (OD-004: do not push).
+
+## Approved exceptions
+
+| ID | Reason | Expires |
+| --- | --- | --- |
+| *(none)* | — | — |

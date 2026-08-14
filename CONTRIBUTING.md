@@ -21,7 +21,7 @@ Toolchain pins are in [docs/toolchain.md](https://github.com/hilather/go-lab-lda
 make verify
 ```
 
-`make verify` is the release gate. It runs `format`, `lint`, `generate`, `generate-drift`, `test-unit`, and `test-security`.
+`make verify` is the release gate. It runs `format`, `lint`, `generate`, `generate-drift`, `test-unit`, `test-security`, `sbom`, `checksums`, and `archcheck`.
 
 Other stable targets: `make test-integration` (real 389 DS harness; needs Docker), `make test-e2e`, `make image-bootstrap`, `make image` (hardened `labldap-control:dev`), `make frontend-build`, `make compose-up` / `compose-up-persistent` / `compose-down` / `compose-reset`.
 

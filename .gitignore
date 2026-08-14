@@ -41,3 +41,6 @@ test/e2e/playwright/.cache/
 # Compose / container local state
 .compose-data/
 *.log
+
+# Generated release evidence (T-118)
+/dist/

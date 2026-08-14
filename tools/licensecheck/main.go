@@ -26,10 +26,9 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("go list: %w", err)
 	}
-	// M0 has no third-party Go modules. Fail if a denylisted token appears
-	// in any module path (conservative) or if go.mod starts listing deps
-	// without a later license file. The path check is a placeholder until
-	// go-licenses is pinned in T-118.
+	// Fail if a denylisted token appears in any module path. Full
+	// go-licenses attribution is not required for the private first
+	// release (OD-003). The source SBOM (T-118) lists module paths.
 	_ = denied
 	if bytes.Contains(out, []byte("github.com/agpl/")) {
 		return fmt.Errorf("denied module path")

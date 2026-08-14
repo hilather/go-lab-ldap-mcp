@@ -48,6 +48,7 @@ type Options struct {
 	Ready           func() bool
 	Logger          *slog.Logger
 	AllowedOrigins  []string
+	AllowedHosts    []string
 	MaxBody         int64
 	ForceSecure     bool
 	MetricsAuth     bool
@@ -77,6 +78,7 @@ type Server struct {
 	ready           func() bool
 	log             *slog.Logger
 	allowedOrigins  []string
+	allowedHosts    []string
 	maxBody         int64
 	forceSecure     bool
 	metricsAuth     bool
@@ -144,6 +146,7 @@ func New(opt Options) (*Server, error) {
 		ready:           ready,
 		log:             log,
 		allowedOrigins:  append([]string(nil), opt.AllowedOrigins...),
+		allowedHosts:    append([]string(nil), opt.AllowedHosts...),
 		maxBody:         maxBody,
 		forceSecure:     opt.ForceSecure,
 		metricsAuth:     opt.MetricsAuth,
@@ -215,6 +218,7 @@ func (s *Server) Handler() http.Handler {
 	var h http.Handler = mux
 	h = s.authMiddleware(h)
 	h = s.corsMiddleware(h)
+	h = s.hostMiddleware(h)
 	h = s.securityHeaders(h)
 	h = s.bodyLimit(h)
 	h = s.metricsMiddleware(h)

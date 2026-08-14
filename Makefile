@@ -29,8 +29,9 @@ IMAGE_BUILD_ARGS := --build-arg VERSION=$(VERSION) --build-arg REVISION=$(REVISI
 .PHONY: help format lint generate generate-drift test test-unit \
 	test-integration test-e2e test-security compose-up compose-down \
 	compose-up-persistent compose-reset compose-secrets compose-preflight \
-	setup-tls image image-bootstrap \
-	image-control-placeholder verify frontend-install frontend-build
+	setup-tls image image-bootstrap image-multiarch \
+	image-control-placeholder verify frontend-install frontend-build \
+	sbom scan checksums archcheck dataset
 
 help:
 	@printf '%s\n' \
@@ -50,7 +51,12 @@ help:
 		'  compose-reset      operator hard reset: down -v then compose-up (not REST/MCP)' \
 		'  image-bootstrap    build labldap-bootstrap:dev (pinned 389 DS)' \
 		'  image              build labldap-control:dev (hardened; matching version)' \
-		'  verify             format lint generate generate-drift test-unit test-security'
+		'  image-multiarch    build advertised platforms only (see deploy/docker/architectures.md)' \
+		'  sbom               write source CycloneDX SBOM to dist/sbom/' \
+		'  scan               govulncheck + optional grype; fail on unapproved criticals' \
+		'  checksums          provenance.json + SHA256SUMS in dist/release/' \
+		'  archcheck          compare advertised arches to the pinned dirsrv digest' \
+		'  verify             format lint generate generate-drift test-unit test-security sbom checksums archcheck'
 
 format:
 	$(GO) fmt ./...
@@ -188,5 +194,53 @@ frontend-install:
 frontend-build: frontend-install
 	cd frontend && $(PNPM) build
 
-verify: format lint generate generate-drift test-unit test-security
+LABLDAP_PLATFORMS ?= linux/amd64
+
+image-multiarch: archcheck
+	@printf '%s\n' "image-multiarch: platforms=$(LABLDAP_PLATFORMS) (advertised list only; see deploy/docker/architectures.md)"
+	docker buildx build \
+		-f deploy/docker/Dockerfile.control \
+		--platform $(LABLDAP_PLATFORMS) \
+		--build-arg GO_IMAGE=$(GO_IMAGE) \
+		--build-arg NODE_IMAGE=$(NODE_IMAGE) \
+		--build-arg ALPINE_IMAGE=$(ALPINE_IMAGE) \
+		$(IMAGE_BUILD_ARGS) \
+		-t labldap-control:dev \
+		--load \
+		.
+	docker buildx build \
+		-f deploy/docker/Dockerfile.bootstrap \
+		--platform $(LABLDAP_PLATFORMS) \
+		--build-arg DIRSRV_IMAGE=$(DIRSRV_IMAGE) \
+		--build-arg GO_IMAGE=$(GO_IMAGE) \
+		$(IMAGE_BUILD_ARGS) \
+		-t labldap-bootstrap:dev \
+		--load \
+		.
+	@cver=$$(docker run --rm labldap-control:dev version); \
+	bver=$$(docker run --rm labldap-bootstrap:dev version); \
+	cfield=$$(printf '%s\n' "$$cver" | sed -n 's/.*version=//p' | awk '{print $$1}'); \
+	bfield=$$(printf '%s\n' "$$bver" | sed -n 's/.*version=//p' | awk '{print $$1}'); \
+	if [ "$$cfield" != "$$bfield" ]; then \
+		printf '%s\n' "image-multiarch: version mismatch control=$$cfield bootstrap=$$bfield"; \
+		exit 1; \
+	fi
+	@printf '%s\n' "image-multiarch: control and bootstrap version=$$cfield"
+
+sbom:
+	$(GO) run ./tools/sbom dist/sbom/source.cdx.json
+
+scan:
+	$(GO) run ./tools/imagescan
+
+checksums:
+	$(GO) run ./tools/releasecheck dist/release
+
+archcheck:
+	$(GO) run ./tools/archcheck
+
+dataset:
+	$(GO) run ./tools/dataset --users 50 --groups 5 --out dist/dataset/small.yaml
+
+verify: format lint generate generate-drift test-unit test-security sbom checksums archcheck
 	@printf '%s\n' 'verify: ok'

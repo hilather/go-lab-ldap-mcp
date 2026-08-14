@@ -1,0 +1,6 @@
+# Observed platforms for deploy/docker/dirsrv.digest
+# Recorded 2026-08-14 via `docker manifest inspect`.
+linux/amd64
+linux/arm64
+linux/ppc64le
+linux/s390x

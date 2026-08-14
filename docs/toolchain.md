@@ -18,6 +18,7 @@ Recorded 2026-08-12 against the LabLDAP design baseline.
 | OpenAPI Go generator | oapi-codegen (OD-009) | `v2.8.0` | `Makefile` `OAPI_CODEGEN_MOD`; models only |
 | OpenAPI TypeScript types | openapi-typescript (OD-009) | `7.13.0` | `Makefile` `OPENAPI_TS_PKG` |
 | Playwright | product acceptance (T-107) | `@playwright/test@1.62.1`, `@axe-core/playwright@4.10.2` | `test/e2e/package.json` |
+| govulncheck | reachable vulns (T-007 / T-118) | `golang.org/x/vuln/cmd/govulncheck@v1.1.4` | `Makefile` `GOVULNCHECK_MOD` |
 
 No deviation from the Go or Node baseline. Frontend scaffold (T-095): React 19.2.8, Vite 8.2.1, TanStack Query 5.101.4, React Router 8.3.0, React Hook Form 7.85.0, Zod 4.4.3, openapi-fetch 0.17.0. `pnpm install --frozen-lockfile && pnpm build` must succeed from the committed lockfile.
 

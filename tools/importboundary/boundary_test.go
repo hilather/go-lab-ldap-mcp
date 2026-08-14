@@ -241,6 +241,9 @@ func TestKDR8LDAPClientImportEdges(t *testing.T) {
 
 func forbiddenGoLDAP(rel string, imps []string) bool {
 	switch {
+	case strings.HasPrefix(rel, "test/"):
+		// Independent compatibility clients (T-115) and engine tests may use go-ldap.
+		return false
 	case rel == "internal/directory/ds389" || strings.HasPrefix(rel, "internal/directory/ds389/"):
 		return false
 	case rel == "internal/directory/ldapclient" || strings.HasPrefix(rel, "internal/directory/ldapclient/"):

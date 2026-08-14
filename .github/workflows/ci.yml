@@ -1,7 +1,7 @@
 # LabLDAP continuous integration (T-004, T-007 wiring).
 #
 # Required PR gate: static, unit, frontend, security, integration.
-# image-bootstrap is required. make image stays PENDING:control-image until T-108.
+# image-bootstrap and make image are required. SBOM/provenance is the sbom job.
 #
 # Caches are only the Go module/build cache and the pnpm store.
 # Do not add cache paths that include /secrets, .env, or credential files.
@@ -206,5 +206,42 @@ jobs:
       - name: Bootstrap image
         run: make image-bootstrap
 
-      - name: Control image remains pending
+      - name: Control image
         run: make image
+
+  sbom:
+    name: sbom
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+          cache-dependency-path: go.mod
+
+      - name: Source SBOM, provenance, architecture check
+        run: |
+          set -euo pipefail
+          make sbom
+          make checksums
+          make archcheck
+
+      - name: Upload SBOM and checksums
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-and-checksums
+          path: |
+            dist/sbom/source.cdx.json
+            dist/release/provenance.json
+            dist/release/SHA256SUMS
+          if-no-files-found: warn
+          retention-days: 30
+          include-hidden-files: false

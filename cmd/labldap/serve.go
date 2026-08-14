@@ -268,12 +268,14 @@ func serverOptionsFromCompiled(c *config.Compiled, flags serveFlags, log *slog.L
 			return gate != nil && gate.InProgress()
 		})
 	}
+	warnInsecureLab(log, c.Public.Spec.Transport.InsecureLabMode)
 	opt := api.Options{
 		Registry:        reg,
 		Sessions:        auth.NewStore(sessCfg),
 		Ready:           ready,
 		Logger:          log,
 		AllowedOrigins:  append([]string(nil), c.Public.Spec.Management.CORS.AllowedOrigins...),
+		AllowedHosts:    auth.LoopbackHosts(c.Public.Spec.Management.Listen),
 		MaxBody:         c.Public.Spec.Limits.MaxRequestBodyBytes,
 		ForceSecure:     false, // cookie Secure follows r.TLS until serve terminates TLS (OD-014)
 		MetricsAuth:     c.Public.Spec.Management.Metrics.RequireAuth,
@@ -319,6 +321,19 @@ func runtimeConfigFromCompiled(c *config.Compiled) ds389.RuntimeConfig {
 		ExportMaxEntries: c.Public.Spec.Limits.ExportMaxEntries,
 		ExportMaxBytes:   c.Public.Spec.Limits.ExportMaxBytes,
 	}
+}
+
+const insecureLabWarning = "insecureLabMode is enabled: cleartext LDAP bind and skipped TLS verification are allowed; this is a lab-only setting"
+
+func warnInsecureLab(log *slog.Logger, insecure bool) {
+	if !insecure {
+		return
+	}
+	if log != nil {
+		log.Warn(insecureLabWarning)
+		return
+	}
+	fmt.Fprintln(os.Stderr, insecureLabWarning)
 }
 
 const serveUsage = `Usage:

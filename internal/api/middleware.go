@@ -58,6 +58,16 @@ func (s *Server) securityHeaders(next http.Handler) http.Handler {
 	})
 }
 
+func (s *Server) hostMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !auth.HostAllowed(r.Host, s.allowedHosts) {
+			writeProblemStatus(w, r, http.StatusBadRequest, "invalid_host", "host is not allowed", nil)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 func (s *Server) corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origin := auth.RequestOrigin(r)

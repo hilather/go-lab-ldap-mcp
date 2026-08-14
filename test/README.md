@@ -5,7 +5,8 @@
 - `composecontract/` — T-110/T-111 Compose file contract (no Docker)
 - `imagecontract/` — T-108 / T-109 Dockerfile pin and hardening contract (no Docker)
 - `e2e/` — Playwright product acceptance (T-107). `make test-e2e` runs against a contract mock unless `LABLDAP_E2E_BASE_URL` is set.
-- `compatibility/` — LDAP client matrix (T-115)
+- `compatibility/` — LDAP client matrix report + independent Go client (T-115)
+- `inspect/` — Compose/image hardening contract (T-114; live inspect is `test/integration/compose`)
 - `fixtures/` — configuration and golden files (M1)
 
 Mocks must not replace the real 389 DS integration suite for engine behavior.
