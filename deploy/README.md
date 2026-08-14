@@ -26,6 +26,7 @@ if they are missing (KD-R20). The directory service uses the env_file;
 bootstrap uses `--directory-manager-password-file`; control never receives
 Directory Manager.
 
-Placeholder control listens on `LABLDAP_LISTEN` (`127.0.0.1:8443` in Compose).
+Placeholder control binds `0.0.0.0:8443` inside the container so Docker can
+forward to eth0. The host publish is loopback-only (`127.0.0.1:8443:8443`).
 `GET /health` is liveness. `GET /health/ready` returns 503. `make compose-reset`
 stays pending until T-110.

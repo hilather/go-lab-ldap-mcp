@@ -57,7 +57,9 @@ services:
       bootstrap:
         condition: service_completed_successfully
     environment:
-      LABLDAP_LISTEN: 127.0.0.1:8443
+      # Bind all container interfaces so Docker DNAT to eth0 works.
+      # Host publish stays loopback-only (KD-R19 host-facing address).
+      LABLDAP_LISTEN: 0.0.0.0:8443
     ports:
       - "127.0.0.1:8443:8443"
     healthcheck:

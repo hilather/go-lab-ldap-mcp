@@ -45,6 +45,14 @@ func TestDevComposeTopology(t *testing.T) {
 	}
 
 	dir := doc.Services["directory"]
+	df, err := os.ReadFile(filepath.Join(root, "deploy", "docker", "Dockerfile.bootstrap"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(df), "ARG DIRSRV_IMAGE="+digest) {
+		t.Fatalf("Dockerfile.bootstrap default DIRSRV_IMAGE must match dirsrv.digest %s", digest)
+	}
+
 	if img, _ := dir["image"].(string); img != digest {
 		t.Fatalf("directory image %q, want pinned %q", img, digest)
 	}
@@ -77,11 +85,15 @@ func TestDevComposeTopology(t *testing.T) {
 	}
 	assertDepends(t, ctl, "bootstrap", "service_completed_successfully")
 	env, _ := ctl["environment"].(map[string]any)
-	if env["LABLDAP_LISTEN"] != "127.0.0.1:8443" {
-		t.Fatalf("LABLDAP_LISTEN = %v", env["LABLDAP_LISTEN"])
+	if env["LABLDAP_LISTEN"] != "0.0.0.0:8443" {
+		t.Fatalf("LABLDAP_LISTEN = %v (in-container bind must be 0.0.0.0 so host DNAT works)", env["LABLDAP_LISTEN"])
 	}
 	if _, ok := env["DS_DM_PASSWORD"]; ok {
 		t.Fatal("control must not receive DS_DM_PASSWORD")
+	}
+	ports := flatten(ctl["ports"])
+	if !containsExact(ports, "127.0.0.1:8443:8443") {
+		t.Fatalf("control host publish must be 127.0.0.1:8443:8443, got %v", ports)
 	}
 	hc, _ := ctl["healthcheck"].(map[string]any)
 	test := flatten(hc["test"])
@@ -107,6 +119,15 @@ func assertDepends(t *testing.T, svc map[string]any, peer, cond string) {
 	if peerSpec["condition"] != cond {
 		t.Fatalf("depends_on.%s.condition = %v, want %s", peer, peerSpec["condition"], cond)
 	}
+}
+
+func containsExact(got []string, want string) bool {
+	for _, s := range got {
+		if s == want {
+			return true
+		}
+	}
+	return false
 }
 
 func flatten(v any) []string {
