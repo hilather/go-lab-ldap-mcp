@@ -6,6 +6,7 @@ import { isApiError } from "../api/problem";
 import type { AuditEvent } from "../api/types";
 import { useSession } from "../auth/SessionGate";
 import { queryKeys } from "../lib/query";
+import { safeAuditField } from "../lib/ops-model";
 import {
   dashboardMode,
   hasScope,
@@ -265,8 +266,8 @@ function AuditList({ events }: { events: AuditEvent[] }) {
           <tr key={`${event.time}-${event.action}-${event.requestId}`}>
             <td>{event.time}</td>
             <td>{event.action}</td>
-            <td>{event.actor}</td>
-            <td>{event.target}</td>
+            <td>{safeAuditField(event.actor)}</td>
+            <td>{safeAuditField(event.target)}</td>
             <td>{event.result}</td>
           </tr>
         ))}

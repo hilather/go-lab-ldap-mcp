@@ -49,6 +49,11 @@ test("audit actor and target drop secret-looking values", () => {
   assert.equal(safeAuditField("Bearer lab-admin-token-value"), "[redacted]");
   assert.equal(safeAuditField("password=super-secret-value"), "[redacted]");
   assert.equal(looksSecret("Cookie=labldap_session=abc"), true);
+  assert.equal(looksSecret("Cookie: labldap_session=abc"), true);
+  assert.equal(looksSecret("Authorization: Bearer abc"), true);
+  assert.equal(looksSecret("password=secret12"), true);
+  assert.equal(looksSecret("e2e-admin-token"), true);
+  assert.equal(looksSecret("directory:read"), false);
   assert.deepEqual(auditQuery({ pageSize: 25, action: "reset", actor: " token:admin ", cursor: "" }), {
     pageSize: 25,
     action: "reset",

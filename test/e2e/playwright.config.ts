@@ -16,7 +16,11 @@ export default defineConfig({
   use: {
     baseURL,
     screenshot: "only-on-failure",
-    trace: "retain-on-failure",
+    // Action log is retained for failures; page snapshots/screenshots inside
+    // the zip are off so filled password fields are not stored as pixels.
+    // fill() values and POST bodies still land in trace JSON and are scrubbed
+    // from the zip by helpers/redact.mjs in global teardown.
+    trace: { mode: "retain-on-failure", snapshots: false, screenshots: false, sources: false },
     video: "off",
     extraHTTPHeaders: { "X-Request-ID": "e2e" },
   },

@@ -19,7 +19,7 @@ export function ResetPage() {
   const [revision, setRevision] = useState("");
   const [notice, setNotice] = useState<string | undefined>();
   const [submitting, setSubmitting] = useState(false);
-  const started = useRef(false);
+  const wasInProgress = useRef(false);
   const baseline = useQuery({
     queryKey: queryKeys.directory.baseline,
     queryFn: getBaseline,
@@ -44,10 +44,12 @@ export function ResetPage() {
 
   useEffect(() => {
     const state = resetQuery.data?.state;
-    if (!started.current || isResetInProgress(state)) {
+    const now = isResetInProgress(state);
+    const ended = wasInProgress.current && !now;
+    wasInProgress.current = now;
+    if (!ended) {
       return;
     }
-    started.current = false;
     void invalidateAfterReset(queryClient);
     if (state === "Ready") {
       setNotice("Reset completed. Baseline, users, groups, capabilities, and audit were refreshed.");
@@ -88,10 +90,16 @@ export function ResetPage() {
             setNotice(undefined);
             try {
               const status = await startReset({ name: name.trim(), expectedRevision: revision.trim() });
-              started.current = isResetInProgress(status.state) || status.state === "Ready";
               queryClient.setQueryData(queryKeys.directory.reset, status);
-              if (!isResetInProgress(status.state)) {
-                started.current = true;
+              if (isResetInProgress(status.state)) {
+                wasInProgress.current = true;
+              } else {
+                await invalidateAfterReset(queryClient);
+                if (status.state === "Failed") {
+                  setNotice(status.error || "Reset failed. See diagnostics for recovery.");
+                } else {
+                  setNotice("Reset completed. Baseline, users, groups, capabilities, and audit were refreshed.");
+                }
               }
               await resetQuery.refetch();
             } catch (err) {

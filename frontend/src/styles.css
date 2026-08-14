@@ -359,15 +359,15 @@ caption {
   background: #fff;
 }
 
-.schema-browser li button {
+.schema-browser li[role="option"] {
   width: 100%;
   text-align: left;
-  border: 0;
-  background: transparent;
+  padding: 0.35rem 0.55rem;
+  cursor: pointer;
 }
 
 .schema-browser li.is-active,
-.schema-browser li[aria-selected="true"] button {
+.schema-browser li[aria-selected="true"] {
   background: #e8eef8;
 }
 

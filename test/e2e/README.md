@@ -30,6 +30,13 @@ injection (`POST /__e2e/outage`) is mock-only.
 
 ## Secrets in artifacts
 
-Tokens and bind passwords are not committed. Failure traces are scrubbed
-by `helpers/redact.mjs` in `afterEach` and global teardown. Do not attach
-unredacted `test-results/` to issues.
+Tokens and bind passwords are not committed. Playwright records `fill()`
+values and JSON bodies in `trace.zip`. That zip is rewritten in global
+teardown: text members have fixture/`LABLDAP_E2E_*` secrets replaced with
+`[redacted]`. Page snapshots and screenshots inside the trace are disabled
+so password fields are not stored as pixels. Standalone failure PNGs that
+still contain a secret as UTF-8 bytes are replaced with a 1x1 placeholder.
+
+`clearPasswordFields` in `afterEach` is not the redaction path (Playwright
+attaches traces after hooks). Do not attach `test-results/` from a run
+that failed before teardown finished.

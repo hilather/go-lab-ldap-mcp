@@ -234,10 +234,12 @@ function SchemaList<T extends { name: string }>({
               role="option"
               aria-selected={selectedName === item.name || activeIndex === index}
               className={activeIndex === index ? "is-active" : undefined}
+              onClick={() => {
+                onIndex(index);
+                onSelect(item.name);
+              }}
             >
-              <button type="button" onClick={() => { onIndex(index); onSelect(item.name); }}>
-                {item.name}
-              </button>
+              {item.name}
             </li>
           ))}
         </ul>

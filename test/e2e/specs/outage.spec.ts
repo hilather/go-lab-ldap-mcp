@@ -1,13 +1,8 @@
 import { expect, test } from "@playwright/test";
-import { redactTree } from "../helpers/redact.mjs";
-import { secretsToMask } from "../helpers/secrets";
 import { clearPasswordFields, login } from "../helpers/session";
 
-test.afterEach(async ({ page }, info) => {
+test.afterEach(async ({ page }) => {
   await clearPasswordFields(page);
-  if (info.status !== info.expectedStatus) {
-    await redactTree(info.outputDir, secretsToMask());
-  }
 });
 
 test("dashboard stays up and names a directory outage", async ({ page, request }) => {

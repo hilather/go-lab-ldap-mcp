@@ -116,6 +116,8 @@ test("dashboard covers ready, degraded, outage, and missing scopes", async () =>
   assert.match(dash, /Scenario status/);
   assert.match(dash, /status\.symbol/);
   assert.match(dash, /status\.label/);
+  assert.match(dash, /safeAuditField\(event\.actor\)/);
+  assert.match(dash, /safeAuditField\(event\.target\)/);
 });
 
 test("user list and create cover search, sort, empty, and read-only create", async () => {
@@ -203,6 +205,7 @@ test("schema browser is read-only and keyboard navigable", async () => {
   assert.match(page, /ArrowDown/);
   assert.match(page, /getRootDSE/);
   assert.match(page, /getSchema/);
+  assert.doesNotMatch(page, /role="option"[\s\S]{0,200}<button/);
   assert.doesNotMatch(page, /api\.POST|api\.PATCH|api\.DELETE/);
 });
 
@@ -221,6 +224,7 @@ test("reset requires scope, exact scenario name, and current revision", async ()
   assert.match(page, /startReset\(\{ name:/);
   assert.match(page, /expectedRevision: revision/);
   assert.match(page, /invalidateAfterReset/);
+  assert.match(page, /wasInProgress/);
   assert.match(page, /disabled=\{!gate\.ok \|\| submitting\}/);
   const exp = await readFile(join(srcRoot, "routes/export/ExportPage.tsx"), "utf8");
   assert.match(exp, /downloadExport/);

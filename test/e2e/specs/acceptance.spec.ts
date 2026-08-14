@@ -1,13 +1,9 @@
 import { expect, test } from "@playwright/test";
-import { redactTree } from "../helpers/redact.mjs";
-import { adminToken, bindPassword, compiledRevision, scenarioName, secretsToMask } from "../helpers/secrets";
+import { adminToken, bindPassword, compiledRevision, scenarioName } from "../helpers/secrets";
 import { clearPasswordFields, login, loginReadOnly, storageDump, visit } from "../helpers/session";
 
-test.afterEach(async ({ page }, info) => {
+test.afterEach(async ({ page }) => {
   await clearPasswordFields(page);
-  if (info.status !== info.expectedStatus) {
-    await redactTree(info.outputDir, secretsToMask());
-  }
 });
 
 test("admin session completes the product acceptance scenario", async ({ page }) => {

@@ -99,21 +99,40 @@ export const DEFAULT_AUDIT_PAGE_SIZE = 25;
 export const AUDIT_RETENTION_NOTICE =
   "The in-memory audit ring is process-local. Events are discarded on restart and are not a durable log.";
 
-const SECRETISH = /password|passwd|userpassword|authorization|bearer\s|cookie=|set-cookie|csrf|token=/i;
+const ACTOR_ALLOW = /^(token|session):[A-Za-z0-9._:@-]+$/i;
 const JWTISH = /^eyj[a-z0-9_-]+\.[a-z0-9_-]+/i;
+const HEADERISH = /^(cookie|set-cookie|authorization)\s*:/i;
+const ASSIGNED = /(cookie|set-cookie|authorization|password|passwd|userpassword|csrf)\s*[:=]/i;
 
 export function looksSecret(value: string): boolean {
   const trimmed = value.trim();
   if (trimmed === "") {
     return false;
   }
+  if (ACTOR_ALLOW.test(trimmed)) {
+    return false;
+  }
   if (JWTISH.test(trimmed)) {
     return true;
   }
-  if (SECRETISH.test(trimmed) && trimmed.length > 16) {
+  if (/^(bearer|basic)\s+\S+/i.test(trimmed)) {
     return true;
   }
-  if (/^(bearer|basic)\s+\S+/i.test(trimmed)) {
+  if (HEADERISH.test(trimmed) || ASSIGNED.test(trimmed) || /token=/i.test(trimmed)) {
+    return true;
+  }
+  if (/\b(password|passwd|userpassword|csrf)\b/i.test(trimmed)) {
+    return true;
+  }
+  // Unprefixed opaque credentials (live LABLDAP_E2E_* tokens). Scoped
+  // names such as directory:read keep a letter prefix and a colon.
+  if (
+    trimmed.length >= 12 &&
+    !/\s/.test(trimmed) &&
+    /[A-Za-z]/.test(trimmed) &&
+    /\d/.test(trimmed) &&
+    !/^[a-z][-a-z0-9]*:/i.test(trimmed)
+  ) {
     return true;
   }
   return false;

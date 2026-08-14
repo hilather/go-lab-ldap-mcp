@@ -1,14 +1,11 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
-import { redactTree } from "../helpers/redact.mjs";
-import { secretsToMask } from "../helpers/secrets";
 import { clearPasswordFields, login, visit } from "../helpers/session";
 
-test.afterEach(async ({ page }, info) => {
+test.afterEach(async ({ page }) => {
+  // Best-effort UI cleanup only. Trace zip redaction runs in global teardown
+  // after Playwright has written attachments.
   await clearPasswordFields(page);
-  if (info.status !== info.expectedStatus) {
-    await redactTree(info.outputDir, secretsToMask());
-  }
 });
 
 async function expectNoSeriousViolations(page: Parameters<typeof login>[0]): Promise<void> {
@@ -34,5 +31,10 @@ test("core forms pass automated accessibility checks", async ({ page }) => {
   await expect(page.getByRole("heading", { name: /alice/i })).toBeVisible();
   await page.getByRole("button", { name: /^Delete$/ }).click();
   await expect(page.getByRole("heading", { name: /Delete user/ })).toBeVisible();
+  await expectNoSeriousViolations(page);
+
+  await page.keyboard.press("Escape");
+  await visit(page, "/schema");
+  await expect(page.getByRole("heading", { name: "Schema" })).toBeVisible();
   await expectNoSeriousViolations(page);
 });
