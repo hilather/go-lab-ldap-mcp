@@ -30,6 +30,9 @@ func runBootstrap(cmd string, args []string, stdout, stderr io.Writer, logger *s
 	opt.Seed = eng
 	opt.VerifyRuntime = eng
 	opt.VerifyApp = eng
+	opt.Drift = eng
+	opt.Marker = eng
+	opt.Capabilities = eng
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()

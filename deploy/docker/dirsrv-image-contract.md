@@ -81,6 +81,16 @@ Unknown compiled plugin names are `plugin_missing`. Failed MemberOf fix-up is `f
 
 `targetattr!="aci"` on `labldap:runtime-people-write` / `labldap:runtime-groups-write` (KD-R23) is accepted by 2.4.6 and denies runtime ACI rewrite (LDAP 50). Runtime people-write still grants read of hashed `userPassword` on people entries; suffix-read deny is `targetattr!="userPassword"` on the suffix/marker. `nsAccountLock: true` bind is LDAP 53. Password lockout is confirmed when the correct password also fails after `pwdmaxfailures`.
 
+## Baseline marker attributes (OD-012, T-039)
+
+Observed on the pinned 2.4.6 image: `objectClass: top, device` with `cn` is accepted. Adding the preferred KD-R17 set (`serialNumber`, `owner` as `labldap-bootstrap/<version>`, `description` as RFC3339, `destinationIndicator` as the Directory revision hex) is rejected (objectClass / syntax). Bootstrap therefore writes **namespaced `description` JSON only**:
+
+```json
+{"serialNumber":"<hex>","destinationIndicator":"<hex>","owner":"labldap-bootstrap/<version>","appliedAt":"<RFC3339>"}
+```
+
+No secret digests. Private OID registration remains an owner checkpoint before stable release, not a T-039 blocker. Runtime may read the marker and must not modify it.
+
 ## Environment (subset)
 
 - `DS_DM_PASSWORD` — set Directory Manager password after first start

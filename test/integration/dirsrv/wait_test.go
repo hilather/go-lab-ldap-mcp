@@ -62,11 +62,14 @@ spec:
 		Seed:          stubSeed{},
 		VerifyRuntime: stubRuntime{},
 		VerifyApp:     stubApp{},
+		Drift:         stubDrift{},
+		Marker:        stubMarker{},
+		Capabilities:  stubCaps{},
 	}, ioDiscard(), ioDiscard())
 	if err != nil {
 		t.Fatalf("apply wait: %v summary=%+v", err, sum)
 	}
-	if !sum.OK || len(sum.Phases) != 11 {
+	if !sum.OK || len(sum.Phases) != 13 {
 		t.Fatalf("%+v", sum)
 	}
 
@@ -174,6 +177,26 @@ type stubApp struct{}
 
 func (stubApp) VerifyApp(context.Context, bootstrap.VerifyRequest) (bootstrap.VerifyResult, error) {
 	return bootstrap.VerifyResult{Binds: 1, SkippedLockout: 1}, nil
+}
+
+type stubDrift struct{}
+
+func (stubDrift) Inspect(context.Context, bootstrap.DriftRequest) (bootstrap.DriftReport, error) {
+	return bootstrap.DriftReport{}, nil
+}
+
+type stubMarker struct{}
+
+func (stubMarker) ReadMarker(context.Context, bootstrap.MarkerRequest) (bootstrap.Marker, error) {
+	return bootstrap.Marker{}, nil
+}
+
+func (stubMarker) WriteMarker(context.Context, bootstrap.MarkerRequest) error { return nil }
+
+type stubCaps struct{}
+
+func (stubCaps) Capabilities(context.Context, bootstrap.CapabilityRequest) (bootstrap.Capabilities, error) {
+	return bootstrap.Capabilities{EngineVersion: "test", RequiredOK: true}, nil
 }
 
 func waitCode(err error) string {

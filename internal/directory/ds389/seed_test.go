@@ -16,11 +16,12 @@ import (
 )
 
 type seedMem struct {
-	entries          map[string]*ldap.Entry
-	adds, mods, dels []string
-	failPWAfterAdd   bool
-	delErr           error
-	binds            []string
+	entries             map[string]*ldap.Entry
+	adds, mods, dels    []string
+	failPWAfterAdd      bool
+	failPreferredMarker bool
+	delErr              error
+	binds               []string
 }
 
 func (m *seedMem) Search(req *ldap.SearchRequest) (*ldap.SearchResult, error) {
@@ -45,6 +46,9 @@ func (m *seedMem) Search(req *ldap.SearchRequest) (*ldap.SearchResult, error) {
 }
 
 func (m *seedMem) Add(req *ldap.AddRequest) error {
+	if m.failPreferredMarker && markerHasPreferred(req.Attributes) {
+		return ldap.NewError(ldap.LDAPResultObjectClassViolation, errors.New("injected preferred marker reject"))
+	}
 	m.adds = append(m.adds, req.DN)
 	key := strings.ToLower(req.DN)
 	if _, ok := m.entries[key]; ok {
@@ -94,6 +98,15 @@ func (m *seedMem) Bind(username, password string) error {
 }
 
 func (m *seedMem) Close() error { return nil }
+
+func markerHasPreferred(attrs []ldap.Attribute) bool {
+	for _, a := range attrs {
+		if strings.EqualFold(a.Type, "destinationIndicator") || strings.EqualFold(a.Type, "owner") {
+			return true
+		}
+	}
+	return false
+}
 
 func justAdded(m *seedMem, dn string) bool {
 	for _, a := range m.adds {
@@ -310,6 +323,24 @@ func TestReconcileSeedValidateNoWrite(t *testing.T) {
 	}
 	if len(res.Matched) != 0 || len(mem.adds) != 0 || len(mem.mods) != 0 || len(mem.dels) != 0 {
 		t.Fatalf("validate wrote or matched missing entries: res=%+v adds=%v mods=%v dels=%v", res, mem.adds, mem.mods, mem.dels)
+	}
+}
+
+func TestReconcileSeedMergeKeepsUnmanagedAttr(t *testing.T) {
+	mem := &seedMem{entries: baseEntries()}
+	eng := testSeedEngine(mem)
+	req := sampleSeedReq(true, v1alpha1.StartupMerge)
+	if _, err := eng.ReconcileSeed(t.Context(), req); err != nil {
+		t.Fatal(err)
+	}
+	alice := mem.entries["uid=alice,ou=people,dc=example,dc=test"]
+	setAttr(alice, "description", []string{"runtime-note"})
+	if _, err := eng.ReconcileSeed(t.Context(), req); err != nil {
+		t.Fatal(err)
+	}
+	alice = mem.entries["uid=alice,ou=people,dc=example,dc=test"]
+	if !hasValue(alice, "description", "runtime-note") {
+		t.Fatalf("merge clobbered unmanaged description: %v", alice.Attributes)
 	}
 }
 

@@ -22,7 +22,7 @@ No distribution license file (OD-003). Local images only (OD-004).
 Milestone **M0** is in progress. First usable release is the README definition
 in the design package plus every P0 task in [`TASKS.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/TASKS.md).
 
-Completed: **T-001–T-037**. Next: **T-038** bootstrap validate/merge/reset modes. Remaining-work design: [`docs/design/remaining-work-t035-t120.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/design/remaining-work-t035-t120.md).
+Completed: **T-001–T-040, T-044**. Next: **T-041** bootstrap container image. Remaining-work design: [`docs/design/remaining-work-t035-t120.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/design/remaining-work-t035-t120.md).
 
 ## Commands
 

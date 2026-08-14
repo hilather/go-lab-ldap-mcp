@@ -66,7 +66,18 @@ func TestShippedApplySeedBindAndMembership(t *testing.T) {
 		t.Fatalf("alice bind after re-apply: %v", err)
 	}
 
+	before := ldapSearch(t, inst, "uid=alice,ou=people,dc=example,dc=test", "modifyTimestamp", "sn")
+	vout, err := execValidate(t, inst, guest)
+	if err != nil {
+		t.Fatalf("validate matching: %v\n%s", err, redactLogs(vout, seedCanary, inst.password))
+	}
+	after := ldapSearch(t, inst, "uid=alice,ou=people,dc=example,dc=test", "modifyTimestamp", "sn")
+	if before != after {
+		t.Fatalf("validate mutated alice\nbefore=%s\nafter=%s", before, after)
+	}
+
 	addExtraPerson(t, inst, "uid=extra,ou=people,dc=example,dc=test")
+	addUserDescription(t, inst, "uid=alice,ou=people,dc=example,dc=test", "runtime-note")
 	out3, err := execApply(t, inst, guest, nil)
 	if err != nil {
 		t.Fatalf("merge re-apply: %v\n%s", err, redactLogs(out3, seedCanary, inst.password))
@@ -74,15 +85,19 @@ func TestShippedApplySeedBindAndMembership(t *testing.T) {
 	if !strings.Contains(ldapSearch(t, inst, "uid=extra,ou=people,dc=example,dc=test", "dn"), "uid=extra,ou=people,dc=example,dc=test") {
 		t.Fatal("merge removed extra user")
 	}
-
-	before := ldapSearch(t, inst, "uid=alice,ou=people,dc=example,dc=test", "modifyTimestamp", "sn")
-	vout, err := execValidate(t, inst, guest)
-	if err != nil {
-		t.Fatalf("validate: %v\n%s", err, redactLogs(vout, seedCanary, inst.password))
+	if !strings.Contains(ldapSearch(t, inst, "uid=alice,ou=people,dc=example,dc=test", "description"), "runtime-note") {
+		t.Fatal("merge clobbered unmanaged description")
 	}
-	after := ldapSearch(t, inst, "uid=alice,ou=people,dc=example,dc=test", "modifyTimestamp", "sn")
-	if before != after {
-		t.Fatalf("validate mutated alice\nbefore=%s\nafter=%s", before, after)
+	if err := userBind(t, inst, "uid=alice,ou=people,dc=example,dc=test", seedCanary); err != nil {
+		t.Fatalf("alice bind after merge: %v", err)
+	}
+
+	dvout, err := execValidate(t, inst, guest)
+	if err == nil {
+		t.Fatalf("validate drifted should fail:\n%s", dvout)
+	}
+	if !strings.Contains(dvout, "phase.drift") || !strings.Contains(dvout, "drift") {
+		t.Fatalf("want phase.drift / drift:\n%s", redactLogs(dvout, seedCanary, inst.password))
 	}
 	if strings.Contains(ldapSearch(t, inst, "uid=extra,ou=people,dc=example,dc=test", "dn"), "uid=extra") == false {
 		t.Fatal("validate removed extra")
@@ -297,6 +312,23 @@ func stageSeedApply(t *testing.T, inst *Instance, yaml, alicePW string) (string,
 	}
 }
 
+func addUserDescription(t *testing.T, inst *Instance, dn, value string) {
+	t.Helper()
+	ldif := "dn: " + dn + `
+changetype: modify
+add: description
+description: ` + value + `
+`
+	cmd := exec.Command("docker", "exec", "-i", inst.Name,
+		"ldapmodify", "-x", "-H", "ldaps://127.0.0.1:3636", "-o", "tls_reqcert=never",
+		"-D", "cn=Directory Manager", "-w", inst.Password().Reveal())
+	cmd.Stdin = strings.NewReader(ldif)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("ldapmodify description: %v\n%s", err, out)
+	}
+}
+
 func addExtraPerson(t *testing.T, inst *Instance, dn string) {
 	t.Helper()
 	ldif := "dn: " + dn + `
@@ -345,9 +377,8 @@ func assertRemainingAfterSeed(t *testing.T, out string) {
 	if err := decodeSummary(out, &sum); err != nil {
 		t.Fatalf("summary: %v\n%s", err, out)
 	}
-	want := []string{"drift", "marker"}
-	if strings.Join(sum.Remaining, ",") != strings.Join(want, ",") {
-		t.Fatalf("remaining = %v, want %v", sum.Remaining, want)
+	if len(sum.Remaining) != 0 {
+		t.Fatalf("remaining = %v, want empty after successful apply", sum.Remaining)
 	}
 }
 

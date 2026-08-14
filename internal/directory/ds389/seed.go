@@ -265,6 +265,7 @@ func addUser(conn treeConn, u config.NormalizedUser) error {
 }
 
 func modifyUser(conn treeConn, live *ldap.Entry, u config.NormalizedUser) error {
+	// Replace only planned attributes so merge keeps unknown unmanaged values.
 	mod := ldap.NewModifyRequest(u.DN, nil)
 	mod.Replace("cn", []string{u.UID})
 	mod.Replace("sn", []string{userSN(u)})

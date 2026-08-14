@@ -19,14 +19,6 @@ import (
 	"github.com/hilather/go-lab-ldap-mcp/internal/observability"
 )
 
-// remainingAfterVerify is the not-yet-run apply suffix after verify_app.
-// remainingAfterValidate is the not-yet-run validate suffix after seed
-// (write-probe verifiers are not planned on validate).
-var (
-	remainingAfterVerify   = []string{"drift", "marker"}
-	remainingAfterValidate = []string{"inspect", "drift"}
-)
-
 // Options is the parsed bootstrap command.
 type Options struct {
 	Command        string
@@ -47,6 +39,9 @@ type Options struct {
 	Seed           SeedReconciler
 	VerifyRuntime  RuntimeVerifier
 	VerifyApp      AppVerifier
+	Drift          DriftInspector
+	Marker         MarkerWriter
+	Capabilities   CapabilityInspector
 	RequireSASL    []string
 	Log            *slog.Logger
 	Now            func() time.Time
@@ -124,6 +119,12 @@ func Run(ctx context.Context, opt Options, stdout, stderr io.Writer) (Summary, e
 	}
 
 	write := opt.Command == "apply" && compiled.Normalized.StartupMode != v1alpha1.StartupValidate
+	planned := plannedPhases(opt.Command, write)
+	after := func(last string) {
+		sum.Remaining = remainingAfter(planned, last)
+		sum.Phases = rep.phases
+	}
+
 	err = rep.run("backend", func() (map[string]int, error) {
 		if opt.Backend == nil {
 			return nil, phaseErr("backend", "create_failed", "backend reconciler is not configured")
@@ -148,7 +149,7 @@ func Run(ctx context.Context, opt Options, stdout, stderr io.Writer) (Summary, e
 		return counts, nil
 	})
 	if err != nil {
-		sum.Phases = rep.phases
+		after("backend")
 		return sum, err
 	}
 
@@ -167,7 +168,7 @@ func Run(ctx context.Context, opt Options, stdout, stderr io.Writer) (Summary, e
 		return map[string]int{"transports": len(res.Transports), "sasl": len(res.SASL)}, nil
 	})
 	if err != nil {
-		sum.Phases = rep.phases
+		after("tls")
 		return sum, err
 	}
 
@@ -187,7 +188,7 @@ func Run(ctx context.Context, opt Options, stdout, stderr io.Writer) (Summary, e
 		return map[string]int{"applied": len(res.Applied)}, nil
 	})
 	if err != nil {
-		sum.Phases = rep.phases
+		after("pwpolicy")
 		return sum, err
 	}
 
@@ -208,7 +209,7 @@ func Run(ctx context.Context, opt Options, stdout, stderr io.Writer) (Summary, e
 		return map[string]int{"applied": len(res.Applied)}, nil
 	})
 	if err != nil {
-		sum.Phases = rep.phases
+		after("plugins")
 		return sum, err
 	}
 
@@ -227,7 +228,7 @@ func Run(ctx context.Context, opt Options, stdout, stderr io.Writer) (Summary, e
 		return map[string]int{"created": len(res.Created), "matched": len(res.Matched)}, nil
 	})
 	if err != nil {
-		sum.Phases = rep.phases
+		after("tree")
 		return sum, err
 	}
 
@@ -249,7 +250,7 @@ func Run(ctx context.Context, opt Options, stdout, stderr io.Writer) (Summary, e
 		return map[string]int{"applied": len(res.Applied), "matched": len(res.Matched)}, nil
 	})
 	if err != nil {
-		sum.Phases = rep.phases
+		after("aci")
 		return sum, err
 	}
 
@@ -273,7 +274,7 @@ func Run(ctx context.Context, opt Options, stdout, stderr io.Writer) (Summary, e
 		}, nil
 	})
 	if err != nil {
-		sum.Phases = rep.phases
+		after("seed")
 		return sum, err
 	}
 
@@ -297,7 +298,7 @@ func Run(ctx context.Context, opt Options, stdout, stderr io.Writer) (Summary, e
 			}, nil
 		})
 		if err != nil {
-			sum.Phases = rep.phases
+			after("verify_runtime")
 			return sum, err
 		}
 		err = rep.run("verify_app", func() (map[string]int, error) {
@@ -312,6 +313,9 @@ func Run(ctx context.Context, opt Options, stdout, stderr io.Writer) (Summary, e
 			if e != nil {
 				return nil, e
 			}
+			if e := attachCapabilities(ctx, opt, compiled, pw, write, "verify_app", &sum); e != nil {
+				return nil, e
+			}
 			return map[string]int{
 				"binds":           res.Binds,
 				"groups":          res.Groups,
@@ -319,16 +323,145 @@ func Run(ctx context.Context, opt Options, stdout, stderr io.Writer) (Summary, e
 			}, nil
 		})
 		if err != nil {
-			sum.Phases = rep.phases
+			after("verify_app")
 			return sum, err
 		}
-		sum.Remaining = append([]string(nil), remainingAfterVerify...)
 	} else {
-		sum.Remaining = append([]string(nil), remainingAfterValidate...)
+		err = rep.run("inspect", func() (map[string]int, error) {
+			pw, e := readPasswordFile(opt.PasswordFile)
+			if e != nil {
+				return nil, e
+			}
+			if e := attachCapabilities(ctx, opt, compiled, pw, write, "inspect", &sum); e != nil {
+				return nil, e
+			}
+			return map[string]int{"plugins": capabilityCount(sum.Capabilities, "plugins")}, nil
+		})
+		if err != nil {
+			after("inspect")
+			return sum, err
+		}
 	}
-	sum.Phases = rep.phases
+
+	err = rep.run("drift", func() (map[string]int, error) {
+		if opt.Drift == nil {
+			return nil, phaseErr("drift", "drift", "drift inspector is not configured")
+		}
+		pw, e := readPasswordFile(opt.PasswordFile)
+		if e != nil {
+			return nil, e
+		}
+		report, e := opt.Drift.Inspect(ctx, driftRequestFrom(compiled, opt, pw, write))
+		if e != nil {
+			return nil, e
+		}
+		raw, je := json.Marshal(report)
+		if je != nil {
+			return nil, phaseErr("drift", "drift", "could not encode drift report").Wrap(je)
+		}
+		sum.Drift = raw
+		if write {
+			return map[string]int{
+				"extraUsers":  len(report.ExtraUsers),
+				"extraGroups": len(report.ExtraGroups),
+			}, nil
+		}
+		if report.Differ {
+			return nil, phaseErr("drift", "drift", "directory inventory differs from the compiled plan")
+		}
+		return map[string]int{"matched": 1}, nil
+	})
+	if err != nil {
+		after("drift")
+		return sum, err
+	}
+
+	if write {
+		err = rep.run("marker", func() (map[string]int, error) {
+			if opt.Marker == nil {
+				return nil, phaseErr("marker", "apply_failed", "marker writer is not configured")
+			}
+			pw, e := readPasswordFile(opt.PasswordFile)
+			if e != nil {
+				return nil, e
+			}
+			req := markerRequestFrom(compiled, opt, pw, write)
+			if e := opt.Marker.WriteMarker(ctx, req); e != nil {
+				return nil, e
+			}
+			return map[string]int{"written": 1}, nil
+		})
+		if err != nil {
+			after("marker")
+			return sum, err
+		}
+	}
+
+	after("marker")
+	if !write {
+		after("drift")
+	}
 	sum.OK = true
 	return sum, nil
+}
+
+func plannedPhases(cmd string, write bool) []string {
+	if cmd == "plan" {
+		return []string{"load"}
+	}
+	p := []string{"load", "wait", "backend", "tls", "pwpolicy", "plugins", "tree", "aci", "seed"}
+	if write {
+		return append(p, "verify_runtime", "verify_app", "drift", "marker")
+	}
+	return append(p, "inspect", "drift")
+}
+
+func remainingAfter(planned []string, last string) []string {
+	for i, p := range planned {
+		if p == last {
+			if i+1 >= len(planned) {
+				return nil
+			}
+			return append([]string(nil), planned[i+1:]...)
+		}
+	}
+	return append([]string(nil), planned...)
+}
+
+func attachCapabilities(ctx context.Context, opt Options, compiled *config.Compiled, pw observability.Secret, write bool, phase string, sum *Summary) error {
+	if opt.Capabilities == nil {
+		return phaseErr(phase, "capability", "capability inspector is not configured")
+	}
+	req := capabilityRequestFrom(compiled, opt, pw, write)
+	req.Phase = phase
+	caps, err := opt.Capabilities.Capabilities(ctx, req)
+	if err != nil {
+		return err
+	}
+	raw, err := json.Marshal(caps)
+	if err != nil {
+		return phaseErr(phase, "capability", "could not encode capability report").Wrap(err)
+	}
+	sum.Capabilities = raw
+	if !caps.RequiredOK {
+		return phaseErr(phase, "capability", "required engine capabilities are not present")
+	}
+	return nil
+}
+
+func capabilityCount(raw json.RawMessage, field string) int {
+	if len(raw) == 0 {
+		return 0
+	}
+	var doc map[string]any
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		return 0
+	}
+	v, ok := doc[field].([]any)
+	if !ok {
+		return 0
+	}
+	return len(v)
 }
 
 func loadConfig(ctx context.Context, opt Options) (*config.Compiled, error) {
@@ -453,6 +586,53 @@ func seedRequestFrom(c *config.Compiled, opt Options, dm observability.Secret, w
 		Groups:      c.Normalized.Groups,
 		StartupMode: c.Normalized.StartupMode,
 		Preserve:    append([]string(nil), c.Data.Preserve...),
+	}
+}
+
+func capabilityRequestFrom(c *config.Compiled, opt Options, dm observability.Secret, write bool) CapabilityRequest {
+	var transports []string
+	if c.Public.Spec.Transport.LDAPS.Enabled {
+		transports = append(transports, "ldaps")
+	}
+	if c.Public.Spec.Transport.StartTLS {
+		transports = append(transports, "starttls")
+	}
+	return CapabilityRequest{
+		TreeRequest:        treeRequestFrom(c, opt, dm, write),
+		PasswordFile:       opt.PasswordFile,
+		Instance:           opt.DSConfInstance,
+		RequiredPlugins:    append([]string(nil), c.Engine.Plugins...),
+		RequiredTransports: transports,
+		RequiredScheme:     c.Normalized.Policy.StorageScheme,
+		Phase:              "inspect",
+	}
+}
+
+func driftRequestFrom(c *config.Compiled, opt Options, dm observability.Secret, write bool) DriftRequest {
+	return DriftRequest{
+		TreeRequest:       treeRequestFrom(c, opt, dm, write),
+		Users:             c.Normalized.Users,
+		Groups:            c.Normalized.Groups,
+		ACIs:              c.Data.ACIs,
+		MarkerDN:          c.Data.Marker,
+		DirectoryRevision: c.Revisions.Directory,
+		Preserve:          append([]string(nil), c.Data.Preserve...),
+		FailOnDifference:  !write,
+	}
+}
+
+func markerRequestFrom(c *config.Compiled, opt Options, dm observability.Secret, write bool) MarkerRequest {
+	ver := observability.CurrentBuild("labldap-bootstrap").Version
+	if ver == "" {
+		ver = "dev"
+	}
+	return MarkerRequest{
+		TreeRequest:      treeRequestFrom(c, opt, dm, write),
+		DN:               c.Data.Marker,
+		AppliedRevision:  c.Revisions.Directory,
+		ExpectedRevision: c.Revisions.Directory,
+		ApplyVersion:     "labldap-bootstrap/" + ver,
+		AppliedAt:        opt.Now().UTC().Format(time.RFC3339),
 	}
 }
 

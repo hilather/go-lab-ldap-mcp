@@ -44,8 +44,8 @@ published address in --ldap-url.
 
 plan accepts --config and optional --directory-manager-password-file.
 
-This apply currently runs phases load, wait, backend, tls, pwpolicy, plugins, tree, aci, seed, verify_runtime, and verify_app.
-Remaining phases (drift, marker) land in later M2 tasks.
+apply + merge|reset runs load, wait, backend, tls, pwpolicy, plugins, tree, aci, seed, verify_runtime, verify_app, drift, then marker last.
+validate (subcommand or startupMode validate) is read-only: inspect + drift; no marker write.
 
 Structured logs go to stderr. Set LABLDAP_LOG_FORMAT=json for JSON logs.
 

@@ -62,8 +62,8 @@ func TestShippedApplyVerifyRuntimeAndApp(t *testing.T) {
 	if !sum.OK {
 		t.Fatalf("apply not ok:\n%s", out)
 	}
-	if strings.Join(sum.Remaining, ",") != "drift,marker" {
-		t.Fatalf("remaining = %v", sum.Remaining)
+	if len(sum.Remaining) != 0 {
+		t.Fatalf("remaining = %v, want empty", sum.Remaining)
 	}
 	var appCounts map[string]int
 	for _, p := range sum.Phases {
@@ -98,8 +98,8 @@ func TestShippedApplyVerifyRuntimeAndApp(t *testing.T) {
 			t.Fatalf("validate ran write probe %s", p.Phase)
 		}
 	}
-	if strings.Join(vsum.Remaining, ",") != "inspect,drift" {
-		t.Fatalf("validate remaining = %v", vsum.Remaining)
+	if len(vsum.Remaining) != 0 {
+		t.Fatalf("validate remaining = %v, want empty", vsum.Remaining)
 	}
 }
 

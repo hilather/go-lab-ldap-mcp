@@ -22,6 +22,8 @@ type Engine struct {
 	UserBind func(ctx context.Context, req bootstrap.TreeRequest, dn, password string) error
 	// SeedPasswordReplace, if set, replaces the post-add password modify so tests can inject password_set.
 	SeedPasswordReplace func(dn, password string) error
+	// FailWriteMarker, if set, is returned from WriteMarker without mutating.
+	FailWriteMarker error
 }
 
 type listedBackend struct {

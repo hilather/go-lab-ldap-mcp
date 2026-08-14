@@ -29,6 +29,8 @@ type Summary struct {
 	Remaining         []string        `json:"remaining,omitempty"`
 	Plan              json.RawMessage `json:"plan,omitempty"`
 	DirectoryRevision string          `json:"directoryRevision,omitempty"`
+	Drift             json.RawMessage `json:"drift,omitempty"`
+	Capabilities      json.RawMessage `json:"capabilities,omitempty"`
 }
 
 func (s Summary) JSON() ([]byte, error) {

@@ -442,38 +442,38 @@ Acceptance:
 - [x] Lockout test cleans up or uses isolated state.
 - [x] Verification output does not expose passwords.
 
-## [ ] T-038 Implement bootstrap `validate`, `merge`, and `reset` modes
+## [x] T-038 Implement bootstrap `validate`, `merge`, and `reset` modes
 
 Priority: P0 | Size: L | Depends on: T-035 to T-037
 
 Deliverables: mode-specific planning, managed-field merge, runtime-entry preservation, and baseline replacement behavior.
 
 Acceptance:
-- [ ] Validate performs no writes and reports drift.
-- [ ] Merge preserves an unconfigured runtime entry and unknown unmanaged attribute.
-- [ ] Reset removes runtime data and restores configured objects.
+- [x] Validate performs no writes and reports drift.
+- [x] Merge preserves an unconfigured runtime entry and unknown unmanaged attribute.
+- [x] Reset removes runtime data and restores configured objects.
 
-## [ ] T-039 Implement metadata marker and drift reporting
+## [x] T-039 Implement metadata marker and drift reporting
 
 Priority: P0 | Size: M | Depends on: T-021, T-036 to T-038
 
 Deliverables: metadata entry mapping, expected and applied revision, apply version, timestamp, and drift report.
 
 Acceptance:
-- [ ] Marker is written last after verification.
-- [ ] Partial apply leaves prior marker or no committed new marker.
-- [ ] Marker contains no secret digests or values that aid credential recovery.
+- [x] Marker is written last after verification.
+- [x] Partial apply leaves prior marker or no committed new marker.
+- [x] Marker contains no secret digests or values that aid credential recovery.
 
-## [ ] T-040 Add bootstrap failure recovery and phase diagnostics
+## [x] T-040 Add bootstrap failure recovery and phase diagnostics
 
 Priority: P0 | Size: M | Depends on: T-027 to T-039
 
 Deliverables: retry classification, partial-operation summary, readiness implications, and safe troubleshooting output.
 
 Acceptance:
-- [ ] Failure injection at each apply phase produces an actionable phase and code.
-- [ ] A later reset-mode apply can recover from supported partial states.
-- [ ] Bootstrap never reports success after verification failure.
+- [x] Failure injection at each apply phase produces an actionable phase and code.
+- [x] A later reset-mode apply can recover from supported partial states.
+- [x] Bootstrap never reports success after verification failure.
 
 ## [ ] T-041 Build the bootstrap container image
 
@@ -508,16 +508,16 @@ Acceptance:
 - [ ] Test-log secret scan passes.
 - [ ] CI executes the suite with the release image digest.
 
-## [ ] T-044 Implement measured engine capability report
+## [x] T-044 Implement measured engine capability report
 
 Priority: P0 | Size: M | Depends on: T-030 to T-039
 
 Deliverables: Root DSE, schema, version, plugin, transport, policy, and optional control measurements; JSON representation.
 
 Acceptance:
-- [ ] Capabilities derive from inspection or verification, not engine-name assumptions.
-- [ ] Required capability absence can fail bootstrap.
-- [ ] Report includes engine and adapter versions and no secrets.
+- [x] Capabilities derive from inspection or verification, not engine-name assumptions.
+- [x] Required capability absence can fail bootstrap.
+- [x] Report includes engine and adapter versions and no secrets.
 
 # M3 - Runtime directory and application services
 

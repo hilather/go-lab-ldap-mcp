@@ -109,6 +109,77 @@ func (f *fakeRuntimeVerifier) VerifyRuntime(ctx context.Context, req VerifyReque
 	return VerifyResult{Allowed: 4, Denied: 4, Skipped: 1}, nil
 }
 
+type fakeDrift struct {
+	err    error
+	called int
+	req    DriftRequest
+	report DriftReport
+}
+
+func (f *fakeDrift) Inspect(ctx context.Context, req DriftRequest) (DriftReport, error) {
+	_ = ctx
+	f.called++
+	f.req = req
+	if f.err != nil {
+		return DriftReport{}, f.err
+	}
+	return f.report, nil
+}
+
+type fakeMarker struct {
+	err    error
+	called int
+	req    MarkerRequest
+	last   Marker
+}
+
+func (f *fakeMarker) ReadMarker(ctx context.Context, req MarkerRequest) (Marker, error) {
+	_ = ctx
+	return f.last, nil
+}
+
+func (f *fakeMarker) WriteMarker(ctx context.Context, req MarkerRequest) error {
+	_ = ctx
+	f.called++
+	f.req = req
+	if f.err != nil {
+		return f.err
+	}
+	f.last = Marker{
+		DN:               req.DN,
+		AppliedRevision:  req.AppliedRevision,
+		ExpectedRevision: req.ExpectedRevision,
+		ApplyVersion:     req.ApplyVersion,
+		AppliedAt:        req.AppliedAt,
+	}
+	return nil
+}
+
+type fakeCaps struct {
+	err    error
+	called int
+	ok     bool
+	req    CapabilityRequest
+}
+
+func (f *fakeCaps) Capabilities(ctx context.Context, req CapabilityRequest) (Capabilities, error) {
+	_ = ctx
+	f.called++
+	f.req = req
+	if f.err != nil {
+		return Capabilities{}, f.err
+	}
+	return Capabilities{
+		EngineVendor:   "389 Project",
+		EngineVersion:  "389-Directory/test",
+		AdapterVersion: "dev",
+		Transports:     []string{"ldaps"},
+		Plugins:        []string{"memberof", "referint", "account-disable"},
+		PasswordScheme: "PBKDF2-SHA256",
+		RequiredOK:     f.ok,
+	}, nil
+}
+
 type fakeAppVerifier struct {
 	err    error
 	called int
@@ -221,6 +292,33 @@ spec:
 	return cfgPath, pwPath
 }
 
+func applyOpts(cfg, pw string) (Options, *fakeSeed, *fakeRuntimeVerifier, *fakeAppVerifier, *fakeDrift, *fakeMarker, *fakeCaps) {
+	fs := &fakeSeed{}
+	fv := &fakeRuntimeVerifier{}
+	fap := &fakeAppVerifier{}
+	fd := &fakeDrift{}
+	fm := &fakeMarker{}
+	fc := &fakeCaps{ok: true}
+	return Options{
+		Command:       "apply",
+		ConfigPath:    cfg,
+		PasswordFile:  pw,
+		Waiter:        &fakeWaiter{},
+		Backend:       &fakeBackend{},
+		TLS:           &fakeTLS{},
+		Policy:        &fakePolicy{},
+		Plugins:       &fakePlugins{},
+		Tree:          &fakeTree{},
+		ACIs:          &fakeACIs{},
+		Seed:          fs,
+		VerifyRuntime: fv,
+		VerifyApp:     fap,
+		Drift:         fd,
+		Marker:        fm,
+		Capabilities:  fc,
+	}, fs, fv, fap, fd, fm, fc
+}
+
 func TestPlanOffline(t *testing.T) {
 	cfg, _ := testConfigDir(t)
 	var stdout, stderr bytes.Buffer
@@ -241,38 +339,22 @@ func TestPlanOffline(t *testing.T) {
 
 func TestApplyLoadThenWaitOK(t *testing.T) {
 	cfg, pw := testConfigDir(t)
-	fw := &fakeWaiter{}
-	fb := &fakeBackend{}
-	ft := &fakeTLS{}
-	fp := &fakePolicy{}
-	fg := &fakePlugins{}
-	fr := &fakeTree{}
-	fa := &fakeACIs{}
-	fs := &fakeSeed{}
-	fv := &fakeRuntimeVerifier{}
-	fap := &fakeAppVerifier{}
-	sum, err := Run(t.Context(), Options{
-		Command:       "apply",
-		ConfigPath:    cfg,
-		PasswordFile:  pw,
-		Waiter:        fw,
-		Backend:       fb,
-		TLS:           ft,
-		Policy:        fp,
-		Plugins:       fg,
-		Tree:          fr,
-		ACIs:          fa,
-		Seed:          fs,
-		VerifyRuntime: fv,
-		VerifyApp:     fap,
-		LDAPURL:       "ldaps://127.0.0.1:3636",
-		CAFile:        "/tmp/ca.crt",
-	}, ioDiscard(), ioDiscard())
+	opt, fs, fv, fap, fd, fm, fc := applyOpts(cfg, pw)
+	fw := opt.Waiter.(*fakeWaiter)
+	fb := opt.Backend.(*fakeBackend)
+	ft := opt.TLS.(*fakeTLS)
+	fp := opt.Policy.(*fakePolicy)
+	fg := opt.Plugins.(*fakePlugins)
+	fr := opt.Tree.(*fakeTree)
+	fa := opt.ACIs.(*fakeACIs)
+	opt.LDAPURL = "ldaps://127.0.0.1:3636"
+	opt.CAFile = "/tmp/ca.crt"
+	sum, err := Run(t.Context(), opt, ioDiscard(), ioDiscard())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !sum.OK || fw.called != 1 || fb.called != 1 || ft.called != 1 || fp.called != 1 || fg.called != 1 || fr.called != 1 || fa.called != 1 || fs.called != 1 || fv.called != 1 || fap.called != 1 {
-		t.Fatalf("sum=%+v wait=%d backend=%d tls=%d policy=%d plugins=%d tree=%d aci=%d seed=%d verify_runtime=%d verify_app=%d", sum, fw.called, fb.called, ft.called, fp.called, fg.called, fr.called, fa.called, fs.called, fv.called, fap.called)
+	if !sum.OK || fw.called != 1 || fb.called != 1 || ft.called != 1 || fp.called != 1 || fg.called != 1 || fr.called != 1 || fa.called != 1 || fs.called != 1 || fv.called != 1 || fap.called != 1 || fd.called != 1 || fm.called != 1 || fc.called != 1 {
+		t.Fatalf("sum=%+v wait=%d backend=%d tls=%d policy=%d plugins=%d tree=%d aci=%d seed=%d verify_runtime=%d verify_app=%d drift=%d marker=%d caps=%d", sum, fw.called, fb.called, ft.called, fp.called, fg.called, fr.called, fa.called, fs.called, fv.called, fap.called, fd.called, fm.called, fc.called)
 	}
 	if !fb.req.Write {
 		t.Fatal("apply merge must write backend")
@@ -307,22 +389,32 @@ func TestApplyLoadThenWaitOK(t *testing.T) {
 	if fw.req.LDAPURL != "ldaps://127.0.0.1:3636" {
 		t.Fatalf("url = %s", fw.req.LDAPURL)
 	}
-	if len(sum.Phases) != 11 || sum.Phases[9].Phase != "verify_runtime" || sum.Phases[10].Phase != "verify_app" || !sum.Phases[10].OK {
+	if len(sum.Phases) != 13 || sum.Phases[9].Phase != "verify_runtime" || sum.Phases[10].Phase != "verify_app" || sum.Phases[11].Phase != "drift" || sum.Phases[12].Phase != "marker" || !sum.Phases[12].OK {
 		t.Fatalf("phases = %+v", sum.Phases)
 	}
-	wantRem := []string{"drift", "marker"}
-	if strings.Join(sum.Remaining, ",") != strings.Join(wantRem, ",") {
-		t.Fatalf("remaining = %v, want %v", sum.Remaining, wantRem)
+	if len(sum.Remaining) != 0 {
+		t.Fatalf("remaining = %v, want empty", sum.Remaining)
+	}
+	if fd.req.FailOnDifference {
+		t.Fatal("apply drift must be leftover-only")
+	}
+	if fm.req.DN == "" || !strings.HasPrefix(fm.req.ApplyVersion, "labldap-bootstrap/") {
+		t.Fatalf("marker req = %+v", fm.req)
+	}
+	if strings.Contains(fm.req.AppliedRevision, "alice-seed-secret") || strings.Contains(fm.req.ApplyVersion, "alice-seed-secret") {
+		t.Fatal("marker contained a secret")
+	}
+	if len(sum.Capabilities) == 0 || bytes.Contains(sum.Capabilities, []byte("alice-seed-secret")) {
+		t.Fatalf("capabilities = %s", sum.Capabilities)
 	}
 }
 
 func TestTlsRequestUsesCompiledLDAPSPort(t *testing.T) {
 	cfg, pw := testConfigDir(t)
+	opt, _, _, _, _, _, _ := applyOpts(cfg, pw)
 	ft := &fakeTLS{}
-	_, err := Run(t.Context(), Options{
-		Command: "apply", ConfigPath: cfg, PasswordFile: pw,
-		Waiter: &fakeWaiter{}, Backend: &fakeBackend{}, TLS: ft, Policy: &fakePolicy{}, Plugins: &fakePlugins{}, Tree: &fakeTree{}, ACIs: &fakeACIs{}, Seed: &fakeSeed{}, VerifyRuntime: &fakeRuntimeVerifier{}, VerifyApp: &fakeAppVerifier{},
-	}, ioDiscard(), ioDiscard())
+	opt.TLS = ft
+	_, err := Run(t.Context(), opt, ioDiscard(), ioDiscard())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -381,71 +473,74 @@ spec:
 	if err := os.WriteFile(pw, []byte("dm-secret\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	fb := &fakeBackend{}
-	ft := &fakeTLS{}
-	fp := &fakePolicy{}
-	fg := &fakePlugins{}
-	fr := &fakeTree{}
-	fa := &fakeACIs{}
-	fs := &fakeSeed{}
-	fv := &fakeRuntimeVerifier{}
-	fap := &fakeAppVerifier{}
-	sum, err := Run(t.Context(), Options{
-		Command: "apply", ConfigPath: cfg, PasswordFile: pw, Waiter: &fakeWaiter{}, Backend: fb, TLS: ft, Policy: fp, Plugins: fg, Tree: fr, ACIs: fa, Seed: fs, VerifyRuntime: fv, VerifyApp: fap,
-	}, ioDiscard(), ioDiscard())
+	opt, fs, fv, fap, fd, fm, fc := applyOpts(cfg, pw)
+	fb := opt.Backend.(*fakeBackend)
+	ft := opt.TLS.(*fakeTLS)
+	fp := opt.Policy.(*fakePolicy)
+	fg := opt.Plugins.(*fakePlugins)
+	fr := opt.Tree.(*fakeTree)
+	fa := opt.ACIs.(*fakeACIs)
+	sum, err := Run(t.Context(), opt, ioDiscard(), ioDiscard())
 	if err != nil {
 		t.Fatal(err)
 	}
 	if fb.req.Write || ft.req.Write || fp.req.Write || fg.req.Write || fr.req.Write || fa.req.Write || fs.req.Write {
 		t.Fatal("startupMode validate must not write")
 	}
-	if fv.called != 0 || fap.called != 0 {
-		t.Fatal("validate must not run write-probe verifiers")
+	if fv.called != 0 || fap.called != 0 || fm.called != 0 {
+		t.Fatal("validate must not run write-probe verifiers or write the marker")
 	}
-	if strings.Join(sum.Remaining, ",") != "inspect,drift" {
+	if fd.called != 1 || fc.called != 1 {
+		t.Fatalf("validate inspect/drift calls: drift=%d caps=%d", fd.called, fc.called)
+	}
+	if !fd.req.FailOnDifference {
+		t.Fatal("validate drift must fail on difference")
+	}
+	if len(sum.Remaining) != 0 {
 		t.Fatalf("remaining = %v", sum.Remaining)
+	}
+	if sum.Phases[len(sum.Phases)-1].Phase != "drift" {
+		t.Fatalf("last phase = %+v", sum.Phases)
 	}
 }
 
 func TestValidateSubcommandDoesNotWrite(t *testing.T) {
 	cfg, pw := testConfigDir(t)
+	opt, fs, fv, fap, fd, fm, _ := applyOpts(cfg, pw)
+	opt.Command = "validate"
 	fb := &fakeBackend{res: BackendResult{Action: "matched", Name: "userroot", Suffix: "dc=example,dc=test"}}
-	ft := &fakeTLS{}
-	fp := &fakePolicy{}
-	fg := &fakePlugins{}
-	fr := &fakeTree{}
-	fa := &fakeACIs{}
-	fs := &fakeSeed{}
-	fv := &fakeRuntimeVerifier{}
-	fap := &fakeAppVerifier{}
-	sum, err := Run(t.Context(), Options{
-		Command: "validate", ConfigPath: cfg, PasswordFile: pw, Waiter: &fakeWaiter{}, Backend: fb, TLS: ft, Policy: fp, Plugins: fg, Tree: fr, ACIs: fa, Seed: fs, VerifyRuntime: fv, VerifyApp: fap,
-	}, ioDiscard(), ioDiscard())
+	opt.Backend = fb
+	ft := opt.TLS.(*fakeTLS)
+	fp := opt.Policy.(*fakePolicy)
+	fg := opt.Plugins.(*fakePlugins)
+	fr := opt.Tree.(*fakeTree)
+	fa := opt.ACIs.(*fakeACIs)
+	sum, err := Run(t.Context(), opt, ioDiscard(), ioDiscard())
 	if err != nil {
 		t.Fatal(err)
 	}
 	if fb.req.Write || ft.req.Write || fp.req.Write || fg.req.Write || fr.req.Write || fa.req.Write || fs.req.Write {
 		t.Fatal("validate subcommand must not write")
 	}
-	if fv.called != 0 || fap.called != 0 {
-		t.Fatal("validate must not run write-probe verifiers")
+	if fv.called != 0 || fap.called != 0 || fm.called != 0 {
+		t.Fatal("validate must not run write-probe verifiers or write the marker")
 	}
-	if !sum.OK || sum.Phases[len(sum.Phases)-1].Phase != "seed" {
+	if !sum.OK || sum.Phases[len(sum.Phases)-1].Phase != "drift" {
 		t.Fatalf("%+v", sum)
 	}
-	if strings.Join(sum.Remaining, ",") != "inspect,drift" {
+	if len(sum.Remaining) != 0 {
 		t.Fatalf("remaining = %v", sum.Remaining)
+	}
+	if !fd.req.FailOnDifference {
+		t.Fatal("validate subcommand must ignore YAML merge for drift exit codes")
 	}
 }
 
 func TestApplySeedPasswordFailure(t *testing.T) {
 	cfg, pw := testConfigDir(t)
-	fs := &fakeSeed{err: PhaseError("seed", "password_set", "could not set seed user password")}
-	sum, err := Run(t.Context(), Options{
-		Command: "apply", ConfigPath: cfg, PasswordFile: pw,
-		Waiter: &fakeWaiter{}, Backend: &fakeBackend{}, TLS: &fakeTLS{}, Policy: &fakePolicy{},
-		Plugins: &fakePlugins{}, Tree: &fakeTree{}, ACIs: &fakeACIs{}, Seed: fs,
-	}, ioDiscard(), ioDiscard())
+	opt, _, _, _, _, fm, _ := applyOpts(cfg, pw)
+	opt.Seed = &fakeSeed{err: PhaseError("seed", "password_set", "could not set seed user password")}
+	sum, err := Run(t.Context(), opt, ioDiscard(), ioDiscard())
 	if err == nil {
 		t.Fatal("expected seed failure")
 	}
@@ -459,17 +554,16 @@ func TestApplySeedPasswordFailure(t *testing.T) {
 	if strings.Contains(err.Error(), "alice-seed-secret") {
 		t.Fatal("seed error leaked password")
 	}
+	if fm.called != 0 {
+		t.Fatal("partial seed must not write marker")
+	}
 }
 
 func TestApplyVerifyRuntimeFailure(t *testing.T) {
 	cfg, pw := testConfigDir(t)
-	fv := &fakeRuntimeVerifier{err: PhaseError("verify_runtime", "deny_failed", "runtime modified cn=config")}
-	sum, err := Run(t.Context(), Options{
-		Command: "apply", ConfigPath: cfg, PasswordFile: pw,
-		Waiter: &fakeWaiter{}, Backend: &fakeBackend{}, TLS: &fakeTLS{}, Policy: &fakePolicy{},
-		Plugins: &fakePlugins{}, Tree: &fakeTree{}, ACIs: &fakeACIs{}, Seed: &fakeSeed{},
-		VerifyRuntime: fv, VerifyApp: &fakeAppVerifier{},
-	}, ioDiscard(), ioDiscard())
+	opt, _, _, _, _, fm, _ := applyOpts(cfg, pw)
+	opt.VerifyRuntime = &fakeRuntimeVerifier{err: PhaseError("verify_runtime", "deny_failed", "runtime modified cn=config")}
+	sum, err := Run(t.Context(), opt, ioDiscard(), ioDiscard())
 	if err == nil {
 		t.Fatal("expected verify_runtime failure")
 	}
@@ -482,6 +576,9 @@ func TestApplyVerifyRuntimeFailure(t *testing.T) {
 	}
 	if strings.Contains(err.Error(), "alice-seed-secret") || strings.Contains(err.Error(), "runtime-secret") {
 		t.Fatal("verify error leaked password")
+	}
+	if fm.called != 0 {
+		t.Fatal("verify failure must not write marker")
 	}
 }
 
@@ -542,6 +639,140 @@ func TestSummaryDoesNotFormatSecret(t *testing.T) {
 	s := observability.Secret("super-secret")
 	if strings.Contains(s.String(), "super-secret") {
 		t.Fatal("secret string leaked")
+	}
+}
+
+func TestValidateDriftFails(t *testing.T) {
+	cfg, pw := testConfigDir(t)
+	opt, _, _, _, fd, fm, _ := applyOpts(cfg, pw)
+	opt.Command = "validate"
+	fd.report = DriftReport{Differ: true, ExtraUsers: []string{"uid=extra,ou=people,dc=example,dc=test"}}
+	sum, err := Run(t.Context(), opt, ioDiscard(), ioDiscard())
+	if err == nil {
+		t.Fatal("expected drift failure")
+	}
+	if sum.OK {
+		t.Fatal("validate drift must not report success")
+	}
+	apperr.Assert(t, err).Code(apperr.CodeBootstrap).FieldPath("phase.drift")
+	if sum.Phases[len(sum.Phases)-1].Code != "drift" {
+		t.Fatalf("phase code = %+v", sum.Phases)
+	}
+	if fm.called != 0 {
+		t.Fatal("validate must not write marker")
+	}
+	if !bytes.Contains(sum.Drift, []byte("uid=extra")) {
+		t.Fatalf("drift report missing extra: %s", sum.Drift)
+	}
+}
+
+func TestApplyLeftoverDriftDoesNotFail(t *testing.T) {
+	cfg, pw := testConfigDir(t)
+	opt, _, _, _, fd, fm, _ := applyOpts(cfg, pw)
+	fd.report = DriftReport{Differ: true, ExtraUsers: []string{"uid=runtime-extra,ou=people,dc=example,dc=test"}}
+	sum, err := Run(t.Context(), opt, ioDiscard(), ioDiscard())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !sum.OK || fm.called != 1 {
+		t.Fatalf("merge leftover must still write marker: ok=%v marker=%d", sum.OK, fm.called)
+	}
+	if !bytes.Contains(sum.Drift, []byte("runtime-extra")) {
+		t.Fatalf("leftover report missing extra: %s", sum.Drift)
+	}
+}
+
+func TestApplyCapabilityFailureDoesNotWriteMarker(t *testing.T) {
+	cfg, pw := testConfigDir(t)
+	opt, _, _, _, _, fm, fc := applyOpts(cfg, pw)
+	fc.ok = false
+	sum, err := Run(t.Context(), opt, ioDiscard(), ioDiscard())
+	if err == nil {
+		t.Fatal("expected capability failure")
+	}
+	if sum.OK {
+		t.Fatal("bootstrap must not report success after verification failure")
+	}
+	apperr.Assert(t, err).Code(apperr.CodeBootstrap).FieldPath("phase.verify_app")
+	if sum.Phases[len(sum.Phases)-1].Code != "capability" {
+		t.Fatalf("phase code = %+v", sum.Phases)
+	}
+	if fm.called != 0 {
+		t.Fatal("capability failure must leave prior marker")
+	}
+}
+
+func TestApplyMarkerWriteFailure(t *testing.T) {
+	cfg, pw := testConfigDir(t)
+	opt, _, _, _, _, fm, _ := applyOpts(cfg, pw)
+	fm.err = PhaseError("marker", "apply_failed", "injected marker write failure")
+	sum, err := Run(t.Context(), opt, ioDiscard(), ioDiscard())
+	if err == nil {
+		t.Fatal("expected marker failure")
+	}
+	if sum.OK {
+		t.Fatal("marker failure must not report success")
+	}
+	apperr.Assert(t, err).Code(apperr.CodeBootstrap).FieldPath("phase.marker")
+	if fm.last.AppliedRevision != "" {
+		t.Fatal("failed write must not commit a new marker")
+	}
+}
+
+func TestApplyPhaseFailureInjection(t *testing.T) {
+	cfg, pw := testConfigDir(t)
+	cases := []struct {
+		phase, code string
+		patch       func(*Options)
+	}{
+		{"backend", "create_failed", func(o *Options) {
+			o.Backend = &fakeBackend{err: PhaseError("backend", "create_failed", "injected backend fail")}
+		}},
+		{"tls", "tls", func(o *Options) {
+			o.TLS = &fakeTLS{err: PhaseError("tls", "tls", "injected tls fail")}
+		}},
+		{"pwpolicy", "readback_mismatch", func(o *Options) {
+			o.Policy = &fakePolicy{err: PhaseError("pwpolicy", "readback_mismatch", "injected policy fail")}
+		}},
+		{"plugins", "plugin_missing", func(o *Options) {
+			o.Plugins = &fakePlugins{err: PhaseError("plugins", "plugin_missing", "injected plugin fail")}
+		}},
+		{"tree", "parent_failed", func(o *Options) {
+			o.Tree = &fakeTree{err: PhaseError("tree", "parent_failed", "injected tree fail")}
+		}},
+		{"aci", "server_reject", func(o *Options) {
+			o.ACIs = &fakeACIs{err: PhaseError("aci", "server_reject", "injected aci fail")}
+		}},
+		{"seed", "apply_failed", func(o *Options) {
+			o.Seed = &fakeSeed{err: PhaseError("seed", "apply_failed", "injected seed fail")}
+		}},
+		{"marker", "apply_failed", func(o *Options) {
+			o.Marker = &fakeMarker{err: PhaseError("marker", "apply_failed", "injected marker fail")}
+		}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.phase, func(t *testing.T) {
+			opt, _, _, _, _, fm, _ := applyOpts(cfg, pw)
+			tc.patch(&opt)
+			sum, err := Run(t.Context(), opt, ioDiscard(), ioDiscard())
+			if err == nil {
+				t.Fatal("expected phase failure")
+			}
+			if sum.OK {
+				t.Fatal("must not report success")
+			}
+			apperr.Assert(t, err).Code(apperr.CodeBootstrap).FieldPath("phase." + tc.phase)
+			last := sum.Phases[len(sum.Phases)-1]
+			if last.Phase != tc.phase || last.Code != tc.code {
+				t.Fatalf("phase=%s code=%s want %s/%s", last.Phase, last.Code, tc.phase, tc.code)
+			}
+			if tc.phase != "marker" && fm.called != 0 {
+				t.Fatal("failed write phase must not write marker")
+			}
+			if strings.Contains(err.Error(), "alice-seed-secret") || strings.Contains(err.Error(), "dm-secret") {
+				t.Fatal("public error leaked secret")
+			}
+		})
 	}
 }
 

@@ -60,7 +60,7 @@ Pain this document removes:
 | Workspace | `/home/mbrewer/projects/go-lab-ldap-mcp` |
 | Module | `github.com/hilather/go-lab-ldap-mcp` (`go 1.26`, `toolchain go1.26.5`) |
 | TASKS status | T-001–T-034 `[x]`; T-035–T-120 `[ ]` (86 remaining) |
-| Milestones | M0 complete; M1 complete; M2 in progress (T-024–T-034 done; T-035–T-044 remain); M3–M8 not started |
+| Milestones | M0 complete; M1 complete; M2 in progress (T-024–T-040, T-044 done; T-041–T-043 remain); M3–M8 not started |
 | `cmd/labldap` | `help`, `version`, `validate`, `normalize`, `plan`. No-args is help/exit 0. `serve` is unknown/exit 2 |
 | `cmd/labldap-bootstrap` | `apply` / `validate` / `plan` via `bootstrap.ParseArgs` + `bootstrap.Run`; wires `ds389.Admin` and `ds389.Engine` |
 | `internal/config` | Full compiler: `Load` → `*Parsed`; `Compile` → `*Compiled` (Normalized, EnginePlan, DataPlan, Revisions) |
