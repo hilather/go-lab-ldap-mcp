@@ -153,11 +153,12 @@ func (r *Runtime) Modify(ctx context.Context, id directory.UserID, patch directo
 		if e != nil {
 			return e
 		}
+		if err := r.refuseRuntimeMutation(dn, patch); err != nil {
+			return err
+		}
 		mod := ldap.NewModifyRequest(dn, nil)
-		changed := false
 		if patch.Enabled != nil {
 			applyEnabled(mod, live, *patch.Enabled)
-			changed = true
 		}
 		for name, val := range patch.Attributes {
 			if skipPlannedUserAttr(name) && config.CanonicalAttr(name) != "cn" && config.CanonicalAttr(name) != "sn" {
@@ -174,9 +175,8 @@ func (r *Runtime) Modify(ctx context.Context, id directory.UserID, patch directo
 				return cfgErr("attributes."+name, "required", "schema-required attribute cannot be empty")
 			}
 			mod.Replace(name, []string{val})
-			changed = true
 		}
-		if changed {
+		if len(mod.Changes) > 0 {
 			if e := c.Modify(ctx, mod); e != nil {
 				return e
 			}
@@ -196,6 +196,9 @@ func (r *Runtime) SetEnabled(ctx context.Context, id directory.UserID, enabled b
 	if err != nil {
 		return directory.User{}, err
 	}
+	if err := r.refuseRuntimeAccount(dn, "runtime account cannot be mutated"); err != nil {
+		return directory.User{}, err
+	}
 	size, seconds := r.searchLimits()
 	var out directory.User
 	err = r.pool.Do(ctx, func(c *ldapclient.Conn) error {
@@ -212,9 +215,10 @@ func (r *Runtime) SetEnabled(ctx context.Context, id directory.UserID, enabled b
 			return nil
 		}
 		mod := ldap.NewModifyRequest(dn, nil)
-		applyEnabled(mod, live, enabled)
-		if e := c.Modify(ctx, mod); e != nil {
-			return e
+		if applyEnabled(mod, live, enabled) {
+			if e := c.Modify(ctx, mod); e != nil {
+				return e
+			}
 		}
 		ent, e := searchBaseConn(ctx, c, dn, runtimeUserReadAttrs(), size, seconds)
 		if e != nil {
@@ -231,8 +235,8 @@ func (r *Runtime) Delete(ctx context.Context, id directory.UserID, rev directory
 	if err != nil {
 		return err
 	}
-	if r.cfg.RuntimeDN != "" && sameDN(dn, r.cfg.RuntimeDN) {
-		return directory.Error("id", directory.FieldForbidden, "runtime account cannot be deleted")
+	if err := r.refuseRuntimeAccount(dn, "runtime account cannot be deleted"); err != nil {
+		return err
 	}
 	size, seconds := r.searchLimits()
 	return r.pool.Do(ctx, func(c *ldapclient.Conn) error {
@@ -253,6 +257,9 @@ func (r *Runtime) Delete(ctx context.Context, id directory.UserID, rev directory
 func (r *Runtime) SetPassword(ctx context.Context, id directory.UserID, password observability.Secret, rev directory.Revision) error {
 	dn, err := r.userDN(string(id))
 	if err != nil {
+		return err
+	}
+	if err := r.refuseRuntimeAccount(dn, "runtime account cannot be mutated"); err != nil {
 		return err
 	}
 	if password.Reveal() == "" {
@@ -278,14 +285,34 @@ func replaceUserPassword(ctx context.Context, c *ldapclient.Conn, dn string, pas
 	return c.Modify(ctx, mod)
 }
 
-func applyEnabled(mod *ldap.ModifyRequest, live *ldap.Entry, enabled bool) {
+func applyEnabled(mod *ldap.ModifyRequest, live *ldap.Entry, enabled bool) bool {
+	locked := accountLocked(live)
 	if enabled {
-		if accountLocked(live) {
-			mod.Delete("nsAccountLock", nil)
+		if !locked {
+			return false
 		}
-		return
+		mod.Delete("nsAccountLock", nil)
+		return true
+	}
+	if locked {
+		return false
 	}
 	mod.Replace("nsAccountLock", []string{"true"})
+	return true
+}
+
+func (r *Runtime) refuseRuntimeAccount(dn, public string) error {
+	if r.cfg.RuntimeDN != "" && sameDN(dn, r.cfg.RuntimeDN) {
+		return directory.Error("id", directory.FieldForbidden, public)
+	}
+	return nil
+}
+
+func (r *Runtime) refuseRuntimeMutation(dn string, patch directory.UserPatch) error {
+	if patch.Enabled == nil {
+		return nil
+	}
+	return r.refuseRuntimeAccount(dn, "runtime account cannot be mutated")
 }
 
 func validateUserSpec(spec directory.UserSpec) error {

@@ -2,10 +2,7 @@ package ds389
 
 import (
 	"context"
-	"errors"
 	"strings"
-
-	"github.com/go-ldap/ldap/v3"
 
 	"github.com/hilather/go-lab-ldap-mcp/internal/config"
 	"github.com/hilather/go-lab-ldap-mcp/internal/directory"
@@ -33,6 +30,12 @@ func (r *Runtime) BindTest(ctx context.Context, identity string, password observ
 		return directory.BindTestResult{Outcome: directory.BindOutcomeUnavailable}, redactSecrets(err, password)
 	}
 	defer conn.Close()
+
+	// Empty simple bind is an unauthenticated bind (389 result 53), not a
+	// disabled account. Do not call Bind; still used a disposable conn.
+	if password.Reveal() == "" {
+		return directory.BindTestResult{Outcome: directory.BindOutcomeInvalidCredentials}, nil
+	}
 
 	bindErr := conn.Bind(ctx, dn, password)
 	outcome := bindOutcome(found, disabled, locked, bindErr)
@@ -96,13 +99,10 @@ func accountInactivated(err error) bool {
 	if err == nil {
 		return false
 	}
-	var le *ldap.Error
-	if errors.As(err, &le) && le != nil && le.ResultCode == ldap.LDAPResultUnwillingToPerform {
-		return true
-	}
+	// 389 uses LDAP 53 for inactivated accounts *and* unauthenticated binds.
+	// Only the diagnostic distinguishes them; do not key off result code 53.
 	msg := strings.ToLower(err.Error())
-	return strings.Contains(msg, "inactivated") || strings.Contains(msg, "account disabled") ||
-		strings.Contains(msg, "account locked")
+	return strings.Contains(msg, "inactivated") || strings.Contains(msg, "account disabled")
 }
 
 func bindOutcome(found, disabled, locked bool, bindErr error) string {

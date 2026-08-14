@@ -124,6 +124,15 @@ func testRuntimeUsers(t *testing.T, env *runtimeEnv) {
 		t.Fatal("empty sn must fail")
 	}
 
+	en := true
+	noop, err := users.Modify(t.Context(), "alice", directory.UserPatch{Enabled: &en})
+	if err != nil {
+		t.Fatalf("modify enabled no-op: %v", err)
+	}
+	if !noop.Enabled {
+		t.Fatal("no-op enable cleared enabled")
+	}
+
 	patched, err := users.Modify(t.Context(), "alice", directory.UserPatch{Attributes: map[string]string{"description": "updated"}})
 	if err != nil {
 		t.Fatalf("modify: %v", err)
@@ -172,6 +181,13 @@ func testRuntimeUsers(t *testing.T, env *runtimeEnv) {
 	}
 	if !hasUser(page.Items, "alice") {
 		t.Fatalf("list missing alice: %+v", page.Items)
+	}
+
+	if _, err := users.SetEnabled(t.Context(), "rt", false, ""); err == nil || fieldCode(err) != directory.FieldForbidden {
+		t.Fatalf("disable runtime: %v", err)
+	}
+	if err := users.SetPassword(t.Context(), "rt", observability.Secret("repo-runtime-pass-12"), ""); err == nil || fieldCode(err) != directory.FieldForbidden {
+		t.Fatalf("rotate runtime: %v", err)
 	}
 
 	if err := users.Delete(t.Context(), "alice", afterPW.Revision); err != nil {
@@ -323,6 +339,11 @@ func testRuntimeSearch(t *testing.T, env *runtimeEnv) {
 		t.Fatal("over-broad &")
 	}
 	assertField(t, err, "filter", "over_broad")
+	_, err = env.rt.Search(t.Context(), directory.SearchQuery{Base: "dc=example,dc=test", Scope: directory.SearchScopeChildren, Filter: "(objectClass=*)"})
+	if err == nil {
+		t.Fatal("over-broad children")
+	}
+	assertField(t, err, "filter", "over_broad")
 
 	_, err = env.rt.Search(t.Context(), directory.SearchQuery{Base: "cn=config", Filter: "(objectClass=*)"})
 	if err == nil {
@@ -423,6 +444,17 @@ func testRuntimeBindTest(t *testing.T, env *runtimeEnv) {
 	}
 	if wrong.Outcome != directory.BindOutcomeInvalidCredentials || unknown.Outcome != wrong.Outcome {
 		t.Fatalf("enumeration: wrong=%s unknown=%s", wrong.Outcome, unknown.Outcome)
+	}
+	emptyLive, err := env.rt.BindTest(t.Context(), "bindme", "", directory.TransportLDAPS)
+	if err != nil {
+		t.Fatalf("empty live: %v", err)
+	}
+	emptyUnknown, err := env.rt.BindTest(t.Context(), "no-such-user", "", directory.TransportLDAPS)
+	if err != nil {
+		t.Fatalf("empty unknown: %v", err)
+	}
+	if emptyLive.Outcome != directory.BindOutcomeInvalidCredentials || emptyUnknown.Outcome != emptyLive.Outcome {
+		t.Fatalf("empty password: live=%s unknown=%s", emptyLive.Outcome, emptyUnknown.Outcome)
 	}
 	after := env.pool.Stats()
 	if after.Active != before.Active {

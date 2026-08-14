@@ -79,7 +79,10 @@ func (r *Runtime) buildSearch(q directory.SearchQuery) (*ldap.SearchRequest, str
 	if _, err := config.ParseFilterLimits(q.Filter, r.cfg.MaxFilterDepth, r.cfg.MaxFilterLength); err != nil {
 		return nil, "", nil, false, err
 	}
-	if config.IsOverBroad(q.Filter) && parsed.Equal(suffix) && scopeName == directory.SearchScopeSub {
+	// children is emulated as subtree minus the base, so suffix+children+
+	// match-all is the same dump as suffix+sub and is rejected with it.
+	if config.IsOverBroad(q.Filter) && parsed.Equal(suffix) &&
+		(scopeName == directory.SearchScopeSub || scopeName == directory.SearchScopeChildren) {
 		return nil, "", nil, false, apperr.New(apperr.CodeConfiguration, "search too broad").
 			WithField(apperr.Field{Path: "filter", Code: "over_broad", Message: "filter is over-broad"})
 	}

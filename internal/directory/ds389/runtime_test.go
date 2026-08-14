@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-ldap/ldap/v3"
+
 	"github.com/hilather/go-lab-ldap-mcp/internal/apperr"
 	"github.com/hilather/go-lab-ldap-mcp/internal/directory"
 	"github.com/hilather/go-lab-ldap-mcp/internal/directory/ldapclient"
@@ -186,6 +188,12 @@ func TestSearchConstraints(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	_, _, _, _, err = rt.buildSearch(directory.SearchQuery{
+		Base: "dc=example,dc=test", Scope: directory.SearchScopeChildren, Filter: "(objectClass=*)",
+	})
+	if err == nil || !hasField(err, "filter", "over_broad") {
+		t.Fatalf("suffix+children match-all: %v", err)
+	}
 }
 
 func TestBindOutcomeDoesNotEnumerate(t *testing.T) {
@@ -201,11 +209,32 @@ func TestBindOutcomeDoesNotEnumerate(t *testing.T) {
 	if bindOutcome(true, false, false, directory.Error("connection", directory.FieldUnavailable, "Account inactivated. Contact system administrator.")) != directory.BindOutcomeDisabled {
 		t.Fatal("inactivated")
 	}
+	unauth := directory.Error("connection", directory.FieldUnavailable, "Unauthenticated binds are not allowed")
+	if accountInactivated(unauth) || bindOutcome(true, false, false, unauth) != directory.BindOutcomeUnavailable {
+		t.Fatalf("generic 53 / unauthenticated bind must not be disabled: %s", bindOutcome(true, false, false, unauth))
+	}
 	if bindOutcome(true, false, true, directory.Error("bind", directory.FieldInvalidCredentials, "x")) != directory.BindOutcomeLocked {
 		t.Fatal("locked")
 	}
 	if bindOutcome(true, false, false, nil) != directory.BindOutcomeSuccess {
 		t.Fatal("success")
+	}
+}
+
+func TestBindTestEmptyPasswordStillDials(t *testing.T) {
+	t.Parallel()
+	rt := testRuntime(t)
+	var connectCalls int
+	rt.cfg.Connect = func(ctx context.Context, cfg ldapclient.Config) (*ldapclient.Conn, error) {
+		connectCalls++
+		return nil, directory.Error("connection", directory.FieldUnavailable, "directory unavailable")
+	}
+	res, err := rt.BindTest(t.Context(), "cn=ghost,dc=example,dc=test", "", directory.TransportLDAP)
+	if connectCalls != 1 {
+		t.Fatalf("empty password must still open a disposable conn, calls=%d", connectCalls)
+	}
+	if res.Outcome != directory.BindOutcomeUnavailable {
+		t.Fatalf("down directory: %+v %v", res, err)
 	}
 }
 
@@ -316,6 +345,42 @@ func TestUsersGroupsAreSeparateRepos(t *testing.T) {
 	var _ directory.BindTester = rt
 	var _ directory.SchemaRepository = rt
 	var _ directory.CapabilityInspector = rt
+}
+
+func TestApplyEnabledNoopWhenUnchanged(t *testing.T) {
+	t.Parallel()
+	unlocked := &ldap.Entry{DN: "uid=a,ou=people,dc=example,dc=test"}
+	mod := ldap.NewModifyRequest(unlocked.DN, nil)
+	if applyEnabled(mod, unlocked, true) || len(mod.Changes) != 0 {
+		t.Fatal("enable on unlocked must not queue a modify")
+	}
+	locked := &ldap.Entry{
+		DN:         unlocked.DN,
+		Attributes: []*ldap.EntryAttribute{{Name: "nsAccountLock", Values: []string{"true"}}},
+	}
+	mod = ldap.NewModifyRequest(locked.DN, nil)
+	if applyEnabled(mod, locked, false) || len(mod.Changes) != 0 {
+		t.Fatal("disable on locked must not queue a modify")
+	}
+	if !applyEnabled(mod, locked, true) || len(mod.Changes) == 0 {
+		t.Fatal("enable on locked must queue a delete")
+	}
+}
+
+func TestRefuseRuntimeAccountMutations(t *testing.T) {
+	t.Parallel()
+	rt := testRuntime(t)
+	dn := "uid=rt,ou=people,dc=example,dc=test"
+	if err := rt.refuseRuntimeAccount(dn, "runtime account cannot be mutated"); err == nil || fieldOf(err) != directory.FieldForbidden {
+		t.Fatalf("runtime guard: %v", err)
+	}
+	en := true
+	if err := rt.refuseRuntimeMutation(dn, directory.UserPatch{Enabled: &en}); err == nil {
+		t.Fatal("enabled patch on runtime")
+	}
+	if err := rt.refuseRuntimeMutation(dn, directory.UserPatch{Attributes: map[string]string{"sn": "x"}}); err != nil {
+		t.Fatalf("attr-only patch: %v", err)
+	}
 }
 
 func TestConfigFieldCodes(t *testing.T) {

@@ -170,23 +170,12 @@ func rootDSEFromEntry(e *ldap.Entry) directory.RootDSE {
 		return directory.RootDSE{}
 	}
 	return directory.RootDSE{
-		NamingContexts:    sortCI(filterSecretValues(e.GetAttributeValues("namingContexts"))),
+		NamingContexts:    sortCI(e.GetAttributeValues("namingContexts")),
 		VendorName:        e.GetAttributeValue("vendorName"),
 		VendorVersion:     e.GetAttributeValue("vendorVersion"),
 		SupportedControls: sortCI(e.GetAttributeValues("supportedControl")),
 		SupportedSASL:     sortCI(e.GetAttributeValues("supportedSASLMechanisms")),
 	}
-}
-
-func filterSecretValues(in []string) []string {
-	var out []string
-	for _, v := range in {
-		if skipReturnedAttr(v) {
-			continue
-		}
-		out = append(out, v)
-	}
-	return out
 }
 
 func secretSchemaName(name string) bool {
