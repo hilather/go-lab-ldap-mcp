@@ -12,4 +12,12 @@ if (!pkg.engines?.node?.startsWith(">=22.12")) {
   console.error("frontend engines.node pin drifted:", pkg.engines?.node);
   process.exit(1);
 }
+if (!String(pkg.dependencies?.react ?? "").startsWith("19.2.")) {
+  console.error("frontend react pin drifted:", pkg.dependencies?.react);
+  process.exit(1);
+}
+if (!String(pkg.dependencies?.["react-dom"] ?? "").startsWith("19.2.")) {
+  console.error("frontend react-dom pin drifted:", pkg.dependencies?.["react-dom"]);
+  process.exit(1);
+}
 console.log("frontend pin lint ok");

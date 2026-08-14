@@ -255,10 +255,11 @@ const serveUsage = `Usage:
   labldap serve --config FILE [--ldap-url URL] [--directory-ca-file FILE] [--directory-host NAME]
   labldap serve --placeholder
 
-serve starts the management HTTP listener (REST, later MCP and UI).
+serve starts the management HTTP listener (REST, later MCP, and embedded UI).
 GET /health is process liveness and never consults LDAP.
 GET /health/ready requires runtime bind, marker, Directory revision match,
 required capabilities, and no reset.
+GET / serves hashed UI assets or index.html.
 
 --ldap-url defaults to ldaps://127.0.0.1:<compiled ldaps port> (or LABLDAP_LDAP_URL).
 --directory-ca-file is required unless insecure lab mode is set

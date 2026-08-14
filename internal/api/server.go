@@ -1,6 +1,7 @@
 package api
 
 import (
+	"io/fs"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	"github.com/hilather/go-lab-ldap-mcp/internal/auth"
 	"github.com/hilather/go-lab-ldap-mcp/internal/config"
 	"github.com/hilather/go-lab-ldap-mcp/internal/observability"
+	"github.com/hilather/go-lab-ldap-mcp/internal/web"
 )
 
 const (
@@ -63,6 +65,7 @@ type Options struct {
 	PageSizeDefault int
 	PageSizeMax     int
 	CursorKey       config.CursorKey
+	Assets          fs.FS
 }
 
 // Server is the REST transport. It does not import mcpserver or LDAP.
@@ -89,6 +92,7 @@ type Server struct {
 	pageSizeDefault int
 	pageSizeMax     int
 	cursorKey       config.CursorKey
+	assets          fs.FS
 }
 
 func New(opt Options) (*Server, error) {
@@ -126,6 +130,10 @@ func New(opt Options) (*Server, error) {
 	if pageMax <= 0 {
 		pageMax = defaultPageMax
 	}
+	assets := opt.Assets
+	if assets == nil {
+		assets = web.FS()
+	}
 	return &Server{
 		registry:        opt.Registry,
 		sessions:        opt.Sessions,
@@ -149,6 +157,7 @@ func New(opt Options) (*Server, error) {
 		pageSizeDefault: pageDef,
 		pageSizeMax:     pageMax,
 		cursorKey:       append(config.CursorKey(nil), opt.CursorKey...),
+		assets:          assets,
 	}, nil
 }
 
@@ -163,6 +172,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/session", s.handleCreateSession)
 	mux.HandleFunc("GET /api/v1/session", s.handleGetSession)
 	mux.HandleFunc("DELETE /api/v1/session", s.handleDeleteSession)
+	// GET / is a subtree pattern: hashed assets or index.html fallback.
+	mux.HandleFunc("GET /", s.handleUI)
 
 	mux.HandleFunc("GET /api/v1/users", s.handleListUsers)
 	mux.HandleFunc("POST /api/v1/users", s.handleCreateUser)

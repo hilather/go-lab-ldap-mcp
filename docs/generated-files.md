@@ -13,7 +13,7 @@ This document is the source-versus-generated policy for LabLDAP.
 
 Regenerate with `make generate`. Fail CI on drift with `make generate-drift`.
 
-A later frontend OpenAPI client (T-095) consumes the generated TypeScript types. Do not duplicate those types by hand.
+The frontend client ([`frontend/src/api/client.ts`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/frontend/src/api/client.ts)) consumes these TypeScript types through `openapi-fetch`. Do not duplicate resource models by hand.
 
 ## OD-009 verification
 
@@ -25,7 +25,7 @@ Commands or tests: make generate; make generate-drift; go test ./api ./internal/
 Observed behavior: oapi-codegen v2.8.0 emits deterministic Go models from OpenAPI 3.0.3. openapi-typescript 7.13.0 emits TypeScript types. OpenAPI 3.1 was not selected because request validation and examples are expressed as the documented 3.0.3 subset.
 Security implications: examples contain only lab placeholders, not fixture or production secrets. Generated code is models only (no third-party HTTP router).
 Result: accepted default
-Related tasks: T-060, T-061
+Related tasks: T-060, T-061, T-095
 ```
 
 ## Rules
