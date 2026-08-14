@@ -53,6 +53,7 @@ var (
 	OpBaseline     = Operation{Name: "baseline", Scope: v1alpha1.ScopeDirectoryRead}
 	OpReset        = Operation{Name: "reset", Scope: v1alpha1.ScopeLabReset}
 	OpExport       = Operation{Name: "export", Scope: v1alpha1.ScopeLabExport}
+	OpAuditRead    = Operation{Name: "audit.read", Scope: v1alpha1.ScopeAuditRead}
 )
 
 // Baseline separates compiled expected/control revisions from the applied marker.

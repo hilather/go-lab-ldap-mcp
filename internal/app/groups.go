@@ -17,21 +17,21 @@ type Groups struct {
 }
 
 func (s *Groups) List(ctx context.Context, p Principal, q directory.GroupListQuery) (directory.GroupPage, error) {
-	if err := s.hooks.authorize(p, OpGroupList); err != nil {
+	if err := s.hooks.authorize(ctx, p, OpGroupList); err != nil {
 		return directory.GroupPage{}, err
 	}
 	return s.repo.List(ctx, q)
 }
 
 func (s *Groups) Get(ctx context.Context, p Principal, id directory.GroupID) (directory.Group, error) {
-	if err := s.hooks.authorize(p, OpGroupGet); err != nil {
+	if err := s.hooks.authorize(ctx, p, OpGroupGet); err != nil {
 		return directory.Group{}, err
 	}
 	return s.repo.Get(ctx, id)
 }
 
 func (s *Groups) Create(ctx context.Context, p Principal, spec directory.GroupSpec) (directory.Group, error) {
-	if err := s.hooks.authorize(p, OpGroupCreate); err != nil {
+	if err := s.hooks.authorize(ctx, p, OpGroupCreate); err != nil {
 		return directory.Group{}, err
 	}
 	if err := s.hooks.allowWrite(ctx); err != nil {
@@ -65,7 +65,7 @@ func (s *Groups) Create(ctx context.Context, p Principal, spec directory.GroupSp
 }
 
 func (s *Groups) Delete(ctx context.Context, p Principal, id directory.GroupID, rev directory.Revision) error {
-	if err := s.hooks.authorize(p, OpGroupDelete); err != nil {
+	if err := s.hooks.authorize(ctx, p, OpGroupDelete); err != nil {
 		return err
 	}
 	if err := s.hooks.allowWrite(ctx); err != nil {
@@ -96,14 +96,14 @@ func (s *Groups) RemoveMembers(ctx context.Context, p Principal, id directory.Gr
 
 func (s *Groups) ReplaceMembers(ctx context.Context, p Principal, id directory.GroupID, members []directory.MemberRef, rev directory.Revision) (directory.MembershipSummary, error) {
 	if err := requireRevision(rev); err != nil {
-		if authErr := s.hooks.authorize(p, OpGroupMembers); authErr != nil {
+		if authErr := s.hooks.authorize(ctx, p, OpGroupMembers); authErr != nil {
 			return directory.MembershipSummary{}, authErr
 		}
 		s.hooks.record(ctx, p, "group.replace_members", string(id), AuditFailure, string(rev), "")
 		return directory.MembershipSummary{}, err
 	}
 	if err := s.rejectSelfMember(id, members); err != nil {
-		if authErr := s.hooks.authorize(p, OpGroupMembers); authErr != nil {
+		if authErr := s.hooks.authorize(ctx, p, OpGroupMembers); authErr != nil {
 			return directory.MembershipSummary{}, authErr
 		}
 		s.hooks.record(ctx, p, "group.replace_members", string(id), AuditFailure, string(rev), "")
@@ -115,7 +115,7 @@ func (s *Groups) ReplaceMembers(ctx context.Context, p Principal, id directory.G
 type memberMutate func(context.Context, directory.GroupID, []directory.MemberRef, directory.Revision) (directory.MembershipSummary, error)
 
 func (s *Groups) mutateMembers(ctx context.Context, p Principal, id directory.GroupID, members []directory.MemberRef, rev directory.Revision, action string, fn memberMutate) (directory.MembershipSummary, error) {
-	if err := s.hooks.authorize(p, OpGroupMembers); err != nil {
+	if err := s.hooks.authorize(ctx, p, OpGroupMembers); err != nil {
 		return directory.MembershipSummary{}, err
 	}
 	if err := s.hooks.allowWrite(ctx); err != nil {

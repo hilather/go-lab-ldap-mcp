@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/hilather/go-lab-ldap-mcp/internal/apperr"
+	"github.com/hilather/go-lab-ldap-mcp/internal/audit"
 	"github.com/hilather/go-lab-ldap-mcp/internal/auth"
 	"github.com/hilather/go-lab-ldap-mcp/internal/config"
 	"github.com/hilather/go-lab-ldap-mcp/internal/observability"
@@ -43,6 +44,8 @@ type Options struct {
 	Users           Users
 	Groups          Groups
 	Query           Query
+	Audit           audit.Lister
+	AuditHook       audit.Hook
 	Build           observability.BuildInfo
 	PageSizeDefault int
 	PageSizeMax     int
@@ -65,6 +68,8 @@ type Server struct {
 	users           Users
 	groups          Groups
 	query           Query
+	audit           audit.Lister
+	auditHook       audit.Hook
 	build           observability.BuildInfo
 	pageSizeDefault int
 	pageSizeMax     int
@@ -121,6 +126,8 @@ func New(opt Options) (*Server, error) {
 		users:           opt.Users,
 		groups:          opt.Groups,
 		query:           opt.Query,
+		audit:           opt.Audit,
+		auditHook:       opt.AuditHook,
 		build:           build,
 		pageSizeDefault: pageDef,
 		pageSizeMax:     pageMax,
@@ -165,6 +172,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/schema", s.handleSchema)
 	mux.HandleFunc("GET /api/v1/schema/objectclasses/{name}", s.handleObjectClass)
 	mux.HandleFunc("GET /api/v1/schema/attributes/{name}", s.handleAttributeType)
+	mux.HandleFunc("GET /api/v1/audit", s.handleListAudit)
 
 	var h http.Handler = mux
 	h = s.authMiddleware(h)

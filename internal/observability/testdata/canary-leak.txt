@@ -1,0 +1,2 @@
+# Deliberate leak fixture (T-072). The scanner must fail on this file.
+INFO component=labldap msg=login Authorization: Bearer lab-canary-must-fail-scan-32chars!

@@ -22,7 +22,7 @@ type Query struct {
 }
 
 func (s *Query) Search(ctx context.Context, p Principal, q directory.SearchQuery) (directory.SearchPage, error) {
-	if err := s.hooks.authorize(p, OpSearch); err != nil {
+	if err := s.hooks.authorize(ctx, p, OpSearch); err != nil {
 		return directory.SearchPage{}, err
 	}
 	page, err := s.search.Search(ctx, q)
@@ -34,7 +34,7 @@ func (s *Query) Search(ctx context.Context, p Principal, q directory.SearchQuery
 }
 
 func (s *Query) BindTest(ctx context.Context, p Principal, identity string, password observability.Secret, transport directory.Transport) (directory.BindTestResult, error) {
-	if err := s.hooks.authorize(p, OpBindTest); err != nil {
+	if err := s.hooks.authorize(ctx, p, OpBindTest); err != nil {
 		return directory.BindTestResult{}, err
 	}
 	if err := s.hooks.rateLimit(ctx, "bind:"+p.ID); err != nil {
@@ -42,20 +42,29 @@ func (s *Query) BindTest(ctx context.Context, p Principal, identity string, pass
 	}
 	res, err := s.bind.BindTest(ctx, identity, password, transport)
 	if err != nil && isUnavailable(err) {
-		return directory.BindTestResult{Outcome: directory.BindOutcomeUnavailable}, err
+		res.Outcome = directory.BindOutcomeUnavailable
 	}
+	// Generic result only: never the password, identity, or filter.
+	result := string(res.Outcome)
+	if result == "" {
+		result = AuditFailure
+	}
+	if err != nil && res.Outcome == "" {
+		result = AuditFailure
+	}
+	s.hooks.record(ctx, p, OpBindTest.Name, "bind", result, "", "")
 	return res, err
 }
 
 func (s *Query) RootDSE(ctx context.Context, p Principal) (directory.RootDSE, error) {
-	if err := s.hooks.authorize(p, OpSchemaRead); err != nil {
+	if err := s.hooks.authorize(ctx, p, OpSchemaRead); err != nil {
 		return directory.RootDSE{}, err
 	}
 	return s.schema.RootDSE(ctx)
 }
 
 func (s *Query) Schema(ctx context.Context, p Principal) (directory.Schema, error) {
-	if err := s.hooks.authorize(p, OpSchemaRead); err != nil {
+	if err := s.hooks.authorize(ctx, p, OpSchemaRead); err != nil {
 		return directory.Schema{}, err
 	}
 	sch, err := s.schema.Schema(ctx)
@@ -100,14 +109,14 @@ func (s *Query) AttributeType(ctx context.Context, p Principal, name string) (di
 }
 
 func (s *Query) Capabilities(ctx context.Context, p Principal) (directory.Capabilities, error) {
-	if err := s.hooks.authorize(p, OpCapabilities); err != nil {
+	if err := s.hooks.authorize(ctx, p, OpCapabilities); err != nil {
 		return directory.Capabilities{}, err
 	}
 	return s.caps.Capabilities(ctx)
 }
 
 func (s *Query) Baseline(ctx context.Context, p Principal) (Baseline, error) {
-	if err := s.hooks.authorize(p, OpBaseline); err != nil {
+	if err := s.hooks.authorize(ctx, p, OpBaseline); err != nil {
 		return Baseline{}, err
 	}
 	out := Baseline{

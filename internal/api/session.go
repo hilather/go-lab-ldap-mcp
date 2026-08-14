@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hilather/go-lab-ldap-mcp/internal/audit"
 	"github.com/hilather/go-lab-ldap-mcp/internal/auth"
 )
 
@@ -39,6 +40,7 @@ func (s *Server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 	}
 	p, ok := s.lookupToken(body.Token)
 	if !ok {
+		s.emitAudit(r, audit.ActionAuthenticate, "", "session", audit.ResultFailure)
 		writeProblem(w, r, auth.AuthRequired())
 		return
 	}
@@ -57,6 +59,9 @@ func (s *Server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 	}
 	secure := auth.CookieSecure(r, s.forceSecure)
 	http.SetCookie(w, auth.NewSessionCookie(cookie, secure, 0))
+	actor := appActor(auth.KindToken, p.ID)
+	s.emitAudit(r, audit.ActionAuthenticate, actor, "session", audit.ResultSuccess)
+	s.emitAudit(r, audit.ActionSessionCreate, actor, "session", audit.ResultSuccess)
 	setNoStore(w)
 	writeJSON(w, r, http.StatusOK, "application/json", sessionCreatedBody{CSRFToken: csrf})
 }
@@ -91,13 +96,22 @@ func (s *Server) handleDeleteSession(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, r, auth.AuthRequired())
 		return
 	}
-	if _, _, ok := s.sessions.Lookup(c.Value); !ok {
+	sess, _, ok := s.sessions.Lookup(c.Value)
+	if !ok {
 		writeProblem(w, r, auth.AuthRequired())
 		return
 	}
 	s.sessions.Delete(c.Value)
 	http.SetCookie(w, auth.ClearSessionCookie(auth.CookieSecure(r, s.forceSecure)))
+	s.emitAudit(r, audit.ActionSessionDestroy, appActor(auth.KindSession, sess.ID), "session", audit.ResultSuccess)
 	writeNoContent(w, r)
+}
+
+func appActor(kind, id string) string {
+	if id == "" {
+		return kind
+	}
+	return kind + ":" + id
 }
 
 func bearerOrSession401(r *http.Request) error {

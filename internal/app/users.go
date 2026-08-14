@@ -16,21 +16,21 @@ type Users struct {
 }
 
 func (s *Users) List(ctx context.Context, p Principal, q directory.UserListQuery) (directory.UserPage, error) {
-	if err := s.hooks.authorize(p, OpUserList); err != nil {
+	if err := s.hooks.authorize(ctx, p, OpUserList); err != nil {
 		return directory.UserPage{}, err
 	}
 	return s.repo.List(ctx, q)
 }
 
 func (s *Users) Get(ctx context.Context, p Principal, id directory.UserID) (directory.User, error) {
-	if err := s.hooks.authorize(p, OpUserGet); err != nil {
+	if err := s.hooks.authorize(ctx, p, OpUserGet); err != nil {
 		return directory.User{}, err
 	}
 	return s.repo.Get(ctx, id)
 }
 
 func (s *Users) Create(ctx context.Context, p Principal, spec CreateUser) (directory.User, error) {
-	if err := s.hooks.authorize(p, OpUserCreate); err != nil {
+	if err := s.hooks.authorize(ctx, p, OpUserCreate); err != nil {
 		return directory.User{}, err
 	}
 	if err := s.hooks.allowWrite(ctx); err != nil {
@@ -68,7 +68,7 @@ func (s *Users) compensateCreate(ctx context.Context, id directory.UserID) {
 }
 
 func (s *Users) Update(ctx context.Context, p Principal, id directory.UserID, patch UpdateUser) (directory.User, error) {
-	if err := s.hooks.authorize(p, OpUserUpdate); err != nil {
+	if err := s.hooks.authorize(ctx, p, OpUserUpdate); err != nil {
 		return directory.User{}, err
 	}
 	if err := s.hooks.allowWrite(ctx); err != nil {
@@ -94,7 +94,7 @@ func (s *Users) Update(ctx context.Context, p Principal, id directory.UserID, pa
 }
 
 func (s *Users) Delete(ctx context.Context, p Principal, id directory.UserID, rev directory.Revision) error {
-	if err := s.hooks.authorize(p, OpUserDelete); err != nil {
+	if err := s.hooks.authorize(ctx, p, OpUserDelete); err != nil {
 		return err
 	}
 	if err := s.hooks.allowWrite(ctx); err != nil {
@@ -116,7 +116,7 @@ func (s *Users) Delete(ctx context.Context, p Principal, id directory.UserID, re
 }
 
 func (s *Users) SetEnabled(ctx context.Context, p Principal, id directory.UserID, enabled bool, rev directory.Revision) (directory.User, error) {
-	if err := s.hooks.authorize(p, OpUserSetEnabled); err != nil {
+	if err := s.hooks.authorize(ctx, p, OpUserSetEnabled); err != nil {
 		return directory.User{}, err
 	}
 	if err := s.hooks.allowWrite(ctx); err != nil {
@@ -138,7 +138,7 @@ func (s *Users) SetEnabled(ctx context.Context, p Principal, id directory.UserID
 }
 
 func (s *Users) SetPassword(ctx context.Context, p Principal, id directory.UserID, pw observability.Secret, rev directory.Revision) error {
-	if err := s.hooks.authorize(p, OpUserPassword); err != nil {
+	if err := s.hooks.authorize(ctx, p, OpUserPassword); err != nil {
 		return err
 	}
 	if err := s.hooks.allowWrite(ctx); err != nil {

@@ -119,6 +119,7 @@ func TestEveryOperationCoverage(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	var sawDeny, sawBind bool
 	for _, ev := range sink.Snapshot() {
 		raw, _ := json.Marshal(ev)
 		if hasSecret(string(raw), unitPass, unitPass+"x") {
@@ -127,5 +128,20 @@ func TestEveryOperationCoverage(t *testing.T) {
 		if ev.RequestID == "" && ev.Actor == "" {
 			t.Fatalf("empty audit: %+v", ev)
 		}
+		if ev.Action == audit.ActionAuthzDeny {
+			sawDeny = true
+			if ev.Actor != "token:none" {
+				t.Fatalf("deny actor %q", ev.Actor)
+			}
+		}
+		if ev.Action == audit.ActionBindTest {
+			sawBind = true
+			if ev.Target != "bind" {
+				t.Fatalf("bind target %q", ev.Target)
+			}
+		}
+	}
+	if !sawDeny || !sawBind {
+		t.Fatalf("missing deny=%v bind=%v", sawDeny, sawBind)
 	}
 }

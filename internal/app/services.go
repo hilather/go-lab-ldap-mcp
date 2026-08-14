@@ -77,11 +77,17 @@ func (h hooks) lock(key string) func() {
 	return h.locks.Lock(key)
 }
 
-func (h hooks) authorize(p Principal, op Operation) error {
+func (h hooks) authorize(ctx context.Context, p Principal, op Operation) error {
+	var err error
 	if h.authz == nil {
-		return ScopeAuthorizer{}.Authorize(p, op)
+		err = ScopeAuthorizer{}.Authorize(p, op)
+	} else {
+		err = h.authz.Authorize(p, op)
 	}
-	return h.authz.Authorize(p, op)
+	if err != nil {
+		h.record(ctx, p, "authz.deny", op.Name, AuditFailure, "", "")
+	}
+	return err
 }
 
 func (h hooks) allowWrite(ctx context.Context) error {

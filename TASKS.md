@@ -809,27 +809,27 @@ Acceptance:
 - [x] Output validates against generated schemas.
 - [x] Secret and denied operational attributes are absent.
 
-## [ ] T-071 Implement structured audit model, ring buffer, and query service
+## [x] T-071 Implement structured audit model, ring buffer, and query service
 
 Priority: P0 | Size: L | Depends on: T-058, T-063
 
 Deliverables: audit event taxonomy, structured log sink, bounded in-memory recent-event buffer, filtering, and REST query endpoint.
 
 Acceptance:
-- [ ] Every mutation and security event type in the design can be represented.
-- [ ] Buffer is bounded and expiry behavior is documented.
-- [ ] Audit actor is a non-secret token or session identifier.
+- [x] Every mutation and security event type in the design can be represented.
+- [x] Buffer is bounded and expiry behavior is documented.
+- [x] Audit actor is a non-secret token or session identifier.
 
-## [ ] T-072 Implement sensitive-data redaction and full-log leak tests
+## [x] T-072 Implement sensitive-data redaction and full-log leak tests
 
 Priority: P0 | Size: L | Depends on: T-005, T-061 to T-071
 
 Deliverables: typed sensitive wrappers, header and field sanitizer, safe LDAP diagnostics, test-run log scanner, and regression corpus.
 
 Acceptance:
-- [ ] Generated tokens, seed passwords, session IDs, and bind passwords are absent from complete test logs.
-- [ ] Authorization and cookie headers are redacted.
-- [ ] A deliberate leak fixture makes the scan fail.
+- [x] Generated tokens, seed passwords, session IDs, and bind passwords are absent from complete test logs.
+- [x] Authorization and cookie headers are redacted.
+- [x] A deliberate leak fixture makes the scan fail.
 
 ## [ ] T-073 Implement liveness, readiness, degraded state, and diagnostics
 
