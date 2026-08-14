@@ -346,6 +346,7 @@ func TestUsersGroupsAreSeparateRepos(t *testing.T) {
 	var _ directory.BindTester = rt
 	var _ directory.SchemaRepository = rt
 	var _ directory.CapabilityInspector = rt
+	var _ directory.MarkerReader = rt
 }
 
 func TestApplyEnabledNoopWhenUnchanged(t *testing.T) {

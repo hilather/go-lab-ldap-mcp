@@ -620,38 +620,38 @@ Acceptance:
 - [x] Cursor cannot be reused with a different query or after tampering.
 - [x] If assertion control is supported, it has a real-engine atomic update test; otherwise residual race is documented.
 
-## [ ] T-054 Implement user application service
+## [x] T-054 Implement user application service
 
 Priority: P0 | Size: L | Depends on: T-045, T-048, T-053
 
 Deliverables: list, get, create, update, enable, disable, delete, password command, validation, scope hooks, revision checks, compensation, and audit hooks.
 
 Acceptance:
-- [ ] Service is usable from unit tests without HTTP or MCP.
-- [ ] Password failure after create performs documented compensation.
-- [ ] Every mutation emits success or failure audit intent.
+- [x] Service is usable from unit tests without HTTP or MCP.
+- [x] Password failure after create performs documented compensation.
+- [x] Every mutation emits success or failure audit intent.
 
-## [ ] T-055 Implement group and membership application service
+## [x] T-055 Implement group and membership application service
 
 Priority: P0 | Size: L | Depends on: T-045, T-049, T-053
 
 Deliverables: group CRUD, membership add, remove, replace, confirmation, revision checks, cycle validation, and audit hooks.
 
 Acceptance:
-- [ ] Same commands can support REST and MCP.
-- [ ] Idempotent membership summaries are correct.
-- [ ] Delete and replace operations require expected revision.
+- [x] Same commands can support REST and MCP.
+- [x] Idempotent membership summaries are correct.
+- [x] Delete and replace operations require expected revision.
 
-## [ ] T-056 Implement search, bind-test, schema, capability, and baseline services
+## [x] T-056 Implement search, bind-test, schema, capability, and baseline services
 
 Priority: P0 | Size: L | Depends on: T-044, T-050 to T-053
 
 Deliverables: application commands, scope hooks, safe output types, baseline marker comparison, and rate-limit hook points.
 
 Acceptance:
-- [ ] Directory-unavailable errors are stable and retryable.
-- [ ] Baseline response separates expected, applied, and control revisions.
-- [ ] Search output applies all redaction and limit rules.
+- [x] Directory-unavailable errors are stable and retryable.
+- [x] Baseline response separates expected, applied, and control revisions.
+- [x] Search output applies all redaction and limit rules.
 
 ## [ ] T-057 Define principal, scope, authorization, and operation policy model
 

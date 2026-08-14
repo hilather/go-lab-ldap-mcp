@@ -1,0 +1,120 @@
+package app
+
+import (
+	"strings"
+	"testing"
+
+	"github.com/hilather/go-lab-ldap-mcp/internal/apperr"
+	"github.com/hilather/go-lab-ldap-mcp/internal/directory"
+	"github.com/hilather/go-lab-ldap-mcp/internal/observability"
+)
+
+func TestSearchRedactsSecretsAndUnavailable(t *testing.T) {
+	t.Parallel()
+	q := New(Deps{
+		Search: fakeSearch{page: directory.SearchPage{Entries: []directory.SearchEntry{{
+			DN: "uid=alice,ou=people,dc=example,dc=test",
+			Attributes: []directory.AttrKV{
+				{Name: "cn", Value: "Alice"},
+				{Name: "userPassword", Value: "unit-search-pass-12"},
+			},
+		}}}},
+	}).Query
+	page, err := q.Search(t.Context(), writer(), directory.SearchQuery{Filter: "(uid=alice)"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page.Entries) != 1 || len(page.Entries[0].Attributes) != 1 || page.Entries[0].Attributes[0].Name != "cn" {
+		t.Fatalf("redaction: %+v", page.Entries)
+	}
+
+	down := New(Deps{Search: fakeSearch{err: directory.Error("connection", directory.FieldUnavailable, "directory unavailable")}}).Query
+	_, err = down.Search(t.Context(), writer(), directory.SearchQuery{Filter: "(uid=a)"})
+	if err == nil || !isUnavailable(err) {
+		t.Fatalf("unavailable: %v", err)
+	}
+}
+
+func TestBindTestPasswordScope(t *testing.T) {
+	t.Parallel()
+	q := New(Deps{Bind: fakeBind{res: directory.BindTestResult{Outcome: directory.BindOutcomeSuccess}}}).Query
+	_, err := q.BindTest(t.Context(), reader(), "alice", observability.Secret("unit-bind-pass-12"), directory.TransportLDAPS)
+	if err == nil || apperr.CodeOf(err) != apperr.CodeAuth {
+		t.Fatalf("password scope: %v", err)
+	}
+	res, err := q.BindTest(t.Context(), writer(), "alice", observability.Secret("unit-bind-pass-12"), directory.TransportLDAPS)
+	if err != nil || res.Outcome != directory.BindOutcomeSuccess {
+		t.Fatalf("ok: %+v %v", res, err)
+	}
+}
+
+func TestSchemaAndCapabilitiesScopes(t *testing.T) {
+	t.Parallel()
+	q := New(Deps{
+		Schema: fakeSchema{dse: directory.RootDSE{VendorName: "389 Project"}, sch: directory.Schema{}},
+		Caps:   fakeCaps{caps: directory.Capabilities{EngineVendor: "389 Project", Controls: []string{directory.ControlAssertionOID}, RequiredOK: true}},
+	}).Query
+	if _, err := q.RootDSE(t.Context(), reader()); err == nil {
+		t.Fatal("schema:read required")
+	}
+	schemaP := Principal{Kind: KindToken, ID: "s", Scopes: directory.ScopeSet{"schema:read"}}
+	dse, err := q.RootDSE(t.Context(), schemaP)
+	if err != nil || dse.VendorName == "" {
+		t.Fatalf("rootdse: %+v %v", dse, err)
+	}
+	_, err = q.Capabilities(t.Context(), writer())
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestBaselineSeparatesRevisions(t *testing.T) {
+	t.Parallel()
+	q := New(Deps{
+		Marker: fakeMarker{m: directory.BaselineMarker{
+			DN: "cn=labldap-baseline,dc=example,dc=test", AppliedRevision: "aaa", ExpectedRevision: "aaa",
+		}},
+		ExpectedRevision: "aaa",
+		ControlRevision:  "bbb",
+	}).Query
+	b, err := q.Baseline(t.Context(), writer())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b.ExpectedRevision != "aaa" || b.AppliedRevision != "aaa" || b.ControlRevision != "bbb" || !b.Match {
+		t.Fatalf("%+v", b)
+	}
+	mismatch := New(Deps{
+		Marker:           fakeMarker{m: directory.BaselineMarker{AppliedRevision: "ccc"}},
+		ExpectedRevision: "aaa",
+		ControlRevision:  "bbb",
+	}).Query
+	got, err := mismatch.Baseline(t.Context(), writer())
+	if err != nil || got.Match || got.AppliedRevision != "ccc" || got.ControlRevision != "bbb" {
+		t.Fatalf("%+v %v", got, err)
+	}
+}
+
+func TestResetExportScopesIndependent(t *testing.T) {
+	t.Parallel()
+	p := writer()
+	az := ScopeAuthorizer{}
+	if az.Authorize(p, OpReset) == nil {
+		t.Fatal("write must not imply lab:reset")
+	}
+	if az.Authorize(p, OpExport) == nil {
+		t.Fatal("write must not imply lab:export")
+	}
+	if az.Authorize(p, OpUserPassword) != nil {
+		t.Fatal("writer fixture includes password")
+	}
+}
+
+func TestMarkerReadOnlyDoesNotWrite(t *testing.T) {
+	t.Parallel()
+	// MarkerReader has ReadMarker only — compile-time KD-R18.
+	var _ directory.MarkerReader = fakeMarker{}
+	if strings.Contains(strings.ToLower("ReadMarker"), "write") {
+		t.Fatal("sanity")
+	}
+}

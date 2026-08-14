@@ -39,6 +39,7 @@ type RuntimeConfig struct {
 	PeopleDN     string
 	GroupsDN     string
 	RuntimeDN    string
+	MarkerDN     string
 	NestedGroups bool
 	// NestedMemberHook, if set, is the nested-group validation hook (T-049).
 	NestedMemberHook func(member directory.MemberRef) error
