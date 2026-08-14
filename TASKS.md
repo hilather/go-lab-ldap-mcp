@@ -967,49 +967,49 @@ Acceptance:
 
 # M6 - MCP
 
-## [ ] T-085 Pin official MCP Go SDK and scaffold Streamable HTTP server
+## [x] T-085 Pin official MCP Go SDK and scaffold Streamable HTTP server
 
 Priority: P0 | Size: M | Depends on: T-002, T-063
 
 Deliverables: official SDK dependency, supported protocol record, server implementation metadata, `/mcp` mount, and initialization test.
 
 Acceptance:
-- [ ] Official SDK client initializes and negotiates a supported version.
-- [ ] Current Streamable HTTP POST behavior is used.
-- [ ] No legacy unauthenticated HTTP+SSE endpoint is exposed.
+- [x] Official SDK client initializes and negotiates a supported version.
+- [x] Current Streamable HTTP POST behavior is used.
+- [x] No legacy unauthenticated HTTP+SSE endpoint is exposed.
 
-## [ ] T-086 Integrate MCP bearer authorization, request IDs, limits, and cancellation
+## [x] T-086 Integrate MCP bearer authorization, request IDs, limits, and cancellation
 
 Priority: P0 | Size: L | Depends on: T-061, T-063, T-085
 
 Deliverables: MCP-aware middleware integration, every-request auth, request context principal, body limits, Host and Origin checks, and cancellation propagation.
 
 Acceptance:
-- [ ] Every HTTP MCP request requires valid bearer authorization.
-- [ ] Request ID appears in application and tool results.
-- [ ] Cancelled SDK request cancels downstream operation within tested bounds.
+- [x] Every HTTP MCP request requires valid bearer authorization.
+- [x] Request ID appears in application and tool results.
+- [x] Cancelled SDK request cancels downstream operation within tested bounds.
 
-## [ ] T-087 Implement central MCP tool catalog and schema validation
+## [x] T-087 Implement central MCP tool catalog and schema validation
 
 Priority: P0 | Size: L | Depends on: T-057, T-085, T-086
 
 Deliverables: table-driven definitions, scope metadata, read-only and destructive hints, input and output types, registration validation, and docs generator.
 
 Acceptance:
-- [ ] Tool names are unique and match design.
-- [ ] Every tool has scopes, description, schemas, and behavior metadata.
-- [ ] Sensitive input fields have redaction coverage.
+- [x] Tool names are unique and match design.
+- [x] Every tool has scopes, description, schemas, and behavior metadata.
+- [x] Sensitive input fields have redaction coverage.
 
-## [ ] T-088 Implement MCP read tools and resources
+## [x] T-088 Implement MCP read tools and resources
 
 Priority: P0 | Size: L | Depends on: T-056, T-087
 
 Deliverables: capabilities, baseline, search, get-entry tools and optional capabilities, baseline, Root DSE, schema, and entry resources.
 
 Acceptance:
-- [ ] Read-only token can call all intended read operations.
-- [ ] Search paging and cursors match application semantics.
-- [ ] Resources enforce scopes and attribute restrictions.
+- [x] Read-only token can call all intended read operations.
+- [x] Search paging and cursors match application semantics.
+- [x] Resources enforce scopes and attribute restrictions.
 
 ## [ ] T-089 Implement MCP user tools
 

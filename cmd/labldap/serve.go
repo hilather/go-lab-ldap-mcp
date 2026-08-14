@@ -18,6 +18,7 @@ import (
 	"github.com/hilather/go-lab-ldap-mcp/internal/auth"
 	"github.com/hilather/go-lab-ldap-mcp/internal/config"
 	"github.com/hilather/go-lab-ldap-mcp/internal/directory/ds389"
+	"github.com/hilather/go-lab-ldap-mcp/internal/mcpserver"
 	"github.com/hilather/go-lab-ldap-mcp/internal/observability"
 )
 
@@ -72,7 +73,7 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 			fmt.Fprintf(stderr, "labldap serve: %v\n", err)
 			return 1
 		}
-		handler = srv.Handler()
+		handler = mountTransports(srv.Handler(), mcpserver.Disabled(nil))
 		readTO, writeTO, idleTO, stopTO = srv.Timeouts(30*time.Second, 15*time.Second)
 	} else {
 		built, err := compileControl(ctx, flags.configPath)
@@ -93,7 +94,12 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 			fmt.Fprintf(stderr, "labldap serve: %v\n", err)
 			return 1
 		}
-		handler = srv.Handler()
+		mcpH, err := mcpHandlerFromCompiled(built, opt.Registry, log)
+		if err != nil {
+			fmt.Fprintf(stderr, "labldap serve: %v\n", err)
+			return 1
+		}
+		handler = mountTransports(srv.Handler(), mcpH)
 		listen = built.Public.Spec.Management.Listen
 		reqTO, err := time.ParseDuration(built.Public.Spec.Limits.RequestTimeout)
 		if err != nil {
@@ -235,6 +241,43 @@ func serverOptionsFromCompiled(c *config.Compiled, flags serveFlags, log *slog.L
 	return opt, closer, nil
 }
 
+func mountTransports(rest, mcp http.Handler) http.Handler {
+	mux := http.NewServeMux()
+	if mcp == nil {
+		mcp = mcpserver.Disabled(nil)
+	}
+	mux.Handle(mcpserver.MountPath, mcp)
+	mux.Handle("/", rest)
+	return mux
+}
+
+func mcpHandlerFromCompiled(c *config.Compiled, reg *auth.Registry, log *slog.Logger) (http.Handler, error) {
+	if c == nil || c.Public == nil || (c.Public.Spec.Management.MCP.Enabled != nil && !*c.Public.Spec.Management.MCP.Enabled) {
+		return mcpserver.Disabled(reg), nil
+	}
+	mcpCfg := c.Public.Spec.Management.MCP
+	s, err := mcpserver.New(mcpserver.Options{
+		Registry: reg,
+		// Application services attach when the runtime pool lands (T-073).
+		// Nil keeps tool handlers returning directory unavailable, not panic.
+		Services:       nil,
+		Logger:         log,
+		AllowedOrigins: append([]string(nil), c.Public.Spec.Management.CORS.AllowedOrigins...),
+		AllowedHosts:   mcpserver.HostsFromListen(c.Public.Spec.Management.Listen),
+		MaxBody:        c.Public.Spec.Limits.MaxRequestBodyBytes,
+		Flags: mcpserver.RegisterFlags{
+			Mutations: mcpCfg.RegisterMutations,
+			Password:  mcpCfg.RegisterPassword,
+			Reset:     mcpCfg.RegisterReset,
+			Export:    mcpCfg.RegisterExport,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	return s.Handler(), nil
+}
+
 func runtimeConfigFromCompiled(c *config.Compiled) ds389.RuntimeConfig {
 	n := c.Normalized
 	return ds389.RuntimeConfig{
@@ -258,7 +301,7 @@ const serveUsage = `Usage:
   labldap serve --config FILE [--ldap-url URL] [--directory-ca-file FILE] [--directory-host NAME]
   labldap serve --placeholder
 
-serve starts the management HTTP listener (REST, later MCP and UI).
+serve starts the management HTTP listener (REST, MCP, and later UI).
 GET /health is process liveness and never consults LDAP.
 GET /health/ready requires runtime bind, marker, Directory revision match,
 required capabilities, and no reset.
@@ -271,6 +314,8 @@ required capabilities, and no reset.
 GET /metrics is Prometheus text. Default requireAuth is false: restrict
 the listener with loopback or network policy, or set
 spec.management.metrics.requireAuth.
+
+POST /mcp requires a bearer; when MCP is disabled a valid token gets 501.
 
 --placeholder listens on LABLDAP_LISTEN (default 127.0.0.1:8443) without
 loading a scenario or contacting LDAP.

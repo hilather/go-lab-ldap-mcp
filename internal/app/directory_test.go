@@ -34,6 +34,35 @@ func TestSearchRedactsSecretsAndUnavailable(t *testing.T) {
 	}
 }
 
+func TestGetEntryRedactsAndRequiresDN(t *testing.T) {
+	t.Parallel()
+	q := New(Deps{
+		Search: fakeSearch{page: directory.SearchPage{Entries: []directory.SearchEntry{{
+			DN: "uid=alice,ou=people,dc=example,dc=test",
+			Attributes: []directory.AttrKV{
+				{Name: "uid", Value: "alice"},
+				{Name: "userPassword", Value: "unit-getentry-pass-12"},
+			},
+		}}}},
+	}).Query
+	got, err := q.GetEntry(t.Context(), reader(), "uid=alice,ou=people,dc=example,dc=test", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.DN == "" || len(got.Attributes) != 1 || got.Attributes[0].Name != "uid" {
+		t.Fatalf("redaction: %+v", got)
+	}
+	_, err = q.GetEntry(t.Context(), reader(), "  ", nil)
+	if err == nil || apperr.CodeOf(err) != apperr.CodeConfiguration {
+		t.Fatalf("empty dn: %v", err)
+	}
+	missing := New(Deps{Search: fakeSearch{page: directory.SearchPage{}}}).Query
+	_, err = missing.GetEntry(t.Context(), reader(), "uid=missing,dc=example,dc=test", nil)
+	if err == nil || apperr.CodeOf(err) != apperr.CodeDirectory {
+		t.Fatalf("not found: %v", err)
+	}
+}
+
 func TestBindTestPasswordScope(t *testing.T) {
 	t.Parallel()
 	q := New(Deps{Bind: fakeBind{res: directory.BindTestResult{Outcome: directory.BindOutcomeSuccess}}}).Query

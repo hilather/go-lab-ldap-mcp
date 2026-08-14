@@ -66,6 +66,19 @@ An implementation agent must propose an ADR before changing:
 
 ## 6. Verification record format
 
+### OD-015 verification (T-085)
+
+```text
+Decision ID: OD-015
+Pinned component/version/digest: github.com/modelcontextprotocol/go-sdk@v1.7.0; MCP spec 2026-07-28; StreamableHTTPOptions.Stateless=true; StreamableHTTPOptions.PropagateRequestCancellation=true
+Environment tested: host Go 1.26.5 / toolchain go1.26.5
+Commands or tests: go test ./internal/mcpserver ./cmd/labldap
+Observed behavior: Official SDK client connects via server/discover and negotiates 2026-07-28 only when Stateless is true. Without Stateless the SDK falls back to 2025-11-25. GET /mcp is 405 (no standalone SSE). Every HTTP MCP request requires a bearer token.
+Security implications: No unauthenticated SSE. Host/Origin checks and body limits wrap the SDK handler. Tools call internal/app only (KD-R8).
+Result: accepted default
+Related tasks: T-085, T-086, T-087, T-088
+```
+
 When resolving a verification decision, record:
 
 ```text
