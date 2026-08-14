@@ -211,5 +211,5 @@ func sameDN(a, b string) bool {
 	if err != nil {
 		return false
 	}
-	return da.Equal(db)
+	return da.EqualFold(db)
 }

@@ -866,104 +866,104 @@ Acceptance:
 
 # M5 - Soft reset and LDIF export
 
-## [ ] T-076 Implement global mutation gate and reset state machine
+## [x] T-076 Implement global mutation gate and reset state machine
 
 Priority: P0 | Size: M | Depends on: T-058, T-073
 
 Deliverables: exclusive reset lock, ordinary write admission, reset phases, current and last operation state, cancellation policy, and metrics hooks.
 
 Acceptance:
-- [ ] Only one reset can run.
-- [ ] Ordinary writes receive stable reset-in-progress error.
-- [ ] State transitions are validated and observable without secrets.
+- [x] Only one reset can run.
+- [x] Ordinary writes receive stable reset-in-progress error.
+- [x] State transitions are validated and observable without secrets.
 
-## [ ] T-077 Implement managed-suffix inventory and dependency-safe delete plan
+## [x] T-077 Implement managed-suffix inventory and dependency-safe delete plan
 
 Priority: P0 | Size: L | Depends on: T-020, T-049, T-050, T-076
 
 Deliverables: paged inventory, preserved-DN protection, depth ordering, group-reference handling, counts, and dry-run plan.
 
 Acceptance:
-- [ ] Plan never deletes outside managed containers.
-- [ ] Runtime service account and required containers are preserved.
-- [ ] Direct LDAP runtime entries are included for reset removal.
+- [x] Plan never deletes outside managed containers.
+- [x] Runtime service account and required containers are preserved.
+- [x] Direct LDAP runtime entries are included for reset removal.
 
-## [ ] T-078 Implement baseline reapply with seed passwords
+## [x] T-078 Implement baseline reapply with seed passwords
 
 Priority: P0 | Size: L | Depends on: T-014, T-020, T-048, T-049, T-077
 
 Deliverables: delete execution, preserved-entry reconcile, user creation and password set, group and membership apply, and fix-up hook.
 
 Acceptance:
-- [ ] Baseline users can bind with seed passwords after reset.
-- [ ] Runtime-only entries are absent.
-- [ ] Seed secrets remain redacted and soft reset refuses startup when required files are unavailable.
+- [x] Baseline users can bind with seed passwords after reset.
+- [x] Runtime-only entries are absent.
+- [x] Seed secrets remain redacted and soft reset refuses startup when required files are unavailable.
 
-## [ ] T-079 Implement reset verification, marker commit, and operation status
+## [x] T-079 Implement reset verification, marker commit, and operation status
 
 Priority: P0 | Size: L | Depends on: T-039, T-056, T-076 to T-078
 
 Deliverables: canonical baseline comparison, representative bind and membership checks, marker update last, status service, and summary.
 
 Acceptance:
-- [ ] Successful reset reports expected and applied revision equality.
-- [ ] Verification failure does not commit new marker and readiness remains false.
-- [ ] Counts and phase are correct in operation response.
+- [x] Successful reset reports expected and applied revision equality.
+- [x] Verification failure does not commit new marker and readiness remains false.
+- [x] Counts and phase are correct in operation response.
 
-## [ ] T-080 Add reset failure injection and recovery behavior
+## [x] T-080 Add reset failure injection and recovery behavior
 
 Priority: P0 | Size: L | Depends on: T-079
 
 Deliverables: controlled failure points, partial-state fixtures, process restart or subsequent apply recovery, and operator diagnostics.
 
 Acceptance:
-- [ ] Each destructive phase has at least one failure test.
-- [ ] Reset-mode startup recovers supported partial states.
-- [ ] Persistent unresolved state produces explicit recovery instructions, not false readiness.
+- [x] Each destructive phase has at least one failure test.
+- [x] Reset-mode startup recovers supported partial states.
+- [x] Persistent unresolved state produces explicit recovery instructions, not false readiness.
 
-## [ ] T-081 Implement reset REST endpoints and destructive confirmations
+## [x] T-081 Implement reset REST endpoints and destructive confirmations
 
 Priority: P0 | Size: M | Depends on: T-060 to T-065, T-076 to T-080
 
 Deliverables: start reset, get reset status, exact scenario confirmation, expected revision, scope, rate limit, and audit.
 
 Acceptance:
-- [ ] `directory:write` without `lab:reset` is denied.
-- [ ] Wrong confirmation or revision fails before mutation.
-- [ ] Duplicate request returns current operation or conflict deterministically.
+- [x] `directory:write` without `lab:reset` is denied.
+- [x] Wrong confirmation or revision fails before mutation.
+- [x] Duplicate request returns current operation or conflict deterministically.
 
-## [ ] T-082 Implement deterministic streaming LDIF encoder
+## [x] T-082 Implement deterministic streaming LDIF encoder
 
 Priority: P0 | Size: L | Depends on: T-013, T-050
 
 Deliverables: RFC-compatible encoding, base64 and line folding, deterministic DN and attribute order, comments, redaction policy, and writer cancellation.
 
 Acceptance:
-- [ ] Supported entries round-trip through an independent LDIF parser.
-- [ ] Password and secret attributes are omitted by default.
-- [ ] Export does not require loading all entries into memory.
+- [x] Supported entries round-trip through an independent LDIF parser.
+- [x] Password and secret attributes are omitted by default.
+- [x] Export does not require loading all entries into memory.
 
-## [ ] T-083 Implement export application service and REST streaming endpoint
+## [x] T-083 Implement export application service and REST streaming endpoint
 
 Priority: P0 | Size: L | Depends on: T-056, T-065, T-071, T-082
 
 Deliverables: export request validation, paging, entry and byte limits, authenticated stream, safe filename, headers, cancellation, and audit.
 
 Acceptance:
-- [ ] Client disconnect cancels directory reads.
-- [ ] Actor without `lab:export` is denied.
-- [ ] Export limit failure is explicit and not presented as complete output.
+- [x] Client disconnect cancels directory reads.
+- [x] Actor without `lab:export` is denied.
+- [x] Export limit failure is explicit and not presented as complete output.
 
-## [ ] T-084 Complete reset and export cross-interface integration tests
+## [x] T-084 Complete reset and export cross-interface integration tests
 
 Priority: P0 | Size: L | Depends on: T-078 to T-083
 
 Deliverables: mutations from application, REST, and direct LDAP; reset; export before and after; failure, concurrency, and redaction tests.
 
 Acceptance:
-- [ ] Canonical baseline is restored repeatedly.
-- [ ] Reads and writes during destructive reset follow documented availability behavior.
-- [ ] Full exported content and logs contain no seeded passwords.
+- [x] Canonical baseline is restored repeatedly.
+- [x] Reads and writes during destructive reset follow documented availability behavior.
+- [x] Full exported content and logs contain no seeded passwords.
 
 # M6 - MCP
 

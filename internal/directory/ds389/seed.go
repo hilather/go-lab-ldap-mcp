@@ -495,7 +495,7 @@ func dnKey(s string) string {
 	if err != nil {
 		return strings.ToLower(strings.TrimSpace(s))
 	}
-	return d.String()
+	return d.FoldedKey()
 }
 
 func hasValue(e *ldap.Entry, name, want string) bool {

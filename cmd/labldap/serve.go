@@ -19,7 +19,6 @@ import (
 	"github.com/hilather/go-lab-ldap-mcp/internal/config"
 	"github.com/hilather/go-lab-ldap-mcp/internal/directory/ds389"
 	"github.com/hilather/go-lab-ldap-mcp/internal/observability"
-	"github.com/hilather/go-lab-ldap-mcp/internal/reset"
 )
 
 const defaultListen = "127.0.0.1:8443"
@@ -199,7 +198,7 @@ func serverOptionsFromCompiled(c *config.Compiled, flags serveFlags, log *slog.L
 			st := pool.Stats()
 			return st.Active, st.Idle, st.Max, st.Waiters
 		}, func() bool {
-			return gate != nil && gate.State() != reset.Ready
+			return gate != nil && gate.InProgress()
 		})
 	}
 	opt := api.Options{
@@ -218,6 +217,8 @@ func serverOptionsFromCompiled(c *config.Compiled, flags serveFlags, log *slog.L
 		Users:           b.users,
 		Groups:          b.groups,
 		Query:           b.query,
+		Reset:           b.reset,
+		Export:          b.export,
 		Audit:           b.audit,
 		AuditHook:       b.auditHook,
 		Diagnostics:     diag,
@@ -237,17 +238,19 @@ func serverOptionsFromCompiled(c *config.Compiled, flags serveFlags, log *slog.L
 func runtimeConfigFromCompiled(c *config.Compiled) ds389.RuntimeConfig {
 	n := c.Normalized
 	return ds389.RuntimeConfig{
-		Suffix:          n.Suffix.String(),
-		PeopleDN:        n.PeopleDN.String(),
-		GroupsDN:        n.GroupsDN.String(),
-		RuntimeDN:       n.Runtime.DN,
-		MarkerDN:        c.Data.Marker,
-		NestedGroups:    n.NestedGroups,
-		PageSizeDefault: c.Public.Spec.Limits.PageSizeDefault,
-		PageSizeMax:     c.Public.Spec.Limits.PageSizeMax,
-		SearchSizeLimit: c.Public.Spec.Limits.SearchSizeLimit,
-		MaxFilterDepth:  c.Public.Spec.Limits.MaxFilterDepth,
-		MaxFilterLength: c.Public.Spec.Limits.MaxFilterLength,
+		Suffix:           n.Suffix.String(),
+		PeopleDN:         n.PeopleDN.String(),
+		GroupsDN:         n.GroupsDN.String(),
+		RuntimeDN:        n.Runtime.DN,
+		MarkerDN:         c.Data.Marker,
+		NestedGroups:     n.NestedGroups,
+		PageSizeDefault:  c.Public.Spec.Limits.PageSizeDefault,
+		PageSizeMax:      c.Public.Spec.Limits.PageSizeMax,
+		SearchSizeLimit:  c.Public.Spec.Limits.SearchSizeLimit,
+		MaxFilterDepth:   c.Public.Spec.Limits.MaxFilterDepth,
+		MaxFilterLength:  c.Public.Spec.Limits.MaxFilterLength,
+		ExportMaxEntries: c.Public.Spec.Limits.ExportMaxEntries,
+		ExportMaxBytes:   c.Public.Spec.Limits.ExportMaxBytes,
 	}
 }
 

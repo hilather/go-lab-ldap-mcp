@@ -46,6 +46,11 @@ type Probe struct {
 	StartupMode string
 	ResetState  func() string
 	Pool        func() PoolView
+	// BaselineOK, if set, must be true for Ready. Used after a failed
+	// reset so a process restart cannot report false readiness (T-080).
+	// Implementations must not walk the full inventory; treat transport
+	// errors as unknown (return true) so Ping owns outages.
+	BaselineOK func(ctx context.Context) bool
 }
 
 func (p *Probe) Evaluate(ctx context.Context) Diagnostics {
@@ -89,9 +94,13 @@ func (p *Probe) Evaluate(ctx context.Context) Diagnostics {
 		}
 	}
 	resetOK := out.Reset.State == string(reset.Ready)
+	baselineOK := true
+	if p.BaselineOK != nil && bindOK {
+		baselineOK = p.BaselineOK(ctx)
+	}
 	// Mode is recorded for operators; mismatch still blocks every mode.
 	_ = p.StartupMode
-	out.Ready = bindOK && markerOK && match && capsOK && resetOK
+	out.Ready = bindOK && markerOK && match && capsOK && resetOK && baselineOK
 	return out
 }
 

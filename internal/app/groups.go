@@ -20,11 +20,17 @@ func (s *Groups) List(ctx context.Context, p Principal, q directory.GroupListQue
 	if err := s.hooks.authorize(ctx, p, OpGroupList); err != nil {
 		return directory.GroupPage{}, err
 	}
+	if err := s.hooks.allowRead(ctx); err != nil {
+		return directory.GroupPage{}, err
+	}
 	return s.repo.List(ctx, q)
 }
 
 func (s *Groups) Get(ctx context.Context, p Principal, id directory.GroupID) (directory.Group, error) {
 	if err := s.hooks.authorize(ctx, p, OpGroupGet); err != nil {
+		return directory.Group{}, err
+	}
+	if err := s.hooks.allowRead(ctx); err != nil {
 		return directory.Group{}, err
 	}
 	return s.repo.Get(ctx, id)

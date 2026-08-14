@@ -4,7 +4,9 @@ import (
 	"context"
 
 	"github.com/hilather/go-lab-ldap-mcp/internal/apperr"
+	"github.com/hilather/go-lab-ldap-mcp/internal/config"
 	"github.com/hilather/go-lab-ldap-mcp/internal/directory"
+	"github.com/hilather/go-lab-ldap-mcp/internal/reset"
 )
 
 // Services is the transport-neutral application surface.
@@ -12,6 +14,8 @@ type Services struct {
 	Users  *Users
 	Groups *Groups
 	Query  *Query
+	Reset  *Reset
+	Export *Export
 }
 
 // Deps are injected repositories and hooks. Transports never see ds389 types.
@@ -35,16 +39,41 @@ type Deps struct {
 	// ControlRevision is the compiled control-plane revision.
 	ControlRevision string
 
-	PeopleDN string
-	GroupsDN string
+	PeopleDN  string
+	GroupsDN  string
+	Suffix    string
+	RuntimeDN string
+	MarkerDN  string
+
+	ResetDir      directory.ResetSupport
+	Secrets       config.SecretResolver
+	SoftReset     bool
+	ScenarioName  string
+	ResetUsers    []config.NormalizedUser
+	ResetGroups   []config.NormalizedGroup
+	ResetLock     *reset.Gate
+	BindTransport directory.Transport
+
+	ExportMaxEntries int
+	ExportMaxBytes   int64
+	ObserveExport    func(outcome string)
 }
 
 func New(d Deps) *Services {
 	if d.Authz == nil {
 		d.Authz = ScopeAuthorizer{}
 	}
+	lock := d.ResetLock
+	if lock == nil {
+		if g, ok := d.Gate.(*reset.Gate); ok {
+			lock = g
+		}
+	}
 	if d.Gate == nil {
-		d.Gate = OpenGate{}
+		if lock == nil {
+			lock = reset.NewGate()
+		}
+		d.Gate = lock
 	}
 	if d.Locks == nil {
 		d.Locks = NewCoordinator()
@@ -59,7 +88,59 @@ func New(d Deps) *Services {
 			expected: d.ExpectedRevision, control: d.ControlRevision,
 			hooks: h,
 		},
+		Reset: newReset(d, h, lock),
+		Export: &Export{
+			hooks:      h,
+			dir:        d.ResetDir,
+			maxEntries: d.ExportMaxEntries,
+			maxBytes:   d.ExportMaxBytes,
+			observe:    d.ObserveExport,
+		},
 	}
+}
+
+func newReset(d Deps, h hooks, lock *reset.Gate) *Reset {
+	return &Reset{
+		hooks:    h,
+		gate:     lock,
+		dir:      d.ResetDir,
+		users:    d.Users,
+		groups:   d.Groups,
+		marker:   d.Marker,
+		bind:     d.Bind,
+		secrets:  d.Secrets,
+		soft:     d.SoftReset,
+		name:     d.ScenarioName,
+		expected: d.ExpectedRevision,
+		plan: reset.PlanConfig{
+			PeopleDN:         d.PeopleDN,
+			GroupsDN:         d.GroupsDN,
+			Suffix:           d.Suffix,
+			RuntimeDN:        d.RuntimeDN,
+			MarkerDN:         d.MarkerDN,
+			ConfiguredUsers:  userDNs(d.ResetUsers),
+			ConfiguredGroups: groupDNs(d.ResetGroups),
+		},
+		seedU:     d.ResetUsers,
+		seedG:     d.ResetGroups,
+		transport: d.BindTransport,
+	}
+}
+
+func userDNs(in []config.NormalizedUser) []string {
+	out := make([]string, 0, len(in))
+	for _, u := range in {
+		out = append(out, u.DN)
+	}
+	return out
+}
+
+func groupDNs(in []config.NormalizedGroup) []string {
+	out := make([]string, 0, len(in))
+	for _, g := range in {
+		out = append(out, g.DN)
+	}
+	return out
 }
 
 type hooks struct {
@@ -95,6 +176,13 @@ func (h hooks) allowWrite(ctx context.Context) error {
 		return nil
 	}
 	return h.gate.Allow(ctx)
+}
+
+func (h hooks) allowRead(ctx context.Context) error {
+	if h.gate == nil {
+		return nil
+	}
+	return h.gate.AllowRead(ctx)
 }
 
 func (h hooks) rateLimit(ctx context.Context, key string) error {

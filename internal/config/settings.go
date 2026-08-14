@@ -74,6 +74,12 @@ func applyDefaults(f *v1alpha1.File) {
 	if lim.PageSizeMax == 0 {
 		lim.PageSizeMax = 500
 	}
+	if lim.ExportMaxEntries == 0 {
+		lim.ExportMaxEntries = 20000
+	}
+	if lim.ExportMaxBytes == 0 {
+		lim.ExportMaxBytes = 67108864
+	}
 	if lim.LDAPPoolSize == 0 {
 		lim.LDAPPoolSize = 16
 	}

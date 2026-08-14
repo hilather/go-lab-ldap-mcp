@@ -97,6 +97,21 @@ func TestProbeMissingMarkerAndResetBlockReady(t *testing.T) {
 	}
 }
 
+func TestProbeMissingBaselineBlocksReady(t *testing.T) {
+	t.Parallel()
+	p := &Probe{
+		Ping:       func(context.Context) error { return nil },
+		Marker:     probeMarker{m: directory.BaselineMarker{AppliedRevision: "aaa"}},
+		Caps:       probeCaps{c: directory.Capabilities{RequiredOK: true}},
+		Expected:   "aaa",
+		ResetState: func() string { return string(reset.Ready) },
+		BaselineOK: func(context.Context) bool { return false },
+	}
+	if p.Evaluate(t.Context()).Ready {
+		t.Fatal("missing baseline must not be ready")
+	}
+}
+
 func TestDiagnosticsHasNoSecretFields(t *testing.T) {
 	t.Parallel()
 	d := Diagnostics{

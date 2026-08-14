@@ -24,6 +24,8 @@ var (
 	_ directory.BindTester          = (*Runtime)(nil)
 	_ directory.SchemaRepository    = (*Runtime)(nil)
 	_ directory.CapabilityInspector = (*Runtime)(nil)
+	_ directory.ResetSupport        = (*Runtime)(nil)
+	_ directory.MarkerReader        = (*Runtime)(nil)
 )
 
 // Runtime is the restricted-account repository surface (T-048–T-052).
@@ -51,12 +53,17 @@ type RuntimeConfig struct {
 
 	PageSizeDefault int
 	PageSizeMax     int
-	SearchSizeLimit int
-	SearchTimeLimit time.Duration
-	MaxFilterDepth  int
-	MaxFilterLength int
-	SchemaTTL       time.Duration
-	AllowedAttrs    []string
+	// InventoryPageSize bounds paged inventory searches (T-077). Zero uses PageSizeDefault.
+	InventoryPageSize int
+	SearchSizeLimit   int
+	SearchTimeLimit   time.Duration
+	// ExportMaxEntries/Bytes are hard caps used when ExportOptions are zero.
+	ExportMaxEntries int
+	ExportMaxBytes   int64
+	MaxFilterDepth   int
+	MaxFilterLength  int
+	SchemaTTL        time.Duration
+	AllowedAttrs     []string
 
 	// CursorKey is the process-local HMAC key. Empty → generated in NewRuntime.
 	CursorKey config.CursorKey
@@ -91,6 +98,14 @@ func NewRuntime(pool *ldapclient.Pool, cfg RuntimeConfig) (*Runtime, error) {
 	return &Runtime{pool: pool, cfg: cfg, now: time.Now}, nil
 }
 
+// SetInventoryPageSize is a test hook for paged inventory (T-077).
+func (r *Runtime) SetInventoryPageSize(n int) {
+	if r == nil || n < 1 {
+		return
+	}
+	r.cfg.InventoryPageSize = n
+}
+
 // SetAfterSearch installs a test hook for the search-to-modify window.
 func (r *Runtime) SetAfterSearch(fn func(context.Context, string)) {
 	if r == nil {
@@ -114,6 +129,12 @@ func (c *RuntimeConfig) applyDefaults() {
 	}
 	if c.SearchSizeLimit <= 0 {
 		c.SearchSizeLimit = 1000
+	}
+	if c.ExportMaxEntries <= 0 {
+		c.ExportMaxEntries = 20000
+	}
+	if c.ExportMaxBytes <= 0 {
+		c.ExportMaxBytes = 67108864
 	}
 	if c.SearchTimeLimit <= 0 {
 		c.SearchTimeLimit = 10 * time.Second

@@ -67,6 +67,9 @@ func restSuite() []suiteCase {
 		{method: http.MethodGet, path: "/api/v1/schema", scope: auth.ScopeSchemaRead},
 		{method: http.MethodGet, path: "/api/v1/schema/objectclasses/inetOrgPerson", scope: auth.ScopeSchemaRead},
 		{method: http.MethodGet, path: "/api/v1/schema/attributes/uid", scope: auth.ScopeSchemaRead},
+		{method: http.MethodPost, path: "/api/v1/reset", scope: auth.ScopeLabReset, mutate: true, body: `{"name":"lab","expectedRevision":"aaa"}`},
+		{method: http.MethodGet, path: "/api/v1/reset", scope: auth.ScopeLabReset},
+		{method: http.MethodGet, path: "/api/v1/export", scope: auth.ScopeLabExport},
 	}
 }
 
@@ -90,7 +93,7 @@ func TestRESTScopeMatrixAndReadOnlyCannotMutate(t *testing.T) {
 	reg, err := auth.NewRegistry([]auth.Token{
 		{ID: "admin", Scopes: []string{
 			auth.ScopeDirectoryRead, auth.ScopeDirectoryWrite, auth.ScopeDirectoryPassword,
-			auth.ScopeSchemaRead, auth.ScopeAuditRead,
+			auth.ScopeSchemaRead, auth.ScopeAuditRead, auth.ScopeLabReset, auth.ScopeLabExport,
 		}, Secret: observability.Secret(testToken)},
 		{ID: "reader", Scopes: []string{auth.ScopeDirectoryRead}, Secret: observability.Secret(read)},
 	})
@@ -105,6 +108,8 @@ func TestRESTScopeMatrixAndReadOnlyCannotMutate(t *testing.T) {
 		Groups:         svc.Groups,
 		Query:          svc.Query,
 		System:         svc.Query,
+		Reset:          svc.Reset,
+		Export:         svc.Export,
 		MetricsEnabled: true,
 		Metrics:        observability.NewRegistry(observability.CurrentBuild("labldap")),
 		CursorKey:      mustCursorKey(t),

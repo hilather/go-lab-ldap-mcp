@@ -25,6 +25,9 @@ func (s *Query) Search(ctx context.Context, p Principal, q directory.SearchQuery
 	if err := s.hooks.authorize(ctx, p, OpSearch); err != nil {
 		return directory.SearchPage{}, err
 	}
+	if err := s.hooks.allowRead(ctx); err != nil {
+		return directory.SearchPage{}, err
+	}
 	page, err := s.search.Search(ctx, q)
 	if err != nil {
 		return directory.SearchPage{}, err

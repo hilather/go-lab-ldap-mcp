@@ -14,6 +14,8 @@ var (
 	_ Users  = (*app.Users)(nil)
 	_ Groups = (*app.Groups)(nil)
 	_ Query  = (*app.Query)(nil)
+	_ Reset  = (*app.Reset)(nil)
+	_ Export = (*app.Export)(nil)
 )
 
 // Users is the application user surface. *app.Users implements it.

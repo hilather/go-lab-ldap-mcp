@@ -19,11 +19,17 @@ func (s *Users) List(ctx context.Context, p Principal, q directory.UserListQuery
 	if err := s.hooks.authorize(ctx, p, OpUserList); err != nil {
 		return directory.UserPage{}, err
 	}
+	if err := s.hooks.allowRead(ctx); err != nil {
+		return directory.UserPage{}, err
+	}
 	return s.repo.List(ctx, q)
 }
 
 func (s *Users) Get(ctx context.Context, p Principal, id directory.UserID) (directory.User, error) {
 	if err := s.hooks.authorize(ctx, p, OpUserGet); err != nil {
+		return directory.User{}, err
+	}
+	if err := s.hooks.allowRead(ctx); err != nil {
 		return directory.User{}, err
 	}
 	return s.repo.Get(ctx, id)

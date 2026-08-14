@@ -690,11 +690,16 @@ export interface components {
             phase?: string;
             state?: string;
             counts?: {
-                [key: string]: number;
+                deleted?: number;
+                users?: number;
+                groups?: number;
+                extra?: number;
             };
             expectedRevision?: string;
             appliedRevision?: string;
+            inventoryChecksum?: string;
             error?: string;
+            recovery?: string;
         };
         Diagnostics: {
             ready: boolean;
@@ -1883,7 +1888,17 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
-            409: components["responses"]["Conflict"];
+            /** @description Duplicate in-progress reset returns the current operation; confirmation or revision mismatch uses Problem Details */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResetStatus"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            429: components["responses"]["TooManyRequests"];
         };
     };
     exportLDIF: {
@@ -1908,6 +1923,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
         };

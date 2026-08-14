@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -212,7 +213,9 @@ func attachDirectory(opt *apiOptionsBuilder) error {
 		return err
 	}
 	gate := reset.NewGate()
+	gate.SetMetrics(opt.metrics)
 	sink := audit.NewSink(opt.log, audit.DefaultCapacity)
+	n := opt.compiled.Normalized
 	svc := app.New(app.Deps{
 		Users:            rt.Users(),
 		Groups:           rt.Groups(),
@@ -223,12 +226,29 @@ func attachDirectory(opt *apiOptionsBuilder) error {
 		Marker:           rt,
 		Audit:            app.HookAuditor{Hook: sink},
 		Gate:             gate,
+		ResetLock:        gate,
 		Limit:            opt.limit,
 		ExpectedRevision: opt.compiled.Revisions.Directory,
 		ControlRevision:  opt.compiled.Revisions.Control,
-		PeopleDN:         opt.compiled.Normalized.PeopleDN.String(),
-		GroupsDN:         opt.compiled.Normalized.GroupsDN.String(),
+		PeopleDN:         n.PeopleDN.String(),
+		GroupsDN:         n.GroupsDN.String(),
+		Suffix:           n.Suffix.String(),
+		RuntimeDN:        n.Runtime.DN,
+		MarkerDN:         opt.compiled.Data.Marker,
+		ResetDir:         rt,
+		Secrets:          config.DirSecretResolver(filepath.Dir(opt.compiled.Source)),
+		SoftReset:        n.SoftReset,
+		ScenarioName:     n.Name,
+		ResetUsers:       n.Users,
+		ResetGroups:      n.Groups,
+		BindTransport:    cfg.Transport,
+		ExportMaxEntries: opt.compiled.Public.Spec.Limits.ExportMaxEntries,
+		ExportMaxBytes:   opt.compiled.Public.Spec.Limits.ExportMaxBytes,
+		ObserveExport:    opt.metrics.ObserveExport,
 	})
+	inspectCtx, inspectCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	_ = svc.Reset.Inspect(inspectCtx)
+	inspectCancel()
 	probe := &app.Probe{
 		Ping: func(ctx context.Context) error {
 			return pool.Do(ctx, func(c *ldapclient.Conn) error { return c.Ping(ctx) })
@@ -236,8 +256,9 @@ func attachDirectory(opt *apiOptionsBuilder) error {
 		Marker:      rt,
 		Caps:        rt,
 		Expected:    opt.compiled.Revisions.Directory,
-		StartupMode: opt.compiled.Normalized.StartupMode,
+		StartupMode: n.StartupMode,
 		ResetState:  func() string { return string(gate.State()) },
+		BaselineOK:  svc.Reset.BaselinePresent,
 		Pool: func() app.PoolView {
 			st := pool.Stats()
 			return app.PoolView{Active: st.Active, Idle: st.Idle, Max: st.Max}
@@ -249,6 +270,8 @@ func attachDirectory(opt *apiOptionsBuilder) error {
 	opt.groups = svc.Groups
 	opt.query = svc.Query
 	opt.system = svc.Query
+	opt.reset = svc.Reset
+	opt.export = svc.Export
 	opt.audit = sink
 	opt.auditHook = sink
 	opt.gate = gate
@@ -268,6 +291,8 @@ type apiOptionsBuilder struct {
 	groups    *app.Groups
 	query     *app.Query
 	system    *app.Query
+	reset     *app.Reset
+	export    *app.Export
 	audit     *audit.Sink
 	auditHook audit.Hook
 	gate      *reset.Gate
