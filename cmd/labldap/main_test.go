@@ -88,8 +88,8 @@ func TestMountTransportsMCPDisabled(t *testing.T) {
 	h := mountTransports(rest, nil)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/mcp", nil))
-	if rec.Code != http.StatusNotImplemented {
-		t.Fatalf("/mcp disabled = %d %s", rec.Code, rec.Body.String())
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("/mcp disabled without bearer = %d %s", rec.Code, rec.Body.String())
 	}
 	live := httptest.NewRecorder()
 	h.ServeHTTP(live, httptest.NewRequest(http.MethodGet, "/health", nil))

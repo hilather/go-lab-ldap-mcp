@@ -47,6 +47,12 @@ func TestCatalogMarkdownLockNote(t *testing.T) {
 	if !strings.Contains(md, "binding") || !strings.Contains(md, "proposed") {
 		t.Fatal(md)
 	}
+	if !strings.Contains(md, "ldap_update_group") || !strings.Contains(md, "omitted") {
+		t.Fatal("lock note must record omitted ldap_update_group")
+	}
+	if _, ok := LookupTool("ldap_update_group"); ok {
+		t.Fatal("ldap_update_group must not be a registered catalog tool")
+	}
 }
 
 func TestRedactSensitiveInputs(t *testing.T) {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"net"
 	"net/http"
 	"strings"
 
@@ -89,11 +90,42 @@ func (s *Server) Handler() http.Handler {
 	return h
 }
 
-// Disabled returns 501 for /mcp when the transport is not registered.
-func Disabled() http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+// Disabled returns /mcp when the transport is off. Every request still
+// requires a valid bearer (T-086); a valid token then gets 501.
+func Disabled(reg *auth.Registry) http.Handler {
+	s := &Server{registry: reg, maxBody: defaultMaxBodyBytes}
+	h := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, r, http.StatusNotImplemented, "internal", "MCP transport not registered")
-	})
+	}))
+	h = s.requireBearer(h)
+	h = s.requestID(h)
+	return h
+}
+
+// HostsFromListen builds the MCP Host allowlist from spec.management.listen.
+// Bind-all addresses return nil so the empty-list allow-all path stays
+// test-only / wildcard-bind only; loopback listen also accepts localhost.
+func HostsFromListen(listen string) []string {
+	listen = strings.TrimSpace(listen)
+	if listen == "" {
+		return nil
+	}
+	host, port, err := net.SplitHostPort(listen)
+	if err != nil {
+		return []string{listen}
+	}
+	switch host {
+	case "", "0.0.0.0", "::":
+		return nil
+	}
+	out := []string{net.JoinHostPort(host, port)}
+	if host == "127.0.0.1" || host == "::1" {
+		loc := net.JoinHostPort("localhost", port)
+		if !hostInList(loc, out) {
+			out = append(out, loc)
+		}
+	}
+	return out
 }
 
 func (s *Server) recoverPanic(next http.Handler) http.Handler {
@@ -178,6 +210,10 @@ func hostAllowed(host string, allowed []string) bool {
 	if len(allowed) == 0 {
 		return true
 	}
+	return hostInList(host, allowed)
+}
+
+func hostInList(host string, allowed []string) bool {
 	for _, a := range allowed {
 		if strings.EqualFold(strings.TrimSpace(a), host) {
 			return true

@@ -83,7 +83,7 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 			fmt.Fprintf(stderr, "labldap serve: %v\n", err)
 			return 1
 		}
-		handler = mountTransports(srv.Handler(), mcpserver.Disabled())
+		handler = mountTransports(srv.Handler(), mcpserver.Disabled(nil))
 		readTO, writeTO, idleTO, stopTO = srv.Timeouts(30*time.Second, 15*time.Second)
 	} else {
 		built, err := compileControl(ctx, configPath)
@@ -198,7 +198,7 @@ func serverOptionsFromCompiled(c *config.Compiled, log *slog.Logger) (api.Option
 func mountTransports(rest, mcp http.Handler) http.Handler {
 	mux := http.NewServeMux()
 	if mcp == nil {
-		mcp = mcpserver.Disabled()
+		mcp = mcpserver.Disabled(nil)
 	}
 	mux.Handle(mcpserver.MountPath, mcp)
 	mux.Handle("/", rest)
@@ -207,7 +207,7 @@ func mountTransports(rest, mcp http.Handler) http.Handler {
 
 func mcpHandlerFromCompiled(c *config.Compiled, reg *auth.Registry, log *slog.Logger) (http.Handler, error) {
 	if c == nil || c.Public == nil || (c.Public.Spec.Management.MCP.Enabled != nil && !*c.Public.Spec.Management.MCP.Enabled) {
-		return mcpserver.Disabled(), nil
+		return mcpserver.Disabled(reg), nil
 	}
 	mcpCfg := c.Public.Spec.Management.MCP
 	s, err := mcpserver.New(mcpserver.Options{
@@ -217,6 +217,7 @@ func mcpHandlerFromCompiled(c *config.Compiled, reg *auth.Registry, log *slog.Lo
 		Services:       nil,
 		Logger:         log,
 		AllowedOrigins: append([]string(nil), c.Public.Spec.Management.CORS.AllowedOrigins...),
+		AllowedHosts:   mcpserver.HostsFromListen(c.Public.Spec.Management.Listen),
 		MaxBody:        c.Public.Spec.Limits.MaxRequestBodyBytes,
 		Flags: mcpserver.RegisterFlags{
 			Mutations: mcpCfg.RegisterMutations,
@@ -255,5 +256,6 @@ const serveUsage = `Usage:
 serve starts the management HTTP listener (REST, MCP, and later UI).
 --placeholder listens on LABLDAP_LISTEN (default 127.0.0.1:8443) without
 loading a scenario or contacting LDAP. GET /health is live; GET /health/ready
-is 503 until the directory is ready. POST /mcp is 501 until a scenario enables MCP.
+is 503 until the directory is ready. POST /mcp requires a bearer; when MCP is
+disabled a valid token gets 501.
 `

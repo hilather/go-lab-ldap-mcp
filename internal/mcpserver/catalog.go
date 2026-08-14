@@ -28,6 +28,7 @@ import (
 //	ldap_add_members        proposed  T-090  registerMutations   directory:write
 //	ldap_remove_members     proposed  T-090  registerMutations   directory:write
 //	ldap_replace_members    proposed  T-090  registerMutations   directory:write
+//	ldap_update_group       omitted   v1     no GroupPatch / no PATCH /groups/{id} (membership tools are the update path)
 //	ldap_bind_test          proposed  T-091  registerPassword    directory:password
 //	ldap_reset_suffix       proposed  T-092  registerReset       lab:reset
 //	ldap_export_ldif        proposed  T-092  registerExport      lab:export
@@ -324,6 +325,9 @@ func CatalogMarkdown() string {
 		fmt.Fprintf(&b, "| `%s` | %s | %s | %s | `%s` | %t | %t | %s |\n",
 			d.Name, d.Contract, d.Task, reg, d.Scope, d.ReadOnly, d.Destructive, strings.Join(d.SensitiveInputs, ", "))
 	}
+	b.WriteString("\n## Omitted v1 names\n\n")
+	b.WriteString("| Name | Reason |\n| --- | --- |\n")
+	b.WriteString("| `ldap_update_group` | omitted: v1 has no GroupPatch and no PATCH /api/v1/groups/{id}; membership tools are the group update path |\n")
 	b.WriteString("\n## Resources\n\n")
 	b.WriteString("| URI | Scope | Sibling |\n| --- | --- | --- |\n")
 	for _, r := range ResourceCatalog() {

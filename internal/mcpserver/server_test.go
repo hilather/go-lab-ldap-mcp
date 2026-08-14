@@ -253,6 +253,28 @@ func TestNoLegacyUnauthenticatedSSE(t *testing.T) {
 	}
 }
 
+func TestSessionCookieWithoutBearerIs401(t *testing.T) {
+	t.Parallel()
+	s := testServer(t, nil)
+	store := auth.NewStore(auth.DefaultSessionConfig())
+	cookie, _, sess, err := store.Create("admin", directory.ScopeSet{auth.ScopeDirectoryRead})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodPost, MountPath, strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"ping"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(auth.NewSessionCookie(cookie, false, 0))
+	rec := httptest.NewRecorder()
+	s.Handler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("session cookie without bearer = %d %s", rec.Code, rec.Body.String())
+	}
+	body := rec.Body.String()
+	if strings.Contains(body, "admin") || strings.Contains(body, cookie) || strings.Contains(body, sess.ID) || strings.Contains(body, testToken) {
+		t.Fatalf("leaked session identity: %s", body)
+	}
+}
+
 func TestEveryRequestRequiresBearer(t *testing.T) {
 	t.Parallel()
 	s := testServer(t, nil)
@@ -396,11 +418,33 @@ func TestCancelledRequestCancelsSearch(t *testing.T) {
 
 func TestDisabledHandler(t *testing.T) {
 	t.Parallel()
+	h := Disabled(testRegistry(t))
 	req := httptest.NewRequest(http.MethodPost, MountPath, strings.NewReader(`{}`))
 	rec := httptest.NewRecorder()
-	Disabled().ServeHTTP(rec, req)
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("disabled without bearer = %d", rec.Code)
+	}
+	req = httptest.NewRequest(http.MethodPost, MountPath, strings.NewReader(`{}`))
+	req.Header.Set("Authorization", "Bearer "+testToken)
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusNotImplemented {
-		t.Fatalf("disabled = %d", rec.Code)
+		t.Fatalf("disabled with bearer = %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestHostsFromListen(t *testing.T) {
+	t.Parallel()
+	got := HostsFromListen("127.0.0.1:8443")
+	if !hostInList("127.0.0.1:8443", got) || !hostInList("localhost:8443", got) {
+		t.Fatalf("loopback listen = %v", got)
+	}
+	if HostsFromListen("0.0.0.0:8443") != nil {
+		t.Fatal("bind-all must not invent a tight allowlist")
+	}
+	if len(HostsFromListen("10.0.0.5:9000")) != 1 || HostsFromListen("10.0.0.5:9000")[0] != "10.0.0.5:9000" {
+		t.Fatalf("public listen = %v", HostsFromListen("10.0.0.5:9000"))
 	}
 }
 

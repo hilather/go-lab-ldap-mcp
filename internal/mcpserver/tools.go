@@ -9,7 +9,6 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/hilather/go-lab-ldap-mcp/internal/app"
-	"github.com/hilather/go-lab-ldap-mcp/internal/apperr"
 	"github.com/hilather/go-lab-ldap-mcp/internal/directory"
 )
 
@@ -86,7 +85,7 @@ func (s *Server) callGetEntry(ctx context.Context, _ *mcp.CallToolRequest, in Ge
 	if err != nil {
 		return nil, directory.SearchEntry{}, err
 	}
-	entry, err := getEntry(ctx, q, p, in)
+	entry, err := q.GetEntry(ctx, p, in.DN, in.Attributes)
 	if err != nil {
 		return nil, directory.SearchEntry{}, err
 	}
@@ -104,28 +103,6 @@ func (s *Server) ready(ctx context.Context, tool string) (app.Principal, *app.Qu
 		return app.Principal{}, nil, err
 	}
 	return p, q, nil
-}
-
-func getEntry(ctx context.Context, q *app.Query, p app.Principal, in GetEntryInput) (directory.SearchEntry, error) {
-	dn := strings.TrimSpace(in.DN)
-	if dn == "" {
-		return directory.SearchEntry{}, apperr.New(apperr.CodeConfiguration, "dn is required").
-			WithField(apperr.Field{Path: "dn", Code: "required", Message: "dn is required"})
-	}
-	page, err := q.Search(ctx, p, directory.SearchQuery{
-		Base:       dn,
-		Scope:      directory.SearchScopeBase,
-		Filter:     "(objectClass=*)",
-		Attributes: in.Attributes,
-		PageSize:   1,
-	})
-	if err != nil {
-		return directory.SearchEntry{}, err
-	}
-	if len(page.Entries) == 0 {
-		return directory.SearchEntry{}, directory.Error("entry", directory.FieldNotFound, "directory entry not found")
-	}
-	return page.Entries[0], nil
 }
 
 func normalizePage(page directory.SearchPage) directory.SearchPage {
@@ -235,8 +212,7 @@ func (s *Server) resourceBody(ctx context.Context, q *app.Query, p app.Principal
 		name, _ := url.PathUnescape(strings.TrimPrefix(path, "attribute/"))
 		return lookupAttribute(ctx, q, p, name)
 	case host == "entry":
-		dn := u.Query().Get("dn")
-		entry, err := getEntry(ctx, q, p, GetEntryInput{DN: dn})
+		entry, err := q.GetEntry(ctx, p, u.Query().Get("dn"), nil)
 		if err != nil {
 			return nil, err
 		}
