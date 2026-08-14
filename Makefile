@@ -80,7 +80,7 @@ test-unit: frontend-install
 	cd frontend && $(PNPM) test
 
 test-integration:
-	$(GO) test -tags=integration ./test/integration/... -count=1 -timeout 25m
+	$(GO) test -tags=integration ./test/integration/... -count=1 -timeout 30m
 
 test-e2e: frontend-build
 	cd test/e2e && $(PNPM) install --frozen-lockfile

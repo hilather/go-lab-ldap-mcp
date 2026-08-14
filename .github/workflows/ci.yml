@@ -176,7 +176,7 @@ jobs:
   integration:
     name: integration
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -190,8 +190,35 @@ jobs:
           cache: true
           cache-dependency-path: go.mod
 
+      # ubuntu-latest does not ship ldap-utils or python3-venv. T-115
+      # host clients and the ldap3 venv must be present so those cases
+      # cannot skip.
+      - name: Install host LDAP and Python tools
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ldap-utils python3-venv python3-pip
+          command -v ldapsearch
+          command -v ldapmodify
+          command -v ldapwhoami
+          python3 --version
+
       - name: Integration tests
-        run: make test-integration
+        run: |
+          set -euo pipefail
+          make test-integration 2>&1 | tee integration.log
+
+      # Log artifact only. Tests redact bind passwords. Do not upload
+      # /secrets, .env, password files, or other credential material.
+      - name: Upload integration log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-log
+          path: integration.log
+          if-no-files-found: warn
+          retention-days: 30
+          include-hidden-files: false
 
   image:
     name: image

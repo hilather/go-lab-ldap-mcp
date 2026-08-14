@@ -23,11 +23,11 @@ IANA ports; this pin listens on 3389/3636.
 
 | Client | Version recorded | Transports **exercised** | Notes |
 | --- | --- | --- | --- |
-| OpenLDAP `ldapsearch` | host `ldapsearch -VV` (test log; not committed) | **LDAPS**; paging on LDAPS | `-y` password-file. |
+| OpenLDAP `ldapsearch` | host `ldapsearch -VV` (test log; not committed) | **LDAPS**; paging on LDAPS | `-y` password-file. OpenLDAP 2.6 `-y` uses the complete file, including a trailing newline, so the test writes the password with no extra newline. |
 | OpenLDAP `ldapwhoami` | same OpenLDAP package | **StartTLS** (`-ZZ` on 3389) | Alice bind. |
-| OpenLDAP `ldapmodify` | same OpenLDAP package | **LDAPS** (in-container) | DM `replace userPassword` (not RFC 3062; not alice self-service). |
+| OpenLDAP `ldapmodify` | same OpenLDAP package | **LDAPS** (host client) | DM `replace userPassword` (not RFC 3062; not alice self-service). CI installs `ldap-utils` and fails if `ldapmodify` is missing. |
 | Independent Go (`go-ldap` v3.4.14) | `go.mod` | **LDAPS** and **StartTLS** | `test/compatibility/goindep`. Cleartext LDAP bind is expected to **fail** (`allowCleartextBind: false`). |
-| Independent Python (`ldap3`) | venv at run time (not committed) | **LDAPS** and **StartTLS** | `test/compatibility/clients/python/client.py`. Skips if `pip` cannot install `ldap3`. |
+| Independent Python (`ldap3`) | venv at run time (not committed) | **LDAPS** and **StartTLS** | `test/compatibility/clients/python/client.py` with `--server-name localhost`. ldap3 matches `valid_names` to DNS SANs only and ignores IP SANs, so a connect host of `127.0.0.1` fails without the DNS name. Missing `python3` / `ldap3` fails in CI. |
 
 The LabLDAP runtime pool (`internal/directory/ldapclient`) is **not** one
 of the independent clients. It is covered by `test/integration/dirsrv/ldapclient_test.go`.
@@ -50,9 +50,10 @@ Exact engine versions: `389-ds-base-2.4.6-1.fc39.x86_64`,
 ```text
 make test-integration
 # or the compatibility subset:
-go test -tags=integration ./test/integration/dirsrv -run Compatibility -count=1 -timeout 25m
+go test -tags=integration ./test/integration/dirsrv -run Compatibility -count=1 -timeout 30m
 ```
 
-Host tools used when present: `/usr/bin/ldapsearch`, `/usr/bin/ldapwhoami`.
-The Python client is invoked with a throwaway venv; the repository does
-not vendor `ldap3`.
+Host tools required in CI (installed by `.github/workflows/ci.yml`):
+`/usr/bin/ldapsearch`, `/usr/bin/ldapwhoami`, `/usr/bin/ldapmodify`.
+Locally those cases skip if the binary is missing. The Python client is
+invoked with a throwaway venv; the repository does not vendor `ldap3`.

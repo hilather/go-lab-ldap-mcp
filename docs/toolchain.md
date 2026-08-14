@@ -26,6 +26,11 @@ No deviation from the Go or Node baseline. Frontend scaffold (T-095): React 19.2
 
 Make installs or invokes tools at versions listed in the `Makefile`. Do not `go install` or `npx` a floating `@latest` tag.
 
+CI (`/.github/workflows/ci.yml`) installs host `ldap-utils` and `python3-venv`
+before `make test-integration`. The T-115 cases fail (they do not skip) when
+those tools are missing on GitHub Actions. Locally the same cases skip if the
+binary is absent.
+
 ## Dependency update policy
 
 - Go: bump the `toolchain` line when a new 1.26.x patch is adopted; bump the `go` line only for a new language version. Record the change here.

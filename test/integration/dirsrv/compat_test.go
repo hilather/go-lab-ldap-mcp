@@ -26,9 +26,7 @@ func TestCompatibilityLDAPClients(t *testing.T) {
 	recordClientVersions(t)
 
 	t.Run("ldapsearch_ldaps", func(t *testing.T) {
-		if _, err := exec.LookPath("ldapsearch"); err != nil {
-			t.Skip("ldapsearch not on PATH")
-		}
+		requireHostTool(t, "ldapsearch")
 		pw := writePW(t, inst.Password().Reveal())
 		cmd := exec.Command("ldapsearch", "-x", "-LLL",
 			"-H", "ldaps://"+inst.LDAPSAddr,
@@ -46,9 +44,7 @@ func TestCompatibilityLDAPClients(t *testing.T) {
 	})
 
 	t.Run("ldapwhoami_starttls", func(t *testing.T) {
-		if _, err := exec.LookPath("ldapwhoami"); err != nil {
-			t.Skip("ldapwhoami not on PATH")
-		}
+		requireHostTool(t, "ldapwhoami")
 		pw := writePW(t, seedCanary)
 		cmd := exec.Command("ldapwhoami", "-x", "-ZZ",
 			"-H", "ldap://"+inst.LDAPAddr,
@@ -65,9 +61,7 @@ func TestCompatibilityLDAPClients(t *testing.T) {
 	})
 
 	t.Run("ldapsearch_paging", func(t *testing.T) {
-		if _, err := exec.LookPath("ldapsearch"); err != nil {
-			t.Skip("ldapsearch not on PATH")
-		}
+		requireHostTool(t, "ldapsearch")
 		pw := writePW(t, inst.Password().Reveal())
 		cmd := exec.Command("ldapsearch", "-x", "-LLL",
 			"-H", "ldaps://"+inst.LDAPSAddr,
@@ -86,31 +80,27 @@ func TestCompatibilityLDAPClients(t *testing.T) {
 	})
 
 	t.Run("password_modify_and_rebind", func(t *testing.T) {
+		requireHostTool(t, "ldapmodify")
 		neu := seedCanary + "X"
-		guestPW := "/tmp/labldap-dm.pw"
-		hostPW := writePW(t, inst.Password().Reveal())
-		if out, err := exec.Command("docker", "cp", hostPW, inst.Name+":"+guestPW).CombinedOutput(); err != nil {
-			t.Fatalf("cp dm.pw: %v\n%s", err, out)
+		pw := writePW(t, inst.Password().Reveal())
+		replacePassword := func(value string) {
+			t.Helper()
+			ldif := "dn: uid=alice,ou=people,dc=example,dc=test\nchangetype: modify\nreplace: userPassword\nuserPassword: " + value + "\n"
+			cmd := exec.Command("ldapmodify", "-x",
+				"-H", "ldaps://"+inst.LDAPSAddr,
+				"-o", "tls_reqcert=demand",
+				"-o", "tls_cacert="+ca,
+				"-D", "cn=Directory Manager", "-y", pw)
+			cmd.Stdin = strings.NewReader(ldif)
+			if out, err := cmd.CombinedOutput(); err != nil {
+				t.Fatalf("ldapmodify: %v\n%s", err, redactLogs(string(out), inst.password, seedCanary, neu))
+			}
 		}
-		ldif := "dn: uid=alice,ou=people,dc=example,dc=test\nchangetype: modify\nreplace: userPassword\nuserPassword: " + neu + "\n"
-		cmd := exec.Command("docker", "exec", "-i", inst.Name,
-			"ldapmodify", "-x", "-H", "ldaps://127.0.0.1:3636", "-o", "tls_reqcert=never",
-			"-D", "cn=Directory Manager", "-y", guestPW)
-		cmd.Stdin = strings.NewReader(ldif)
-		if out, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("ldapmodify: %v\n%s", err, out)
-		}
+		replacePassword(neu)
 		if err := userBind(t, inst, "uid=alice,ou=people,dc=example,dc=test", neu); err != nil {
 			t.Fatalf("rebind: %v", err)
 		}
-		ldif = "dn: uid=alice,ou=people,dc=example,dc=test\nchangetype: modify\nreplace: userPassword\nuserPassword: " + seedCanary + "\n"
-		cmd = exec.Command("docker", "exec", "-i", inst.Name,
-			"ldapmodify", "-x", "-H", "ldaps://127.0.0.1:3636", "-o", "tls_reqcert=never",
-			"-D", "cn=Directory Manager", "-y", guestPW)
-		cmd.Stdin = strings.NewReader(ldif)
-		if out, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("restore: %v\n%s", err, out)
-		}
+		replacePassword(seedCanary)
 	})
 
 	t.Run("go_independent", func(t *testing.T) {
@@ -183,9 +173,7 @@ func TestCompatibilityLDAPClients(t *testing.T) {
 	})
 
 	t.Run("anonymous_denied", func(t *testing.T) {
-		if _, err := exec.LookPath("ldapsearch"); err != nil {
-			t.Skip("ldapsearch not on PATH")
-		}
+		requireHostTool(t, "ldapsearch")
 		cmd := exec.Command("ldapsearch", "-x", "-LLL",
 			"-H", "ldaps://"+inst.LDAPSAddr,
 			"-o", "tls_reqcert=demand",
@@ -201,16 +189,34 @@ func TestCompatibilityLDAPClients(t *testing.T) {
 func writePW(t *testing.T, value string) string {
 	t.Helper()
 	p := filepath.Join(t.TempDir(), "pw")
-	if err := os.WriteFile(p, []byte(value+"\n"), 0o600); err != nil {
+	// OpenLDAP 2.6 -y uses the complete file, including a trailing newline.
+	if err := os.WriteFile(p, []byte(value), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	return p
+}
+
+func inCI() bool {
+	return os.Getenv("CI") != "" || os.Getenv("GITHUB_ACTIONS") != ""
+}
+
+func requireHostTool(t *testing.T, name string) {
+	t.Helper()
+	if _, err := exec.LookPath(name); err != nil {
+		if inCI() {
+			t.Fatalf("%s is required in CI: %v", name, err)
+		}
+		t.Skipf("%s not on PATH", name)
+	}
 }
 
 func recordClientVersions(t *testing.T) {
 	t.Helper()
 	if out, err := exec.Command("ldapsearch", "-VV").CombinedOutput(); err == nil || len(out) > 0 {
 		t.Logf("ldapsearch: %s", strings.TrimSpace(string(out)))
+	}
+	if out, err := exec.Command("ldapmodify", "-VV").CombinedOutput(); err == nil || len(out) > 0 {
+		t.Logf("ldapmodify: %s", strings.TrimSpace(string(out)))
 	}
 	if out, err := exec.Command("go", "list", "-m", "github.com/go-ldap/ldap/v3").CombinedOutput(); err == nil {
 		t.Logf("go-ldap: %s", strings.TrimSpace(string(out)))
@@ -219,20 +225,24 @@ func recordClientVersions(t *testing.T) {
 
 func runPythonClient(t *testing.T, inst *Instance, ca string, startTLS bool) {
 	t.Helper()
-	if _, err := exec.LookPath("python3"); err != nil {
-		t.Skip("python3 not on PATH")
-	}
+	requireHostTool(t, "python3")
 	root, err := moduleRoot()
 	if err != nil {
 		t.Fatal(err)
 	}
 	venv := t.TempDir()
 	if out, err := exec.Command("python3", "-m", "venv", venv).CombinedOutput(); err != nil {
+		if inCI() {
+			t.Fatalf("venv: %v\n%s", err, out)
+		}
 		t.Skipf("venv: %v\n%s", err, out)
 	}
 	pip := filepath.Join(venv, "bin", "pip")
 	py := filepath.Join(venv, "bin", "python")
 	if out, err := exec.Command(pip, "install", "--quiet", "ldap3").CombinedOutput(); err != nil {
+		if inCI() {
+			t.Fatalf("pip install ldap3: %v\n%s", err, out)
+		}
 		t.Skipf("pip install ldap3: %v\n%s", err, out)
 	}
 	pw := filepath.Join(t.TempDir(), "dm.pw")
@@ -245,6 +255,7 @@ func runPythonClient(t *testing.T, inst *Instance, ca string, startTLS bool) {
 		"--password-file", pw,
 		"--base", "dc=example,dc=test",
 		"--filter", "(uid=alice)",
+		"--server-name", "localhost",
 	}
 	if startTLS {
 		args = append(args, "--url", "ldap://"+inst.LDAPAddr, "--starttls")

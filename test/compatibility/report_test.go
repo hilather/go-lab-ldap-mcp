@@ -2,6 +2,7 @@ package compatibility
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -22,6 +23,9 @@ func TestCompatibilityReportRecordsClientsAndEngine(t *testing.T) {
 		"v3.4.14",
 		"allowAnonymousBind",
 		"cn=config",
+		"--server-name",
+		"ldap-utils",
+		"IP SAN",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("compatibility report missing %q", want)
@@ -30,6 +34,46 @@ func TestCompatibilityReportRecordsClientsAndEngine(t *testing.T) {
 	mod := read(t, filepath.Join(root, "go.mod"))
 	if !strings.Contains(mod, "github.com/go-ldap/ldap/v3 v3.4.14") {
 		t.Fatal("report version must match go.mod")
+	}
+}
+
+func TestPythonClientTLSNamesIncludeServerNameForIPURL(t *testing.T) {
+	if _, err := exec.LookPath("python3"); err != nil {
+		t.Skip("python3 not on PATH")
+	}
+	script := filepath.Join(repoRoot(t), "test", "compatibility", "clients", "python", "client.py")
+	cmd := exec.Command("python3", script, "--print-valid-names",
+		"--url", "ldaps://127.0.0.1:3636", "--server-name", "localhost")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("print-valid-names: %v\n%s", err, out)
+	}
+	got := strings.Split(strings.TrimSpace(string(out)), "\n")
+	if len(got) < 1 || got[0] != "localhost" {
+		t.Fatalf("first valid name must be --server-name localhost, got %q", got)
+	}
+	joined := strings.Join(got, ",")
+	if !strings.Contains(joined, "127.0.0.1") {
+		t.Fatalf("valid names should still include the URL host, got %q", got)
+	}
+}
+
+func TestCompatSuiteDoesNotUseInContainerPasswordModify(t *testing.T) {
+	src := read(t, filepath.Join(repoRoot(t), "test", "integration", "dirsrv", "compat_test.go"))
+	if !strings.Contains(src, `"ldapmodify"`) {
+		t.Fatal("compat suite must invoke host ldapmodify")
+	}
+	if strings.Contains(src, "docker\", \"exec\", \"-i\"") {
+		t.Fatal("password modify must not docker-exec ldapmodify; host OpenLDAP -y is the T-115 client")
+	}
+	if !strings.Contains(src, `"--server-name", "localhost"`) {
+		t.Fatal("python_ldap3 must pass --server-name localhost (ldap3 ignores IP SANs)")
+	}
+	if !strings.Contains(src, "requireHostTool") {
+		t.Fatal("compat suite must fail in CI when host LDAP clients are missing")
+	}
+	if strings.Contains(src, `value+"\n"`) || strings.Contains(src, "value+\"\\n\"") {
+		t.Fatal("writePW must not append a newline; OpenLDAP 2.6 -y sends the complete file as the password")
 	}
 }
 
