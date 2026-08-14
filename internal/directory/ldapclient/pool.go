@@ -119,8 +119,12 @@ func (p *Pool) Do(ctx context.Context, fn func(*Conn) error) error {
 		c.Release()
 		return nil
 	}
+	if !c.isBroken() && !isBroken(err) {
+		c.Release()
+		return err
+	}
 	c.Invalidate()
-	if !isBroken(err) || ctx.Err() != nil {
+	if ctx.Err() != nil {
 		return err
 	}
 	c2, err2 := p.Acquire(ctx)
@@ -129,7 +133,11 @@ func (p *Pool) Do(ctx context.Context, fn func(*Conn) error) error {
 	}
 	err2 = fn(c2)
 	if err2 != nil {
-		c2.Invalidate()
+		if c2.isBroken() || isBroken(err2) {
+			c2.Invalidate()
+		} else {
+			c2.Release()
+		}
 		return err2
 	}
 	c2.Release()

@@ -88,9 +88,14 @@ func tlsVerifyFailed(err error) bool {
 		return true
 	}
 	msg := err.Error()
+	// go-ldap StartTLS wraps Handshake with %v, dropping x509 types.
+	if strings.Contains(msg, "TLS handshake") {
+		return true
+	}
 	return strings.Contains(msg, "certificate") &&
 		(strings.Contains(msg, "unknown authority") ||
 			strings.Contains(msg, "not valid for") ||
+			strings.Contains(msg, "is valid for") ||
 			strings.Contains(msg, "verification") ||
 			strings.Contains(msg, "hostname"))
 }

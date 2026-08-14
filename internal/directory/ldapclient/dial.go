@@ -46,7 +46,9 @@ func Connect(ctx context.Context, cfg Config) (*Conn, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, MapError(err)
 	}
-	raw, err := dialNetwork(ctx, cfg)
+	dialCtx, cancel := context.WithTimeout(ctx, cfg.DialTimeout)
+	defer cancel()
+	raw, err := dialNetwork(dialCtx, cfg)
 	if err != nil {
 		return nil, MapError(err)
 	}
@@ -98,6 +100,8 @@ func dialNetwork(ctx context.Context, cfg Config) (*ldap.Conn, error) {
 		}
 		conn := ldap.NewConn(nc, false)
 		conn.Start()
+		// StartTLS is still part of dial; bound it before the extended op.
+		applyTimeout(ctx, conn, remainingTimeout(ctx, cfg.DialTimeout))
 		if err := startTLS(ctx, conn, tc); err != nil {
 			conn.Close()
 			return nil, err
@@ -118,13 +122,19 @@ func startTLS(ctx context.Context, conn *ldap.Conn, tc *tls.Config) error {
 	return runOp(ctx, conn, func() error { return conn.StartTLS(tc) })
 }
 
-func applyTimeout(ctx context.Context, conn *ldap.Conn, op time.Duration) {
+func remainingTimeout(ctx context.Context, fallback time.Duration) time.Duration {
 	if d, ok := ctx.Deadline(); ok {
-		rem := time.Until(d)
-		if rem < op || op <= 0 {
-			op = rem
+		if rem := time.Until(d); rem > 0 {
+			if fallback <= 0 || rem < fallback {
+				return rem
+			}
 		}
 	}
+	return fallback
+}
+
+func applyTimeout(ctx context.Context, conn *ldap.Conn, op time.Duration) {
+	op = remainingTimeout(ctx, op)
 	if op > 0 {
 		conn.SetTimeout(op)
 	}
@@ -139,7 +149,13 @@ func runOp(ctx context.Context, conn *ldap.Conn, fn func() error) error {
 	select {
 	case <-ctx.Done():
 		conn.Close()
-		<-done
+		// Close can block in go-ldap when requestTimeout is 0; do not wait forever.
+		timer := time.NewTimer(250 * time.Millisecond)
+		defer timer.Stop()
+		select {
+		case <-done:
+		case <-timer.C:
+		}
 		return ctx.Err()
 	case err := <-done:
 		return err
@@ -217,16 +233,29 @@ func (c *Conn) mutate(ctx context.Context, fn func() error) error {
 	return nil
 }
 
-// Close tears down the network session. Prefer Release for pooled conns.
+// Close tears down a disposable session. On a pooled conn it is Invalidate:
+// the slot is returned and a later Close is a no-op so idle/reissued conns
+// are not closed under another owner.
 func (c *Conn) Close() error {
-	if c == nil {
+	if c == nil || c.released.Load() {
 		return nil
 	}
+	if c.pool != nil {
+		c.Invalidate()
+		return nil
+	}
+	if !c.released.CompareAndSwap(false, true) {
+		return nil
+	}
+	c.closeRaw()
+	return nil
+}
+
+func (c *Conn) closeRaw() {
 	c.markBroken()
 	if c.raw != nil {
-		return c.raw.Close()
+		_ = c.raw.Close()
 	}
-	return nil
 }
 
 // Invalidate marks the connection broken and returns it to the pool for eviction.
@@ -244,7 +273,7 @@ func (c *Conn) Release() {
 		return
 	}
 	if c.pool == nil {
-		_ = c.Close()
+		c.closeRaw()
 		return
 	}
 	c.pool.put(c)

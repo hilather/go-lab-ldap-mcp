@@ -47,7 +47,7 @@ type ResetSupport interface {
 	Export(ctx context.Context, w io.Writer, opts ExportOptions) error
 }
 
-// CapabilityInspector is the runtime inspect surface. T-044 owns the Capabilities shape.
+// CapabilityInspector is the runtime inspect surface for the shared Capabilities report.
 type CapabilityInspector interface {
 	Capabilities(ctx context.Context) (Capabilities, error)
 }

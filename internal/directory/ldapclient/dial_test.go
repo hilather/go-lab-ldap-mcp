@@ -16,6 +16,9 @@ import (
 	"testing"
 	"time"
 
+	ber "github.com/go-asn1-ber/asn1-ber"
+	"github.com/go-ldap/ldap/v3"
+
 	"github.com/hilather/go-lab-ldap-mcp/internal/apperr"
 	"github.com/hilather/go-lab-ldap-mcp/internal/directory"
 	"github.com/hilather/go-lab-ldap-mcp/internal/observability"
@@ -120,6 +123,57 @@ func TestMissingCAFailClosed(t *testing.T) {
 	}
 }
 
+func TestConnectSilentPeerTimesOut(t *testing.T) {
+	t.Parallel()
+	mat := writeTestCerts(t, "localhost")
+	addr, stop := serveSilent(t)
+	t.Cleanup(stop)
+
+	for _, tr := range []directory.Transport{directory.TransportLDAPS, directory.TransportStartTLS} {
+		tr := tr
+		t.Run(string(tr), func(t *testing.T) {
+			t.Parallel()
+			start := time.Now()
+			_, err := Connect(context.Background(), Config{
+				Address:     addr,
+				Transport:   tr,
+				CAFile:      mat.caFile,
+				ServerName:  "localhost",
+				DialTimeout: 300 * time.Millisecond,
+			})
+			elapsed := time.Since(start)
+			if err == nil {
+				t.Fatal("silent peer must fail")
+			}
+			if elapsed > 2*time.Second {
+				t.Fatalf("%s hung for %v", tr, elapsed)
+			}
+		})
+	}
+}
+
+func TestConnectStartTLSWrongName(t *testing.T) {
+	t.Parallel()
+	mat := writeTestCerts(t, "localhost")
+	addr, stop := serveStartTLS(t, mat.cert)
+	t.Cleanup(stop)
+
+	_, err := Connect(t.Context(), Config{
+		Address:     addr,
+		Transport:   directory.TransportStartTLS,
+		CAFile:      mat.caFile,
+		ServerName:  "not-the-server.example",
+		DialTimeout: 2 * time.Second,
+	})
+	if err == nil {
+		t.Fatal("wrong name must fail closed")
+	}
+	apperr.Assert(t, err).Code(apperr.CodeDirectory).Retryable(false)
+	if !hasField(err, directory.FieldForbidden) {
+		t.Fatalf("want forbidden, got %v", err)
+	}
+}
+
 func TestConnectCancelUnreachable(t *testing.T) {
 	t.Parallel()
 	ctx, cancel := context.WithCancel(t.Context())
@@ -196,6 +250,79 @@ func writeTestCerts(t *testing.T, serverName string) testCerts {
 		t.Fatal(err)
 	}
 	return testCerts{caFile: caFile, wrongCA: wrongFile, cert: cert}
+}
+
+func serveSilent(t *testing.T) (addr string, stop func()) {
+	t.Helper()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan struct{})
+	go func() {
+		for {
+			c, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			go func(c net.Conn) {
+				defer c.Close()
+				select {
+				case <-done:
+				case <-time.After(5 * time.Second):
+				}
+			}(c)
+		}
+	}()
+	return ln.Addr().String(), func() { close(done); _ = ln.Close() }
+}
+
+func serveStartTLS(t *testing.T, cert tls.Certificate) (addr string, stop func()) {
+	t.Helper()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan struct{})
+	go func() {
+		for {
+			c, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			go func(c net.Conn) {
+				defer c.Close()
+				_ = c.SetReadDeadline(time.Now().Add(2 * time.Second))
+				pkt, err := ber.ReadPacket(c)
+				if err != nil || len(pkt.Children) == 0 {
+					return
+				}
+				var msgid int64
+				switch v := pkt.Children[0].Value.(type) {
+				case int64:
+					msgid = v
+				case int:
+					msgid = int64(v)
+				}
+				resp := ber.Encode(ber.ClassUniversal, ber.TypeConstructed, ber.TagSequence, nil, "LDAP Response")
+				resp.AppendChild(ber.NewInteger(ber.ClassUniversal, ber.TypePrimitive, ber.TagInteger, msgid, "MessageID"))
+				ext := ber.Encode(ber.ClassApplication, ber.TypeConstructed, ldap.ApplicationExtendedResponse, nil, "Extended Response")
+				ext.AppendChild(ber.NewInteger(ber.ClassUniversal, ber.TypePrimitive, ber.TagEnumerated, 0, "resultCode"))
+				ext.AppendChild(ber.NewString(ber.ClassUniversal, ber.TypePrimitive, ber.TagOctetString, "", "matchedDN"))
+				ext.AppendChild(ber.NewString(ber.ClassUniversal, ber.TypePrimitive, ber.TagOctetString, "", "diagnosticMessage"))
+				resp.AppendChild(ext)
+				_, _ = c.Write(resp.Bytes())
+				tc := tls.Server(c, &tls.Config{
+					Certificates: []tls.Certificate{cert},
+					MinVersion:   tls.VersionTLS12,
+				})
+				_ = tc.Handshake()
+				buf := make([]byte, 512)
+				_, _ = tc.Read(buf)
+			}(c)
+		}
+	}()
+	return ln.Addr().String(), func() { close(done); _ = ln.Close() }
 }
 
 func serveTLS(t *testing.T, cert tls.Certificate) (addr string, stop func()) {

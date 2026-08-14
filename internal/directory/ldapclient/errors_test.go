@@ -43,6 +43,19 @@ func TestMapErrorPreservesDirectory(t *testing.T) {
 	}
 }
 
+func TestMapErrorStartTLSHandshakeWrap(t *testing.T) {
+	t.Parallel()
+	// go-ldap StartTLS uses fmt.Errorf("%v") so the x509 type is lost.
+	err := MapError(&ldap.Error{
+		ResultCode: ldap.ErrorNetwork,
+		Err:        errors.New("TLS handshake failed (x509: certificate is valid for localhost, not not-the-server.example)"),
+	})
+	apperr.Assert(t, err).Code(apperr.CodeDirectory).Retryable(false)
+	if !hasField(err, directory.FieldForbidden) {
+		t.Fatalf("want forbidden, got %v", err)
+	}
+}
+
 func TestMapErrorCanceled(t *testing.T) {
 	t.Parallel()
 	err := MapError(context.Canceled)

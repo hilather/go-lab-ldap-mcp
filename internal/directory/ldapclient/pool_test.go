@@ -169,6 +169,77 @@ func TestPoolDoRetriesBroken(t *testing.T) {
 	}
 }
 
+func TestPoolCloseReturnsSlot(t *testing.T) {
+	t.Parallel()
+	p, err := NewPool(testPoolCfg(fakeDial, 1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = p.Close() })
+	c, err := p.Acquire(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.Close()
+	ctx, cancel := context.WithTimeout(t.Context(), 200*time.Millisecond)
+	defer cancel()
+	c2, err := p.Acquire(ctx)
+	if err != nil {
+		t.Fatalf("Acquire after Close must not wait out WaitTimeout: %v", err)
+	}
+	c2.Release()
+}
+
+func TestPoolReleaseThenCloseDoesNotBreakNext(t *testing.T) {
+	t.Parallel()
+	var n atomic.Int32
+	dial := func(ctx context.Context, cfg Config) (*Conn, error) {
+		n.Add(1)
+		return fakeDial(ctx, cfg)
+	}
+	p, err := NewPool(testPoolCfg(dial, 1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = p.Close() })
+	c, err := p.Acquire(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.Release()
+	c.Close()
+	c2, err := p.Acquire(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	c2.Release()
+	if n.Load() != 1 {
+		t.Fatalf("Close after Release must not destroy the idle conn, dials=%d", n.Load())
+	}
+}
+
+func TestPoolDoKeepsHealthyOnAppError(t *testing.T) {
+	t.Parallel()
+	p, err := NewPool(testPoolCfg(fakeDial, 1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = p.Close() })
+	err = p.Do(t.Context(), func(*Conn) error {
+		return directory.Error("entry", directory.FieldNotFound, "directory entry not found")
+	})
+	if err == nil {
+		t.Fatal("expected not_found")
+	}
+	st := p.Stats()
+	if st.Idle == 0 {
+		t.Fatalf("healthy conn evicted on app error: %+v", st)
+	}
+	if st.Dialed != 1 {
+		t.Fatalf("redialed on not_found: dialed=%d", st.Dialed)
+	}
+}
+
 func TestPoolShutdown(t *testing.T) {
 	t.Parallel()
 	p, err := NewPool(testPoolCfg(fakeDial, 2))
