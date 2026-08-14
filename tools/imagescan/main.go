@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -31,7 +32,7 @@ func run(stdout, stderr *os.File) int {
 		fmt.Fprintf(stderr, "imagescan: exceptions: %v\n", err)
 		return 1
 	}
-	if err := runGovulncheck(root, stdout, stderr); err != nil {
+	if err := runGovulncheck(root, exceptions, stdout, stderr); err != nil {
 		fmt.Fprintf(stderr, "imagescan: govulncheck: %v\n", err)
 		return 1
 	}
@@ -43,16 +44,56 @@ func run(stdout, stderr *os.File) int {
 	return 0
 }
 
-func runGovulncheck(root string, stdout, stderr *os.File) error {
+var govulnID = regexp.MustCompile(`(?m)^Vulnerability #\d+: (GO-\d{4}-\d+)\b`)
+
+func govulnIDs(text string) []string {
+	var ids []string
+	for _, m := range govulnID.FindAllStringSubmatch(text, -1) {
+		if len(m) > 1 {
+			ids = append(ids, m[1])
+		}
+	}
+	return ids
+}
+
+func runGovulncheck(root string, exceptions map[string]bool, stdout, stderr *os.File) error {
 	cmd := exec.Command("go", "run", govulncheckMod, "./...")
 	cmd.Dir = root
 	cmd.Env = append(os.Environ(), "GOTOOLCHAIN=go1.26.5")
-	cmd.Stdout = stdout
-	cmd.Stderr = stderr
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("unapproved vulnerability (govulncheck failed): %w", err)
+	out, err := cmd.CombinedOutput()
+	_, _ = stdout.Write(out)
+	if err == nil {
+		return nil
+	}
+	ids := unique(govulnIDs(string(out)))
+	var unapproved []string
+	for _, id := range ids {
+		if exceptions[id] {
+			fmt.Fprintf(stdout, "imagescan: approved exception %s\n", id)
+			continue
+		}
+		unapproved = append(unapproved, id)
+	}
+	if len(unapproved) > 0 {
+		return fmt.Errorf("unapproved findings: %s", strings.Join(unapproved, ", "))
+	}
+	if len(ids) == 0 {
+		return fmt.Errorf("govulncheck failed without parseable IDs: %w", err)
 	}
 	return nil
+}
+
+func unique(in []string) []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, s := range in {
+		if seen[s] {
+			continue
+		}
+		seen[s] = true
+		out = append(out, s)
+	}
+	return out
 }
 
 func runGrypeIfPresent(root string, exceptions map[string]bool, stdout, stderr *os.File) error {

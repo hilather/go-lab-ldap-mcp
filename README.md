@@ -22,7 +22,10 @@ No distribution license file (OD-003). Local images only (OD-004).
 Milestones **M0–M2** are complete. First usable release is the README definition
 in the design package plus every P0 task in [`TASKS.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/TASKS.md).
 
-Completed: **T-001–T-118**. Next: **T-119** operator package. Remaining-work design: [`docs/design/remaining-work-t035-t120.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/design/remaining-work-t035-t120.md).
+Completed: **T-001–T-044**, **T-045–T-084**, **T-095–T-120** on this
+branch. M6 MCP (T-085–T-094) remains a package stub
+([`docs/mcp/catalog.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/mcp/catalog.md)).
+Remaining-work design: [`docs/design/remaining-work-t035-t120.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/design/remaining-work-t035-t120.md).
 
 ## Commands
 
@@ -73,6 +76,8 @@ assets at `GET /` with hashed-file cache headers and `index.html` SPA fallback.
 | [`docs/10-implementation-plan.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/10-implementation-plan.md) | Milestones M0–M8 |
 | [`docs/13-open-decisions.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/13-open-decisions.md) | Owner / verification / agent defaults |
 | [`TASKS.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/TASKS.md) | T-001–T-120 backlog |
+| [`docs/operations/operator-guide.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/operations/operator-guide.md) | Operator deploy, reset, TLS, limitations |
+| [`docs/release/notes.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/release/notes.md) | First-usable-release notes and residuals |
 | [`docs/adr/`](https://github.com/hilather/go-lab-ldap-mcp/tree/main/docs/adr) | Title-only ADR stubs until recovered ADR text exists |
 
 Eighteen inventoried design-package documents are absent from the source

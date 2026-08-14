@@ -43,4 +43,6 @@ image IDs + workflow path) and `dist/release/SHA256SUMS`. Signing
 
 | ID | Reason | Expires |
 | --- | --- | --- |
-| *(none)* | — | — |
+| GO-2026-6090 | Pinned toolchain `go1.26.5` (`crypto/tls` handshake limit). Fixed in `go1.26.6`. Do not bump the builder digest in this PR without a new pin. | 2026-09-14 |
+| GO-2026-6089 | Pinned toolchain `go1.26.5` (`net/http` ReadHeaderTimeout on h2c). Fixed in `go1.26.6`. | 2026-09-14 |
+| GO-2026-5972 | Pinned toolchain `go1.26.5` (`encoding/asn1` recursion). Fixed in `go1.26.6`. | 2026-09-14 |

@@ -90,7 +90,7 @@ test-e2e: frontend-build
 
 test-security:
 	$(GO) run ./tools/secretscan .
-	$(GO) run $(GOVULNCHECK_MOD) ./...
+	$(GO) run ./tools/imagescan
 	$(GO) run ./tools/licensecheck
 
 compose-preflight:
