@@ -9,7 +9,7 @@ export const SCOPE_LAB_EXPORT = "lab:export";
 export const SCOPE_SCHEMA_READ = "schema:read";
 export const SCOPE_AUDIT_READ = "audit:read";
 
-export type LoginNoticeKind = "invalid" | "rate_limit" | "expired" | "unknown";
+export type LoginNoticeKind = "invalid" | "rate_limit" | "expired" | "reauth" | "unknown";
 
 export type LoginNotice = {
   kind: LoginNoticeKind;
@@ -37,6 +37,13 @@ export function loginNotice(kind: LoginNoticeKind): LoginNotice {
         role: "status",
         message: "Your session expired. Sign in again to continue.",
       };
+    case "reauth":
+      return {
+        kind,
+        role: "status",
+        message:
+          "This tab has a directory cookie but no CSRF secret. Enter the token again to restore a signed-in session.",
+      };
     case "unknown":
       return {
         kind,
@@ -56,14 +63,18 @@ export function classifyLoginHttpStatus(status: number): LoginNoticeKind {
   return "unknown";
 }
 
-export type DashboardMode = "ready" | "degraded" | "outage";
+export type DashboardMode = "loading" | "ready" | "degraded" | "outage";
 
 export function dashboardMode(input: {
   ready: boolean | undefined;
   directoryUnreachable: boolean;
+  settled: boolean;
 }): DashboardMode {
   if (input.directoryUnreachable) {
     return "outage";
+  }
+  if (!input.settled) {
+    return "loading";
   }
   if (input.ready === true) {
     return "ready";
@@ -80,6 +91,13 @@ export type StatusPresentation = {
 
 export function statusPresentation(mode: DashboardMode): StatusPresentation {
   switch (mode) {
+    case "loading":
+      return {
+        mode,
+        symbol: "…",
+        label: "Checking",
+        detail: "Waiting for directory readiness.",
+      };
     case "ready":
       return {
         mode,
@@ -214,6 +232,12 @@ export function scenarioStatus(input: {
   resetState: string | undefined;
   markerMatch: boolean | undefined;
 }): { label: string; detail: string } {
+  if (input.mode === "loading") {
+    return {
+      label: "Checking",
+      detail: "Scenario status is still loading.",
+    };
+  }
   if (input.mode === "outage") {
     return {
       label: "Unavailable",
@@ -245,3 +269,17 @@ export function scenarioStatus(input: {
 }
 
 export const emptyTokenField = { token: "" } as const;
+
+export type SessionEndResult = "deleted" | "unauthorized" | "csrf" | "failed";
+
+export function browserSessionComplete(hasCookieSession: boolean, csrfPresent: boolean): boolean {
+  return hasCookieSession && csrfPresent;
+}
+
+export function canDestroySession(csrfPresent: boolean): boolean {
+  return csrfPresent;
+}
+
+export function sessionEndInvalidated(result: SessionEndResult): boolean {
+  return result === "deleted" || result === "unauthorized";
+}

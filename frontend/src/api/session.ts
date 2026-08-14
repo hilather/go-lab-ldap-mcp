@@ -1,10 +1,18 @@
 import type { QueryClient } from "@tanstack/react-query";
-import { classifyLoginHttpStatus, emptyTokenField } from "../lib/session-model";
+import {
+  browserSessionComplete,
+  classifyLoginHttpStatus,
+  emptyTokenField,
+  sessionEndInvalidated,
+  type SessionEndResult,
+} from "../lib/session-model";
 import { clearSessionQueryData } from "../lib/query";
 import { api } from "./client";
 import { isApiError, toApiError } from "./problem";
-import { clearMemoryBearer, clearMemoryCSRF, setMemoryCSRF } from "./token";
+import { clearMemoryBearer, clearMemoryCSRF, getMemoryCSRF, setMemoryCSRF } from "./token";
 import type { SessionCreated, SessionView } from "./types";
+
+export type { SessionEndResult };
 
 export function clearedLoginValues(): typeof emptyTokenField {
   return emptyTokenField;
@@ -19,6 +27,14 @@ export function applySessionCreated(created: SessionCreated): void {
 export function clearBrowserSecrets(): void {
   clearMemoryBearer();
   clearMemoryCSRF();
+}
+
+export function hasMemoryCSRF(): boolean {
+  return getMemoryCSRF() !== undefined;
+}
+
+export function isCompleteBrowserSession(hasCookieSession: boolean): boolean {
+  return browserSessionComplete(hasCookieSession, hasMemoryCSRF());
 }
 
 export function clearSessionClientState(client: QueryClient): void {
@@ -53,18 +69,29 @@ export async function getSession(): Promise<SessionView> {
   return data;
 }
 
-export async function deleteSession(): Promise<void> {
-  const { error, response } = await api.DELETE("/api/v1/session");
+// DELETE first while CSRF is still in memory. 403 means the cookie session
+// is still live — do not pretend the tab is signed out.
+export async function deleteSession(): Promise<SessionEndResult> {
+  if (!hasMemoryCSRF()) {
+    return "csrf";
+  }
+  const { response } = await api.DELETE("/api/v1/session");
   if (response.status === 204 || response.ok) {
     clearBrowserSecrets();
-    return;
+    return "deleted";
   }
-  // Missing CSRF after reload still must leave the tab signed out.
-  if (response.status === 401 || response.status === 403) {
+  if (response.status === 401) {
     clearBrowserSecrets();
-    return;
+    return "unauthorized";
   }
-  throw toApiError(error, response.status, "logout failed");
+  if (response.status === 403) {
+    return "csrf";
+  }
+  return "failed";
+}
+
+export function endedServerSession(result: SessionEndResult): boolean {
+  return sessionEndInvalidated(result);
 }
 
 export function loginFailureKind(err: unknown): "invalid" | "rate_limit" | "unknown" {

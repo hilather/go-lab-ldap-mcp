@@ -1,15 +1,22 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createContext, useContext, useEffect, useRef } from "react";
 import { Navigate, Outlet, useNavigate } from "react-router";
-import { setSessionExpiredHandler } from "../api/expiry";
+import { setSessionActivityHandler, setSessionExpiredHandler } from "../api/expiry";
 import { isUnauthorized } from "../api/problem";
-import { clearSessionClientState, deleteSession, getSession } from "../api/session";
+import {
+  clearSessionClientState,
+  deleteSession,
+  endedServerSession,
+  getSession,
+  hasMemoryCSRF,
+} from "../api/session";
 import type { SessionView } from "../api/types";
 import { queryKeys } from "../lib/query";
 
 type SessionContextValue = {
   session: SessionView;
   logout: () => Promise<void>;
+  canLogout: boolean;
 };
 
 const SessionContext = createContext<SessionContextValue | undefined>(undefined);
@@ -41,6 +48,7 @@ export function SessionGate() {
   }
 
   useEffect(() => {
+    // Real 401 from the server: the cookie session is already gone.
     const expire = (): void => {
       if (!hadSession.current) {
         return;
@@ -51,6 +59,19 @@ export function SessionGate() {
     setSessionExpiredHandler(expire);
     return () => setSessionExpiredHandler(undefined);
   }, [navigate, queryClient]);
+
+  useEffect(() => {
+    let last = 0;
+    setSessionActivityHandler(() => {
+      const now = Date.now();
+      if (now - last < 15_000) {
+        return;
+      }
+      last = now;
+      void queryClient.invalidateQueries({ queryKey: queryKeys.session });
+    });
+    return () => setSessionActivityHandler(undefined);
+  }, [queryClient]);
 
   useEffect(() => {
     if (!sessionQuery.isError || !isUnauthorized(sessionQuery.error)) {
@@ -71,9 +92,16 @@ export function SessionGate() {
       return;
     }
     const timer = window.setTimeout(() => {
-      hadSession.current = true;
-      clearSessionClientState(queryClient);
-      void navigate("/login", { replace: true, state: { reason: "expired" } });
+      void (async () => {
+        // Invalidate the server session while CSRF is still in memory.
+        const result = await deleteSession();
+        if (!endedServerSession(result)) {
+          return;
+        }
+        hadSession.current = true;
+        clearSessionClientState(queryClient);
+        await navigate("/login", { replace: true, state: { reason: "expired" } });
+      })();
     }, Math.max(0, ms));
     return () => window.clearTimeout(timer);
   }, [navigate, queryClient, sessionQuery.data?.expiresAt]);
@@ -97,16 +125,18 @@ export function SessionGate() {
   }
 
   const logout = async (): Promise<void> => {
-    try {
-      await deleteSession();
-    } finally {
-      clearSessionClientState(queryClient);
-      await navigate("/login", { replace: true });
+    const result = await deleteSession();
+    if (!endedServerSession(result)) {
+      return;
     }
+    clearSessionClientState(queryClient);
+    await navigate("/login", { replace: true });
   };
 
   return (
-    <SessionContext.Provider value={{ session: sessionQuery.data, logout }}>
+    <SessionContext.Provider
+      value={{ session: sessionQuery.data, logout, canLogout: hasMemoryCSRF() }}
+    >
       <Outlet />
     </SessionContext.Provider>
   );

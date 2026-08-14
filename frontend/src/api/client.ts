@@ -1,17 +1,22 @@
 import createClient, { type Middleware } from "openapi-fetch";
 import type { paths } from "@labldap/openapi";
-import { notifySessionExpired } from "./expiry";
+import { notifySessionActivity, notifySessionExpired } from "./expiry";
 import { getMemoryBearer, getMemoryCSRF } from "./token";
 
-function isSessionCreate(request: Request): boolean {
-  if (request.method !== "POST") {
-    return false;
-  }
+function sessionPath(request: Request): string | undefined {
   try {
-    return new URL(request.url).pathname === "/api/v1/session";
+    return new URL(request.url).pathname;
   } catch {
-    return false;
+    return undefined;
   }
+}
+
+function isSessionCreate(request: Request): boolean {
+  return request.method === "POST" && sessionPath(request) === "/api/v1/session";
+}
+
+function isSessionGet(request: Request): boolean {
+  return request.method === "GET" && sessionPath(request) === "/api/v1/session";
 }
 
 const memoryCredentials: Middleware = {
@@ -29,6 +34,12 @@ const memoryCredentials: Middleware = {
   async onResponse({ request, response }) {
     if (response.status === 401 && !isSessionCreate(request)) {
       notifySessionExpired();
+      return response;
+    }
+    // Successful authenticated calls extend server idle via Lookup.
+    // Skip GET /session so a refresh cannot loop into another GET /session.
+    if (response.ok && !isSessionCreate(request) && !isSessionGet(request)) {
+      notifySessionActivity();
     }
     return response;
   },

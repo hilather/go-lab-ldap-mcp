@@ -1,7 +1,14 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router";
-import { createSession, getSession, loginFailureKind, clearedLoginValues } from "../api/session";
+import {
+  createSession,
+  getSession,
+  hasMemoryCSRF,
+  isCompleteBrowserSession,
+  loginFailureKind,
+  clearedLoginValues,
+} from "../api/session";
 import { zodResolver, useForm, z } from "../lib/form";
 import { queryKeys } from "../lib/query";
 import { loginNotice, type LoginNoticeKind } from "../lib/session-model";
@@ -49,11 +56,16 @@ export function LoginPage() {
     );
   }
 
-  if (existing.data !== undefined) {
+  // Cookie presence is not a complete browser session. Missing CSRF after a
+  // reload must keep this form up so the operator can rotate a new secret.
+  if (isCompleteBrowserSession(existing.data !== undefined)) {
     return <Navigate to="/" replace />;
   }
 
-  const notice = noticeKind === undefined ? undefined : loginNotice(noticeKind);
+  const inferredKind: LoginNoticeKind | undefined =
+    noticeKind ??
+    (existing.data !== undefined && !hasMemoryCSRF() ? "reauth" : undefined);
+  const notice = inferredKind === undefined ? undefined : loginNotice(inferredKind);
   const fieldError = form.formState.errors.token?.message;
   const describedBy = [notice ? "login-notice" : undefined, fieldError ? "login-token-error" : undefined]
     .filter((id): id is string => id !== undefined)

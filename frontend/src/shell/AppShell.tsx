@@ -1,11 +1,9 @@
-import { NavLink, Outlet } from "react-router";
-import { getMemoryCSRF } from "../api/token";
+import { Link, NavLink, Outlet } from "react-router";
 import { useSession } from "../auth/SessionGate";
 import { navigationItems, navRestriction } from "../lib/session-model";
 
 export function AppShell() {
-  const { session, logout } = useSession();
-  const csrfMissing = getMemoryCSRF() === undefined;
+  const { session, logout, canLogout } = useSession();
   const scopes = session.scopes;
 
   return (
@@ -33,16 +31,19 @@ export function AppShell() {
               </ul>
             )}
           </section>
-          <button type="button" onClick={() => void logout()}>
+          <button type="button" onClick={() => void logout()} disabled={!canLogout}>
             Sign out
           </button>
         </div>
       </header>
-      {csrfMissing ? (
+      {canLogout ? null : (
         <p className="banner banner-warning" role="status">
-          This tab has no CSRF secret after a reload. Sign in again before making changes.
+          This tab has no CSRF secret after a reload.{" "}
+          <Link to="/login">Sign in again</Link> with the token before making
+          changes. Sign out stays disabled until that re-exchange or the cookie
+          expires.
         </p>
-      ) : null}
+      )}
       <div className="app-body">
         <nav className="app-nav" aria-label="Primary">
           <ul>

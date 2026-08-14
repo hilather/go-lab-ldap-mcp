@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  browserSessionComplete,
+  canDestroySession,
   classifyLoginHttpStatus,
   dashboardMode,
   emptyTokenField,
@@ -13,6 +15,7 @@ import {
   scenarioStatus,
   SCOPE_DIRECTORY_READ,
   SCOPE_DIRECTORY_WRITE,
+  sessionEndInvalidated,
   statusPresentation,
 } from "./session-model.ts";
 
@@ -31,16 +34,40 @@ test("successful login leaves no retained token field", () => {
 });
 
 test("dashboard works in ready, degraded, and outage modes", () => {
-  assert.equal(dashboardMode({ ready: true, directoryUnreachable: false }), "ready");
-  assert.equal(dashboardMode({ ready: false, directoryUnreachable: false }), "degraded");
-  assert.equal(dashboardMode({ ready: true, directoryUnreachable: true }), "outage");
-  for (const mode of ["ready", "degraded", "outage"] as const) {
+  assert.equal(
+    dashboardMode({ ready: true, directoryUnreachable: false, settled: true }),
+    "ready",
+  );
+  assert.equal(
+    dashboardMode({ ready: false, directoryUnreachable: false, settled: true }),
+    "degraded",
+  );
+  assert.equal(
+    dashboardMode({ ready: true, directoryUnreachable: true, settled: false }),
+    "outage",
+  );
+  assert.equal(
+    dashboardMode({ ready: false, directoryUnreachable: false, settled: false }),
+    "loading",
+  );
+  for (const mode of ["loading", "ready", "degraded", "outage"] as const) {
     const status = statusPresentation(mode);
     assert.ok(status.label.length > 0);
     assert.ok(status.symbol.length > 0);
     assert.ok(status.detail.length > 0);
     assert.notEqual(status.label, status.symbol);
   }
+});
+
+test("cookie session without CSRF is not a complete browser session", () => {
+  assert.equal(browserSessionComplete(true, false), false);
+  assert.equal(browserSessionComplete(true, true), true);
+  assert.equal(canDestroySession(false), false);
+  assert.equal(canDestroySession(true), true);
+  assert.equal(sessionEndInvalidated("deleted"), true);
+  assert.equal(sessionEndInvalidated("unauthorized"), true);
+  assert.equal(sessionEndInvalidated("csrf"), false);
+  assert.equal(sessionEndInvalidated("failed"), false);
 });
 
 test("scope-restricted actions name the missing permission", () => {

@@ -58,7 +58,11 @@ export function DashboardPage() {
     isUnavailable(baselineQuery.error);
   const ready =
     diagnosticsQuery.data !== undefined ? diagnosticsQuery.data.ready : readyQuery.data === true;
-  const mode = dashboardMode({ ready, directoryUnreachable });
+  const settled =
+    diagnosticsQuery.data !== undefined ||
+    diagnosticsQuery.isError ||
+    readyQuery.data === true;
+  const mode = dashboardMode({ ready, directoryUnreachable, settled });
   const status = statusPresentation(mode);
   const scenario = scenarioStatus({
     mode,

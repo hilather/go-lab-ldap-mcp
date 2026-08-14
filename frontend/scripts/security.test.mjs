@@ -52,6 +52,7 @@ test("login form posts the token and clears retained field state", async () => {
   assert.match(login, /clearedLoginValues/);
   assert.match(login, /createSession/);
   assert.match(login, /reason === "expired"/);
+  assert.match(login, /isCompleteBrowserSession/);
   assert.match(login, /loginFailureKind/);
   assert.match(login, /role=\{notice\.role\}/);
   assert.match(login, /aria-live="assertive"/);
@@ -64,15 +65,25 @@ test("session exchange stores CSRF in memory and never the bearer after login", 
   assert.match(session, /clearMemoryBearer/);
   assert.match(session, /clearSessionQueryData/);
   assert.doesNotMatch(session, /setMemoryBearer\(/);
+  assert.match(session, /return "csrf"/);
+  assert.doesNotMatch(
+    session,
+    /status === 403[\s\S]{0,80}clearBrowserSecrets/,
+    "403 CSRF failure must not clear local state as a successful logout",
+  );
 });
 
-test("logout and expiry clear directory query data", async () => {
+test("logout and expiry invalidate the server session then clear directory data", async () => {
   const query = await readFile(join(srcRoot, "lib/query.ts"), "utf8");
   assert.match(query, /removeQueries\(\s*\{\s*queryKey:\s*directoryQueryKey/);
   const gate = await readFile(join(srcRoot, "auth/SessionGate.tsx"), "utf8");
+  assert.match(gate, /deleteSession/);
+  assert.match(gate, /endedServerSession/);
   assert.match(gate, /clearSessionClientState/);
   assert.match(gate, /reason: "expired"/);
-  assert.match(gate, /deleteSession/);
+  const shell = await readFile(join(srcRoot, "shell/AppShell.tsx"), "utf8");
+  assert.match(shell, /disabled=\{!canLogout\}/);
+  assert.match(shell, /to="\/login"/);
 });
 
 test("dashboard covers ready, degraded, outage, and missing scopes", async () => {

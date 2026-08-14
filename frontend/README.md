@@ -20,9 +20,13 @@ keeps only the returned CSRF secret in process memory. The session cookie
 is `HttpOnly`. Do not write bearer tokens or CSRF secrets to
 `localStorage`, `sessionStorage`, IndexedDB, or the URL.
 
-Logout and session expiry clear TanStack Query directory data and return
-to `/login`. A reload keeps the cookie but drops the CSRF secret; the
-shell tells the operator to sign in again before mutations.
+Logout and idle expiry call `DELETE /api/v1/session` **before** dropping
+the in-memory CSRF secret, then clear TanStack Query directory data.
+A reload keeps the cookie but drops the CSRF secret. That is not a
+complete browser session: `/login` stays on the token form (it does not
+bounce back to `/`), Sign out stays disabled, and the shell links to
+`/login` so the operator can rotate a new CSRF. A 403 from DELETE is
+not treated as a successful logout.
 
 ## Dashboard
 

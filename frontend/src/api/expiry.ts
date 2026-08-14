@@ -1,6 +1,7 @@
-// Session expiry is signaled in-memory only. Do not persist the reason.
+// Session expiry and idle refresh are signaled in-memory only.
 
 let onExpired: (() => void) | undefined;
+let onActivity: (() => void) | undefined;
 
 export function setSessionExpiredHandler(handler: (() => void) | undefined): void {
   onExpired = handler;
@@ -8,4 +9,12 @@ export function setSessionExpiredHandler(handler: (() => void) | undefined): voi
 
 export function notifySessionExpired(): void {
   onExpired?.();
+}
+
+export function setSessionActivityHandler(handler: (() => void) | undefined): void {
+  onActivity = handler;
+}
+
+export function notifySessionActivity(): void {
+  onActivity?.();
 }

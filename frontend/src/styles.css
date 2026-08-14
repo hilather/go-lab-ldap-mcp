@@ -138,6 +138,10 @@ input:focus-visible {
   font-weight: 650;
 }
 
+.status-loading {
+  border-left: 6px solid #5c5c5c;
+}
+
 .status-ready {
   border-left: 6px solid #0a7a32;
 }
