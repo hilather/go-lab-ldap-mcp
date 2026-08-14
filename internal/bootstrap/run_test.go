@@ -77,6 +77,22 @@ func (f *fakeACIs) ReconcileACIs(ctx context.Context, req ACIRequest) (ACIResult
 	return ACIResult{Applied: []string{"labldap:runtime-suffix-read"}}, nil
 }
 
+type fakeSeed struct {
+	err    error
+	called int
+	req    SeedRequest
+}
+
+func (f *fakeSeed) ReconcileSeed(ctx context.Context, req SeedRequest) (SeedResult, error) {
+	_ = ctx
+	f.called++
+	f.req = req
+	if f.err != nil {
+		return SeedResult{}, f.err
+	}
+	return SeedResult{Created: []string{"uid=alice,ou=people,dc=example,dc=test"}}, nil
+}
+
 type fakeTLS struct {
 	err    error
 	called int
@@ -144,6 +160,9 @@ func testConfigDir(t *testing.T) (cfgPath, pwPath string) {
 	if err := os.WriteFile(filepath.Join(sec, "runtime-ldap"), []byte("runtime-secret\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.WriteFile(filepath.Join(sec, "user-alice"), []byte("alice-seed-secret\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	cfgPath = filepath.Join(dir, "lab.yaml")
 	src := `apiVersion: labldap.dev/v1alpha1
 kind: LabScenario
@@ -152,6 +171,13 @@ spec:
   directory: { suffix: "dc=example,dc=test" }
   transport: { ldaps: { enabled: true, port: 3636 } }
   runtimeAccount: { id: rt, passwordFile: secrets/runtime-ldap }
+  users:
+    - id: alice
+      uid: alice
+      passwordFile: secrets/user-alice
+  groups:
+    - id: staff
+      members: [{ user: alice }]
 `
 	if err := os.WriteFile(cfgPath, []byte(src), 0o600); err != nil {
 		t.Fatal(err)
@@ -176,7 +202,7 @@ func TestPlanOffline(t *testing.T) {
 	if sum.DirectoryRevision == "" || len(sum.Plan) == 0 {
 		t.Fatal("missing plan/revision")
 	}
-	if bytes.Contains(sum.Plan, []byte("runtime-secret")) || bytes.Contains(sum.Plan, []byte("dm-secret")) {
+	if bytes.Contains(sum.Plan, []byte("runtime-secret")) || bytes.Contains(sum.Plan, []byte("dm-secret")) || bytes.Contains(sum.Plan, []byte("alice-seed-secret")) {
 		t.Fatal("plan leaked secret")
 	}
 }
@@ -190,6 +216,7 @@ func TestApplyLoadThenWaitOK(t *testing.T) {
 	fg := &fakePlugins{}
 	fr := &fakeTree{}
 	fa := &fakeACIs{}
+	fs := &fakeSeed{}
 	sum, err := Run(t.Context(), Options{
 		Command:      "apply",
 		ConfigPath:   cfg,
@@ -201,14 +228,15 @@ func TestApplyLoadThenWaitOK(t *testing.T) {
 		Plugins:      fg,
 		Tree:         fr,
 		ACIs:         fa,
+		Seed:         fs,
 		LDAPURL:      "ldaps://127.0.0.1:3636",
 		CAFile:       "/tmp/ca.crt",
 	}, ioDiscard(), ioDiscard())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !sum.OK || fw.called != 1 || fb.called != 1 || ft.called != 1 || fp.called != 1 || fg.called != 1 || fr.called != 1 || fa.called != 1 {
-		t.Fatalf("sum=%+v wait=%d backend=%d tls=%d policy=%d plugins=%d tree=%d aci=%d", sum, fw.called, fb.called, ft.called, fp.called, fg.called, fr.called, fa.called)
+	if !sum.OK || fw.called != 1 || fb.called != 1 || ft.called != 1 || fp.called != 1 || fg.called != 1 || fr.called != 1 || fa.called != 1 || fs.called != 1 {
+		t.Fatalf("sum=%+v wait=%d backend=%d tls=%d policy=%d plugins=%d tree=%d aci=%d seed=%d", sum, fw.called, fb.called, ft.called, fp.called, fg.called, fr.called, fa.called, fs.called)
 	}
 	if !fb.req.Write {
 		t.Fatal("apply merge must write backend")
@@ -225,17 +253,30 @@ func TestApplyLoadThenWaitOK(t *testing.T) {
 	if !fa.req.Write {
 		t.Fatal("apply merge must write ACIs")
 	}
+	if !fs.req.Write {
+		t.Fatal("apply merge must write seed")
+	}
+	if len(fs.req.Users) != 1 || fs.req.Users[0].ID != "alice" {
+		t.Fatalf("seed users = %+v", fs.req.Users)
+	}
+	if len(fs.req.Groups) != 1 || fs.req.Groups[0].ID != "staff" {
+		t.Fatalf("seed groups = %+v", fs.req.Groups)
+	}
+	if fs.req.Users[0].Password != nil && fs.req.Users[0].Password.Value.Reveal() == "" {
+		t.Fatal("seed user password empty")
+	}
 	if fw.req.Password.Reveal() != "dm-secret" {
 		t.Fatal("password not loaded from file")
 	}
 	if fw.req.LDAPURL != "ldaps://127.0.0.1:3636" {
 		t.Fatalf("url = %s", fw.req.LDAPURL)
 	}
-	if len(sum.Phases) != 8 || sum.Phases[7].Phase != "aci" || !sum.Phases[7].OK {
+	if len(sum.Phases) != 9 || sum.Phases[8].Phase != "seed" || !sum.Phases[8].OK {
 		t.Fatalf("phases = %+v", sum.Phases)
 	}
-	if len(sum.Remaining) == 0 {
-		t.Fatal("expected remaining phases")
+	wantRem := []string{"verify_runtime", "verify_app", "drift", "marker"}
+	if strings.Join(sum.Remaining, ",") != strings.Join(wantRem, ",") {
+		t.Fatalf("remaining = %v, want %v", sum.Remaining, wantRem)
 	}
 }
 
@@ -244,7 +285,7 @@ func TestTlsRequestUsesCompiledLDAPSPort(t *testing.T) {
 	ft := &fakeTLS{}
 	_, err := Run(t.Context(), Options{
 		Command: "apply", ConfigPath: cfg, PasswordFile: pw,
-		Waiter: &fakeWaiter{}, Backend: &fakeBackend{}, TLS: ft, Policy: &fakePolicy{}, Plugins: &fakePlugins{}, Tree: &fakeTree{}, ACIs: &fakeACIs{},
+		Waiter: &fakeWaiter{}, Backend: &fakeBackend{}, TLS: ft, Policy: &fakePolicy{}, Plugins: &fakePlugins{}, Tree: &fakeTree{}, ACIs: &fakeACIs{}, Seed: &fakeSeed{},
 	}, ioDiscard(), ioDiscard())
 	if err != nil {
 		t.Fatal(err)
@@ -264,7 +305,7 @@ func TestApplyWaitBindFailure(t *testing.T) {
 	cfg, pw := testConfigDir(t)
 	fw := &fakeWaiter{err: PhaseError("wait", "bind", "Directory Manager bind failed")}
 	sum, err := Run(t.Context(), Options{
-		Command: "apply", ConfigPath: cfg, PasswordFile: pw, Waiter: fw, Backend: &fakeBackend{}, TLS: &fakeTLS{}, Policy: &fakePolicy{}, Plugins: &fakePlugins{}, Tree: &fakeTree{}, ACIs: &fakeACIs{},
+		Command: "apply", ConfigPath: cfg, PasswordFile: pw, Waiter: fw, Backend: &fakeBackend{}, TLS: &fakeTLS{}, Policy: &fakePolicy{}, Plugins: &fakePlugins{}, Tree: &fakeTree{}, ACIs: &fakeACIs{}, Seed: &fakeSeed{},
 	}, ioDiscard(), ioDiscard())
 	if err == nil {
 		t.Fatal("expected bind failure")
@@ -310,13 +351,14 @@ spec:
 	fg := &fakePlugins{}
 	fr := &fakeTree{}
 	fa := &fakeACIs{}
+	fs := &fakeSeed{}
 	_, err := Run(t.Context(), Options{
-		Command: "apply", ConfigPath: cfg, PasswordFile: pw, Waiter: &fakeWaiter{}, Backend: fb, TLS: ft, Policy: fp, Plugins: fg, Tree: fr, ACIs: fa,
+		Command: "apply", ConfigPath: cfg, PasswordFile: pw, Waiter: &fakeWaiter{}, Backend: fb, TLS: ft, Policy: fp, Plugins: fg, Tree: fr, ACIs: fa, Seed: fs,
 	}, ioDiscard(), ioDiscard())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if fb.req.Write || ft.req.Write || fp.req.Write || fg.req.Write || fr.req.Write || fa.req.Write {
+	if fb.req.Write || ft.req.Write || fp.req.Write || fg.req.Write || fr.req.Write || fa.req.Write || fs.req.Write {
 		t.Fatal("startupMode validate must not write")
 	}
 }
@@ -329,17 +371,41 @@ func TestValidateSubcommandDoesNotWrite(t *testing.T) {
 	fg := &fakePlugins{}
 	fr := &fakeTree{}
 	fa := &fakeACIs{}
+	fs := &fakeSeed{}
 	sum, err := Run(t.Context(), Options{
-		Command: "validate", ConfigPath: cfg, PasswordFile: pw, Waiter: &fakeWaiter{}, Backend: fb, TLS: ft, Policy: fp, Plugins: fg, Tree: fr, ACIs: fa,
+		Command: "validate", ConfigPath: cfg, PasswordFile: pw, Waiter: &fakeWaiter{}, Backend: fb, TLS: ft, Policy: fp, Plugins: fg, Tree: fr, ACIs: fa, Seed: fs,
 	}, ioDiscard(), ioDiscard())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if fb.req.Write || ft.req.Write || fp.req.Write || fg.req.Write || fr.req.Write || fa.req.Write {
+	if fb.req.Write || ft.req.Write || fp.req.Write || fg.req.Write || fr.req.Write || fa.req.Write || fs.req.Write {
 		t.Fatal("validate subcommand must not write")
 	}
-	if !sum.OK || sum.Phases[len(sum.Phases)-1].Phase != "aci" {
+	if !sum.OK || sum.Phases[len(sum.Phases)-1].Phase != "seed" {
 		t.Fatalf("%+v", sum)
+	}
+}
+
+func TestApplySeedPasswordFailure(t *testing.T) {
+	cfg, pw := testConfigDir(t)
+	fs := &fakeSeed{err: PhaseError("seed", "password_set", "could not set seed user password")}
+	sum, err := Run(t.Context(), Options{
+		Command: "apply", ConfigPath: cfg, PasswordFile: pw,
+		Waiter: &fakeWaiter{}, Backend: &fakeBackend{}, TLS: &fakeTLS{}, Policy: &fakePolicy{},
+		Plugins: &fakePlugins{}, Tree: &fakeTree{}, ACIs: &fakeACIs{}, Seed: fs,
+	}, ioDiscard(), ioDiscard())
+	if err == nil {
+		t.Fatal("expected seed failure")
+	}
+	if sum.OK {
+		t.Fatal("summary should not be ok")
+	}
+	apperr.Assert(t, err).Code(apperr.CodeBootstrap).FieldPath("phase.seed")
+	if sum.Phases[len(sum.Phases)-1].Code != "password_set" {
+		t.Fatalf("phase code = %+v", sum.Phases)
+	}
+	if strings.Contains(err.Error(), "alice-seed-secret") {
+		t.Fatal("seed error leaked password")
 	}
 }
 
@@ -354,7 +420,7 @@ func TestApplyInvalidConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 	sum, err := Run(t.Context(), Options{
-		Command: "apply", ConfigPath: path, PasswordFile: pw, Waiter: &fakeWaiter{}, Backend: &fakeBackend{}, TLS: &fakeTLS{}, Policy: &fakePolicy{}, Plugins: &fakePlugins{}, Tree: &fakeTree{}, ACIs: &fakeACIs{},
+		Command: "apply", ConfigPath: path, PasswordFile: pw, Waiter: &fakeWaiter{}, Backend: &fakeBackend{}, TLS: &fakeTLS{}, Policy: &fakePolicy{}, Plugins: &fakePlugins{}, Tree: &fakeTree{}, ACIs: &fakeACIs{}, Seed: &fakeSeed{},
 	}, ioDiscard(), ioDiscard())
 	if err == nil {
 		t.Fatal("expected load failure")
@@ -381,7 +447,7 @@ func TestWriteSummaryStableAndRedacted(t *testing.T) {
 	if !bytes.Contains(a.Bytes(), []byte(`"ok": true`)) {
 		t.Fatalf("stdout = %s", a.String())
 	}
-	if bytes.Contains(a.Bytes(), []byte("runtime-secret")) {
+	if bytes.Contains(a.Bytes(), []byte("runtime-secret")) || bytes.Contains(a.Bytes(), []byte("alice-seed-secret")) {
 		t.Fatal("summary leaked")
 	}
 	var j1, j2 map[string]any

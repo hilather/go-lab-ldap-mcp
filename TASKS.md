@@ -409,16 +409,16 @@ Acceptance:
 - [x] Server rejection identifies ACL ID and safe diagnostic.
 - [x] ACI changes do not grant runtime access outside managed suffix.
 
-## [ ] T-035 Apply baseline users, raw entries, groups, and memberships
+## [x] T-035 Apply baseline users, raw entries, groups, and memberships
 
 Priority: P0 | Size: L | Depends on: T-020, T-033, T-034
 
 Deliverables: administrative LDAP data reconciler, secure password setting, group creation, membership apply, and read-back.
 
 Acceptance:
-- [ ] Configured users can bind with seed passwords.
-- [ ] Groups and memberships match normalized plan.
-- [ ] Password-operation failure triggers compensation or explicit partial failure.
+- [x] Configured users can bind with seed passwords.
+- [x] Groups and memberships match normalized plan.
+- [x] Password-operation failure triggers compensation or explicit partial failure.
 
 ## [ ] T-036 Verify runtime service-account allowed and denied operations
 

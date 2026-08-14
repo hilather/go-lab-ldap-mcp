@@ -1,11 +1,13 @@
 # LabLDAP Remaining-Work Implementation Design (M1–M8)
 
+> **Stale (2026-08-13).** M1 and T-024–T-034 have landed. Do not implement from this file’s “current state” tables. The implementation contract for remaining work is [remaining-work-t035-t120.md](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/design/remaining-work-t035-t120.md). KD-R1–KD-R14 here remain historically useful; the rebased document supersedes them where they conflict with landed types.
+
 | Field | Value |
 | --- | --- |
 | Document title | LabLDAP Remaining-Work Implementation Design (T-009 through T-120) |
 | Author | Design synthesis (remaining work after landed M0) |
 | Date | 2026-08-12 |
-| Status | Draft |
+| Status | Draft (superseded for T-035–T-120) |
 | Product | LabLDAP — disposable laboratory LDAP environment |
 | Working names | LabLDAP / `labldap` / `labldap-bootstrap` (OD-001 default) |
 | Implementation workspace | `/home/mbrewer/projects/go-lab-ldap-mcp` |

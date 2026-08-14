@@ -13,11 +13,12 @@ import (
 	"github.com/hilather/go-lab-ldap-mcp/internal/config"
 )
 
-// treeConn is the LDAP surface used by phase.tree. Tests replace TreeDial.
+// treeConn is the LDAP surface used by phase.tree and phase.seed. Tests replace TreeDial.
 type treeConn interface {
 	Search(req *ldap.SearchRequest) (*ldap.SearchResult, error)
 	Add(req *ldap.AddRequest) error
 	Modify(req *ldap.ModifyRequest) error
+	Del(req *ldap.DelRequest) error
 	Bind(username, password string) error
 	Close() error
 }
@@ -123,7 +124,7 @@ func (e Engine) ensureEntry(conn treeConn, req bootstrap.TreeRequest, dn, passwo
 
 func replacePassword(conn treeConn, dn, password string) error {
 	if password == "" {
-		return errors.New("runtime password is empty")
+		return errors.New("password is empty")
 	}
 	mod := ldap.NewModifyRequest(dn, nil)
 	mod.Replace("userPassword", []string{password})

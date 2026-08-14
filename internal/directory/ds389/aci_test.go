@@ -62,8 +62,9 @@ func (m *aciMem) Modify(req *ldap.ModifyRequest) error {
 	return nil
 }
 
-func (m *aciMem) Bind(string, string) error { return nil }
-func (m *aciMem) Close() error              { return nil }
+func (m *aciMem) Del(*ldap.DelRequest) error { return nil }
+func (m *aciMem) Bind(string, string) error  { return nil }
+func (m *aciMem) Close() error               { return nil }
 
 func sampleRuntimeACIs() []config.NamedACI {
 	return []config.NamedACI{

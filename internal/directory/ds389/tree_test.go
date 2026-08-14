@@ -45,6 +45,11 @@ func (m *memTree) Modify(req *ldap.ModifyRequest) error {
 	return nil
 }
 
+func (m *memTree) Del(req *ldap.DelRequest) error {
+	delete(m.entries, strings.ToLower(req.DN))
+	return nil
+}
+
 func (m *memTree) Bind(username, password string) error {
 	m.binds = append(m.binds, username)
 	return nil

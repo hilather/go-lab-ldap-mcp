@@ -19,9 +19,10 @@ import (
 	"github.com/hilather/go-lab-ldap-mcp/internal/observability"
 )
 
-var laterPhases = []string{
-	"inspect",
-	"seed", "verify_runtime", "verify_app", "drift", "marker",
+// remainingAfterSeed is the not-yet-run suffix after phase.seed.
+// inspect is validate-only and must not appear as leftover apply work.
+var remainingAfterSeed = []string{
+	"verify_runtime", "verify_app", "drift", "marker",
 }
 
 // Options is the parsed bootstrap command.
@@ -41,6 +42,7 @@ type Options struct {
 	Plugins        PluginReconciler
 	Tree           TreeReconciler
 	ACIs           ACIReconciler
+	Seed           SeedReconciler
 	RequireSASL    []string
 	Log            *slog.Logger
 	Now            func() time.Time
@@ -242,11 +244,35 @@ func Run(ctx context.Context, opt Options, stdout, stderr io.Writer) (Summary, e
 		}
 		return map[string]int{"applied": len(res.Applied), "matched": len(res.Matched)}, nil
 	})
+	if err != nil {
+		sum.Phases = rep.phases
+		return sum, err
+	}
+
+	err = rep.run("seed", func() (map[string]int, error) {
+		if opt.Seed == nil {
+			return nil, phaseErr("seed", "seed_missing", "seed reconciler is not configured")
+		}
+		pw, e := readPasswordFile(opt.PasswordFile)
+		if e != nil {
+			return nil, e
+		}
+		res, e := opt.Seed.ReconcileSeed(ctx, seedRequestFrom(compiled, opt, pw, write))
+		if e != nil {
+			return nil, e
+		}
+		return map[string]int{
+			"created": len(res.Created),
+			"updated": len(res.Updated),
+			"matched": len(res.Matched),
+			"deleted": len(res.Deleted),
+		}, nil
+	})
 	sum.Phases = rep.phases
 	if err != nil {
 		return sum, err
 	}
-	sum.Remaining = laterPhases
+	sum.Remaining = append([]string(nil), remainingAfterSeed...)
 	sum.OK = true
 	return sum, nil
 }
@@ -363,6 +389,16 @@ func treeRequestFrom(c *config.Compiled, opt Options, dm observability.Secret, w
 		Insecure:        tls.Insecure,
 		Write:           write,
 		DialTimeout:     tls.DialTimeout,
+	}
+}
+
+func seedRequestFrom(c *config.Compiled, opt Options, dm observability.Secret, write bool) SeedRequest {
+	return SeedRequest{
+		TreeRequest: treeRequestFrom(c, opt, dm, write),
+		Users:       c.Normalized.Users,
+		Groups:      c.Normalized.Groups,
+		StartupMode: c.Normalized.StartupMode,
+		Preserve:    append([]string(nil), c.Data.Preserve...),
 	}
 }
 

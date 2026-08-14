@@ -22,7 +22,7 @@ No distribution license file (OD-003). Local images only (OD-004).
 Milestone **M0** is in progress. First usable release is the README definition
 in the design package plus every P0 task in [`TASKS.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/TASKS.md).
 
-Completed: **T-001–T-034**. Next: **T-035** seed users, groups, and memberships. Remaining-work design: [`docs/design/remaining-work-m1-m8.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/design/remaining-work-m1-m8.md).
+Completed: **T-001–T-035**. Next: **T-036** runtime allow/deny verification. Remaining-work design: [`docs/design/remaining-work-t035-t120.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/design/remaining-work-t035-t120.md).
 
 ## Commands
 
@@ -50,6 +50,7 @@ thin and call `internal/app`. `internal/config` never connects to LDAP.
 | Path | Role |
 | --- | --- |
 | [`docs/design/labldap-implementation-design.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/design/labldap-implementation-design.md) | Implementation contract synthesized from the design package |
+| [`docs/design/remaining-work-t035-t120.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/design/remaining-work-t035-t120.md) | Remaining-work contract for T-035–T-120 |
 | [`docs/01-system-architecture.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/01-system-architecture.md) | System architecture (source package) |
 | [`docs/10-implementation-plan.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/10-implementation-plan.md) | Milestones M0–M8 |
 | [`docs/13-open-decisions.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/13-open-decisions.md) | Owner / verification / agent defaults |

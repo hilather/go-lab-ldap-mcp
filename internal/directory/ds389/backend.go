@@ -15,6 +15,9 @@ type Engine struct {
 	Dial        DialFunc
 	TreeDial    TreeDialFunc
 	RuntimeBind func(ctx context.Context, req bootstrap.TreeRequest) error
+	SeedBind    func(ctx context.Context, req bootstrap.TreeRequest, dn, password string) error
+	// SeedPasswordReplace, if set, replaces the post-add password modify so tests can inject password_set.
+	SeedPasswordReplace func(dn, password string) error
 }
 
 type listedBackend struct {
