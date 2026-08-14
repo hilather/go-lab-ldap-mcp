@@ -18,7 +18,7 @@ type Engine struct {
 	// RuntimeDial, if set, opens the runtime LDAP session used by verify probes.
 	RuntimeDial TreeDialFunc
 	SeedBind    func(ctx context.Context, req bootstrap.TreeRequest, dn, password string) error
-	// UserBind, if set, replaces application bind probes (T-037).
+	// UserBind, if set, replaces application bind probes.
 	UserBind func(ctx context.Context, req bootstrap.TreeRequest, dn, password string) error
 	// SeedPasswordReplace, if set, replaces the post-add password modify so tests can inject password_set.
 	SeedPasswordReplace func(dn, password string) error

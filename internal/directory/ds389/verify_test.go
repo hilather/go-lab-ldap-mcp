@@ -262,16 +262,20 @@ func TestVerifyAppLockoutIsolated(t *testing.T) {
 	req.Policy = config.NormalizedPolicy{LockoutEnabled: true, MaxFailures: 2, LockoutDuration: 60}
 	_, err := testVerifyEngine(mem, func(dn, password string) error {
 		if strings.Contains(dn, probeLockoutUID) {
+			live := ""
+			if e := mem.entries[strings.ToLower(dn)]; e != nil {
+				live = e.GetAttributeValue("userPassword")
+			}
+			if live != "" && password == live {
+				if fails[dn] >= 2 {
+					return ldap.NewError(ldap.LDAPResultInvalidCredentials, errors.New("locked"))
+				}
+				return nil
+			}
 			fails[dn]++
-			if fails[dn] > 2 {
-				return ldap.NewError(ldap.LDAPResultInvalidCredentials, errors.New("locked"))
-			}
-			if password != "alice-seed-secret" {
-				return ldap.NewError(ldap.LDAPResultInvalidCredentials, errors.New("invalid"))
-			}
-			return nil
+			return ldap.NewError(ldap.LDAPResultInvalidCredentials, errors.New("invalid"))
 		}
-		if accountLocked(mem.entries[strings.ToLower(dn)]) {
+		if e := mem.entries[strings.ToLower(dn)]; e != nil && accountLocked(e) {
 			return ldap.NewError(ldap.LDAPResultUnwillingToPerform, errors.New("locked"))
 		}
 		if password == "alice-seed-secret" && strings.Contains(dn, "alice") {
@@ -315,5 +319,97 @@ func TestVerifyAppMemberOfMissing(t *testing.T) {
 	}).VerifyApp(t.Context(), sampleVerifyReq())
 	if err == nil || !fieldHas(err, "phase.verify_app", "memberof") {
 		t.Fatalf("%v", err)
+	}
+}
+
+func TestExpectDeniedRequiresInsufficientAccess(t *testing.T) {
+	if err := expectDenied(nil, "runtime modified cn=config"); err == nil || !fieldHas(err, "phase.verify_runtime", "deny_failed") {
+		t.Fatalf("success: %v", err)
+	}
+	if err := expectDenied(ldap.NewError(ldap.LDAPResultNoSuchObject, errors.New("missing")), "runtime modified the probe marker"); err == nil || !fieldHas(err, "phase.verify_runtime", "allow_failed") {
+		t.Fatalf("noSuchObject: %v", err)
+	}
+	if err := expectDenied(ldap.NewError(ldap.LDAPResultObjectClassViolation, errors.New("oc")), "runtime modified cn=config"); err == nil || !fieldHas(err, "phase.verify_runtime", "allow_failed") {
+		t.Fatalf("other: %v", err)
+	}
+	if err := expectDenied(ldap.NewError(ldap.LDAPResultInsufficientAccessRights, errors.New("denied")), "runtime modified cn=config"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestExpectOutsideDeniedClassified(t *testing.T) {
+	mem := newVerifyMem()
+	if err := expectOutsideDenied(ldap.NewError(ldap.LDAPResultNoSuchObject, errors.New("nso")), mem); err != nil {
+		t.Fatal(err)
+	}
+	if err := expectOutsideDenied(ldap.NewError(ldap.LDAPResultObjectClassViolation, errors.New("oc")), mem); err == nil || !fieldHas(err, "phase.verify_runtime", "deny_failed") {
+		t.Fatalf("unexpected: %v", err)
+	}
+	if err := expectOutsideDenied(nil, mem); err == nil || !fieldHas(err, "phase.verify_runtime", "deny_failed") {
+		t.Fatalf("success: %v", err)
+	}
+	if _, ok := mem.entries[strings.ToLower(probeOutsideDN)]; ok {
+		t.Fatal("outside probe left behind")
+	}
+}
+
+func TestVerifyRuntimeOutsideSuccessIsDenyFailed(t *testing.T) {
+	mem := newVerifyMem()
+	mem.outsideOK = true
+	_, err := testVerifyEngine(mem, nil).VerifyRuntime(t.Context(), sampleVerifyReq())
+	if err == nil || !fieldHas(err, "phase.verify_runtime", "deny_failed") {
+		t.Fatalf("%v", err)
+	}
+	if _, ok := mem.entries[strings.ToLower(probeOutsideDN)]; ok {
+		t.Fatal("outside probe left behind")
+	}
+}
+
+func TestVerifyAppLockoutRequiresInitialBind(t *testing.T) {
+	mem := newVerifyMem()
+	mem.entries["uid=alice,ou=people,dc=example,dc=test"] = &ldap.Entry{
+		DN: "uid=alice,ou=people,dc=example,dc=test",
+		Attributes: []*ldap.EntryAttribute{
+			{Name: "uid", Values: []string{"alice"}},
+			{Name: "memberOf", Values: []string{"cn=staff,ou=groups,dc=example,dc=test"}},
+		},
+	}
+	mem.entries["cn=staff,ou=groups,dc=example,dc=test"] = &ldap.Entry{
+		DN: "cn=staff,ou=groups,dc=example,dc=test",
+		Attributes: []*ldap.EntryAttribute{
+			{Name: "cn", Values: []string{"staff"}},
+			{Name: "objectClass", Values: []string{"groupOfNames"}},
+			{Name: "member", Values: []string{"uid=alice,ou=people,dc=example,dc=test"}},
+		},
+	}
+	req := sampleVerifyReq()
+	req.Policy = config.NormalizedPolicy{LockoutEnabled: true, MaxFailures: 2, LockoutDuration: 60}
+	_, err := testVerifyEngine(mem, func(dn, password string) error {
+		if strings.Contains(dn, probeLockoutUID) {
+			return ldap.NewError(ldap.LDAPResultInvalidCredentials, errors.New("invalid"))
+		}
+		if e := mem.entries[strings.ToLower(dn)]; e != nil && accountLocked(e) {
+			return ldap.NewError(ldap.LDAPResultUnwillingToPerform, errors.New("locked"))
+		}
+		if password == "alice-seed-secret" && strings.Contains(dn, "alice") {
+			return nil
+		}
+		return ldap.NewError(ldap.LDAPResultInvalidCredentials, errors.New("invalid"))
+	}).VerifyApp(t.Context(), req)
+	if err == nil || !fieldHas(err, "phase.verify_app", "lockout") {
+		t.Fatalf("%v", err)
+	}
+}
+
+func TestFirstUserMemberSkipsGroups(t *testing.T) {
+	g := config.NormalizedGroup{Members: []config.MemberRef{
+		{Kind: "group", ID: "nested", DN: "cn=nested,ou=groups,dc=example,dc=test"},
+		{Kind: "user", ID: "alice", DN: "uid=alice,ou=people,dc=example,dc=test"},
+	}}
+	if got := firstUserMember(g); got != "uid=alice,ou=people,dc=example,dc=test" {
+		t.Fatalf("got %q", got)
+	}
+	if firstUserMember(config.NormalizedGroup{}) != "" {
+		t.Fatal("empty group")
 	}
 }

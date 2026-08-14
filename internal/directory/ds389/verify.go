@@ -102,12 +102,15 @@ func (e Engine) VerifyRuntime(ctx context.Context, req bootstrap.VerifyRequest) 
 	}
 	res.Denied++
 
-	if err := expectOutsideDenied(rt.Add(outsideAdd())); err != nil {
+	if err := expectOutsideDenied(rt.Add(outsideAdd()), dm); err != nil {
 		return res, err
 	}
 	res.Denied++
 
 	if err := addProbeMarker(dm, probeMarker); err != nil {
+		return res, runtimeAllow("could not stage the probe marker").Wrap(secretFreeErr(err, req))
+	}
+	if _, err := searchBase(dm, probeMarker, []string{"cn"}); err != nil {
 		return res, runtimeAllow("could not stage the probe marker").Wrap(secretFreeErr(err, req))
 	}
 	if err := expectDenied(rt.Modify(attrReplace(probeMarker, "description", "probe-write")), "runtime modified the probe marker"); err != nil {
@@ -118,9 +121,13 @@ func (e Engine) VerifyRuntime(ctx context.Context, req bootstrap.VerifyRequest) 
 	for _, dn := range []string{req.PeopleDN, req.GroupsDN, probeMarker} {
 		mod := ldap.NewModifyRequest(dn, nil)
 		mod.Add("aci", []string{probeWidenACI})
-		if err := rt.Modify(mod); err == nil {
+		err := rt.Modify(mod)
+		if err == nil {
 			_ = modifyACI(dm, dn, ldap.Change{Operation: ldap.DeleteAttribute, Modification: ldap.PartialAttribute{Type: "aci", Vals: []string{probeWidenACI}}})
 			return res, runtimeDeny("runtime rewrote an ACI")
+		}
+		if err := expectDenied(err, "runtime rewrote an ACI"); err != nil {
+			return res, err
 		}
 	}
 	res.Denied++
@@ -133,7 +140,8 @@ func (e Engine) VerifyRuntime(ctx context.Context, req bootstrap.VerifyRequest) 
 		return res, runtimeAllow("runtime could not modify a temporary user").Wrap(secretFreeErr(err, req))
 	}
 	res.Allowed++
-	if err := replacePassword(rt, probeUser, pw); err != nil {
+	next := probeSecret()
+	if err := replacePassword(rt, probeUser, next); err != nil {
 		return res, runtimeAllow("runtime could not set a temporary user password").Wrap(secretFreeErr(err, req))
 	}
 	res.Allowed++
@@ -218,10 +226,10 @@ func (e Engine) VerifyApp(ctx context.Context, req bootstrap.VerifyRequest) (boo
 			return res, appErr("memberof", "configured group membership does not match the plan")
 		}
 		res.Groups++
-		if len(g.Members) == 0 {
+		member := firstUserMember(g)
+		if member == "" {
 			continue
 		}
-		member := g.Members[0].DN
 		uent, err := readEntry(dm, member, []string{"memberOf"})
 		if err != nil {
 			return res, appErr("memberof", "group member is not present").Wrap(secretFreeErr(err, req))
@@ -237,6 +245,9 @@ func (e Engine) probeLockout(ctx context.Context, dm treeConn, req bootstrap.Ver
 	pw := probeSecret()
 	if err := addThrowawayUser(dm, dn, probeLockoutUID, pw); err != nil {
 		return appErr("lockout", "could not create the isolated lockout user").Wrap(secretFreeErr(err, req))
+	}
+	if err := e.bindUser(ctx, req.TreeRequest, dn, pw); err != nil {
+		return appErr("lockout", "isolated lockout user could not bind before the failure sequence").Wrap(secretFreeErr(err, req))
 	}
 	max := req.Policy.MaxFailures
 	if max <= 0 {
@@ -259,44 +270,19 @@ func (e Engine) probeLockout(ctx context.Context, dm treeConn, req bootstrap.Ver
 }
 
 func (e Engine) probeDisablement(ctx context.Context, dm treeConn, req bootstrap.VerifyRequest, throwaway string) error {
-	dn, pw, created, err := e.disableTarget(dm, req, throwaway)
-	if err != nil {
-		return err
+	pw := probeSecret()
+	if err := addThrowawayUser(dm, throwaway, probeDisableUID, pw); err != nil {
+		return appErr("bind", "could not create the isolated disablement user").Wrap(secretFreeErr(err, req))
 	}
-	if created {
-		defer func() { _ = delIgnoreMissing(dm, throwaway) }()
-	} else {
-		defer func() { _ = unlockAccount(dm, dn) }()
-	}
-	if err := lockAccount(dm, dn); err != nil {
+	defer func() { _ = delIgnoreMissing(dm, throwaway) }()
+	if err := lockAccount(dm, throwaway); err != nil {
 		return appErr("bind", "could not disable the probe account").Wrap(secretFreeErr(err, req))
 	}
-	err = e.bindUser(ctx, req.TreeRequest, dn, pw)
+	err := e.bindUser(ctx, req.TreeRequest, throwaway, pw)
 	if !isUnwillingToPerform(err) {
 		return appErr("bind", "disabled account bind must return unwilling to perform")
 	}
-	if created {
-		return delIgnoreMissing(dm, throwaway)
-	}
-	if err := unlockAccount(dm, dn); err != nil {
-		return appErr("bind", "could not re-enable the probe account").Wrap(secretFreeErr(err, req))
-	}
-	return nil
-}
-
-func (e Engine) disableTarget(dm treeConn, req bootstrap.VerifyRequest, throwaway string) (dn, pw string, created bool, err error) {
-	if u, ok := firstEnabled(req.Users); ok {
-		p, e := seedPassword(u)
-		if e != nil {
-			return "", "", false, appErr("bind", "enabled seed user password is not resolved")
-		}
-		return u.DN, p, false, nil
-	}
-	pw = probeSecret()
-	if err := addThrowawayUser(dm, throwaway, probeDisableUID, pw); err != nil {
-		return "", "", false, appErr("bind", "could not create the isolated disablement user").Wrap(secretFreeErr(err, req))
-	}
-	return throwaway, pw, true, nil
+	return delIgnoreMissing(dm, throwaway)
 }
 
 func (e Engine) bindRuntimeCheck(ctx context.Context, req bootstrap.TreeRequest) error {
@@ -413,17 +399,35 @@ func expectDenied(err error, public string) error {
 	if err == nil {
 		return runtimeDeny(public)
 	}
-	return nil
+	if isInsufficientAccess(err) {
+		return nil
+	}
+	if isNoSuchObject(err) {
+		return runtimeAllow("could not prove deny; entry missing")
+	}
+	return runtimeAllow("could not prove deny").Wrap(err)
 }
 
-func expectOutsideDenied(err error) error {
+func expectOutsideDenied(err error, dm treeConn) error {
 	if err == nil {
+		if dm != nil {
+			_ = delIgnoreMissing(dm, probeOutsideDN)
+		}
 		return runtimeDeny("runtime created an entry outside the managed suffix")
 	}
 	if isNoSuchObject(err) || isNamingViolation(err) || isInsufficientAccess(err) || isUnwillingToPerform(err) {
 		return nil
 	}
-	return nil
+	return runtimeDeny("outside-suffix probe returned an unexpected error").Wrap(err)
+}
+
+func firstUserMember(g config.NormalizedGroup) string {
+	for _, m := range g.Members {
+		if m.Kind == "user" && m.DN != "" {
+			return m.DN
+		}
+	}
+	return ""
 }
 
 func addProbeMarker(conn treeConn, dn string) error {
@@ -465,16 +469,6 @@ func addThrowawayUser(conn treeConn, dn, uid, password string) error {
 
 func lockAccount(conn treeConn, dn string) error {
 	return conn.Modify(attrReplace(dn, "nsAccountLock", "true"))
-}
-
-func unlockAccount(conn treeConn, dn string) error {
-	mod := ldap.NewModifyRequest(dn, nil)
-	mod.Delete("nsAccountLock", nil)
-	err := conn.Modify(mod)
-	if err != nil && isNoSuchAttribute(err) {
-		return nil
-	}
-	return err
 }
 
 func attrReplace(dn, name, value string) *ldap.ModifyRequest {
@@ -559,10 +553,6 @@ func isNamingViolation(err error) bool {
 func isSizeOrTimeLimit(err error) bool {
 	c := ldapCode(err)
 	return c == ldap.LDAPResultSizeLimitExceeded || c == ldap.LDAPResultTimeLimitExceeded
-}
-
-func isNoSuchAttribute(err error) bool {
-	return ldapCode(err) == ldap.LDAPResultNoSuchAttribute
 }
 
 func ldapCode(err error) uint16 {

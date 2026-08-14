@@ -13,7 +13,7 @@ import (
 	"github.com/hilather/go-lab-ldap-mcp/internal/config"
 )
 
-// treeConn is the LDAP surface used by phase.tree and phase.seed. Tests replace TreeDial.
+// treeConn is the LDAP surface used by phase.tree, phase.seed, and verify. Tests replace TreeDial.
 type treeConn interface {
 	Search(req *ldap.SearchRequest) (*ldap.SearchResult, error)
 	Add(req *ldap.AddRequest) error
