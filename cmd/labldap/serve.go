@@ -19,7 +19,6 @@ import (
 	"github.com/hilather/go-lab-ldap-mcp/internal/config"
 	"github.com/hilather/go-lab-ldap-mcp/internal/directory/ds389"
 	"github.com/hilather/go-lab-ldap-mcp/internal/observability"
-	"github.com/hilather/go-lab-ldap-mcp/internal/reset"
 )
 
 const defaultListen = "127.0.0.1:8443"
@@ -199,7 +198,7 @@ func serverOptionsFromCompiled(c *config.Compiled, flags serveFlags, log *slog.L
 			st := pool.Stats()
 			return st.Active, st.Idle, st.Max, st.Waiters
 		}, func() bool {
-			return gate != nil && gate.State() != reset.Ready
+			return gate != nil && gate.InProgress()
 		})
 	}
 	opt := api.Options{

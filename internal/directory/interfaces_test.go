@@ -84,6 +84,7 @@ type stubReset struct{}
 func (stubReset) Inventory(context.Context) (directory.ManagedInventory, error) {
 	return directory.ManagedInventory{}, nil
 }
+func (stubReset) DeleteManaged(context.Context, string) error { return nil }
 func (stubReset) Export(context.Context, io.Writer, directory.ExportOptions) error {
 	return nil
 }

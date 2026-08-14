@@ -86,6 +86,9 @@ func (d DN) Leaf() (attr, value string, ok bool) {
 	return d.rdns[0].attr, d.rdns[0].value, true
 }
 
+// Depth is the RDN count. Deeper DNs have a larger depth.
+func (d DN) Depth() int { return len(d.rdns) }
+
 func (d DN) String() string {
 	parts := make([]string, len(d.rdns))
 	for i, r := range d.rdns {

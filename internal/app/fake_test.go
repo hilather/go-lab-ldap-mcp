@@ -371,6 +371,7 @@ type unusedReset struct{}
 func (unusedReset) Inventory(context.Context) (directory.ManagedInventory, error) {
 	return directory.ManagedInventory{}, nil
 }
+func (unusedReset) DeleteManaged(context.Context, string) error                      { return nil }
 func (unusedReset) Export(context.Context, io.Writer, directory.ExportOptions) error { return nil }
 
 func kvFromMap(in map[string]string) []directory.AttrKV {
