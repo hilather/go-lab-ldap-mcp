@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -117,6 +118,9 @@ func TestWriteListEnvelope(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status %d", rec.Code)
 	}
+	if rec.Header().Get("Cache-Control") != "no-store" {
+		t.Fatalf("cache-control %q", rec.Header().Get("Cache-Control"))
+	}
 	var body struct {
 		Items      []string `json:"items"`
 		NextCursor string   `json:"nextCursor"`
@@ -135,6 +139,16 @@ func TestWriteListEnvelope(t *testing.T) {
 	}
 	if got := rec.Body.String(); !containsItemsArray(got) {
 		t.Fatalf("expected items array: %s", got)
+	}
+
+	rec = httptest.NewRecorder()
+	var typedNil []string
+	writeList(rec, req, typedNil, "")
+	if rec.Header().Get("Cache-Control") != "no-store" {
+		t.Fatalf("typed-nil cache-control %q", rec.Header().Get("Cache-Control"))
+	}
+	if got := rec.Body.String(); !containsItemsArray(got) || strings.Contains(got, `"items":null`) {
+		t.Fatalf("typed-nil items must be []: %s", got)
 	}
 }
 

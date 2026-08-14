@@ -52,7 +52,7 @@ func TestParseIfMatch(t *testing.T) {
 		t.Fatalf("header: %q %v", got, err)
 	}
 
-	for _, bad := range []string{"deadbeef", `W/"deadbeef"`, "*", `"a", "b"`, `""`, `"ab\"c"`} {
+	for _, bad := range []string{"deadbeef", `W/"deadbeef"`, "*", `"a", "b"`, `""`, `"ab\"c"`, `"DEADBEEF"`, `"not-hex"`, `"cafe!"`} {
 		_, err := ParseIfMatch(bad)
 		if err == nil || statusFor(err) != http.StatusBadRequest {
 			t.Fatalf("%q: %v status %d", bad, err, statusFor(err))

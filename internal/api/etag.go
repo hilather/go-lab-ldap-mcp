@@ -50,10 +50,25 @@ func ParseIfMatch(header string) (directory.Revision, error) {
 		return "", invalidIfMatch("If-Match must be a quoted revision")
 	}
 	inner := s[1 : len(s)-1]
-	if inner == "" || strings.ContainsAny(inner, `"\\`) {
+	if inner == "" || strings.ContainsAny(inner, `"\\`) || !isRevisionHex(inner) {
 		return "", invalidIfMatch("If-Match must be a quoted revision")
 	}
 	return directory.Revision(inner), nil
+}
+
+// isRevisionHex is the lowercase hex alphabet used by directory.RevisionHash.
+func isRevisionHex(s string) bool {
+	if s == "" {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c >= '0' && c <= '9' || c >= 'a' && c <= 'f' {
+			continue
+		}
+		return false
+	}
+	return true
 }
 
 func missingIfMatch() error {

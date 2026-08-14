@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 	"net/url"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -110,8 +111,19 @@ func EncodeCursor(key config.CursorKey, c config.Cursor, now time.Time) (string,
 }
 
 func writeList(w http.ResponseWriter, r *http.Request, items any, nextCursor string) {
+	setNoStore(w)
+	writeJSON(w, r, http.StatusOK, "application/json", listEnvelope{Items: emptyIfNilSlice(items), NextCursor: nextCursor})
+}
+
+// emptyIfNilSlice turns a typed-nil slice into a non-nil empty slice so
+// encoding/json emits [] rather than null (OpenAPI list envelopes).
+func emptyIfNilSlice(items any) any {
 	if items == nil {
-		items = []struct{}{}
+		return []struct{}{}
 	}
-	writeJSON(w, r, http.StatusOK, "application/json", listEnvelope{Items: items, NextCursor: nextCursor})
+	v := reflect.ValueOf(items)
+	if v.Kind() != reflect.Slice || !v.IsNil() {
+		return items
+	}
+	return reflect.MakeSlice(v.Type(), 0, 0).Interface()
 }
