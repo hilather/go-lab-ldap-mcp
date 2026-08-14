@@ -44,13 +44,14 @@ type Deps struct {
 	RuntimeDN string
 	MarkerDN  string
 
-	ResetDir     directory.ResetSupport
-	Secrets      config.SecretResolver
-	SoftReset    bool
-	ScenarioName string
-	ResetUsers   []config.NormalizedUser
-	ResetGroups  []config.NormalizedGroup
-	ResetLock    *reset.Gate
+	ResetDir      directory.ResetSupport
+	Secrets       config.SecretResolver
+	SoftReset     bool
+	ScenarioName  string
+	ResetUsers    []config.NormalizedUser
+	ResetGroups   []config.NormalizedGroup
+	ResetLock     *reset.Gate
+	BindTransport directory.Transport
 }
 
 func New(d Deps) *Services {
@@ -108,9 +109,9 @@ func newReset(d Deps, h hooks, lock *reset.Gate) *Reset {
 			ConfiguredUsers:  userDNs(d.ResetUsers),
 			ConfiguredGroups: groupDNs(d.ResetGroups),
 		},
-		seedU:  d.ResetUsers,
-		seedG:  d.ResetGroups,
-		inject: &reset.Injector{},
+		seedU:     d.ResetUsers,
+		seedG:     d.ResetGroups,
+		transport: d.BindTransport,
 	}
 }
 
@@ -163,6 +164,13 @@ func (h hooks) allowWrite(ctx context.Context) error {
 		return nil
 	}
 	return h.gate.Allow(ctx)
+}
+
+func (h hooks) allowRead(ctx context.Context) error {
+	if h.gate == nil {
+		return nil
+	}
+	return h.gate.AllowRead(ctx)
 }
 
 func (h hooks) rateLimit(ctx context.Context, key string) error {

@@ -108,14 +108,38 @@ func (g *Gate) Allow(context.Context) error {
 	if st == Ready {
 		return nil
 	}
+	if st == Failed {
+		return FailedErr()
+	}
 	return InProgress()
 }
 
-// InProgress is the stable ordinary-write admission error.
+// AllowRead blocks directory reads while a reset is mutating the suffix.
+// Failed stays readable so operators can inspect the torn state.
+func (g *Gate) AllowRead(context.Context) error {
+	if g == nil {
+		return nil
+	}
+	g.mu.Lock()
+	st := g.stateOrReady()
+	g.mu.Unlock()
+	if st == Ready || st == Failed {
+		return nil
+	}
+	return InProgress()
+}
+
+// InProgress is the stable ordinary-write admission error while a reset runs.
 func InProgress() *apperr.Error {
 	return apperr.New(apperr.CodeReset, "reset in progress").
 		WithField(apperr.Field{Path: "reset", Code: "reset_in_progress", Message: "reset in progress"}).
 		Retry()
+}
+
+// FailedErr blocks writes after a reset did not finish (T-080).
+func FailedErr() *apperr.Error {
+	return apperr.New(apperr.CodeReset, "soft reset did not finish").
+		WithField(apperr.Field{Path: "reset", Code: "reset_failed", Message: RecoveryInstructions})
 }
 
 // Busy is the exclusive-lock conflict when a second reset is requested.

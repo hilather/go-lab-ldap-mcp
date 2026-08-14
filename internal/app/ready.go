@@ -48,6 +48,8 @@ type Probe struct {
 	Pool        func() PoolView
 	// BaselineOK, if set, must be true for Ready. Used after a failed
 	// reset so a process restart cannot report false readiness (T-080).
+	// Implementations must not walk the full inventory; treat transport
+	// errors as unknown (return true) so Ping owns outages.
 	BaselineOK func(ctx context.Context) bool
 }
 

@@ -1,6 +1,7 @@
 package reset
 
 import (
+	"errors"
 	"sync"
 	"testing"
 
@@ -108,6 +109,37 @@ func TestGateFailedRetryAndMetrics(t *testing.T) {
 	}
 	if _, err := g.Begin(); err != nil {
 		t.Fatal("retry from Failed")
+	}
+}
+
+func TestGateFailedWriteErrorIsNotInProgress(t *testing.T) {
+	t.Parallel()
+	g := NewGate()
+	g.Set(Failed)
+	err := g.Allow(t.Context())
+	if err == nil {
+		t.Fatal("failed must block writes")
+	}
+	apperr.Assert(t, err).Code(apperr.CodeReset)
+	var e *apperr.Error
+	if !errors.As(err, &e) {
+		t.Fatal(err)
+	}
+	var code string
+	for _, f := range e.Fields() {
+		if f.Code != "" {
+			code = f.Code
+		}
+	}
+	if code != "reset_failed" {
+		t.Fatalf("code %s", code)
+	}
+	if err := g.AllowRead(t.Context()); err != nil {
+		t.Fatal("failed stays readable")
+	}
+	g.Set(Resetting)
+	if err := g.AllowRead(t.Context()); err == nil {
+		t.Fatal("reads during reset")
 	}
 }
 

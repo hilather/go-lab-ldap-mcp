@@ -17,6 +17,33 @@ import (
 
 const seedAlice = "seed-alice-pass-12"
 
+func failResetAt(s *Reset, phase string) {
+	if s == nil {
+		return
+	}
+	if s.inject == nil {
+		s.inject = &reset.Injector{}
+	}
+	s.inject.Set(phase)
+}
+
+type recBind struct {
+	got directory.Transport
+	res directory.BindTestResult
+}
+
+func (r *recBind) BindTest(_ context.Context, _ string, _ observability.Secret, t directory.Transport) (directory.BindTestResult, error) {
+	r.got = t
+	return r.res, nil
+}
+
+type writeCountMarker struct {
+	fakeMarker
+	writes int
+}
+
+func (w *writeCountMarker) WriteMarker(context.Context) { w.writes++ }
+
 func resetter() Principal {
 	return Principal{Kind: KindToken, ID: "admin", Scopes: directory.ScopeSet{
 		"lab:reset", "directory:read", "directory:write", "directory:password",
@@ -307,7 +334,7 @@ func TestResetVerificationDoesNotWriteMarker(t *testing.T) {
 	t.Parallel()
 	users, groups := newFakeUsers(), newFakeGroups()
 	inv := newLiveReset(users, groups)
-	mark := fakeMarker{m: directory.BaselineMarker{AppliedRevision: "rev-dir"}}
+	mark := &writeCountMarker{fakeMarker: fakeMarker{m: directory.BaselineMarker{AppliedRevision: "rev-dir"}}}
 	d := resetDeps(users, groups, inv, reset.NewGate())
 	d.Marker = mark
 	svc := New(d)
@@ -319,14 +346,15 @@ func TestResetVerificationDoesNotWriteMarker(t *testing.T) {
 		t.Fatalf("%+v", st)
 	}
 	got, err := mark.ReadMarker(t.Context())
-	if err != nil || got.AppliedRevision != "rev-dir" {
-		t.Fatalf("marker mutated %+v %v", got, err)
+	if err != nil || got.AppliedRevision != "rev-dir" || mark.writes != 0 {
+		t.Fatalf("marker mutated %+v writes=%d %v", got, mark.writes, err)
 	}
+	var _ directory.MarkerReader = mark
 }
 
 func TestResetFailureInjectionAndUnresolvedNotReady(t *testing.T) {
 	t.Parallel()
-	for _, phase := range []string{reset.PhaseDeleteGroups, reset.PhaseDeleteUsers, reset.PhaseDeleteExtra, reset.PhaseReapplyUsers, reset.PhaseVerify} {
+	for _, phase := range []string{reset.PhaseDeleteGroups, reset.PhaseDeleteUsers, reset.PhaseDeleteExtra, reset.PhaseReapplyUsers, reset.PhaseReapplyGroups, reset.PhaseVerify} {
 		phase := phase
 		t.Run(phase, func(t *testing.T) {
 			t.Parallel()
@@ -337,7 +365,7 @@ func TestResetFailureInjectionAndUnresolvedNotReady(t *testing.T) {
 			inv.extras = []string{"uid=runtime-extra,ou=people,dc=example,dc=test"}
 			gate := reset.NewGate()
 			svc := New(resetDeps(users, groups, inv, gate))
-			svc.Reset.SetFailPoint(phase)
+			failResetAt(svc.Reset, phase)
 			_, err := svc.Reset.Start(t.Context(), resetter(), ResetRequest{Name: "lab", ExpectedRevision: "rev-dir"})
 			if err == nil {
 				t.Fatal("injected")
@@ -360,6 +388,14 @@ func TestResetFailureInjectionAndUnresolvedNotReady(t *testing.T) {
 			d := probe.Evaluate(t.Context())
 			if d.Ready {
 				t.Fatalf("false ready after %s: %+v", phase, d)
+			}
+			if phase == reset.PhaseReapplyGroups {
+				if _, err := svc.Reset.Start(t.Context(), resetter(), ResetRequest{Name: "lab", ExpectedRevision: "rev-dir"}); err != nil {
+					t.Fatal(err)
+				}
+				if _, err := groups.Get(t.Context(), "staff"); err != nil {
+					t.Fatal(err)
+				}
 			}
 		})
 	}
@@ -425,6 +461,92 @@ func TestResetCancelBeforeMutationReleasesGate(t *testing.T) {
 	}
 	if len(inv.deleted) != 0 {
 		t.Fatalf("deleted %v", inv.deleted)
+	}
+}
+
+func TestResetBindUsesConfiguredTransport(t *testing.T) {
+	t.Parallel()
+	users, groups := newFakeUsers(), newFakeGroups()
+	inv := newLiveReset(users, groups)
+	bind := &recBind{res: directory.BindTestResult{Outcome: directory.BindOutcomeSuccess}}
+	d := resetDeps(users, groups, inv, reset.NewGate())
+	d.Bind = bind
+	d.BindTransport = directory.TransportStartTLS
+	svc := New(d)
+	if _, err := svc.Reset.Start(t.Context(), resetter(), ResetRequest{Name: "lab", ExpectedRevision: "rev-dir"}); err != nil {
+		t.Fatal(err)
+	}
+	if bind.got != directory.TransportStartTLS {
+		t.Fatalf("transport %q", bind.got)
+	}
+}
+
+func TestResetBlocksDirectoryReadsWhileMutating(t *testing.T) {
+	t.Parallel()
+	users, groups := newFakeUsers(), newFakeGroups()
+	users.put(directory.User{ID: "alice", UID: "alice", DN: "uid=alice,ou=people,dc=example,dc=test", Enabled: true})
+	inv := newLiveReset(users, groups)
+	block := make(chan struct{}, 1)
+	unblock := make(chan struct{})
+	inv.block = block
+	inv.unblock = unblock
+	svc := New(resetDeps(users, groups, inv, reset.NewGate()))
+	errc := make(chan error, 1)
+	go func() {
+		_, err := svc.Reset.Start(t.Context(), resetter(), ResetRequest{Name: "lab", ExpectedRevision: "rev-dir"})
+		errc <- err
+	}()
+	<-block
+	_, err := svc.Users.Get(t.Context(), writer(), "alice")
+	if err == nil {
+		t.Fatal("read during reset")
+	}
+	apperr.Assert(t, err).Code(apperr.CodeReset).Retryable(true)
+	close(unblock)
+	if err := <-errc; err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestFailedResetBlocksWritesButAllowsReads(t *testing.T) {
+	t.Parallel()
+	users, groups := newFakeUsers(), newFakeGroups()
+	users.put(directory.User{ID: "alice", UID: "alice", DN: "uid=alice,ou=people,dc=example,dc=test", Enabled: true})
+	inv := newLiveReset(users, groups)
+	gate := reset.NewGate()
+	svc := New(resetDeps(users, groups, inv, gate))
+	gate.Set(reset.Failed)
+	_, err := svc.Users.Create(t.Context(), writer(), CreateUser{ID: "bob", Password: Secret("unit-user-pass-12")})
+	if err == nil || fieldCode(err) != "reset_failed" {
+		t.Fatalf("want reset_failed: %v", err)
+	}
+	if _, err := svc.Users.Get(t.Context(), writer(), "alice"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestInspectMarksFailedWhenExtrasRemain(t *testing.T) {
+	t.Parallel()
+	users, groups := newFakeUsers(), newFakeGroups()
+	users.put(directory.User{ID: "alice", UID: "alice", DN: "uid=alice,ou=people,dc=example,dc=test", Enabled: true})
+	groups.put(directory.Group{ID: "staff", DN: "cn=staff,ou=groups,dc=example,dc=test", Members: []directory.MemberRef{{Kind: "user", ID: "alice"}}})
+	inv := newLiveReset(users, groups)
+	inv.extras = []string{"uid=runtime-extra,ou=people,dc=example,dc=test"}
+	svc := New(resetDeps(users, groups, inv, reset.NewGate()))
+	insp := svc.Reset.Inspect(t.Context())
+	if insp.State != string(reset.Failed) {
+		t.Fatalf("extras must fail inspect: %+v", insp)
+	}
+}
+
+func TestBaselinePresentIgnoresTransportErrors(t *testing.T) {
+	t.Parallel()
+	users, groups := newFakeUsers(), newFakeGroups()
+	users.getErr = directory.Error("connection", directory.FieldUnavailable, "directory unavailable")
+	inv := newLiveReset(users, groups)
+	svc := New(resetDeps(users, groups, inv, reset.NewGate()))
+	if !svc.Reset.BaselinePresent(t.Context()) {
+		t.Fatal("transport error must not look like missing baseline")
 	}
 }
 

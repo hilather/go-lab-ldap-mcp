@@ -109,6 +109,28 @@ func (d DN) Equal(o DN) bool {
 	return true
 }
 
+// EqualFold compares RDN attributes and values case-insensitively.
+func (d DN) EqualFold(o DN) bool {
+	if len(d.rdns) != len(o.rdns) {
+		return false
+	}
+	for i := range d.rdns {
+		if d.rdns[i].attr != o.rdns[i].attr || !strings.EqualFold(d.rdns[i].value, o.rdns[i].value) {
+			return false
+		}
+	}
+	return true
+}
+
+// FoldedKey is a lowercase map key for protected-DN checks.
+func (d DN) FoldedKey() string {
+	parts := make([]string, len(d.rdns))
+	for i, r := range d.rdns {
+		parts[i] = r.attr + "=" + strings.ToLower(r.value)
+	}
+	return strings.Join(parts, ",")
+}
+
 // IsDescendantOf reports whether d is strictly under ancestor (RDN prefix from the root).
 func (d DN) IsDescendantOf(ancestor DN) bool {
 	if len(ancestor.rdns) == 0 || len(d.rdns) <= len(ancestor.rdns) {

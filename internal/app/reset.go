@@ -31,22 +31,23 @@ type ResetStatus struct {
 
 // Reset is the soft-reset coordinator (T-076–T-080). It never writes the marker.
 type Reset struct {
-	hooks    hooks
-	gate     *reset.Gate
-	dir      directory.ResetSupport
-	users    directory.UserRepository
-	groups   directory.GroupRepository
-	marker   directory.MarkerReader
-	bind     directory.BindTester
-	secrets  config.SecretResolver
-	soft     bool
-	name     string
-	expected string
-	plan     reset.PlanConfig
-	seedU    []config.NormalizedUser
-	seedG    []config.NormalizedGroup
-	inject   *reset.Injector
-	fixup    func(context.Context) error
+	hooks     hooks
+	gate      *reset.Gate
+	dir       directory.ResetSupport
+	users     directory.UserRepository
+	groups    directory.GroupRepository
+	marker    directory.MarkerReader
+	bind      directory.BindTester
+	secrets   config.SecretResolver
+	soft      bool
+	name      string
+	expected  string
+	plan      reset.PlanConfig
+	seedU     []config.NormalizedUser
+	seedG     []config.NormalizedGroup
+	transport directory.Transport
+	inject    *reset.Injector
+	fixup     func(context.Context) error
 }
 
 func statusFrom(op reset.Operation) ResetStatus {
@@ -74,16 +75,6 @@ func (s *Reset) State() string {
 		return string(reset.Ready)
 	}
 	return string(s.gate.State())
-}
-
-func (s *Reset) SetFailPoint(phase string) {
-	if s == nil {
-		return
-	}
-	if s.inject == nil {
-		s.inject = &reset.Injector{}
-	}
-	s.inject.Set(phase)
 }
 
 // Start runs one exclusive soft reset. It refuses when softReset is false,
@@ -437,7 +428,7 @@ func (s *Reset) bindCheck(ctx context.Context, seeds []config.NormalizedUser) er
 		if !u.Enabled || u.Password == nil {
 			continue
 		}
-		res, err := s.bind.BindTest(ctx, u.UID, u.Password.Value, directory.TransportLDAPS)
+		res, err := s.bind.BindTest(ctx, u.UID, u.Password.Value, s.transport)
 		if err != nil {
 			return err
 		}
@@ -473,70 +464,98 @@ func (s *Reset) reloadSeeds(ctx context.Context) ([]config.NormalizedUser, error
 	return out, nil
 }
 
-// BaselinePresent reports whether every compiled user/group DN is live.
+// BaselinePresent is the cheap ready-path check: compiled users/groups
+// exist. Transport errors are treated as unknown (true) so Ping owns outages.
 func (s *Reset) BaselinePresent(ctx context.Context) bool {
-	ok, err := s.baselineCheck(ctx)
-	return err == nil && ok
-}
-
-func (s *Reset) baselineCheck(ctx context.Context) (bool, error) {
-	if s == nil || s.dir == nil {
-		return false, apperr.New(apperr.CodeReset, "reset inventory is not configured").
-			WithField(apperr.Field{Path: "reset", Code: "unavailable", Message: "reset inventory is not configured"})
-	}
-	inv, err := s.dir.Inventory(ctx)
+	ok, err := s.compiledPresent(ctx)
 	if err != nil {
-		return false, err
-	}
-	have := map[string]struct{}{}
-	for _, dn := range append(append(append([]string{}, inv.Users...), inv.Groups...), inv.Extra...) {
-		have[strings.ToLower(dn)] = struct{}{}
-		if d, e := config.ParseDN(dn); e == nil {
-			have[strings.ToLower(d.String())] = struct{}{}
-		}
-	}
-	missing := func(dn string) bool {
-		if _, ok := have[strings.ToLower(dn)]; ok {
-			return false
-		}
-		if d, e := config.ParseDN(dn); e == nil {
-			_, ok := have[strings.ToLower(d.String())]
-			return !ok
-		}
 		return true
 	}
+	return ok
+}
+
+func (s *Reset) compiledPresent(ctx context.Context) (bool, error) {
+	if s == nil {
+		return false, nil
+	}
 	for _, u := range s.seedU {
-		if missing(u.DN) {
-			return false, nil
+		if s.users == nil {
+			return false, apperr.New(apperr.CodeReset, "reset repositories are not configured").
+				WithField(apperr.Field{Path: "reset", Code: "unavailable", Message: "reset repositories are not configured"})
+		}
+		if _, err := s.users.Get(ctx, directory.UserID(u.ID)); err != nil {
+			if fieldCode(err) == directory.FieldNotFound {
+				return false, nil
+			}
+			return false, err
 		}
 	}
 	for _, g := range s.seedG {
-		if missing(g.DN) {
-			return false, nil
+		if s.groups == nil {
+			return false, apperr.New(apperr.CodeReset, "reset repositories are not configured").
+				WithField(apperr.Field{Path: "reset", Code: "unavailable", Message: "reset repositories are not configured"})
+		}
+		if _, err := s.groups.Get(ctx, directory.GroupID(g.ID)); err != nil {
+			if fieldCode(err) == directory.FieldNotFound {
+				return false, nil
+			}
+			return false, err
 		}
 	}
 	return true, nil
 }
 
-// Inspect marks Failed when compiled objects are missing so readiness
-// cannot flip true over an unresolved suffix (T-080). Inventory errors
-// do not flip Failed (directory outage is not a half-reset).
+// Inspect runs a read-only verify at process start (T-080). Missing compiled
+// objects, leftover extras, or a checksum mismatch MarkFailed. Transport
+// errors do not flip Failed.
 func (s *Reset) Inspect(ctx context.Context) ResetStatus {
 	if s == nil {
 		return ResetStatus{State: string(reset.Ready), Phase: string(reset.Ready)}
 	}
-	ok, err := s.baselineCheck(ctx)
-	if err != nil || ok {
+	reason, err := s.inspectReason(ctx)
+	if err != nil || reason == "" {
 		return s.Status()
 	}
 	if s.gate != nil {
-		s.gate.MarkFailed("compiled baseline objects are missing")
+		s.gate.MarkFailed(reason)
 	}
 	st := s.Status()
 	if st.Recovery == "" {
 		st.Recovery = reset.RecoveryInstructions
 	}
 	return st
+}
+
+func (s *Reset) inspectReason(ctx context.Context) (string, error) {
+	ok, err := s.compiledPresent(ctx)
+	if err != nil {
+		return "", err
+	}
+	if !ok {
+		return "compiled baseline objects are missing", nil
+	}
+	if s.dir == nil {
+		return "", nil
+	}
+	inv, err := s.dir.Inventory(ctx)
+	if err != nil {
+		return "", err
+	}
+	livePlan := reset.BuildPlan(inv, s.plan)
+	markerSerial := s.expected
+	if s.marker != nil {
+		m, merr := s.marker.ReadMarker(ctx)
+		if merr != nil {
+			return "", merr
+		}
+		markerSerial = m.AppliedRevision
+	}
+	live, missing := s.liveSnaps(ctx)
+	ver := reset.Compare(s.expected, markerSerial, reset.Checksum(live), reset.Checksum(s.wantSnaps()), len(livePlan.Extra), missing)
+	if ver.OK {
+		return "", nil
+	}
+	return ver.Reason, nil
 }
 
 func publicResetErr(err error) string {

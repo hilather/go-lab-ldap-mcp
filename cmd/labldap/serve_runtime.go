@@ -241,8 +241,11 @@ func attachDirectory(opt *apiOptionsBuilder) error {
 		ScenarioName:     n.Name,
 		ResetUsers:       n.Users,
 		ResetGroups:      n.Groups,
+		BindTransport:    cfg.Transport,
 	})
-	_ = svc.Reset.Inspect(context.Background())
+	inspectCtx, inspectCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	_ = svc.Reset.Inspect(inspectCtx)
+	inspectCancel()
 	probe := &app.Probe{
 		Ping: func(ctx context.Context) error {
 			return pool.Do(ctx, func(c *ldapclient.Conn) error { return c.Ping(ctx) })

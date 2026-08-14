@@ -364,7 +364,8 @@ func (f fakeMarker) ReadMarker(context.Context) (directory.BaselineMarker, error
 
 type blockingGate struct{ err error }
 
-func (g blockingGate) Allow(context.Context) error { return g.err }
+func (g blockingGate) Allow(context.Context) error     { return g.err }
+func (g blockingGate) AllowRead(context.Context) error { return nil }
 
 type unusedReset struct{}
 

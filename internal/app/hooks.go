@@ -60,14 +60,17 @@ type RateLimiter interface {
 }
 
 // MutationGate blocks ordinary writes when a reset is in progress (T-058).
+// AllowRead blocks directory reads once mutation begins; Failed stays readable.
 type MutationGate interface {
 	Allow(ctx context.Context) error
+	AllowRead(ctx context.Context) error
 }
 
 // OpenGate never blocks. Reset replaces this with a real exclusive gate.
 type OpenGate struct{}
 
-func (OpenGate) Allow(context.Context) error { return nil }
+func (OpenGate) Allow(context.Context) error     { return nil }
+func (OpenGate) AllowRead(context.Context) error { return nil }
 
 // HookAuditor forwards application intents to audit.Hook without secrets.
 type HookAuditor struct {

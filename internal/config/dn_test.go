@@ -55,6 +55,27 @@ func TestDNCases(t *testing.T) {
 	}
 }
 
+func TestDNEqualFoldAndFoldedKey(t *testing.T) {
+	t.Parallel()
+	a, err := config.ParseDN("uid=RT,ou=people,dc=example,dc=test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := config.ParseDN("uid=rt,ou=people,dc=example,dc=test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a.Equal(b) {
+		t.Fatal("Equal is case-sensitive")
+	}
+	if !a.EqualFold(b) {
+		t.Fatal("EqualFold")
+	}
+	if a.FoldedKey() != b.FoldedKey() || a.FoldedKey() != "uid=rt,ou=people,dc=example,dc=test" {
+		t.Fatalf("folded %q %q", a.FoldedKey(), b.FoldedKey())
+	}
+}
+
 func TestDescendantIsStructural(t *testing.T) {
 	t.Parallel()
 	suffix, err := config.ParseDN("dc=test")
