@@ -471,6 +471,39 @@ func composeArgs(project string, files []string) []string {
 	return args
 }
 
+// Overlay interpolation keys from deploy/compose/compose.yaml. Compose
+// interpolation reads the process environment; tests point these at a
+// temp secrets dir instead of the repo-default ../../secrets/*.
+var composeOverlayEnv = []string{
+	"LABLDAP_DIRECTORY_ENVFILE",
+	"LABLDAP_DM_PASSWORD_FILE",
+	"LABLDAP_SECRETS_DIR",
+	"LABLDAP_TLS_CA",
+	"LABLDAP_SCENARIO_FILE",
+}
+
+func composePassthroughEnv() []string {
+	env := append([]string{}, os.Environ()...)
+	for _, key := range composeOverlayEnv {
+		v, ok := os.LookupEnv(key)
+		if !ok {
+			continue
+		}
+		prefix := key + "="
+		replaced := false
+		for i, kv := range env {
+			if strings.HasPrefix(kv, prefix) {
+				env[i] = prefix + v
+				replaced = true
+			}
+		}
+		if !replaced {
+			env = append(env, prefix+v)
+		}
+	}
+	return env
+}
+
 func waitFirstBoot(ctx context.Context, compose []string, service string) error {
 	deadline, ok := ctx.Deadline()
 	if !ok {
@@ -499,6 +532,9 @@ func runDocker(ctx context.Context, args ...string) error {
 
 func dockerOutput(ctx context.Context, args ...string) ([]byte, error) {
 	cmd := exec.CommandContext(ctx, "docker", args...)
+	if len(args) > 0 && args[0] == "compose" {
+		cmd.Env = composePassthroughEnv()
+	}
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		msg := strings.TrimSpace(string(out))

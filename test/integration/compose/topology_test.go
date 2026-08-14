@@ -32,7 +32,7 @@ func TestComposeControlStartsAfterBootstrap(t *testing.T) {
 	}
 
 	live := hostGet(t, root, proj, env, "/health")
-	if live.status != http.StatusOK || !strings.Contains(live.body, "ok") {
+	if live.status != http.StatusOK || !(strings.Contains(live.body, `"live"`) || strings.Contains(live.body, `"status":"live"`)) {
 		t.Fatalf("GET /health status=%d body=%q", live.status, live.body)
 	}
 	ready := hostGet(t, root, proj, env, "/health/ready")
@@ -237,8 +237,8 @@ func writeLabMaterial(t *testing.T, root, dir string) labEnv {
 	t.Helper()
 	secretDir := filepath.Join(dir, "secrets")
 	tlsDir := filepath.Join(secretDir, "tls")
-	runTool(t, root, []string{"run", "./tools/setupsecrets", "--dir", secretDir})
-	runTool(t, root, []string{"run", "./tools/setuptls", "generate", "--dir", tlsDir, "--host", "directory"})
+	runTool(t, root, nil, []string{"run", "./tools/setupsecrets", "--dir", secretDir})
+	runTool(t, root, nil, []string{"run", "./tools/setuptls", "generate", "--dir", tlsDir, "--host", "directory"})
 	token := strings.TrimSpace(readFile(t, filepath.Join(secretDir, "token-admin")))
 	dm := strings.TrimSpace(readFile(t, filepath.Join(secretDir, "dm.pw")))
 	return labEnv{
@@ -293,7 +293,7 @@ func importTLS(t *testing.T, root, proj string, env labEnv, persistent bool) {
 	bindEnv(&env, root, persistent)
 	args := []string{"run", "./tools/setuptls", "import", "--dir", env.tlsDir, "--project", proj,
 		"-f", env.files[0], "-f", env.files[1]}
-	runTool(t, root, args)
+	runTool(t, root, composeEnv(env), args)
 }
 
 func publishCA(t *testing.T, root, proj string, env labEnv, persistent bool) {
@@ -301,7 +301,7 @@ func publishCA(t *testing.T, root, proj string, env labEnv, persistent bool) {
 	bindEnv(&env, root, persistent)
 	args := []string{"run", "./tools/setuptls", "publish", "--out", env.instanceCA, "--project", proj,
 		"-f", env.files[0], "-f", env.files[1]}
-	runTool(t, root, args)
+	runTool(t, root, composeEnv(env), args)
 }
 
 func waitControl(t *testing.T, root, proj string, env labEnv, persistent bool) {
@@ -361,10 +361,13 @@ func composeOutput(t *testing.T, root, proj string, env labEnv, persistent bool,
 	return string(out)
 }
 
-func runTool(t *testing.T, root string, args []string) {
+func runTool(t *testing.T, root string, env []string, args []string) {
 	t.Helper()
 	cmd := exec.Command("go", args...)
 	cmd.Dir = root
+	if env != nil {
+		cmd.Env = env
+	}
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("go %s: %v\n%s", strings.Join(args, " "), err, out)

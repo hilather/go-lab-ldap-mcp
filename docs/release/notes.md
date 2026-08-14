@@ -71,6 +71,8 @@ security, SBOM, checksums, archcheck). Product acceptance:
   `docs/mcp/catalog.md`. Live MCP mutate / Compose protocol acceptance
   was not re-run on this merge (TASKS T-120 residual).
 
-Security: three dated **approved** exceptions for the pinned `go1.26.5`
-standard library (`GO-2026-6090`, `GO-2026-6089`, `GO-2026-5972`). See
-`docs/security/dependency-policy.md`. No other criticals.
+Security: five dated **approved** exceptions for the pinned `go1.26.5`
+standard library (`GO-2026-6090`, `GO-2026-6089`, `GO-2026-5972`,
+`GO-2026-6218`, `GO-2026-5026`). See
+[dependency-policy.md](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/security/dependency-policy.md).
+No other criticals.

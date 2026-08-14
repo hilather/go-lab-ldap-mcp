@@ -154,6 +154,32 @@ func TestPublishRefusesLabCAPath(t *testing.T) {
 	}
 }
 
+func TestComposePassthroughEnvIncludesOverlayVars(t *testing.T) {
+	want := map[string]string{
+		"LABLDAP_DIRECTORY_ENVFILE": "/tmp/labldap-directory.env",
+		"LABLDAP_DM_PASSWORD_FILE":  "/tmp/labldap-dm.pw",
+		"LABLDAP_SECRETS_DIR":       "/tmp/labldap-secrets",
+		"LABLDAP_TLS_CA":            "/tmp/labldap-ca.crt",
+		"LABLDAP_SCENARIO_FILE":     "/tmp/labldap-scenario.yaml",
+	}
+	for k, v := range want {
+		t.Setenv(k, v)
+	}
+	got := map[string]string{}
+	for _, kv := range composePassthroughEnv() {
+		k, v, ok := strings.Cut(kv, "=")
+		if !ok {
+			continue
+		}
+		got[k] = v
+	}
+	for _, key := range composeOverlayEnv {
+		if got[key] != want[key] {
+			t.Fatalf("%s = %q, want %q", key, got[key], want[key])
+		}
+	}
+}
+
 func TestImportDefaultsToPersistentOverlay(t *testing.T) {
 	got := defaultImportComposeFiles()
 	joined := strings.Join(got, " ")

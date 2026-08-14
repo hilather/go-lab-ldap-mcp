@@ -29,7 +29,7 @@ func TestLoadExceptionsIncludesPinnedStdlib(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !ex["GO-2026-6090"] || !ex["GO-2026-6089"] || !ex["GO-2026-5972"] {
+	if !ex["GO-2026-6090"] || !ex["GO-2026-6089"] || !ex["GO-2026-5972"] || !ex["GO-2026-6218"] || !ex["GO-2026-5026"] {
 		t.Fatalf("missing stdlib exceptions: %v", ex)
 	}
 	if ex["CVE-0000-1"] {
