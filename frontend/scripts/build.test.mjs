@@ -70,6 +70,7 @@ test("production build emits hashed assets from the lockfile toolchain", async (
   assert.doesNotMatch(html, /LabLDAP frontend placeholder/);
   assert.match(html, /assets\/[^"']+-[A-Za-z0-9_-]{8,}\.[A-Za-z0-9]+/);
   assert.doesNotMatch(html, /<script(?![^>]*src=)/i);
+  assert.doesNotMatch(html, /unsafe-inline/);
 
   const assets = await readdir(join(root, "dist/assets"));
   const hashed = assets.filter((name) => /-[A-Za-z0-9_-]{8,}\.[A-Za-z0-9]+$/.test(name));

@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { firstFocusable } from "../../lib/a11y";
 
 export function ConflictRefresh({
   open,
@@ -18,6 +19,7 @@ export function ConflictRefresh({
     }
     if (open && !node.open) {
       node.showModal();
+      firstFocusable(node);
     } else if (!open && node.open) {
       node.close();
     }

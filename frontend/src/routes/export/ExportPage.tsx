@@ -5,6 +5,7 @@ import { useSession } from "../../auth/SessionGate";
 import { canSubmitExport, exportConfirmNeeded } from "../../lib/ops-model";
 import { hasScope, SCOPE_LAB_EXPORT } from "../../lib/session-model";
 import { describedBy, ResourcePage, ScopeNote } from "../shared/ResourcePage";
+import { LiveRegion } from "../shared/SafeText";
 
 export function ExportPage() {
   const { session } = useSession();
@@ -84,7 +85,7 @@ export function ExportPage() {
           </button>
         </div>
       </form>
-      {notice !== undefined ? <p role="status">{notice}</p> : null}
+      <LiveRegion message={notice} />
     </ResourcePage>
   );
 }

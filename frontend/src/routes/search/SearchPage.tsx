@@ -18,7 +18,9 @@ import {
   type SearchFormValues,
 } from "../../lib/search-model";
 import { hasScope, SCOPE_DIRECTORY_READ } from "../../lib/session-model";
+import { mapProblem } from "../../lib/a11y";
 import { describedBy, FormError, ResourcePage, ScopeNote } from "../shared/ResourcePage";
+import { LiveRegion, SafeText } from "../shared/SafeText";
 
 export function SearchPage() {
   const { session } = useSession();
@@ -52,7 +54,15 @@ export function SearchPage() {
       setPrev(history);
       setPage(result);
     } catch (err) {
-      const fallback = isApiError(err) ? err.message : "Search failed.";
+      const fallback = isApiError(err)
+        ? mapProblem({
+            status: err.status,
+            message: err.message,
+            directoryUnavailable: err.directoryUnavailable,
+            forbidden: err.forbidden,
+            requiredScope: () => err.requiredScope(),
+          }).message
+        : "Search failed.";
       const mapped = isApiError(err)
         ? searchProblemMessage(err.fieldErrors(), fallback)
         : { field: "form" as const, message: fallback };
@@ -168,9 +178,7 @@ export function SearchPage() {
                 {busy ? "Searching…" : "Search"}
               </button>
             </div>
-            {errors.form !== undefined ? (
-              <p role="alert">{errors.form}</p>
-            ) : null}
+            <LiveRegion message={errors.form} assertive />
             {errors.cursor !== undefined ? (
               <FormError id="search-cursor-error" message={errors.cursor} />
             ) : null}
@@ -257,7 +265,7 @@ function SearchResults({
               <tr key={entry.dn}>
                 <td>
                   <details>
-                    <summary>{entry.dn}</summary>
+                    <summary><SafeText value={entry.dn} /></summary>
                     <AttrTable attributes={entry.attributes} />
                     <button type="button" onClick={() => onCopy(entry)}>
                       Copy LDIF
@@ -299,8 +307,8 @@ function AttrTable({ attributes }: { attributes: SearchEntry["attributes"] }) {
       <tbody>
         {attributes.map((attr, index) => (
           <tr key={`${attr.name}:${String(index)}`}>
-            <th scope="row">{attr.name}</th>
-            <td>{attr.value}</td>
+            <th scope="row"><SafeText value={attr.name} /></th>
+            <td><SafeText value={attr.value} /></td>
           </tr>
         ))}
       </tbody>

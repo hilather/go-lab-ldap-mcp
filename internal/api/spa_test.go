@@ -94,6 +94,29 @@ func TestDefaultAssetsServePlaceholder(t *testing.T) {
 	}
 }
 
+func TestSecurityHeadersCSPHasNoUnsafeInlineScript(t *testing.T) {
+	t.Parallel()
+	s, err := New(Options{Ready: func() bool { return false }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec := httptest.NewRecorder()
+	s.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+	csp := rec.Header().Get("Content-Security-Policy")
+	if csp == "" {
+		t.Fatal("missing Content-Security-Policy")
+	}
+	if !strings.Contains(csp, "script-src 'self'") {
+		t.Fatalf("script-src self missing: %q", csp)
+	}
+	if strings.Contains(csp, "script-src") && strings.Contains(csp, "unsafe-inline") {
+		t.Fatalf("unsafe-inline script exception: %q", csp)
+	}
+	if rec.Header().Get("X-Content-Type-Options") != "nosniff" {
+		t.Fatalf("nosniff = %q", rec.Header().Get("X-Content-Type-Options"))
+	}
+}
+
 func TestReservedManagementPath(t *testing.T) {
 	t.Parallel()
 	for _, p := range []string{"/api/v1/users", "/health", "/health/ready", "/metrics", "/mcp"} {

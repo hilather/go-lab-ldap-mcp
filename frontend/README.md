@@ -1,7 +1,9 @@
 # LabLDAP frontend
 
-React 19.2 / TypeScript / Vite administrative UI (T-095–T-105).
-Semantic HTML only — no large design system (OD-011).
+React 19.2 / TypeScript / Vite administrative UI (T-095–T-107).
+Semantic HTML only — no large design system (OD-011). Production CSP is
+`script-src 'self'` with no unsafe-inline script exception. LDAP values
+are rendered as text.
 
 Pinned (see [docs/toolchain.md](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/toolchain.md)):
 

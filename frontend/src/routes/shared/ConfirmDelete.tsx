@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { firstFocusable } from "../../lib/a11y";
 import { exactIdConfirmed } from "../../lib/directory-model";
 import { describedBy, FormError } from "./ResourcePage";
 
@@ -29,6 +30,7 @@ export function ConfirmDelete({
     if (open && !node.open) {
       setTyped("");
       node.showModal();
+      firstFocusable(node);
     } else if (!open && node.open) {
       node.close();
     }

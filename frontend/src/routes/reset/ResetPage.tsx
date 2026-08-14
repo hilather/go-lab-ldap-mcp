@@ -9,6 +9,7 @@ import { canSubmitReset, isResetInProgress, resetPollInterval } from "../../lib/
 import { invalidateAfterReset, queryKeys } from "../../lib/query";
 import { hasScope, SCOPE_DIRECTORY_READ, SCOPE_LAB_RESET } from "../../lib/session-model";
 import { describedBy, QueryStatus, ResourcePage, ScopeNote } from "../shared/ResourcePage";
+import { LiveRegion } from "../shared/SafeText";
 
 export function ResetPage() {
   const queryClient = useQueryClient();
@@ -138,7 +139,7 @@ export function ResetPage() {
           </button>
         </div>
       </form>
-      {notice !== undefined ? <p role="status">{notice}</p> : null}
+      <LiveRegion message={notice} />
     </ResourcePage>
   );
 }

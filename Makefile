@@ -23,7 +23,7 @@ help:
 		'  test               alias for test-unit' \
 		'  test-unit          Go tests + frontend build/scaffold tests' \
 		'  test-integration   real 389 DS harness (pinned digest; needs Docker)' \
-		'  test-e2e           pending T-107 (Playwright)' \
+		'  test-e2e           Playwright UI suite (mock control plane; optional live URL)' \
 		'  test-security      secret scan, govulncheck, license denylist' \
 		'  compose-up         pending T-042' \
 		'  compose-down       pending T-042' \
@@ -55,9 +55,11 @@ test-unit: frontend-install
 test-integration:
 	$(GO) test -tags=integration ./test/integration/... -count=1 -timeout 15m
 
-test-e2e:
-	@printf '%s\n' 'test-e2e: pending T-107 — Playwright suite not in this milestone'
-	@printf '%s\n' 'PENDING:test-e2e'
+test-e2e: frontend-build
+	cd test/e2e && $(PNPM) install --frozen-lockfile
+	cd test/e2e && $(PNPM) exec playwright install chromium
+	cd test/e2e && $(PNPM) test
+	@printf '%s\n' 'test-e2e: default target is the contract mock. Set LABLDAP_E2E_BASE_URL for a live Compose/389 DS stack (T-042 residual).'
 
 test-security:
 	$(GO) run ./tools/secretscan .

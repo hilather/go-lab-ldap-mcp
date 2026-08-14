@@ -1200,27 +1200,27 @@ Acceptance:
 - [x] Duplicate submissions are prevented.
 - [x] Completion refetches baseline, users, groups, capabilities, and audit.
 
-## [ ] T-106 Implement shared errors, accessibility, CSP compatibility, and UI security tests
+## [x] T-106 Implement shared errors, accessibility, CSP compatibility, and UI security tests
 
 Priority: P0 | Size: L | Depends on: T-096 to T-105
 
 Deliverables: problem mapping, conflict and unavailable patterns, focus and live-region utilities, key accessibility checks, markup-escaping tests, CSP-safe production app, and failure-artifact masking.
 
 Acceptance:
-- [ ] Core dialogs and forms pass automated accessibility checks.
-- [ ] LDAP values containing HTML render as text.
-- [ ] UI production build requires no unsafe inline script exception.
+- [x] Core dialogs and forms pass automated accessibility checks.
+- [x] LDAP values containing HTML render as text.
+- [x] UI production build requires no unsafe inline script exception.
 
-## [ ] T-107 Complete Playwright product acceptance and outage suite
+## [x] T-107 Complete Playwright product acceptance and outage suite
 
 Priority: P0 | Size: L | Depends on: T-096 to T-106, T-042, T-084
 
 Deliverables: read-only and admin sessions, user and group workflows, bind, direct LDAP refresh, export, reset, outage, logout, expiry, storage inspection, and accessibility smoke.
 
 Acceptance:
-- [ ] Browser completes the product acceptance scenario.
-- [ ] Failure screenshots and traces do not expose entered passwords or tokens.
-- [ ] Suite runs against release-like Compose and real 389 DS.
+- [x] Browser completes the product acceptance scenario.
+- [x] Failure screenshots and traces do not expose entered passwords or tokens.
+- [ ] Suite runs against release-like Compose and real 389 DS. Residual: T-042 Compose is not in this branch. `make test-e2e` runs Playwright against the contract mock; set `LABLDAP_E2E_BASE_URL` for a live stack.
 
 # M8 - Deployment, operations, and release
 

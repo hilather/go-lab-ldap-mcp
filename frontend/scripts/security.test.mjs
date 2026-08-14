@@ -22,6 +22,25 @@ async function walkFiles(dir) {
   return out;
 }
 
+test("UI never assigns innerHTML and renders LDAP strings as text", async () => {
+  const files = await walkFiles(srcRoot);
+  for (const file of files) {
+    const text = await readFile(file, "utf8");
+    assert.doesNotMatch(text, /dangerouslySetInnerHTML/, `${file} must not inject HTML`);
+    assert.doesNotMatch(text, /\.innerHTML\s*=/, `${file} must not assign innerHTML`);
+  }
+  const safe = await readFile(join(srcRoot, "routes/shared/SafeText.tsx"), "utf8");
+  assert.match(safe, /asText/);
+  assert.match(safe, /aria-live/);
+  const search = await readFile(join(srcRoot, "routes/search/SearchPage.tsx"), "utf8");
+  assert.match(search, /<SafeText value=\{attr\.value\}/);
+  const confirm = await readFile(join(srcRoot, "routes/shared/ConfirmDelete.tsx"), "utf8");
+  assert.match(confirm, /aria-labelledby/);
+  assert.match(confirm, /firstFocusable/);
+  const conflict = await readFile(join(srcRoot, "routes/shared/ConflictRefresh.tsx"), "utf8");
+  assert.match(conflict, /firstFocusable/);
+});
+
 test("token and CSRF stay out of Web Storage, IndexedDB, and the URL", async () => {
   const files = await walkFiles(srcRoot);
   assert.ok(files.length > 0, "expected frontend source");

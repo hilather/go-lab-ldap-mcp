@@ -14,6 +14,7 @@ Recorded 2026-08-12 against the LabLDAP design baseline.
 | LDAP client | `github.com/go-ldap/ldap/v3` | `v3.4.14` (T-028 bootstrap DM helper; T-046 runtime) | `go.mod`; only `internal/directory/ds389` and `internal/directory/ldapclient` may import it |
 | OpenAPI Go generator | oapi-codegen (OD-009) | `v2.8.0` | `Makefile` `OAPI_CODEGEN_MOD`; models only |
 | OpenAPI TypeScript types | openapi-typescript (OD-009) | `7.13.0` | `Makefile` `OPENAPI_TS_PKG` |
+| Playwright | product acceptance (T-107) | `@playwright/test@1.62.1`, `@axe-core/playwright@4.10.2` | `test/e2e/package.json` |
 
 No deviation from the Go or Node baseline. Frontend scaffold (T-095): React 19.2.8, Vite 8.2.1, TanStack Query 5.101.4, React Router 8.3.0, React Hook Form 7.85.0, Zod 4.4.3, openapi-fetch 0.17.0. `pnpm install --frozen-lockfile && pnpm build` must succeed from the committed lockfile.
 

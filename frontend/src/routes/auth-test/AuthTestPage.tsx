@@ -12,7 +12,9 @@ import {
   type BindTransport,
 } from "../../lib/ops-model";
 import { hasScope, SCOPE_DIRECTORY_PASSWORD } from "../../lib/session-model";
+import { mapProblem } from "../../lib/a11y";
 import { describedBy, FormError, ResourcePage, ScopeNote } from "../shared/ResourcePage";
+import { LiveRegion } from "../shared/SafeText";
 
 const bindSchema = z.object({
   identity: z.string().trim().min(1, "Enter a user ID or bind DN."),
@@ -70,7 +72,17 @@ export function AuthTestPage() {
               setNotice(bindRateLimitMessage());
               return;
             }
-            setNotice(isApiError(err) ? err.message : "Bind test failed.");
+            setNotice(
+              isApiError(err)
+                ? mapProblem({
+                    status: err.status,
+                    message: err.message,
+                    directoryUnavailable: err.directoryUnavailable,
+                    forbidden: err.forbidden,
+                    requiredScope: () => err.requiredScope(),
+                  }).message
+                : "Bind test failed.",
+            );
           }
         })}
       >
@@ -119,9 +131,7 @@ export function AuthTestPage() {
           </button>
         </div>
       </form>
-      {notice !== undefined ? (
-        <p role="alert">{notice}</p>
-      ) : null}
+      <LiveRegion message={notice} assertive />
       {result !== undefined ? (
         <section aria-labelledby="bind-result-heading">
           <h2 id="bind-result-heading">{result.title}</h2>
