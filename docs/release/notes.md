@@ -66,7 +66,10 @@ security, SBOM, checksums, archcheck). Product acceptance:
 - Ephemeral and persistent lifecycle tests
   (`TestEphemeralRecreateDropsRuntimeEntry`,
   `TestPersistentRestartKeepsRuntimeEntry`).
-- MCP protocol acceptance is residual (catalog stub).
+- MCP is shipped: official SDK Streamable HTTP `POST /mcp` and
+  `labldap mcp-stdio`, with the tool/resource catalog in
+  `docs/mcp/catalog.md`. Live MCP mutate / Compose protocol acceptance
+  was not re-run on this merge (TASKS T-120 residual).
 
 Security: three dated **approved** exceptions for the pinned `go1.26.5`
 standard library (`GO-2026-6090`, `GO-2026-6089`, `GO-2026-5972`). See
