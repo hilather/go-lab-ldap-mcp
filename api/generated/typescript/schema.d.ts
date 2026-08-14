@@ -53,7 +53,11 @@ export interface paths {
         };
         /**
          * Prometheus text
-         * @description Binding `/metrics`. Auth optional via spec.management.metrics.requireAuth.
+         * @description Binding `/metrics`. Prometheus 0.0.4 text with bounded labels
+         *     (route template + status class; no DN, user, request, token, or
+         *     session labels). Default `spec.management.metrics.requireAuth` is
+         *     false: restrict the management listener with loopback or network
+         *     policy, or set requireAuth. Disable with `enabled: false`.
          */
         get: operations["getMetrics"];
         put?: never;
@@ -781,6 +785,15 @@ export interface components {
                 "application/problem+json": components["schemas"]["Problem"];
             };
         };
+        /** @description Password or bind-test rate limit exceeded */
+        TooManyRequests: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
         /** @description Unknown resource */
         NotFound: {
             headers: {
@@ -1283,6 +1296,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             412: components["responses"]["PreconditionFailed"];
+            429: components["responses"]["TooManyRequests"];
         };
     };
     enableUser: {
@@ -1688,6 +1702,7 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            429: components["responses"]["TooManyRequests"];
         };
     };
     getRootDSE: {

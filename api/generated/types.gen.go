@@ -536,6 +536,9 @@ type NotFound = Problem
 // PreconditionFailed defines model for PreconditionFailed.
 type PreconditionFailed = Problem
 
+// TooManyRequests defines model for TooManyRequests.
+type TooManyRequests = Problem
+
 // Unauthorized defines model for Unauthorized.
 type Unauthorized = Problem
 
