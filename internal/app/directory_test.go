@@ -1,7 +1,6 @@
 package app
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/hilather/go-lab-ldap-mcp/internal/apperr"
@@ -112,9 +111,5 @@ func TestResetExportScopesIndependent(t *testing.T) {
 
 func TestMarkerReadOnlyDoesNotWrite(t *testing.T) {
 	t.Parallel()
-	// MarkerReader has ReadMarker only — compile-time KD-R18.
 	var _ directory.MarkerReader = fakeMarker{}
-	if strings.Contains(strings.ToLower("ReadMarker"), "write") {
-		t.Fatal("sanity")
-	}
 }

@@ -10,6 +10,10 @@ const (
 	FieldConstraint         = "constraint"
 	FieldUnavailable        = "unavailable"
 	FieldForbidden          = "forbidden"
+	// FieldIncomplete marks a create that left (or may have left) a
+	// no-password account. Callers may compensate with delete. A
+	// post-success read failure is not incomplete.
+	FieldIncomplete = "incomplete"
 )
 
 // Error builds a CodeDirectory error with a single field code. unavailable is retryable.

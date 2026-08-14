@@ -10,8 +10,10 @@ import (
 
 // Groups is group CRUD plus membership. v1 has no group attribute Modify.
 type Groups struct {
-	repo  directory.GroupRepository
-	hooks hooks
+	repo     directory.GroupRepository
+	hooks    hooks
+	peopleDN string
+	groupsDN string
 }
 
 func (s *Groups) List(ctx context.Context, p Principal, q directory.GroupListQuery) (directory.GroupPage, error) {
@@ -49,7 +51,7 @@ func (s *Groups) Create(ctx context.Context, p Principal, spec directory.GroupSp
 			Path: "members", Code: "empty_group", Message: "groupOfNames cannot be empty",
 		})
 	}
-	if err := rejectSelfMember(directory.GroupID(spec.ID), spec.Members); err != nil {
+	if err := s.rejectSelfMember(directory.GroupID(spec.ID), spec.Members); err != nil {
 		s.hooks.record(ctx, p, OpGroupCreate.Name, spec.ID, AuditFailure, "", "")
 		return directory.Group{}, err
 	}
@@ -100,7 +102,7 @@ func (s *Groups) ReplaceMembers(ctx context.Context, p Principal, id directory.G
 		s.hooks.record(ctx, p, "group.replace_members", string(id), AuditFailure, string(rev), "")
 		return directory.MembershipSummary{}, err
 	}
-	if err := rejectSelfMember(id, members); err != nil {
+	if err := s.rejectSelfMember(id, members); err != nil {
 		if authErr := s.hooks.authorize(p, OpGroupMembers); authErr != nil {
 			return directory.MembershipSummary{}, authErr
 		}
@@ -125,7 +127,7 @@ func (s *Groups) mutateMembers(ctx context.Context, p Principal, id directory.Gr
 		s.hooks.record(ctx, p, action, string(id), AuditFailure, string(rev), "")
 		return directory.MembershipSummary{}, err
 	}
-	if err := rejectSelfMember(id, members); err != nil && action != "group.remove_members" {
+	if err := s.rejectSelfMember(id, members); err != nil && action != "group.remove_members" {
 		s.hooks.record(ctx, p, action, string(id), AuditFailure, string(rev), "")
 		return directory.MembershipSummary{}, err
 	}
@@ -146,7 +148,8 @@ func (s *Groups) detectCycle(ctx context.Context, id directory.GroupID, incoming
 	if action == "group.remove_members" {
 		return nil
 	}
-	for _, m := range incoming {
+	for _, raw := range incoming {
+		m := s.normalizeRef(raw)
 		if !strings.EqualFold(m.Kind, "group") {
 			continue
 		}
@@ -157,7 +160,11 @@ func (s *Groups) detectCycle(ctx context.Context, id directory.GroupID, incoming
 		if gid == "" {
 			continue
 		}
-		if cycleFrom(ctx, s.repo, id, gid, map[directory.GroupID]struct{}{}) {
+		hit, err := s.cycleFrom(ctx, id, gid, map[string]struct{}{})
+		if err != nil {
+			return err
+		}
+		if hit {
 			return apperr.New(apperr.CodeConfiguration, "group membership cycle").WithField(apperr.Field{
 				Path: "members", Code: "cycle", Message: "group membership cycle",
 			})
@@ -166,19 +173,24 @@ func (s *Groups) detectCycle(ctx context.Context, id directory.GroupID, incoming
 	return nil
 }
 
-func cycleFrom(ctx context.Context, repo directory.GroupRepository, origin, cur directory.GroupID, seen map[directory.GroupID]struct{}) bool {
-	if cur == origin {
-		return true
+func (s *Groups) cycleFrom(ctx context.Context, origin, cur directory.GroupID, seen map[string]struct{}) (bool, error) {
+	if strings.EqualFold(string(cur), string(origin)) {
+		return true, nil
 	}
-	if _, ok := seen[cur]; ok {
-		return false
+	key := strings.ToLower(string(cur))
+	if _, ok := seen[key]; ok {
+		return false, nil
 	}
-	seen[cur] = struct{}{}
-	g, err := repo.Get(ctx, cur)
+	seen[key] = struct{}{}
+	g, err := s.repo.Get(ctx, cur)
 	if err != nil {
-		return false
+		if fieldCode(err) == directory.FieldNotFound {
+			return false, nil
+		}
+		return false, err
 	}
-	for _, m := range g.Members {
+	for _, raw := range g.Members {
+		m := s.normalizeRef(raw)
 		if !strings.EqualFold(m.Kind, "group") {
 			continue
 		}
@@ -186,26 +198,70 @@ func cycleFrom(ctx context.Context, repo directory.GroupRepository, origin, cur 
 		if next == "" {
 			next = directory.GroupID(leafCN(m.DN))
 		}
-		if next != "" && cycleFrom(ctx, repo, origin, next, seen) {
-			return true
-		}
-	}
-	return false
-}
-
-func rejectSelfMember(id directory.GroupID, members []directory.MemberRef) error {
-	want := strings.ToLower(string(id))
-	for _, m := range members {
-		if !strings.EqualFold(m.Kind, "group") && m.Kind != "" {
+		if next == "" {
 			continue
 		}
-		if strings.EqualFold(m.Kind, "group") && strings.ToLower(m.ID) == want {
+		hit, err := s.cycleFrom(ctx, origin, next, seen)
+		if err != nil || hit {
+			return hit, err
+		}
+	}
+	return false, nil
+}
+
+func (s *Groups) rejectSelfMember(id directory.GroupID, members []directory.MemberRef) error {
+	for _, raw := range members {
+		if s.isSelfGroup(id, raw) {
 			return apperr.New(apperr.CodeConfiguration, "group membership cycle").WithField(apperr.Field{
 				Path: "members", Code: "cycle", Message: "group cannot contain itself",
 			})
 		}
 	}
 	return nil
+}
+
+func (s *Groups) isSelfGroup(id directory.GroupID, m directory.MemberRef) bool {
+	m = s.normalizeRef(m)
+	if !strings.EqualFold(m.Kind, "group") {
+		return false
+	}
+	if m.ID != "" && strings.EqualFold(m.ID, string(id)) {
+		return true
+	}
+	if m.DN != "" && s.groupsDN != "" {
+		return dnEqualFold(m.DN, "cn="+string(id)+","+s.groupsDN)
+	}
+	return false
+}
+
+func (s *Groups) normalizeRef(m directory.MemberRef) directory.MemberRef {
+	kind := strings.ToLower(strings.TrimSpace(m.Kind))
+	if m.DN != "" && kind == "" {
+		switch {
+		case underDN(m.DN, s.groupsDN):
+			kind = "group"
+		case underDN(m.DN, s.peopleDN):
+			kind = "user"
+		}
+	}
+	if m.ID == "" && m.DN != "" {
+		m.ID = leafCN(m.DN)
+	}
+	m.Kind = kind
+	return m
+}
+
+func underDN(dn, container string) bool {
+	d := strings.ToLower(strings.TrimSpace(dn))
+	c := strings.ToLower(strings.TrimSpace(container))
+	if d == "" || c == "" {
+		return false
+	}
+	return strings.HasSuffix(d, ","+c)
+}
+
+func dnEqualFold(a, b string) bool {
+	return strings.EqualFold(strings.TrimSpace(a), strings.TrimSpace(b))
 }
 
 func leafCN(dn string) string {

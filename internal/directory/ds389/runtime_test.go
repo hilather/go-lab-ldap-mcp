@@ -432,12 +432,12 @@ func TestAssertionFilterUsesOperationalAttrs(t *testing.T) {
 	off := false
 	rt := testRuntime(t)
 	rt.cfg.Assertion = &off
-	if rt.assertionControl(t.Context(), e) != nil {
+	if rt.assertionControl(t.Context(), nil, e) != nil {
 		t.Fatal("disabled assertion still attached")
 	}
 	on := true
 	rt.cfg.Assertion = &on
-	if rt.assertionControl(t.Context(), e) == nil {
+	if rt.assertionControl(t.Context(), nil, e) == nil {
 		t.Fatal("enabled assertion missing")
 	}
 	for _, name := range operationalReadAttrs() {

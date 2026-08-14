@@ -55,6 +55,7 @@ func (r *Runtime) RootDSE(ctx context.Context) (directory.RootDSE, error) {
 		r.cache.invalidate()
 		return directory.RootDSE{}, err
 	}
+	r.noteAssertion(dse)
 	r.cache.mu.Lock()
 	r.cache.dse = dse
 	r.cache.dseOK = true

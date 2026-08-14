@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
+	"log/slog"
 	"sort"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/go-ldap/ldap/v3"
@@ -31,6 +33,9 @@ type Runtime struct {
 	now  func() time.Time
 
 	cache schemaCache
+
+	assertionKnown atomic.Bool
+	assertionOK    atomic.Bool
 }
 
 // RuntimeConfig is compiled directory geometry plus search/schema limits.
@@ -58,6 +63,10 @@ type RuntimeConfig struct {
 	CursorTTL time.Duration
 	// Assertion, if set, overrides Root DSE supportedControl for OID 1.3.6.1.1.12.
 	Assertion *bool
+	// AfterSearch runs after a mutation's live read/checkRev and after the
+	// assertion control is built, immediately before the write. Tests inject
+	// a concurrent directory change into the search-to-modify window.
+	AfterSearch func(ctx context.Context, dn string)
 
 	// Client is the unbound-capable LDAP config for disposable bind-test.
 	Client ldapclient.Config
@@ -80,6 +89,20 @@ func NewRuntime(pool *ldapclient.Pool, cfg RuntimeConfig) (*Runtime, error) {
 		return nil, directory.Error("directory", directory.FieldConstraint, "managed suffix is required")
 	}
 	return &Runtime{pool: pool, cfg: cfg, now: time.Now}, nil
+}
+
+// SetAfterSearch installs a test hook for the search-to-modify window.
+func (r *Runtime) SetAfterSearch(fn func(context.Context, string)) {
+	if r == nil {
+		return
+	}
+	r.cfg.AfterSearch = fn
+}
+
+func (r *Runtime) afterSearch(ctx context.Context, dn string) {
+	if r.cfg.AfterSearch != nil {
+		r.cfg.AfterSearch(ctx, dn)
+	}
 }
 
 func (c *RuntimeConfig) applyDefaults() {
@@ -390,16 +413,59 @@ func (r *Runtime) decodePageCursor(raw, query string) ([]byte, error) {
 	return b, nil
 }
 
-// assertionEnabled is true when T-044 Controls listed 1.3.6.1.1.12, or a test override.
-func (r *Runtime) assertionEnabled(ctx context.Context) bool {
+func (r *Runtime) noteAssertion(dse directory.RootDSE) {
+	r.assertionOK.Store(directory.Capabilities{Controls: dse.SupportedControls}.HasAssertionControl())
+	r.assertionKnown.Store(true)
+}
+
+// assertionEnabledOn uses a cached Root DSE or probes on the held connection.
+// It must not call pool.Do (nested acquire deadlocks ldapPoolSize 1).
+func (r *Runtime) assertionEnabledOn(ctx context.Context, c *ldapclient.Conn) bool {
 	if r.cfg.Assertion != nil {
 		return *r.cfg.Assertion
 	}
-	dse, err := r.RootDSE(ctx)
-	if err != nil {
+	if r.assertionKnown.Load() {
+		return r.assertionOK.Load()
+	}
+	r.cache.mu.Lock()
+	if r.cache.dseOK {
+		dse := r.cache.dse
+		r.cache.mu.Unlock()
+		r.noteAssertion(dse)
+		return r.assertionOK.Load()
+	}
+	r.cache.mu.Unlock()
+	if c == nil {
+		slog.WarnContext(ctx, "ldap assertion control not probed; residual TOCTOU race")
 		return false
 	}
-	return directory.Capabilities{Controls: dse.SupportedControls}.HasAssertionControl()
+	dse, err := r.rootDSEOn(ctx, c)
+	if err != nil {
+		slog.WarnContext(ctx, "ldap assertion control probe failed; residual TOCTOU race")
+		return false
+	}
+	r.noteAssertion(dse)
+	return r.assertionOK.Load()
+}
+
+func (r *Runtime) rootDSEOn(ctx context.Context, c *ldapclient.Conn) (directory.RootDSE, error) {
+	_, seconds := r.searchLimits()
+	res, err := c.Search(ctx, &ldap.SearchRequest{
+		BaseDN:       "",
+		Scope:        ldap.ScopeBaseObject,
+		DerefAliases: ldap.NeverDerefAliases,
+		SizeLimit:    1,
+		TimeLimit:    seconds,
+		Filter:       "(objectClass=*)",
+		Attributes:   rootDSEAttrs,
+	})
+	if err != nil {
+		return directory.RootDSE{}, err
+	}
+	if len(res.Entries) == 0 {
+		return directory.RootDSE{}, directory.Error("rootdse", directory.FieldUnavailable, "Root DSE is empty")
+	}
+	return rootDSEFromEntry(res.Entries[0]), nil
 }
 
 func assertionFilter(e *ldap.Entry) string {
@@ -418,8 +484,8 @@ func assertionFilter(e *ldap.Entry) string {
 	return ""
 }
 
-func (r *Runtime) assertionControl(ctx context.Context, live *ldap.Entry) ldap.Control {
-	if live == nil || !r.assertionEnabled(ctx) {
+func (r *Runtime) assertionControl(ctx context.Context, c *ldapclient.Conn, live *ldap.Entry) ldap.Control {
+	if live == nil || !r.assertionEnabledOn(ctx, c) {
 		return nil
 	}
 	filter := assertionFilter(live)
@@ -428,22 +494,23 @@ func (r *Runtime) assertionControl(ctx context.Context, live *ldap.Entry) ldap.C
 	}
 	ctl, err := ldapclient.NewControlAssertion(filter)
 	if err != nil {
+		slog.WarnContext(ctx, "ldap assertion control encode failed; residual TOCTOU race")
 		return nil
 	}
 	return ctl
 }
 
-func newModify(ctx context.Context, r *Runtime, dn string, live *ldap.Entry) *ldap.ModifyRequest {
+func newModify(ctx context.Context, r *Runtime, c *ldapclient.Conn, dn string, live *ldap.Entry) *ldap.ModifyRequest {
 	var controls []ldap.Control
-	if ctl := r.assertionControl(ctx, live); ctl != nil {
+	if ctl := r.assertionControl(ctx, c, live); ctl != nil {
 		controls = append(controls, ctl)
 	}
 	return ldap.NewModifyRequest(dn, controls)
 }
 
-func newDelete(ctx context.Context, r *Runtime, dn string, live *ldap.Entry) *ldap.DelRequest {
+func newDelete(ctx context.Context, r *Runtime, c *ldapclient.Conn, dn string, live *ldap.Entry) *ldap.DelRequest {
 	var controls []ldap.Control
-	if ctl := r.assertionControl(ctx, live); ctl != nil {
+	if ctl := r.assertionControl(ctx, c, live); ctl != nil {
 		controls = append(controls, ctl)
 	}
 	return ldap.NewDelRequest(dn, controls)

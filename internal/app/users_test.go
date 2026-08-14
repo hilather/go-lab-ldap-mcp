@@ -51,7 +51,7 @@ func TestUserServiceCreateGetUpdateDelete(t *testing.T) {
 func TestUserCreatePasswordFailureCompensates(t *testing.T) {
 	t.Parallel()
 	repo := newFakeUsers()
-	repo.addErr = directory.Error("entry", directory.FieldConstraint, "directory constraint violation")
+	repo.addErr = directory.Error("password", directory.FieldIncomplete, "user create did not complete")
 	repo.leftover = true
 	aud := &MemoryAuditor{}
 	svc := New(Deps{Users: repo, Audit: aud}).Users
@@ -68,6 +68,24 @@ func TestUserCreatePasswordFailureCompensates(t *testing.T) {
 	ev := aud.Snapshot()
 	if len(ev) != 1 || ev[0].Result != AuditFailure || ev[0].Action != OpUserCreate.Name {
 		t.Fatalf("audit: %+v", ev)
+	}
+}
+
+func TestUserCreateReadFailureDoesNotCompensate(t *testing.T) {
+	t.Parallel()
+	repo := newFakeUsers()
+	repo.addErr = directory.Error("entry", directory.FieldUnavailable, "directory unavailable")
+	repo.leftover = true
+	svc := New(Deps{Users: repo}).Users
+	_, err := svc.Create(t.Context(), writer(), CreateUser{ID: "keepme", Password: observability.Secret("unit-user-pass-12")})
+	if err == nil || !isUnavailable(err) {
+		t.Fatalf("want unavailable: %v", err)
+	}
+	if _, err := repo.Get(t.Context(), "keepme"); err != nil {
+		t.Fatal("post-success leftover must not be deleted")
+	}
+	if len(repo.deleted) != 0 {
+		t.Fatalf("compensated: %v", repo.deleted)
 	}
 }
 

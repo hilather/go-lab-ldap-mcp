@@ -54,7 +54,12 @@ func TestGroupServiceMembershipIdempotent(t *testing.T) {
 
 func TestGroupRejectsEmptyAndCycle(t *testing.T) {
 	t.Parallel()
-	svc := New(Deps{Groups: newFakeGroups()}).Groups
+	repo := newFakeGroups()
+	svc := New(Deps{
+		Groups:   repo,
+		PeopleDN: "ou=people,dc=example,dc=test",
+		GroupsDN: "ou=groups,dc=example,dc=test",
+	}).Groups
 	_, err := svc.Create(t.Context(), writer(), directory.GroupSpec{ID: "staff"})
 	if err == nil {
 		t.Fatal("empty group")
@@ -65,6 +70,38 @@ func TestGroupRejectsEmptyAndCycle(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("self member")
+	}
+	alice := directory.MemberRef{Kind: "user", ID: "alice"}
+	g, err := svc.Create(t.Context(), writer(), directory.GroupSpec{ID: "staff", Members: []directory.MemberRef{alice}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = svc.AddMembers(t.Context(), writer(), "staff", []directory.MemberRef{
+		{DN: "cn=staff,ou=groups,dc=example,dc=test"},
+	}, g.Revision)
+	if err == nil {
+		t.Fatal("self DN with empty kind")
+	}
+	_, err = svc.AddMembers(t.Context(), writer(), "staff", []directory.MemberRef{
+		{Kind: "group", ID: "other", DN: "cn=Staff,ou=groups,dc=example,dc=test"},
+	}, g.Revision)
+	if err == nil {
+		t.Fatal("self DN with misleading ID")
+	}
+}
+
+func TestGroupCycleGetErrorFailsClosed(t *testing.T) {
+	t.Parallel()
+	repo := newFakeGroups()
+	alice := directory.MemberRef{Kind: "user", ID: "alice"}
+	parent := repo.put(directory.Group{ID: "staff", Members: []directory.MemberRef{alice}})
+	svc := New(Deps{Groups: repo, GroupsDN: "ou=groups,dc=example,dc=test"}).Groups
+	repo.getErr = directory.Error("connection", directory.FieldUnavailable, "directory unavailable")
+	_, err := svc.AddMembers(t.Context(), writer(), "staff", []directory.MemberRef{
+		{Kind: "group", ID: "nested"},
+	}, parent.Revision)
+	if err == nil || !isUnavailable(err) {
+		t.Fatalf("cycle probe must fail closed: %v", err)
 	}
 }
 

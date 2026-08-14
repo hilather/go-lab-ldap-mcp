@@ -126,7 +126,7 @@ func (r *Runtime) Add(ctx context.Context, spec directory.UserSpec) (directory.U
 		}
 		if e := replaceUserPassword(ctx, c, dn, spec.Password); e != nil {
 			_ = c.Del(ctx, ldap.NewDelRequest(dn, nil))
-			return redactSecrets(e, spec.Password)
+			return directory.Error("password", directory.FieldIncomplete, "user create did not complete")
 		}
 		ent, e := searchBaseConn(ctx, c, dn, runtimeUserReadAttrs(), size, seconds)
 		if e != nil {
@@ -138,7 +138,7 @@ func (r *Runtime) Add(ctx context.Context, spec directory.UserSpec) (directory.U
 	return out, redactSecrets(err, spec.Password)
 }
 
-func (r *Runtime) Modify(ctx context.Context, id directory.UserID, patch directory.UserPatch) (directory.User, error) {
+func (r *Runtime) Modify(ctx context.Context, id directory.UserID, patch directory.UserPatch, rev directory.Revision) (directory.User, error) {
 	dn, err := r.userDN(string(id))
 	if err != nil {
 		return directory.User{}, err
@@ -153,10 +153,15 @@ func (r *Runtime) Modify(ctx context.Context, id directory.UserID, patch directo
 		if e != nil {
 			return e
 		}
+		cur := userFromEntry(live, r.cfg.GroupsDN)
+		if e := checkRev(cur.Revision, rev); e != nil {
+			return e
+		}
 		if err := r.refuseRuntimeMutation(dn, patch); err != nil {
 			return err
 		}
-		mod := newModify(ctx, r, dn, live)
+		mod := newModify(ctx, r, c, dn, live)
+		r.afterSearch(ctx, dn)
 		if patch.Enabled != nil {
 			applyEnabled(mod, live, *patch.Enabled)
 		}
@@ -214,7 +219,8 @@ func (r *Runtime) SetEnabled(ctx context.Context, id directory.UserID, enabled b
 			out = cur
 			return nil
 		}
-		mod := newModify(ctx, r, dn, live)
+		mod := newModify(ctx, r, c, dn, live)
+		r.afterSearch(ctx, dn)
 		if applyEnabled(mod, live, enabled) {
 			if e := c.Modify(ctx, mod); e != nil {
 				return e
@@ -247,7 +253,8 @@ func (r *Runtime) Delete(ctx context.Context, id directory.UserID, rev directory
 		if e := checkRev(userFromEntry(live, r.cfg.GroupsDN).Revision, rev); e != nil {
 			return e
 		}
-		if e := c.Del(ctx, newDelete(ctx, r, dn, live)); e != nil {
+		r.afterSearch(ctx, dn)
+		if e := c.Del(ctx, newDelete(ctx, r, c, dn, live)); e != nil {
 			return e
 		}
 		return r.verifyUserRemovedFromGroups(ctx, c, dn)
@@ -275,9 +282,10 @@ func (r *Runtime) SetPassword(ctx context.Context, id directory.UserID, password
 			return e
 		}
 		var controls []ldap.Control
-		if ctl := r.assertionControl(ctx, live); ctl != nil {
+		if ctl := r.assertionControl(ctx, c, live); ctl != nil {
 			controls = append(controls, ctl)
 		}
+		r.afterSearch(ctx, dn)
 		return replaceUserPassword(ctx, c, dn, password, controls...)
 	})
 	return redactSecrets(err, password)

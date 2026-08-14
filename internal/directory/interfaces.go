@@ -12,7 +12,7 @@ type UserRepository interface {
 	List(ctx context.Context, q UserListQuery) (UserPage, error)
 	Get(ctx context.Context, id UserID) (User, error)
 	Add(ctx context.Context, u UserSpec) (User, error)
-	Modify(ctx context.Context, id UserID, patch UserPatch) (User, error)
+	Modify(ctx context.Context, id UserID, patch UserPatch, rev Revision) (User, error)
 	SetEnabled(ctx context.Context, id UserID, enabled bool, rev Revision) (User, error)
 	Delete(ctx context.Context, id UserID, rev Revision) error
 	SetPassword(ctx context.Context, id UserID, password observability.Secret, rev Revision) error

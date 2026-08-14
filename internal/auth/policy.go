@@ -39,12 +39,20 @@ type Case struct {
 // Matrix enumerates each registered scope as the required grant against
 // empty, exact, write-only, and full-except-required sets.
 func Matrix() []Case {
+	all := Scopes()
 	var out []Case
-	for _, req := range Scopes() {
+	for _, req := range all {
+		except := directory.ScopeSet{}
+		for _, s := range all {
+			if s != req {
+				except = append(except, s)
+			}
+		}
 		out = append(out,
 			Case{Name: "none/" + req, Have: nil, Required: req, Allow: false},
 			Case{Name: "exact/" + req, Have: directory.ScopeSet{req}, Required: req, Allow: true},
 			Case{Name: "write/" + req, Have: directory.ScopeSet{ScopeDirectoryWrite}, Required: req, Allow: req == ScopeDirectoryWrite},
+			Case{Name: "except/" + req, Have: except, Required: req, Allow: false},
 		)
 	}
 	return out

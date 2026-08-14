@@ -127,7 +127,8 @@ func (r *Runtime) deleteGroup(ctx context.Context, id directory.GroupID, rev dir
 			return e
 		}
 		members := append([]directory.MemberRef(nil), g.Members...)
-		if e := c.Del(ctx, newDelete(ctx, r, dn, live)); e != nil {
+		r.afterSearch(ctx, dn)
+		if e := c.Del(ctx, newDelete(ctx, r, c, dn, live)); e != nil {
 			return e
 		}
 		return r.verifyMembership(ctx, c, dn, nil, members)
@@ -182,7 +183,8 @@ func (r *Runtime) mutateMembers(ctx context.Context, id directory.GroupID, membe
 			sum.Revision = cur.Revision
 			return nil
 		}
-		mod := newModify(ctx, r, dn, live)
+		mod := newModify(ctx, r, c, dn, live)
+		r.afterSearch(ctx, dn)
 		switch op {
 		case memberReplace:
 			want := finalMembers(cur.Members, sum)

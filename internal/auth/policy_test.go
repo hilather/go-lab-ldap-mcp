@@ -37,7 +37,7 @@ func TestPasswordResetExportIndependentOfWrite(t *testing.T) {
 func TestMatrixGenerator(t *testing.T) {
 	t.Parallel()
 	rows := Matrix()
-	if len(rows) < len(Scopes())*3 {
+	if len(rows) < len(Scopes())*4 {
 		t.Fatalf("matrix too small: %d", len(rows))
 	}
 	for _, c := range rows {

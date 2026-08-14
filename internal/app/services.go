@@ -34,6 +34,9 @@ type Deps struct {
 	ExpectedRevision string
 	// ControlRevision is the compiled control-plane revision.
 	ControlRevision string
+
+	PeopleDN string
+	GroupsDN string
 }
 
 func New(d Deps) *Services {
@@ -49,7 +52,7 @@ func New(d Deps) *Services {
 	h := hooks{authz: d.Authz, audit: d.Audit, gate: d.Gate, limit: d.Limit, locks: d.Locks}
 	return &Services{
 		Users:  &Users{repo: d.Users, hooks: h},
-		Groups: &Groups{repo: d.Groups, hooks: h},
+		Groups: &Groups{repo: d.Groups, hooks: h, peopleDN: d.PeopleDN, groupsDN: d.GroupsDN},
 		Query: &Query{
 			search: d.Search, bind: d.Bind, schema: d.Schema,
 			caps: d.Caps, marker: d.Marker,

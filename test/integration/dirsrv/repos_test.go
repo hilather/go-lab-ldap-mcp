@@ -3,6 +3,7 @@
 package dirsrv
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"os/exec"
@@ -116,19 +117,19 @@ func testRuntimeUsers(t *testing.T, env *runtimeEnv) {
 	}
 	assertField(t, err, "attributes.userPassword", "forbidden_attribute")
 
-	_, err = users.Modify(t.Context(), "alice", directory.UserPatch{Attributes: map[string]string{"nsAccountLock": "true"}})
+	_, err = users.Modify(t.Context(), "alice", directory.UserPatch{Attributes: map[string]string{"nsAccountLock": "true"}}, "")
 	if err == nil {
 		t.Fatal("forbidden nsAccountLock via attributes must fail")
 	}
 	assertField(t, err, "attributes.nsAccountLock", "forbidden_attribute")
 
-	_, err = users.Modify(t.Context(), "alice", directory.UserPatch{Attributes: map[string]string{"sn": ""}})
+	_, err = users.Modify(t.Context(), "alice", directory.UserPatch{Attributes: map[string]string{"sn": ""}}, "")
 	if err == nil {
 		t.Fatal("empty sn must fail")
 	}
 
 	en := true
-	noop, err := users.Modify(t.Context(), "alice", directory.UserPatch{Enabled: &en})
+	noop, err := users.Modify(t.Context(), "alice", directory.UserPatch{Enabled: &en}, alice.Revision)
 	if err != nil {
 		t.Fatalf("modify enabled no-op: %v", err)
 	}
@@ -136,7 +137,7 @@ func testRuntimeUsers(t *testing.T, env *runtimeEnv) {
 		t.Fatal("no-op enable cleared enabled")
 	}
 
-	patched, err := users.Modify(t.Context(), "alice", directory.UserPatch{Attributes: map[string]string{"description": "updated"}})
+	patched, err := users.Modify(t.Context(), "alice", directory.UserPatch{Attributes: map[string]string{"description": "updated"}}, noop.Revision)
 	if err != nil {
 		t.Fatalf("modify: %v", err)
 	}
@@ -662,7 +663,7 @@ func testRuntimeRevisionsAndCursors(t *testing.T, env *runtimeEnv) {
 			t.Fatalf("operational/secret attr leaked: %+v", a)
 		}
 	}
-	patched, err := users.Modify(t.Context(), "rev-a", directory.UserPatch{Attributes: map[string]string{"description": "two"}})
+	patched, err := users.Modify(t.Context(), "rev-a", directory.UserPatch{Attributes: map[string]string{"description": "two"}}, u.Revision)
 	if err != nil {
 		t.Fatalf("modify: %v", err)
 	}
@@ -719,15 +720,16 @@ func testRuntimeAssertionControl(t *testing.T, env *runtimeEnv) {
 	if err != nil {
 		t.Fatalf("add: %v", err)
 	}
-	runtimeReplace(t, env.inst, u.DN, "userPassword", repoUserPass+"x")
-	afterPW, err := users.Get(t.Context(), "assert-a")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if afterPW.Revision != u.Revision {
-		t.Fatalf("password is not API-exposed; revision changed %q -> %q", u.Revision, afterPW.Revision)
-	}
-	_, err = users.SetEnabled(t.Context(), "assert-a", false, afterPW.Revision)
+	// Inject a password-only write after the live search (and assertion
+	// snapshot) and before Modify. API revision is unchanged so checkRev
+	// passes; assertion on the pre-write CSN must fail when advertised.
+	env.rt.SetAfterSearch(func(_ context.Context, dn string) {
+		if strings.Contains(dn, "assert-a") {
+			runtimeReplace(t, env.inst, dn, "userPassword", repoUserPass+"x")
+		}
+	})
+	t.Cleanup(func() { env.rt.SetAfterSearch(nil) })
+	_, err = users.SetEnabled(t.Context(), "assert-a", false, u.Revision)
 	if !caps.HasAssertionControl() {
 		t.Logf("assertion control %s absent from Controls=%v; residual TOCTOU race documented (KD-R24)", directory.ControlAssertionOID, caps.Controls)
 		if err != nil {
@@ -736,7 +738,7 @@ func testRuntimeAssertionControl(t *testing.T, env *runtimeEnv) {
 		return
 	}
 	if err == nil {
-		t.Fatal("assertion control advertised but concurrent password write was not detected")
+		t.Fatal("assertion control advertised but search-to-modify password write was not detected")
 	}
 	if fieldCode(err) != directory.FieldConflict {
 		t.Fatalf("assertion fail: %v", err)

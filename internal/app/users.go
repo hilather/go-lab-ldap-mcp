@@ -44,10 +44,9 @@ func (s *Users) Create(ctx context.Context, p Principal, spec CreateUser) (direc
 	}
 	u, err := s.repo.Add(ctx, spec)
 	if err != nil {
-		// Password failure after create must not leave a bindable no-password
-		// account. Repo.Add also compensates; the service retries delete when
-		// a leftover exists and the failure is not a pre-existing conflict.
-		if !isConflict(err) {
+		// Only incomplete creates (password failed after add). A follow-up
+		// read error after a successful add+password is not compensated.
+		if fieldCode(err) == directory.FieldIncomplete {
 			s.compensateCreate(ctx, directory.UserID(spec.ID))
 		}
 		s.hooks.record(ctx, p, OpUserCreate.Name, spec.ID, AuditFailure, "", "")
@@ -85,16 +84,7 @@ func (s *Users) Update(ctx context.Context, p Principal, id directory.UserID, pa
 		s.hooks.record(ctx, p, OpUserUpdate.Name, string(id), AuditFailure, string(patch.Revision), "")
 		return directory.User{}, err
 	}
-	cur, err := s.repo.Get(ctx, id)
-	if err != nil {
-		s.hooks.record(ctx, p, OpUserUpdate.Name, string(id), AuditFailure, string(patch.Revision), "")
-		return directory.User{}, err
-	}
-	if cur.Revision != patch.Revision {
-		s.hooks.record(ctx, p, OpUserUpdate.Name, string(id), AuditFailure, string(patch.Revision), string(cur.Revision))
-		return directory.User{}, directory.Error("revision", directory.FieldConflict, "directory entry revision does not match")
-	}
-	u, err := s.repo.Modify(ctx, id, patch.UserPatch)
+	u, err := s.repo.Modify(ctx, id, patch.UserPatch, patch.Revision)
 	if err != nil {
 		s.hooks.record(ctx, p, OpUserUpdate.Name, string(id), AuditFailure, string(patch.Revision), "")
 		return directory.User{}, err

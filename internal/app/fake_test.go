@@ -88,7 +88,7 @@ func (f *fakeUsers) Add(_ context.Context, spec directory.UserSpec) (directory.U
 	return u, nil
 }
 
-func (f *fakeUsers) Modify(_ context.Context, id directory.UserID, patch directory.UserPatch) (directory.User, error) {
+func (f *fakeUsers) Modify(_ context.Context, id directory.UserID, patch directory.UserPatch, rev directory.Revision) (directory.User, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.modErr != nil {
@@ -97,6 +97,9 @@ func (f *fakeUsers) Modify(_ context.Context, id directory.UserID, patch directo
 	u, ok := f.byID[id]
 	if !ok {
 		return directory.User{}, directory.Error("entry", directory.FieldNotFound, "directory entry not found")
+	}
+	if rev != "" && u.Revision != rev {
+		return directory.User{}, directory.Error("revision", directory.FieldConflict, "directory entry revision does not match")
 	}
 	if patch.Enabled != nil {
 		u.Enabled = *patch.Enabled
@@ -170,6 +173,7 @@ type fakeGroups struct {
 	byID   map[directory.GroupID]directory.Group
 	addErr error
 	delErr error
+	getErr error
 }
 
 func newFakeGroups() *fakeGroups {
@@ -195,6 +199,9 @@ func (f *fakeGroups) List(context.Context, directory.GroupListQuery) (directory.
 func (f *fakeGroups) Get(_ context.Context, id directory.GroupID) (directory.Group, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if f.getErr != nil {
+		return directory.Group{}, f.getErr
+	}
 	g, ok := f.byID[id]
 	if !ok {
 		return directory.Group{}, directory.Error("entry", directory.FieldNotFound, "directory entry not found")

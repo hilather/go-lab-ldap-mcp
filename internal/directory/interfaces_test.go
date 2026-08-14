@@ -21,7 +21,7 @@ func (stubDirectory) Get(context.Context, directory.UserID) (directory.User, err
 func (stubDirectory) Add(context.Context, directory.UserSpec) (directory.User, error) {
 	return directory.User{}, nil
 }
-func (stubDirectory) Modify(context.Context, directory.UserID, directory.UserPatch) (directory.User, error) {
+func (stubDirectory) Modify(context.Context, directory.UserID, directory.UserPatch, directory.Revision) (directory.User, error) {
 	return directory.User{}, nil
 }
 func (stubDirectory) SetEnabled(context.Context, directory.UserID, bool, directory.Revision) (directory.User, error) {
