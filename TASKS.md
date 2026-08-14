@@ -921,49 +921,49 @@ Acceptance:
 - [x] Reset-mode startup recovers supported partial states.
 - [x] Persistent unresolved state produces explicit recovery instructions, not false readiness.
 
-## [ ] T-081 Implement reset REST endpoints and destructive confirmations
+## [x] T-081 Implement reset REST endpoints and destructive confirmations
 
 Priority: P0 | Size: M | Depends on: T-060 to T-065, T-076 to T-080
 
 Deliverables: start reset, get reset status, exact scenario confirmation, expected revision, scope, rate limit, and audit.
 
 Acceptance:
-- [ ] `directory:write` without `lab:reset` is denied.
-- [ ] Wrong confirmation or revision fails before mutation.
-- [ ] Duplicate request returns current operation or conflict deterministically.
+- [x] `directory:write` without `lab:reset` is denied.
+- [x] Wrong confirmation or revision fails before mutation.
+- [x] Duplicate request returns current operation or conflict deterministically.
 
-## [ ] T-082 Implement deterministic streaming LDIF encoder
+## [x] T-082 Implement deterministic streaming LDIF encoder
 
 Priority: P0 | Size: L | Depends on: T-013, T-050
 
 Deliverables: RFC-compatible encoding, base64 and line folding, deterministic DN and attribute order, comments, redaction policy, and writer cancellation.
 
 Acceptance:
-- [ ] Supported entries round-trip through an independent LDIF parser.
-- [ ] Password and secret attributes are omitted by default.
-- [ ] Export does not require loading all entries into memory.
+- [x] Supported entries round-trip through an independent LDIF parser.
+- [x] Password and secret attributes are omitted by default.
+- [x] Export does not require loading all entries into memory.
 
-## [ ] T-083 Implement export application service and REST streaming endpoint
+## [x] T-083 Implement export application service and REST streaming endpoint
 
 Priority: P0 | Size: L | Depends on: T-056, T-065, T-071, T-082
 
 Deliverables: export request validation, paging, entry and byte limits, authenticated stream, safe filename, headers, cancellation, and audit.
 
 Acceptance:
-- [ ] Client disconnect cancels directory reads.
-- [ ] Actor without `lab:export` is denied.
-- [ ] Export limit failure is explicit and not presented as complete output.
+- [x] Client disconnect cancels directory reads.
+- [x] Actor without `lab:export` is denied.
+- [x] Export limit failure is explicit and not presented as complete output.
 
-## [ ] T-084 Complete reset and export cross-interface integration tests
+## [x] T-084 Complete reset and export cross-interface integration tests
 
 Priority: P0 | Size: L | Depends on: T-078 to T-083
 
 Deliverables: mutations from application, REST, and direct LDAP; reset; export before and after; failure, concurrency, and redaction tests.
 
 Acceptance:
-- [ ] Canonical baseline is restored repeatedly.
-- [ ] Reads and writes during destructive reset follow documented availability behavior.
-- [ ] Full exported content and logs contain no seeded passwords.
+- [x] Canonical baseline is restored repeatedly.
+- [x] Reads and writes during destructive reset follow documented availability behavior.
+- [x] Full exported content and logs contain no seeded passwords.
 
 # M6 - MCP
 

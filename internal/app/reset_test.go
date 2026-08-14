@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -162,8 +163,62 @@ func (f *liveReset) DeleteManaged(_ context.Context, dn string) error {
 	return nil
 }
 
-func (f *liveReset) Export(context.Context, io.Writer, directory.ExportOptions) error {
-	return nil
+func (f *liveReset) Export(ctx context.Context, w io.Writer, opts directory.ExportOptions) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	enc := directory.NewEncoder(w, opts)
+	f.mu.Lock()
+	users, groups := f.users, f.groups
+	f.mu.Unlock()
+	if users != nil {
+		users.mu.Lock()
+		ids := make([]string, 0, len(users.byID))
+		for id := range users.byID {
+			ids = append(ids, string(id))
+		}
+		users.mu.Unlock()
+		sort.Strings(ids)
+		for _, id := range ids {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			u, err := users.Get(ctx, directory.UserID(id))
+			if err != nil {
+				continue
+			}
+			attrs := append([]directory.AttrKV{{Name: "uid", Value: u.UID}, {Name: "objectClass", Value: "inetOrgPerson"}}, u.Attributes...)
+			if err := enc.WriteEntry(ctx, directory.SearchEntry{DN: u.DN, Attributes: attrs}); err != nil {
+				return err
+			}
+		}
+	}
+	if groups != nil {
+		groups.mu.Lock()
+		ids := make([]string, 0, len(groups.byID))
+		for id := range groups.byID {
+			ids = append(ids, string(id))
+		}
+		groups.mu.Unlock()
+		sort.Strings(ids)
+		for _, id := range ids {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			g, err := groups.Get(ctx, directory.GroupID(id))
+			if err != nil {
+				continue
+			}
+			attrs := []directory.AttrKV{{Name: "cn", Value: g.ID}, {Name: "objectClass", Value: "groupOfNames"}}
+			for _, m := range g.Members {
+				attrs = append(attrs, directory.AttrKV{Name: "member", Value: m.DN})
+			}
+			if err := enc.WriteEntry(ctx, directory.SearchEntry{DN: g.DN, Attributes: attrs}); err != nil {
+				return err
+			}
+		}
+	}
+	return enc.Close()
 }
 
 func seedAliceUser() config.NormalizedUser {
@@ -318,7 +373,10 @@ func TestResetExclusiveAndBlocksWrites(t *testing.T) {
 	if err == nil {
 		t.Fatal("second reset")
 	}
-	apperr.Assert(t, err).Code(apperr.CodeReset).Retryable(true)
+	apperr.Assert(t, err).Code(apperr.CodeReset).Retryable(false)
+	if fieldCode(err) != "conflict" {
+		t.Fatalf("duplicate field %s %v", fieldCode(err), err)
+	}
 	_, err = svc.Users.Create(t.Context(), writer(), CreateUser{ID: "bob", Password: Secret("unit-user-pass-12")})
 	if err == nil {
 		t.Fatal("write during reset")

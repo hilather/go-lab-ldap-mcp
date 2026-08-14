@@ -2,23 +2,15 @@ package ds389
 
 import (
 	"context"
-	"io"
 	"sort"
 	"strings"
 
 	"github.com/go-ldap/ldap/v3"
 
-	"github.com/hilather/go-lab-ldap-mcp/internal/apperr"
 	"github.com/hilather/go-lab-ldap-mcp/internal/config"
 	"github.com/hilather/go-lab-ldap-mcp/internal/directory"
 	"github.com/hilather/go-lab-ldap-mcp/internal/directory/ldapclient"
 )
-
-// Export is implemented in T-082. Soft reset must not depend on it.
-func (r *Runtime) Export(context.Context, io.Writer, directory.ExportOptions) error {
-	return apperr.New(apperr.CodeExport, "export is not implemented").
-		WithField(apperr.Field{Path: "export", Code: "unimplemented", Message: "export is not implemented"})
-}
 
 func (r *Runtime) Inventory(ctx context.Context) (directory.ManagedInventory, error) {
 	if r == nil {

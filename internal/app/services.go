@@ -15,6 +15,7 @@ type Services struct {
 	Groups *Groups
 	Query  *Query
 	Reset  *Reset
+	Export *Export
 }
 
 // Deps are injected repositories and hooks. Transports never see ds389 types.
@@ -52,6 +53,10 @@ type Deps struct {
 	ResetGroups   []config.NormalizedGroup
 	ResetLock     *reset.Gate
 	BindTransport directory.Transport
+
+	ExportMaxEntries int
+	ExportMaxBytes   int64
+	ObserveExport    func(outcome string)
 }
 
 func New(d Deps) *Services {
@@ -84,6 +89,13 @@ func New(d Deps) *Services {
 			hooks: h,
 		},
 		Reset: newReset(d, h, lock),
+		Export: &Export{
+			hooks:      h,
+			dir:        d.ResetDir,
+			maxEntries: d.ExportMaxEntries,
+			maxBytes:   d.ExportMaxBytes,
+			observe:    d.ObserveExport,
+		},
 	}
 }
 

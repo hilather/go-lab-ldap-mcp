@@ -242,6 +242,9 @@ func attachDirectory(opt *apiOptionsBuilder) error {
 		ResetUsers:       n.Users,
 		ResetGroups:      n.Groups,
 		BindTransport:    cfg.Transport,
+		ExportMaxEntries: opt.compiled.Public.Spec.Limits.ExportMaxEntries,
+		ExportMaxBytes:   opt.compiled.Public.Spec.Limits.ExportMaxBytes,
+		ObserveExport:    opt.metrics.ObserveExport,
 	})
 	inspectCtx, inspectCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	_ = svc.Reset.Inspect(inspectCtx)
@@ -267,6 +270,8 @@ func attachDirectory(opt *apiOptionsBuilder) error {
 	opt.groups = svc.Groups
 	opt.query = svc.Query
 	opt.system = svc.Query
+	opt.reset = svc.Reset
+	opt.export = svc.Export
 	opt.audit = sink
 	opt.auditHook = sink
 	opt.gate = gate
@@ -286,6 +291,8 @@ type apiOptionsBuilder struct {
 	groups    *app.Groups
 	query     *app.Query
 	system    *app.Query
+	reset     *app.Reset
+	export    *app.Export
 	audit     *audit.Sink
 	auditHook audit.Hook
 	gate      *reset.Gate

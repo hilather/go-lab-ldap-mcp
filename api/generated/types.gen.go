@@ -395,12 +395,19 @@ type ResetRequest struct {
 
 // ResetStatus defines model for ResetStatus.
 type ResetStatus struct {
-	AppliedRevision  *string         `json:"appliedRevision,omitempty"`
-	Counts           *map[string]int `json:"counts,omitempty"`
-	Error            *string         `json:"error,omitempty"`
-	ExpectedRevision *string         `json:"expectedRevision,omitempty"`
-	Phase            *string         `json:"phase,omitempty"`
-	State            *string         `json:"state,omitempty"`
+	AppliedRevision *string `json:"appliedRevision,omitempty"`
+	Counts          *struct {
+		Deleted *int `json:"deleted,omitempty"`
+		Extra   *int `json:"extra,omitempty"`
+		Groups  *int `json:"groups,omitempty"`
+		Users   *int `json:"users,omitempty"`
+	} `json:"counts,omitempty"`
+	Error             *string `json:"error,omitempty"`
+	ExpectedRevision  *string `json:"expectedRevision,omitempty"`
+	InventoryChecksum *string `json:"inventoryChecksum,omitempty"`
+	Phase             *string `json:"phase,omitempty"`
+	Recovery          *string `json:"recovery,omitempty"`
+	State             *string `json:"state,omitempty"`
 }
 
 // RootDSE defines model for RootDSE.

@@ -43,10 +43,10 @@ type Operation struct {
 }
 
 type Counts struct {
-	Deleted int
-	Users   int
-	Groups  int
-	Extra   int
+	Deleted int `json:"deleted"`
+	Users   int `json:"users"`
+	Groups  int `json:"groups"`
+	Extra   int `json:"extra"`
 }
 
 // Gate is the exclusive reset lock and validated state machine (T-076).
@@ -143,8 +143,11 @@ func FailedErr() *apperr.Error {
 }
 
 // Busy is the exclusive-lock conflict when a second reset is requested.
+// Ordinary writes still use retryable InProgress (503). Duplicate start
+// is a deterministic 409.
 func Busy() *apperr.Error {
-	return InProgress()
+	return apperr.New(apperr.CodeReset, "reset already in progress").
+		WithField(apperr.Field{Path: "reset", Code: "conflict", Message: "reset already in progress"})
 }
 
 func Disabled() *apperr.Error {

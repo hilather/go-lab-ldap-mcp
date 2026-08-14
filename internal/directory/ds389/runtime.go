@@ -57,10 +57,13 @@ type RuntimeConfig struct {
 	InventoryPageSize int
 	SearchSizeLimit   int
 	SearchTimeLimit   time.Duration
-	MaxFilterDepth    int
-	MaxFilterLength   int
-	SchemaTTL         time.Duration
-	AllowedAttrs      []string
+	// ExportMaxEntries/Bytes are hard caps used when ExportOptions are zero.
+	ExportMaxEntries int
+	ExportMaxBytes   int64
+	MaxFilterDepth   int
+	MaxFilterLength  int
+	SchemaTTL        time.Duration
+	AllowedAttrs     []string
 
 	// CursorKey is the process-local HMAC key. Empty → generated in NewRuntime.
 	CursorKey config.CursorKey
@@ -126,6 +129,12 @@ func (c *RuntimeConfig) applyDefaults() {
 	}
 	if c.SearchSizeLimit <= 0 {
 		c.SearchSizeLimit = 1000
+	}
+	if c.ExportMaxEntries <= 0 {
+		c.ExportMaxEntries = 20000
+	}
+	if c.ExportMaxBytes <= 0 {
+		c.ExportMaxBytes = 67108864
 	}
 	if c.SearchTimeLimit <= 0 {
 		c.SearchTimeLimit = 10 * time.Second

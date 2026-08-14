@@ -39,7 +39,7 @@ func TestGateExclusiveBegin(t *testing.T) {
 	if _, err := g.Begin(); err == nil {
 		t.Fatal("second reset must be refused")
 	} else {
-		apperr.Assert(t, err).Code(apperr.CodeReset).Retryable(true)
+		apperr.Assert(t, err).Code(apperr.CodeReset).Retryable(false)
 	}
 	if err := g.Advance(tok, Resetting); err != nil {
 		t.Fatal(err)

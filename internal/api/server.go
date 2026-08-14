@@ -58,6 +58,8 @@ type Options struct {
 	Audit           audit.Lister
 	AuditHook       audit.Hook
 	Diagnostics     func() app.Diagnostics
+	Reset           Reset
+	Export          Export
 	Metrics         *observability.Registry
 	Build           observability.BuildInfo
 	PageSizeDefault int
@@ -84,6 +86,8 @@ type Server struct {
 	audit           audit.Lister
 	auditHook       audit.Hook
 	diagnostics     func() app.Diagnostics
+	reset           Reset
+	export          Export
 	metrics         *observability.Registry
 	build           observability.BuildInfo
 	pageSizeDefault int
@@ -144,6 +148,8 @@ func New(opt Options) (*Server, error) {
 		audit:           opt.Audit,
 		auditHook:       opt.AuditHook,
 		diagnostics:     opt.Diagnostics,
+		reset:           opt.Reset,
+		export:          opt.Export,
 		metrics:         opt.Metrics,
 		build:           build,
 		pageSizeDefault: pageDef,
@@ -191,6 +197,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/schema/attributes/{name}", s.handleAttributeType)
 	mux.HandleFunc("GET /api/v1/audit", s.handleListAudit)
 	mux.HandleFunc("GET /api/v1/diagnostics", s.handleDiagnostics)
+	mux.HandleFunc("POST /api/v1/reset", s.handleStartReset)
+	mux.HandleFunc("GET /api/v1/reset", s.handleGetReset)
+	mux.HandleFunc("GET /api/v1/export", s.handleExport)
 
 	var h http.Handler = mux
 	h = s.authMiddleware(h)

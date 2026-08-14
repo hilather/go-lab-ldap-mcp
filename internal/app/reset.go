@@ -70,6 +70,18 @@ func (s *Reset) Status() ResetStatus {
 	return statusFrom(s.gate.Snapshot())
 }
 
+// Current is GET /api/v1/reset. lab:reset is required.
+func (s *Reset) Current(ctx context.Context, p Principal) (ResetStatus, error) {
+	if s == nil {
+		return ResetStatus{}, apperr.New(apperr.CodeReset, "reset is not configured").
+			WithField(apperr.Field{Path: "reset", Code: "unavailable", Message: "reset is not configured"})
+	}
+	if err := s.hooks.authorize(ctx, p, OpReset); err != nil {
+		return ResetStatus{}, err
+	}
+	return s.Status(), nil
+}
+
 func (s *Reset) State() string {
 	if s == nil || s.gate == nil {
 		return string(reset.Ready)
@@ -85,6 +97,9 @@ func (s *Reset) Start(ctx context.Context, p Principal, req ResetRequest) (Reset
 			WithField(apperr.Field{Path: "reset", Code: "unavailable", Message: "reset is not configured"})
 	}
 	if err := s.hooks.authorize(ctx, p, OpReset); err != nil {
+		return s.Status(), err
+	}
+	if err := s.hooks.rateLimit(ctx, "reset:"+actorOf(p)); err != nil {
 		return s.Status(), err
 	}
 	if !s.soft {
