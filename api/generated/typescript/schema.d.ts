@@ -1288,9 +1288,11 @@ export interface operations {
     enableUser: {
         parameters: {
             query?: never;
-            header?: {
+            header: {
                 /** @description Required for cookie-authenticated unsafe methods */
                 "X-CSRF-Token"?: components["parameters"]["CSRFToken"];
+                /** @description Quoted revision hex */
+                "If-Match": components["parameters"]["IfMatch"];
             };
             path: {
                 id: components["parameters"]["UserID"];
@@ -1302,23 +1304,28 @@ export interface operations {
             /** @description Enabled */
             200: {
                 headers: {
+                    ETag?: string;
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["User"];
                 };
             };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            412: components["responses"]["PreconditionFailed"];
         };
     };
     disableUser: {
         parameters: {
             query?: never;
-            header?: {
+            header: {
                 /** @description Required for cookie-authenticated unsafe methods */
                 "X-CSRF-Token"?: components["parameters"]["CSRFToken"];
+                /** @description Quoted revision hex */
+                "If-Match": components["parameters"]["IfMatch"];
             };
             path: {
                 id: components["parameters"]["UserID"];
@@ -1330,15 +1337,18 @@ export interface operations {
             /** @description Disabled */
             200: {
                 headers: {
+                    ETag?: string;
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["User"];
                 };
             };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            412: components["responses"]["PreconditionFailed"];
         };
     };
     listUserGroups: {

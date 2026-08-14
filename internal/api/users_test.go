@@ -302,9 +302,17 @@ func TestPasswordEnableDisableAndUserGroups(t *testing.T) {
 		t.Fatal("expected enabled")
 	}
 
+	noMatch := httptest.NewRequest(http.MethodPost, "/api/v1/users/carol/disable", nil)
+	noMatch.Header.Set("Authorization", "Bearer "+testToken)
+	nmr := httptest.NewRecorder()
+	h.ServeHTTP(nmr, noMatch)
+	if nmr.Code != http.StatusPreconditionFailed {
+		t.Fatalf("enable/disable without If-Match %d %s", nmr.Code, nmr.Body.String())
+	}
+
 	users.mu.Lock()
 	u := users.byID["carol"]
-	u.Groups = []directory.GroupID{"staff"}
+	u.Groups = []directory.GroupID{"staff", "gone"}
 	users.put(u)
 	users.mu.Unlock()
 	groups.mu.Lock()
@@ -321,7 +329,7 @@ func TestPasswordEnableDisableAndUserGroups(t *testing.T) {
 	var gp generated.GroupPage
 	decodeOpenAPI(t, lgr, &gp)
 	if len(gp.Items) != 1 || gp.Items[0].Id != "staff" {
-		t.Fatalf("groups %+v", gp)
+		t.Fatalf("stale group must be skipped: %+v", gp)
 	}
 
 	pwList := httptest.NewRequest(http.MethodGet, "/api/v1/users/carol/groups", nil)

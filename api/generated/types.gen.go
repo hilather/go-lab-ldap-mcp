@@ -664,12 +664,18 @@ type UpdateUserParams struct {
 type DisableUserParams struct {
 	// XCSRFToken Required for cookie-authenticated unsafe methods
 	XCSRFToken *CSRFToken `json:"X-CSRF-Token,omitempty"`
+
+	// IfMatch Quoted revision hex
+	IfMatch IfMatch `json:"If-Match"`
 }
 
 // EnableUserParams defines parameters for EnableUser.
 type EnableUserParams struct {
 	// XCSRFToken Required for cookie-authenticated unsafe methods
 	XCSRFToken *CSRFToken `json:"X-CSRF-Token,omitempty"`
+
+	// IfMatch Quoted revision hex
+	IfMatch IfMatch `json:"If-Match"`
 }
 
 // SetUserPasswordParams defines parameters for SetUserPassword.
