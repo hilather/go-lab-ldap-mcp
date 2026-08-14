@@ -54,6 +54,10 @@ func applyDefaults(f *v1alpha1.File) {
 	if mg.Session.MaxSessions == 0 {
 		mg.Session.MaxSessions = 64
 	}
+	if mg.Metrics.Enabled == nil {
+		t := true
+		mg.Metrics.Enabled = &t
+	}
 	lim := &f.Spec.Limits
 	if lim.RequestTimeout == "" {
 		lim.RequestTimeout = "30s"

@@ -88,8 +88,10 @@ type MCP struct {
 }
 
 type Metrics struct {
-	Enabled     bool `json:"enabled" yaml:"enabled"`
-	RequireAuth bool `json:"requireAuth" yaml:"requireAuth"`
+	// Enabled defaults to true when omitted (applyDefaults). Pointer so
+	// enabled: false is distinct from an absent key.
+	Enabled     *bool `json:"enabled" yaml:"enabled"`
+	RequireAuth bool  `json:"requireAuth" yaml:"requireAuth"`
 }
 
 type Limits struct {

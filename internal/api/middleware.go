@@ -118,8 +118,9 @@ func (s *Server) lookupToken(secret string) (auth.Principal, bool) {
 }
 
 func (s *Server) requireCookieCSRF(r *http.Request) error {
-	p, ok := auth.PrincipalFrom(r.Context())
-	if !ok || p.Kind != auth.KindSession {
+	// Gate on a valid session cookie, not the resolved principal. A
+	// malformed or invalid Authorization header must not skip CSRF.
+	if !s.hasSessionCookie(r) {
 		return nil
 	}
 	origin := auth.RequestOrigin(r)
@@ -136,6 +137,18 @@ func (s *Server) requireCookieCSRF(r *http.Request) error {
 			WithField(apperr.Field{Path: "csrf", Code: "forbidden", Message: "csrf token is missing or invalid"})
 	}
 	return nil
+}
+
+func (s *Server) hasSessionCookie(r *http.Request) bool {
+	if s == nil || s.sessions == nil || r == nil {
+		return false
+	}
+	c, err := r.Cookie(auth.CookieName)
+	if err != nil || c.Value == "" {
+		return false
+	}
+	_, _, ok := s.sessions.Lookup(c.Value)
+	return ok
 }
 
 func needsCSRF(r *http.Request) bool {

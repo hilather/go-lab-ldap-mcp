@@ -77,11 +77,6 @@ func New(opt Options) (*Server, error) {
 	if lim == nil {
 		lim = NopLimiter{}
 	}
-	metricsEnabled := opt.MetricsEnabled
-	if !opt.MetricsAuth && !opt.MetricsEnabled {
-		// Default: metrics route exists (binding /metrics).
-		metricsEnabled = true
-	}
 	return &Server{
 		registry:       opt.Registry,
 		sessions:       opt.Sessions,
@@ -91,7 +86,7 @@ func New(opt Options) (*Server, error) {
 		maxBody:        maxBody,
 		forceSecure:    opt.ForceSecure,
 		metricsAuth:    opt.MetricsAuth,
-		metricsEnabled: metricsEnabled,
+		metricsEnabled: opt.MetricsEnabled,
 		limiter:        lim,
 	}, nil
 }

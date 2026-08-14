@@ -184,6 +184,48 @@ func TestSessionCookieSecureOnTLS(t *testing.T) {
 	_ = tls.VersionTLS13
 }
 
+func TestSessionCSRFNotBypassedByBadAuthorization(t *testing.T) {
+	t.Parallel()
+	s := testServer(t, nil)
+	h := s.Handler()
+	_, cookie := loginSession(t, h)
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/session", nil)
+	req.Host = "127.0.0.1:8443"
+	req.AddCookie(auth.NewSessionCookie(cookie, false, 0))
+	req.Header.Set("Authorization", "Bearer not-the-token")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status %d %s", rec.Code, rec.Body.String())
+	}
+	if _, _, ok := s.sessions.Lookup(cookie); !ok {
+		t.Fatal("session cleared without CSRF and Origin")
+	}
+}
+
+func TestMetricsDisabledHonored(t *testing.T) {
+	t.Parallel()
+	reg, err := auth.NewRegistry([]auth.Token{{
+		ID:     "admin",
+		Scopes: []string{auth.ScopeDirectoryRead},
+		Secret: observability.Secret(testToken),
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := New(Options{Registry: reg, MetricsEnabled: false})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	rec := httptest.NewRecorder()
+	s.Handler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("disabled metrics = %d %s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestSessionCSRFAndOrigin(t *testing.T) {
 	t.Parallel()
 	s := testServer(t, nil)

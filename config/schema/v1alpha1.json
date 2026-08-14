@@ -116,7 +116,7 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "enabled": { "type": "boolean" },
+            "enabled": { "type": "boolean", "default": true },
             "requireAuth": { "type": "boolean" }
           }
         }

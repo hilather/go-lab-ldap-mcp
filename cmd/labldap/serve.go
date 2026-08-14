@@ -185,7 +185,7 @@ func serverOptionsFromCompiled(c *config.Compiled, log *slog.Logger) (api.Option
 		MaxBody:        c.Public.Spec.Limits.MaxRequestBodyBytes,
 		ForceSecure:    false, // cookie Secure follows r.TLS until serve terminates TLS (OD-014)
 		MetricsAuth:    c.Public.Spec.Management.Metrics.RequireAuth,
-		MetricsEnabled: c.Public.Spec.Management.Metrics.Enabled,
+		MetricsEnabled: c.Public.Spec.Management.Metrics.Enabled == nil || *c.Public.Spec.Management.Metrics.Enabled,
 	}, nil
 }
 

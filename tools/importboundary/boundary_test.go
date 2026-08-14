@@ -51,6 +51,9 @@ func TestAGENTSImportBoundaries(t *testing.T) {
 		if forbiddenDS389Admin(rel, imps) {
 			t.Errorf("%s must not import internal/directory/ds389 (bootstrap helper is command-only)", rel)
 		}
+		if forbiddenLDAPClient(rel, imps) {
+			t.Errorf("%s must not import internal/directory/ldapclient (composition stays in cmd/labldap)", rel)
+		}
 	}
 }
 
@@ -207,6 +210,35 @@ func TestForbiddenConfigImport(t *testing.T) {
 	}
 }
 
+func TestKDR8LDAPClientImportEdges(t *testing.T) {
+	t.Parallel()
+	lc := []string{"github.com/hilather/go-lab-ldap-mcp/internal/directory/ldapclient"}
+	for _, rel := range []string{
+		"internal/directory/ldapclient",
+		"internal/directory/ds389",
+		"cmd/labldap",
+		"test/integration/dirsrv",
+	} {
+		if forbiddenLDAPClient(rel, lc) {
+			t.Errorf("%s must remain allowed to import ldapclient", rel)
+		}
+	}
+	for _, rel := range []string{
+		"internal/directory",
+		"internal/app",
+		"internal/api",
+		"internal/mcpserver",
+		"internal/auth",
+		"internal/audit",
+		"internal/reset",
+		"internal/web",
+	} {
+		if !forbiddenLDAPClient(rel, lc) {
+			t.Errorf("%s must not import ldapclient", rel)
+		}
+	}
+}
+
 func forbiddenGoLDAP(rel string, imps []string) bool {
 	switch {
 	case rel == "internal/directory/ds389" || strings.HasPrefix(rel, "internal/directory/ds389/"):
@@ -229,6 +261,20 @@ func forbiddenDS389Admin(rel string, imps []string) bool {
 		return false
 	}
 	return hasImportPrefix(imps, "github.com/hilather/go-lab-ldap-mcp/internal/directory/ds389")
+}
+
+func forbiddenLDAPClient(rel string, imps []string) bool {
+	switch {
+	case strings.HasPrefix(rel, "test/"):
+		return false
+	case rel == "cmd/labldap" || strings.HasPrefix(rel, "cmd/labldap/"):
+		return false
+	case rel == "internal/directory/ldapclient" || strings.HasPrefix(rel, "internal/directory/ldapclient/"):
+		return false
+	case rel == "internal/directory/ds389" || strings.HasPrefix(rel, "internal/directory/ds389/"):
+		return false
+	}
+	return hasImportPrefix(imps, "github.com/hilather/go-lab-ldap-mcp/internal/directory/ldapclient")
 }
 
 func forbiddenConfigImport(imp string) bool {
