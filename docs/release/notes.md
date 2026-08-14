@@ -1,6 +1,7 @@
 # LabLDAP first usable release notes
 
 Date: 2026-08-14  
+Tag: **v0.1.0**  
 Tasks: T-120  
 Images: `labldap-control:dev`, `labldap-bootstrap:dev` (OD-004; do not push)
 
@@ -8,7 +9,7 @@ Images: `labldap-control:dev`, `labldap-bootstrap:dev` (OD-004; do not push)
 
 | Component | Pin |
 | --- | --- |
-| LabLDAP source | `git describe` / `git rev-parse` (see `dist/release/provenance.json`) |
+| LabLDAP source | `v0.1.0` (`git describe`; see `dist/release/provenance.json`) |
 | Go | 1.26 / toolchain `go1.26.5` |
 | Node / pnpm | 22.14.0 / `pnpm@10.14.0` |
 | React | 19.2.8 |
@@ -68,8 +69,10 @@ security, SBOM, checksums, archcheck). Product acceptance:
   `TestPersistentRestartKeepsRuntimeEntry`).
 - MCP is shipped: official SDK Streamable HTTP `POST /mcp` and
   `labldap mcp-stdio`, with the tool/resource catalog in
-  `docs/mcp/catalog.md`. Live MCP mutate / Compose protocol acceptance
-  was not re-run on this merge (TASKS T-120 residual).
+  `docs/mcp/catalog.md`. Compose lifecycle and LDAP client matrix ran
+  in CI on this tag candidate
+  (https://github.com/hilather/go-lab-ldap-mcp/actions/runs/31850233682).
+  Playwright default remains the contract mock.
 
 Security: five dated **approved** exceptions for the pinned `go1.26.5`
 standard library (`GO-2026-6090`, `GO-2026-6089`, `GO-2026-5972`,

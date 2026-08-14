@@ -19,14 +19,11 @@ No distribution license file (OD-003). Local images only (OD-004).
 
 ## Status
 
-Milestones **M0–M2** are complete. First usable release is the README definition
-in the design package plus every P0 task in [`TASKS.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/TASKS.md).
-
-Completed: **T-001–T-113** plus M6 MCP (T-085–T-094) and M8 packaging
-automation. T-114, T-115, T-117, and T-120 stay `[~]` until live
-compose/compat/soak/e2e run (see `TASKS.md`). MCP catalog:
+First usable release: **v0.1.0**. Milestones **M0–M8** P0 work is complete
+(T-001–T-116, T-118–T-120). T-117 soak measurements stay `[~]` (P1).
+Config `apiVersion` is `labldap.dev/v1alpha1`. MCP catalog:
 [`docs/mcp/catalog.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/mcp/catalog.md).
-Remaining-work design: [`docs/design/remaining-work-t035-t120.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/design/remaining-work-t035-t120.md).
+Release notes: [`docs/release/notes.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/release/notes.md).
 
 ## Commands
 

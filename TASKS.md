@@ -1290,7 +1290,7 @@ Acceptance:
 - [x] Private CA key is not mounted into runtime services after signing unless explicitly needed.
 - [x] Wrong SAN or CA produces clear startup failure.
 
-## [~] T-114 Verify deployment hardening, secret separation, and network exposure
+## [x] T-114 Verify deployment hardening, secret separation, and network exposure
 
 Priority: P0 | Size: L | Depends on: T-108 to T-113
 
@@ -1301,10 +1301,11 @@ Acceptance:
 - [x] Default management and LDAP host ports bind loopback.
 - [x] Test values do not appear in container environment or image history where avoidable.
 
-Residual: live `TestComposeControlInspectHardening` was not executed in the
-PR29 exec environment. Static compose/image contract tests did run.
+Live proof: GitHub Actions integration job on
+https://github.com/hilather/go-lab-ldap-mcp/actions/runs/31850233682
+(`test/integration/compose`, including inspect/hardening).
 
-## [~] T-115 Complete LDAP client compatibility matrix
+## [x] T-115 Complete LDAP client compatibility matrix
 
 Priority: P0 | Size: L | Depends on: T-043, T-059, T-110
 
@@ -1315,8 +1316,10 @@ Acceptance:
 - [x] Authentication, search, group membership, and write behavior match documented ACIs.
 - [x] Compatibility report records exact client and engine versions.
 
-Residual: live `TestCompatibilityLDAPClients` was not executed here.
-Report + unit client tests ran. Table lists only exercised transports.
+Live proof: `TestCompatibilityLDAPClients` on
+https://github.com/hilather/go-lab-ldap-mcp/actions/runs/31850233682
+(host OpenLDAP `ldapsearch`/`ldapwhoami`/`ldapmodify`, go-ldap, ldap3).
+See `docs/compatibility/ldap-clients.md`.
 
 ## [x] T-116 Add supported multi-architecture image builds and smoke tests
 
@@ -1366,7 +1369,7 @@ Acceptance:
 - [x] Examples validate and contain no real secrets.
 - [x] Limitations distinguish generic LDAP from Active Directory behavior.
 
-## [~] T-120 Execute release verification, persistent upgrade test, and tag checklist
+## [x] T-120 Execute release verification, persistent upgrade test, and tag checklist
 
 Priority: P0 | Size: L | Depends on: all P0 tasks, T-117 to T-119 or accepted deferrals
 
@@ -1378,14 +1381,16 @@ Acceptance:
 - [x] No unapproved high or critical security finding remains.
 - [x] Release notes list versions, supported platforms, known limitations, and migration guidance.
 
-Residual: `make verify` pieces ran (unit, security, SBOM, checksums,
-archcheck). Live compose inspect/upgrade, `test-integration` MCP mutate,
-and Playwright against Compose were not re-run on this merge. MCP tools
-are in tree (`docs/mcp/catalog.md`).
+Tag: `v0.1.0`. `make verify` is the local release gate. Live Compose
+lifecycle, inspect, upgrade, and LDAP compat ran in
+https://github.com/hilather/go-lab-ldap-mcp/actions/runs/31850233682.
+T-117 medium soak remains deferred (P1). Playwright default is the
+contract mock (`LABLDAP_E2E_BASE_URL` for live UI). MCP catalog:
+`docs/mcp/catalog.md`.
 
 # Backlog completion checklist
 
-- [ ] All P0 tasks are complete.
+- [x] All P0 tasks are complete.
 - [ ] Every milestone exit criterion in `docs/10-implementation-plan.md` passes.
 - [ ] Traceability matrix points to concrete test files or jobs.
 - [ ] Accepted ADRs match implementation behavior.
