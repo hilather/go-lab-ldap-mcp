@@ -43,7 +43,8 @@ pinned 389 DS image (Docker required). e2e and image targets remain pending.
 See [`AGENTS.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/AGENTS.md)
 for package boundaries. Transports (`internal/api`, `internal/mcpserver`) stay
 thin and call `internal/app`. `internal/config` never connects to LDAP.
-`internal/web` embeds static assets only.
+`internal/web` embeds static assets only. `labldap serve` serves those
+assets at `GET /` with hashed-file cache headers and `index.html` SPA fallback.
 
 ## Design documents
 

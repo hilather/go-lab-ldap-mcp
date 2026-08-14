@@ -21,7 +21,7 @@ help:
 		'  generate           regenerate OpenAPI Go and TypeScript artifacts' \
 		'  generate-drift     fail if generate would change the tree' \
 		'  test               alias for test-unit' \
-		'  test-unit          Go tests + frontend placeholder tests' \
+		'  test-unit          Go tests + frontend build/scaffold tests' \
 		'  test-integration   real 389 DS harness (pinned digest; needs Docker)' \
 		'  test-e2e           pending T-107 (Playwright)' \
 		'  test-security      secret scan, govulncheck, license denylist' \
@@ -48,7 +48,7 @@ generate-drift: generate
 
 test: test-unit
 
-test-unit:
+test-unit: frontend-install
 	$(GO) test ./...
 	cd frontend && $(PNPM) test
 

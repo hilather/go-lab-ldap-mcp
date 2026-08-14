@@ -1079,16 +1079,16 @@ Acceptance:
 
 # M7 - Reactive web UI
 
-## [ ] T-095 Scaffold React application, generated client, and Go asset embedding
+## [x] T-095 Scaffold React application, generated client, and Go asset embedding
 
 Priority: P0 | Size: L | Depends on: T-060, T-063
 
 Deliverables: React 19 TypeScript Vite app, strict settings, TanStack Query, router, form and schema libraries, generated API client, production build, Go embed, and SPA fallback.
 
 Acceptance:
-- [ ] Frontend builds reproducibly from lock file.
-- [ ] Go serves hashed assets with correct caching and index fallback.
-- [ ] Frontend uses generated types rather than handwritten duplicate resource models.
+- [x] Frontend builds reproducibly from lock file.
+- [x] Go serves hashed assets with correct caching and index fallback.
+- [x] Frontend uses generated types rather than handwritten duplicate resource models.
 
 ## [ ] T-096 Implement UI login, session validation, logout, and token-handling security
 

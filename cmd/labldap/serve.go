@@ -210,8 +210,8 @@ const serveUsage = `Usage:
   labldap serve --config FILE
   labldap serve --placeholder
 
-serve starts the management HTTP listener (REST, later MCP and UI).
+serve starts the management HTTP listener (REST, later MCP, and embedded UI).
 --placeholder listens on LABLDAP_LISTEN (default 127.0.0.1:8443) without
 loading a scenario or contacting LDAP. GET /health is live; GET /health/ready
-is 503 until the directory is ready.
+is 503 until the directory is ready. GET / serves hashed UI assets or index.html.
 `
