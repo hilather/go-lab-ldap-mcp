@@ -628,7 +628,7 @@ func TestFailedResetBlocksWritesButAllowsReads(t *testing.T) {
 	}
 }
 
-func TestInspectMarksFailedWhenExtrasRemain(t *testing.T) {
+func TestInspectAllowsRuntimeExtras(t *testing.T) {
 	t.Parallel()
 	users, groups := newFakeUsers(), newFakeGroups()
 	users.put(directory.User{ID: "alice", UID: "alice", DN: "uid=alice,ou=people,dc=example,dc=test", Enabled: true})
@@ -637,8 +637,8 @@ func TestInspectMarksFailedWhenExtrasRemain(t *testing.T) {
 	inv.extras = []string{"uid=runtime-extra,ou=people,dc=example,dc=test"}
 	svc := New(resetDeps(users, groups, inv, reset.NewGate()))
 	insp := svc.Reset.Inspect(t.Context())
-	if insp.State != string(reset.Failed) {
-		t.Fatalf("extras must fail inspect: %+v", insp)
+	if insp.State != string(reset.Ready) {
+		t.Fatalf("merge extras must not fail inspect: %+v", insp)
 	}
 }
 

@@ -154,6 +154,34 @@ func TestControlStarted(t *testing.T) {
 	}
 }
 
+func TestComposeEnvPersistentBindings(t *testing.T) {
+	root := "/repo"
+	env := labEnv{
+		envFile:    "/tmp/directory.env",
+		dmFile:     "/tmp/dm.pw",
+		secretDir:  "/tmp/secrets",
+		labCA:      "/tmp/ca.crt",
+		instanceCA: "/tmp/instance-ca.crt",
+		caFile:     "/tmp/instance-ca.crt",
+		scenario:   filepath.Join(root, "deploy", "compose", "scenario.yaml"),
+	}
+	bindEnv(&env, root, true)
+	got := map[string]string{}
+	for _, kv := range composeEnv(env) {
+		k, v, ok := strings.Cut(kv, "=")
+		if ok {
+			got[k] = v
+		}
+	}
+	if got["LABLDAP_TLS_CA"] != env.labCA {
+		t.Fatalf("LABLDAP_TLS_CA=%q, want lab CA %q", got["LABLDAP_TLS_CA"], env.labCA)
+	}
+	wantScenario := filepath.Join(root, "deploy", "compose", "scenario.persistent.yaml")
+	if got["LABLDAP_SCENARIO_FILE"] != wantScenario {
+		t.Fatalf("LABLDAP_SCENARIO_FILE=%q, want %q", got["LABLDAP_SCENARIO_FILE"], wantScenario)
+	}
+}
+
 func controlStarted(ps string) bool {
 	for _, line := range strings.Split(ps, "\n") {
 		line = strings.TrimSpace(line)
@@ -340,6 +368,7 @@ func composeEnv(env labEnv) []string {
 
 func compose(t *testing.T, root, proj string, env labEnv, persistent bool, args ...string) {
 	t.Helper()
+	bindEnv(&env, root, persistent)
 	cmd := exec.Command("docker", append(composeArgs(root, proj, env, persistent), args...)...)
 	cmd.Dir = root
 	cmd.Env = composeEnv(env)
@@ -351,6 +380,7 @@ func compose(t *testing.T, root, proj string, env labEnv, persistent bool, args 
 
 func composeOutput(t *testing.T, root, proj string, env labEnv, persistent bool, args ...string) string {
 	t.Helper()
+	bindEnv(&env, root, persistent)
 	cmd := exec.Command("docker", append(composeArgs(root, proj, env, persistent), args...)...)
 	cmd.Dir = root
 	cmd.Env = composeEnv(env)
@@ -393,7 +423,7 @@ func tryHostGet(root, proj string, env labEnv, persistent bool, path string) (ht
 
 func hostJSON(t *testing.T, root, proj string, env labEnv, method, path string, body any) httpResult {
 	t.Helper()
-	pub := published(root, proj, env, strings.Contains(proj, "-per-"))
+	pub := published(root, proj, env, strings.Contains(proj, "-per-") || strings.Contains(proj, "-upg-"))
 	raw, _ := json.Marshal(body)
 	res, err := httpDo(method, "https://"+pub+path, env.token, raw)
 	if err != nil {
@@ -403,6 +433,7 @@ func hostJSON(t *testing.T, root, proj string, env labEnv, method, path string, 
 }
 
 func published(root, proj string, env labEnv, persistent bool) string {
+	bindEnv(&env, root, persistent)
 	cmd := exec.Command("docker", append(composeArgs(root, proj, env, persistent), "port", "control", "8443")...)
 	cmd.Dir = root
 	cmd.Env = composeEnv(env)

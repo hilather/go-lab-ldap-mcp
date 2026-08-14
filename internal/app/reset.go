@@ -560,11 +560,9 @@ func (s *Reset) inspectReason(ctx context.Context) (string, error) {
 	if s.dir == nil {
 		return "", nil
 	}
-	inv, err := s.dir.Inventory(ctx)
-	if err != nil {
+	if _, err := s.dir.Inventory(ctx); err != nil {
 		return "", err
 	}
-	livePlan := reset.BuildPlan(inv, s.plan)
 	markerSerial := s.expected
 	if s.marker != nil {
 		m, merr := s.marker.ReadMarker(ctx)
@@ -574,7 +572,11 @@ func (s *Reset) inspectReason(ctx context.Context) (string, error) {
 		markerSerial = m.AppliedRevision
 	}
 	live, missing := s.liveSnaps(ctx)
-	ver := reset.Compare(s.expected, markerSerial, reset.Checksum(live), reset.Checksum(s.wantSnaps()), len(livePlan.Extra), missing)
+	// Merge preserves runtime extras. Startup inspect must not treat them
+	// as a failed reset (control recreate / T-120). T-080 uses missing
+	// compiled objects and an in-process Failed gate. Soft-reset verify
+	// still passes extras into Compare.
+	ver := reset.Compare(s.expected, markerSerial, reset.Checksum(live), reset.Checksum(s.wantSnaps()), 0, missing)
 	if ver.OK {
 		return "", nil
 	}
