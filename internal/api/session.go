@@ -39,6 +39,7 @@ func (s *Server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p, ok := s.lookupToken(body.Token)
+	body.Token = ""
 	if !ok {
 		s.emitAudit(r, audit.ActionAuthenticate, "", "session", audit.ResultFailure)
 		writeProblem(w, r, auth.AuthRequired())

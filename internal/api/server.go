@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hilather/go-lab-ldap-mcp/internal/app"
 	"github.com/hilather/go-lab-ldap-mcp/internal/apperr"
 	"github.com/hilather/go-lab-ldap-mcp/internal/audit"
 	"github.com/hilather/go-lab-ldap-mcp/internal/auth"
@@ -46,6 +47,8 @@ type Options struct {
 	Query           Query
 	Audit           audit.Lister
 	AuditHook       audit.Hook
+	Diagnostics     func() app.Diagnostics
+	Metrics         *observability.Registry
 	Build           observability.BuildInfo
 	PageSizeDefault int
 	PageSizeMax     int
@@ -70,6 +73,8 @@ type Server struct {
 	query           Query
 	audit           audit.Lister
 	auditHook       audit.Hook
+	diagnostics     func() app.Diagnostics
+	metrics         *observability.Registry
 	build           observability.BuildInfo
 	pageSizeDefault int
 	pageSizeMax     int
@@ -128,6 +133,8 @@ func New(opt Options) (*Server, error) {
 		query:           opt.Query,
 		audit:           opt.Audit,
 		auditHook:       opt.AuditHook,
+		diagnostics:     opt.Diagnostics,
+		metrics:         opt.Metrics,
 		build:           build,
 		pageSizeDefault: pageDef,
 		pageSizeMax:     pageMax,
@@ -173,12 +180,14 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/schema/objectclasses/{name}", s.handleObjectClass)
 	mux.HandleFunc("GET /api/v1/schema/attributes/{name}", s.handleAttributeType)
 	mux.HandleFunc("GET /api/v1/audit", s.handleListAudit)
+	mux.HandleFunc("GET /api/v1/diagnostics", s.handleDiagnostics)
 
 	var h http.Handler = mux
 	h = s.authMiddleware(h)
 	h = s.corsMiddleware(h)
 	h = s.securityHeaders(h)
 	h = s.bodyLimit(h)
+	h = s.metricsMiddleware(h)
 	h = s.requestID(h)
 	h = s.recoverPanic(h)
 	return h

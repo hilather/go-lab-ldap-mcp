@@ -831,38 +831,38 @@ Acceptance:
 - [x] Authorization and cookie headers are redacted.
 - [x] A deliberate leak fixture makes the scan fail.
 
-## [ ] T-073 Implement liveness, readiness, degraded state, and diagnostics
+## [x] T-073 Implement liveness, readiness, degraded state, and diagnostics
 
 Priority: P0 | Size: L | Depends on: T-039, T-047, T-056, T-063
 
 Deliverables: component status, marker match, pool status, reset-ready hook, directory outage behavior, and safe diagnostics endpoint.
 
 Acceptance:
-- [ ] LDAP outage keeps liveness healthy and readiness unhealthy.
-- [ ] Revision mismatch blocks readiness according to mode.
-- [ ] Diagnostic body contains no paths or values considered secret.
+- [x] LDAP outage keeps liveness healthy and readiness unhealthy.
+- [x] Revision mismatch blocks readiness according to mode.
+- [x] Diagnostic body contains no paths or values considered secret.
 
-## [ ] T-074 Implement metrics and build-info endpoint
+## [x] T-074 Implement metrics and build-info endpoint
 
 Priority: P1 | Size: M | Depends on: T-005, T-047, T-063, T-071, T-073
 
 Deliverables: bounded-cardinality HTTP, MCP-ready, LDAP, auth, reset-ready, export-ready, and build metrics.
 
 Acceptance:
-- [ ] Metrics have no DN, user ID, request ID, token ID, or session labels.
-- [ ] Build metric exposes version and source revision only.
-- [ ] Metrics endpoint authorization or network policy is documented.
+- [x] Metrics have no DN, user ID, request ID, token ID, or session labels.
+- [x] Build metric exposes version and source revision only.
+- [x] Metrics endpoint authorization or network policy is documented.
 
-## [ ] T-075 Complete REST contract, scope, session, security, and redaction suite
+## [x] T-075 Complete REST contract, scope, session, security, and redaction suite
 
 Priority: P0 | Size: L | Depends on: T-060 to T-074
 
 Deliverables: OpenAPI response validation, route completeness, scope matrix, CSRF, CORS, Origin, rate, conflict, outage, and leak tests.
 
 Acceptance:
-- [ ] Every operation has positive and negative authentication and authorization coverage.
-- [ ] Read-only token cannot mutate any route.
-- [ ] Contract and secret scans pass in CI.
+- [x] Every operation has positive and negative authentication and authorization coverage.
+- [x] Read-only token cannot mutate any route.
+- [x] Contract and secret scans pass in CI.
 
 # M5 - Soft reset and LDIF export
 

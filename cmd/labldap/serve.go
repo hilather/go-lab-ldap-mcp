@@ -14,40 +14,28 @@ import (
 	"time"
 
 	"github.com/hilather/go-lab-ldap-mcp/internal/api"
+	"github.com/hilather/go-lab-ldap-mcp/internal/app"
 	"github.com/hilather/go-lab-ldap-mcp/internal/auth"
 	"github.com/hilather/go-lab-ldap-mcp/internal/config"
 	"github.com/hilather/go-lab-ldap-mcp/internal/directory/ds389"
 	"github.com/hilather/go-lab-ldap-mcp/internal/observability"
+	"github.com/hilather/go-lab-ldap-mcp/internal/reset"
 )
 
 const defaultListen = "127.0.0.1:8443"
 
 func runServe(args []string, stdout, stderr io.Writer) int {
 	_ = stdout
-	placeholder := false
-	configPath := ""
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--placeholder":
-			placeholder = true
-		case "--config":
-			if i+1 >= len(args) {
-				fmt.Fprintln(stderr, "labldap serve: --config requires a path")
-				return 2
-			}
-			i++
-			configPath = args[i]
-		case "-h", "--help":
+	flags, err := parseServeFlags(args)
+	if err != nil {
+		if errors.Is(err, errServeHelp) {
 			fmt.Fprint(stdout, serveUsage)
 			return 0
-		default:
-			fmt.Fprintf(stderr, "labldap serve: unknown flag %q\n", args[i])
-			return 2
 		}
-	}
-	if !placeholder && configPath == "" {
-		fmt.Fprintln(stderr, "labldap serve: --config PATH or --placeholder is required")
-		fmt.Fprint(stderr, serveUsage)
+		fmt.Fprintf(stderr, "labldap serve: %v\n", err)
+		if flags.configPath == "" && !flags.placeholder {
+			fmt.Fprint(stderr, serveUsage)
+		}
 		return 2
 	}
 
@@ -68,7 +56,7 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 		idleTO  time.Duration
 		stopTO  time.Duration
 	)
-	if placeholder {
+	if flags.placeholder {
 		listen = os.Getenv("LABLDAP_LISTEN")
 		if listen == "" {
 			listen = defaultListen
@@ -77,6 +65,7 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 			Ready:          func() bool { return false },
 			Logger:         log,
 			MetricsEnabled: true,
+			Metrics:        observability.NewRegistry(observability.CurrentBuild("labldap")),
 			Build:          observability.CurrentBuild("labldap"),
 			CursorKey:      config.NewCursorKey(),
 		})
@@ -87,18 +76,18 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 		handler = srv.Handler()
 		readTO, writeTO, idleTO, stopTO = srv.Timeouts(30*time.Second, 15*time.Second)
 	} else {
-		built, err := compileControl(ctx, configPath)
+		built, err := compileControl(ctx, flags.configPath)
 		if err != nil {
 			printConfigError(stderr, err)
 			return 1
 		}
-		// Composition root (KD-R15): map compiled geometry onto the 389 DS
-		// runtime config. The live pool is attached when T-073 readiness lands.
-		_ = runtimeConfigFromCompiled(built)
-		opt, err := serverOptionsFromCompiled(built, log)
+		opt, closer, err := serverOptionsFromCompiled(built, flags, log)
 		if err != nil {
 			fmt.Fprintf(stderr, "labldap serve: %v\n", err)
 			return 1
+		}
+		if closer != nil {
+			defer closer()
 		}
 		srv, err := api.New(opt)
 		if err != nil {
@@ -159,14 +148,14 @@ func compileControl(ctx context.Context, path string) (*config.Compiled, error) 
 	})
 }
 
-func serverOptionsFromCompiled(c *config.Compiled, log *slog.Logger) (api.Options, error) {
+func serverOptionsFromCompiled(c *config.Compiled, flags serveFlags, log *slog.Logger) (api.Options, func(), error) {
 	tokens := make([]auth.Token, 0, len(c.Normalized.Tokens))
 	for _, t := range c.Normalized.Tokens {
 		tokens = append(tokens, auth.Token{ID: t.ID, Scopes: t.Scopes, Secret: t.Secret.Value})
 	}
 	reg, err := auth.NewRegistry(tokens)
 	if err != nil {
-		return api.Options{}, err
+		return api.Options{}, nil, err
 	}
 	sessCfg := auth.DefaultSessionConfig()
 	if d, err := time.ParseDuration(c.Public.Spec.Management.Session.IdleTimeout); err == nil && d > 0 {
@@ -178,21 +167,62 @@ func serverOptionsFromCompiled(c *config.Compiled, log *slog.Logger) (api.Option
 	if c.Public.Spec.Management.Session.MaxSessions > 0 {
 		sessCfg.Max = c.Public.Spec.Management.Session.MaxSessions
 	}
-	return api.Options{
+	build := observability.CurrentBuild("labldap")
+	metrics := observability.NewRegistry(build)
+	b := &apiOptionsBuilder{compiled: c, flags: flags, log: log, metrics: metrics}
+	// Composition root (KD-R15): attach the live pool and app services.
+	// Construction failure leaves handlers unwired and readiness false;
+	// liveness still serves.
+	if err := attachDirectory(b); err != nil {
+		log.Error("directory not attached", slog.String("err", err.Error()))
+	}
+	ready := func() bool { return false }
+	diag := func() app.Diagnostics { return app.Diagnostics{Reset: app.ResetHint{State: "Ready"}} }
+	if b.probe != nil {
+		ready = func() bool {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			ok := b.probe.Ready(ctx)
+			if b.gate != nil && metrics != nil {
+				metrics.SetResetInProgress(b.gate.State() != reset.Ready)
+			}
+			return ok
+		}
+		diag = func() app.Diagnostics {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			return b.probe.Evaluate(ctx)
+		}
+	}
+	opt := api.Options{
 		Registry:        reg,
 		Sessions:        auth.NewStore(sessCfg),
-		Ready:           func() bool { return false },
+		Ready:           ready,
 		Logger:          log,
 		AllowedOrigins:  append([]string(nil), c.Public.Spec.Management.CORS.AllowedOrigins...),
 		MaxBody:         c.Public.Spec.Limits.MaxRequestBodyBytes,
 		ForceSecure:     false, // cookie Secure follows r.TLS until serve terminates TLS (OD-014)
 		MetricsAuth:     c.Public.Spec.Management.Metrics.RequireAuth,
 		MetricsEnabled:  c.Public.Spec.Management.Metrics.Enabled == nil || *c.Public.Spec.Management.Metrics.Enabled,
-		Build:           observability.CurrentBuild("labldap"),
+		Metrics:         metrics,
+		System:          b.system,
+		Users:           b.users,
+		Groups:          b.groups,
+		Query:           b.query,
+		Audit:           b.audit,
+		AuditHook:       b.auditHook,
+		Diagnostics:     diag,
+		Build:           build,
 		PageSizeDefault: c.Public.Spec.Limits.PageSizeDefault,
 		PageSizeMax:     c.Public.Spec.Limits.PageSizeMax,
 		CursorKey:       config.NewCursorKey(),
-	}, nil
+	}
+	closer := func() {
+		if b.pool != nil {
+			_ = b.pool.Close()
+		}
+	}
+	return opt, closer, nil
 }
 
 func runtimeConfigFromCompiled(c *config.Compiled) ds389.RuntimeConfig {
@@ -213,11 +243,23 @@ func runtimeConfigFromCompiled(c *config.Compiled) ds389.RuntimeConfig {
 }
 
 const serveUsage = `Usage:
-  labldap serve --config FILE
+  labldap serve --config FILE [--ldap-url URL] [--directory-ca-file FILE] [--directory-host NAME]
   labldap serve --placeholder
 
 serve starts the management HTTP listener (REST, later MCP and UI).
+GET /health is process liveness and never consults LDAP.
+GET /health/ready requires runtime bind, marker, Directory revision match,
+required capabilities, and no reset.
+
+--ldap-url defaults to ldaps://127.0.0.1:<compiled ldaps port> (or LABLDAP_LDAP_URL).
+--directory-ca-file is required unless insecure lab mode is set
+(LABLDAP_DIRECTORY_CA_FILE). --directory-host is the TLS server name
+(LABLDAP_DIRECTORY_HOST).
+
+GET /metrics is Prometheus text. Default requireAuth is false: restrict
+the listener with loopback or network policy, or set
+spec.management.metrics.requireAuth.
+
 --placeholder listens on LABLDAP_LISTEN (default 127.0.0.1:8443) without
-loading a scenario or contacting LDAP. GET /health is live; GET /health/ready
-is 503 until the directory is ready.
+loading a scenario or contacting LDAP.
 `

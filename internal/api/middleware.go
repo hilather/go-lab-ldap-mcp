@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/hilather/go-lab-ldap-mcp/internal/apperr"
 	"github.com/hilather/go-lab-ldap-mcp/internal/auth"
@@ -91,23 +92,61 @@ func (s *Server) authMiddleware(next http.Handler) http.Handler {
 
 func (s *Server) authenticate(r *http.Request) *http.Request {
 	if secret, ok, malformed := auth.ParseBearer(r.Header.Get("Authorization")); malformed {
+		s.observeAuth("failure", "malformed")
 		return r
 	} else if ok {
 		if p, found := s.lookupToken(secret); found {
+			s.observeAuth("success", "ok")
 			return r.WithContext(auth.WithPrincipal(r.Context(), p))
 		}
+		s.observeAuth("failure", "invalid")
 		return r
 	}
 	c, err := r.Cookie(auth.CookieName)
 	if err != nil || c.Value == "" || s.sessions == nil {
+		if r.Header.Get("Authorization") != "" {
+			s.observeAuth("failure", "malformed")
+		}
 		return r
 	}
 	sess, _, ok := s.sessions.Lookup(c.Value)
 	if !ok {
+		s.observeAuth("failure", "invalid")
 		return r
 	}
+	s.observeAuth("success", "ok")
 	p := auth.Principal{Kind: auth.KindSession, ID: sess.ID, Scopes: sess.Scopes}
 	return r.WithContext(auth.WithPrincipal(r.Context(), p))
+}
+
+func (s *Server) observeAuth(result, reason string) {
+	if s != nil && s.metrics != nil {
+		s.metrics.ObserveAuth(result, reason)
+	}
+}
+
+type statusRecorder struct {
+	http.ResponseWriter
+	status int
+}
+
+func (w *statusRecorder) WriteHeader(code int) {
+	w.status = code
+	w.ResponseWriter.WriteHeader(code)
+}
+
+func (s *Server) metricsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if s == nil || s.metrics == nil {
+			next.ServeHTTP(w, r)
+			return
+		}
+		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
+		start := time.Now()
+		next.ServeHTTP(rec, r)
+		route := observability.RouteTemplate(r.Method, r.URL.Path)
+		s.metrics.ObserveHTTP(r.Method, route, observability.StatusClass(rec.status), time.Since(start))
+	})
 }
 
 func (s *Server) lookupToken(secret string) (auth.Principal, bool) {

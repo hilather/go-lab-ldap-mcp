@@ -78,7 +78,12 @@ paths:
       operationId: getMetrics
       tags: [Metrics]
       summary: Prometheus text
-      description: Binding `/metrics`. Auth optional via spec.management.metrics.requireAuth.
+      description: |
+        Binding `/metrics`. Prometheus 0.0.4 text with bounded labels
+        (route template + status class; no DN, user, request, token, or
+        session labels). Default `spec.management.metrics.requireAuth` is
+        false: restrict the management listener with loopback or network
+        policy, or set requireAuth. Disable with `enabled: false`.
       security: []
       responses:
         "200":

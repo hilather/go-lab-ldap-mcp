@@ -43,6 +43,8 @@ spec:
       registerReset: false
       registerExport: false
     metrics:
+      # Default requireAuth is false: keep the listener loopback-only or
+      # apply network policy. Set true if /metrics is reachable remotely.
       enabled: true
       requireAuth: false
   limits:
