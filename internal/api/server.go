@@ -42,6 +42,7 @@ type Options struct {
 	System          System
 	Users           Users
 	Groups          Groups
+	Query           Query
 	Build           observability.BuildInfo
 	PageSizeDefault int
 	PageSizeMax     int
@@ -63,6 +64,7 @@ type Server struct {
 	system          System
 	users           Users
 	groups          Groups
+	query           Query
 	build           observability.BuildInfo
 	pageSizeDefault int
 	pageSizeMax     int
@@ -118,6 +120,7 @@ func New(opt Options) (*Server, error) {
 		system:          opt.System,
 		users:           opt.Users,
 		groups:          opt.Groups,
+		query:           opt.Query,
 		build:           build,
 		pageSizeDefault: pageDef,
 		pageSizeMax:     pageMax,
@@ -155,6 +158,13 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/groups/{id}/members", s.handleAddGroupMembers)
 	mux.HandleFunc("DELETE /api/v1/groups/{id}/members", s.handleRemoveGroupMembers)
 	mux.HandleFunc("PUT /api/v1/groups/{id}/members", s.handleReplaceGroupMembers)
+
+	mux.HandleFunc("POST /api/v1/search", s.handleSearch)
+	mux.HandleFunc("POST /api/v1/auth-tests", s.handleBindTest)
+	mux.HandleFunc("GET /api/v1/rootdse", s.handleRootDSE)
+	mux.HandleFunc("GET /api/v1/schema", s.handleSchema)
+	mux.HandleFunc("GET /api/v1/schema/objectclasses/{name}", s.handleObjectClass)
+	mux.HandleFunc("GET /api/v1/schema/attributes/{name}", s.handleAttributeType)
 
 	var h http.Handler = mux
 	h = s.authMiddleware(h)

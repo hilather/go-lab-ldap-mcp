@@ -31,6 +31,9 @@ type problemExtensions struct {
 
 func statusFor(err error) int {
 	fields := fieldsOf(err)
+	if hasFieldCode(fields, "rate_limited") {
+		return http.StatusTooManyRequests
+	}
 	if isPrecondition(fields) {
 		return http.StatusPreconditionFailed
 	}

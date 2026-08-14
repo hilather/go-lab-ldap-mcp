@@ -787,27 +787,27 @@ Acceptance:
 - [x] Membership writes require group revision.
 - [x] Idempotent add and remove return correct unchanged counts.
 
-## [ ] T-069 Implement constrained search and bind-test REST handlers
+## [x] T-069 Implement constrained search and bind-test REST handlers
 
 Priority: P0 | Size: L | Depends on: T-050, T-051, T-056, T-060 to T-065
 
 Deliverables: search and auth-test endpoints, sensitive decoding, per-IP and per-actor limits, cursor response, and safe diagnostics.
 
 Acceptance:
-- [ ] Search boundary and limit failures map to documented errors.
-- [ ] Bind-test invalid credentials return authorized diagnostic result, not API 401.
-- [ ] Request bodies are excluded from logging.
+- [x] Search boundary and limit failures map to documented errors.
+- [x] Bind-test invalid credentials return authorized diagnostic result, not API 401.
+- [x] Request bodies are excluded from logging.
 
-## [ ] T-070 Implement Root DSE and schema REST handlers
+## [x] T-070 Implement Root DSE and schema REST handlers
 
 Priority: P0 | Size: M | Depends on: T-052, T-056, T-060 to T-065
 
 Deliverables: Root DSE, schema summary, object-class detail, and attribute detail endpoints.
 
 Acceptance:
-- [ ] `schema:read` is required.
-- [ ] Output validates against generated schemas.
-- [ ] Secret and denied operational attributes are absent.
+- [x] `schema:read` is required.
+- [x] Output validates against generated schemas.
+- [x] Secret and denied operational attributes are absent.
 
 ## [ ] T-071 Implement structured audit model, ring buffer, and query service
 

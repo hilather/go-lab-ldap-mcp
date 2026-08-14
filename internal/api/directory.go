@@ -10,6 +10,12 @@ import (
 	"github.com/hilather/go-lab-ldap-mcp/internal/directory"
 )
 
+var (
+	_ Users  = (*app.Users)(nil)
+	_ Groups = (*app.Groups)(nil)
+	_ Query  = (*app.Query)(nil)
+)
+
 // Users is the application user surface. *app.Users implements it.
 type Users interface {
 	List(ctx context.Context, p app.Principal, q directory.UserListQuery) (directory.UserPage, error)
@@ -19,6 +25,17 @@ type Users interface {
 	Delete(ctx context.Context, p app.Principal, id directory.UserID, rev directory.Revision) error
 	SetEnabled(ctx context.Context, p app.Principal, id directory.UserID, enabled bool, rev directory.Revision) (directory.User, error)
 	SetPassword(ctx context.Context, p app.Principal, id directory.UserID, pw app.Secret, rev directory.Revision) error
+}
+
+// Query is the application search, bind-test, and schema surface.
+// *app.Query implements it.
+type Query interface {
+	Search(ctx context.Context, p app.Principal, q directory.SearchQuery) (directory.SearchPage, error)
+	BindTest(ctx context.Context, p app.Principal, identity string, password app.Secret, transport directory.Transport) (directory.BindTestResult, error)
+	RootDSE(ctx context.Context, p app.Principal) (directory.RootDSE, error)
+	Schema(ctx context.Context, p app.Principal) (directory.Schema, error)
+	ObjectClass(ctx context.Context, p app.Principal, name string) (directory.ObjectClass, error)
+	AttributeType(ctx context.Context, p app.Principal, name string) (directory.AttributeType, error)
 }
 
 // Groups is the application group surface. *app.Groups implements it.
@@ -43,6 +60,14 @@ func (s *Server) requireUsers(w http.ResponseWriter, r *http.Request) bool {
 
 func (s *Server) requireGroups(w http.ResponseWriter, r *http.Request) bool {
 	if s == nil || s.groups == nil {
+		writeProblemStatus(w, r, http.StatusServiceUnavailable, "directory", "not ready", nil)
+		return false
+	}
+	return true
+}
+
+func (s *Server) requireQuery(w http.ResponseWriter, r *http.Request) bool {
+	if s == nil || s.query == nil {
 		writeProblemStatus(w, r, http.StatusServiceUnavailable, "directory", "not ready", nil)
 		return false
 	}

@@ -47,6 +47,54 @@ func TestBindTestPasswordScope(t *testing.T) {
 	}
 }
 
+func TestSchemaRedactsSecretsAndLooksUpDetails(t *testing.T) {
+	t.Parallel()
+	q := New(Deps{Schema: fakeSchema{sch: directory.Schema{
+		ObjectClasses: []directory.ObjectClass{{
+			Name: "inetOrgPerson", OID: "2.16.840.1.113730.3.2.2",
+			May: []string{"uid", "userPassword", "mail"},
+		}},
+		Attributes: []directory.AttributeType{
+			{Name: "uid", OID: "0.9.2342.19200300.100.1.1"},
+			{Name: "userPassword"},
+			{Name: "nsslapd-rootpw"},
+			{Name: "nsds5replicaCredentials"},
+		},
+	}}}).Query
+	schemaP := Principal{Kind: KindToken, ID: "s", Scopes: directory.ScopeSet{"schema:read"}}
+	sch, err := q.Schema(t.Context(), schemaP)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, at := range sch.Attributes {
+		if secretSchemaAttr(at.Name) {
+			t.Fatalf("secret schema attr leaked: %s", at.Name)
+		}
+	}
+	if len(sch.Attributes) != 1 || sch.Attributes[0].Name != "uid" {
+		t.Fatalf("schema attrs %+v", sch.Attributes)
+	}
+	oc, err := q.ObjectClass(t.Context(), schemaP, "INETORGPERSON")
+	if err != nil || oc.Name != "inetOrgPerson" {
+		t.Fatalf("object class %+v %v", oc, err)
+	}
+	for _, n := range oc.May {
+		if secretSchemaAttr(n) {
+			t.Fatalf("secret name in MAY: %s", n)
+		}
+	}
+	at, err := q.AttributeType(t.Context(), schemaP, "uid")
+	if err != nil || at.Name != "uid" {
+		t.Fatalf("attribute %+v %v", at, err)
+	}
+	if _, err := q.AttributeType(t.Context(), schemaP, "userPassword"); err == nil || fieldCode(err) != directory.FieldNotFound {
+		t.Fatalf("secret attribute detail: %v", err)
+	}
+	if _, err := q.ObjectClass(t.Context(), reader(), "inetOrgPerson"); err == nil || apperr.CodeOf(err) != apperr.CodeAuth {
+		t.Fatalf("schema:read required: %v", err)
+	}
+}
+
 func TestSchemaAndCapabilitiesScopes(t *testing.T) {
 	t.Parallel()
 	q := New(Deps{

@@ -22,6 +22,7 @@ func TestStatusForErrorFamilies(t *testing.T) {
 		status int
 	}{
 		{name: "auth required", err: auth.AuthRequired(), status: http.StatusUnauthorized},
+		{name: "rate limited", err: rateLimited(), status: http.StatusTooManyRequests},
 		{name: "missing scope", err: auth.Require(nil, auth.ScopeDirectoryRead), status: http.StatusForbidden},
 		{name: "csrf", err: apperr.New(apperr.CodeAuth, "csrf check failed").WithField(apperr.Field{Path: "csrf", Code: "forbidden", Message: "csrf token is missing or invalid"}), status: http.StatusForbidden},
 		{name: "json", err: apperr.New(apperr.CodeConfiguration, "invalid json").WithField(apperr.Field{Path: "body", Code: "invalid", Message: "malformed json"}), status: http.StatusBadRequest},

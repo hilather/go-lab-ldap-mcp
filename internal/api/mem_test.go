@@ -282,6 +282,96 @@ func (m *memGroups) mutate(id directory.GroupID, members []directory.MemberRef, 
 	return sum, nil
 }
 
+type memSearch struct {
+	mu   sync.Mutex
+	last directory.SearchQuery
+	page directory.SearchPage
+	err  error
+}
+
+func newMemSearch() *memSearch { return &memSearch{} }
+
+func (m *memSearch) Search(_ context.Context, q directory.SearchQuery) (directory.SearchPage, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.last = q
+	if m.err != nil {
+		return directory.SearchPage{}, m.err
+	}
+	return m.page, nil
+}
+
+type memBind struct {
+	mu     sync.Mutex
+	lastID string
+	lastPW string
+	lastT  directory.Transport
+	res    directory.BindTestResult
+	err    error
+}
+
+func newMemBind() *memBind {
+	return &memBind{res: directory.BindTestResult{Outcome: directory.BindOutcomeInvalidCredentials}}
+}
+
+func (m *memBind) BindTest(_ context.Context, identity string, password observability.Secret, t directory.Transport) (directory.BindTestResult, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.lastID = identity
+	m.lastPW = password.Reveal()
+	m.lastT = t
+	if m.err != nil {
+		return m.res, m.err
+	}
+	return m.res, nil
+}
+
+type memSchema struct {
+	mu  sync.Mutex
+	dse directory.RootDSE
+	sch directory.Schema
+	err error
+}
+
+func newMemSchema() *memSchema {
+	return &memSchema{
+		dse: directory.RootDSE{
+			NamingContexts:    []string{"dc=example,dc=test"},
+			VendorName:        "389 Project",
+			VendorVersion:     "3.1.2",
+			SupportedControls: []string{"1.2.840.113556.1.4.473"},
+			SupportedSASL:     []string{"EXTERNAL"},
+		},
+		sch: directory.Schema{
+			ObjectClasses: []directory.ObjectClass{{
+				Name: "inetOrgPerson",
+				OID:  "2.16.840.1.113730.3.2.2",
+				Kind: "structural",
+				Must: []string{"sn", "cn"},
+				May:  []string{"uid", "mail"},
+				Sup:  []string{"organizationalPerson"},
+			}},
+			Attributes: []directory.AttributeType{
+				{Name: "uid", OID: "0.9.2342.19200300.100.1.1", Syntax: "1.3.6.1.4.1.1466.115.121.1.15", SingleValue: true},
+				{Name: "nsslapd-rootpw", OID: "2.16.840.1.113730.3.1.211", Syntax: "1.3.6.1.4.1.1466.115.121.1.15"},
+				{Name: "userPassword", OID: "2.5.4.35", Syntax: "1.3.6.1.4.1.1466.115.121.1.40"},
+			},
+		},
+	}
+}
+
+func (m *memSchema) RootDSE(context.Context) (directory.RootDSE, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.dse, m.err
+}
+
+func (m *memSchema) Schema(context.Context) (directory.Schema, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.sch, m.err
+}
+
 func (m *memGroups) match(id directory.GroupID, rev directory.Revision) (directory.Group, error) {
 	g, ok := m.byID[id]
 	if !ok {

@@ -58,7 +58,45 @@ func (s *Query) Schema(ctx context.Context, p Principal) (directory.Schema, erro
 	if err := s.hooks.authorize(p, OpSchemaRead); err != nil {
 		return directory.Schema{}, err
 	}
-	return s.schema.Schema(ctx)
+	sch, err := s.schema.Schema(ctx)
+	if err != nil {
+		return directory.Schema{}, err
+	}
+	return redactSchema(sch), nil
+}
+
+func (s *Query) ObjectClass(ctx context.Context, p Principal, name string) (directory.ObjectClass, error) {
+	sch, err := s.Schema(ctx, p)
+	if err != nil {
+		return directory.ObjectClass{}, err
+	}
+	want := strings.TrimSpace(name)
+	if want == "" {
+		return directory.ObjectClass{}, directory.Error("objectclass", directory.FieldNotFound, "object class not found")
+	}
+	for _, oc := range sch.ObjectClasses {
+		if strings.EqualFold(oc.Name, want) || oc.OID == want {
+			return oc, nil
+		}
+	}
+	return directory.ObjectClass{}, directory.Error("objectclass", directory.FieldNotFound, "object class not found")
+}
+
+func (s *Query) AttributeType(ctx context.Context, p Principal, name string) (directory.AttributeType, error) {
+	sch, err := s.Schema(ctx, p)
+	if err != nil {
+		return directory.AttributeType{}, err
+	}
+	want := strings.TrimSpace(name)
+	if want == "" {
+		return directory.AttributeType{}, directory.Error("attribute", directory.FieldNotFound, "attribute type not found")
+	}
+	for _, at := range sch.Attributes {
+		if strings.EqualFold(at.Name, want) || at.OID == want {
+			return at, nil
+		}
+	}
+	return directory.AttributeType{}, directory.Error("attribute", directory.FieldNotFound, "attribute type not found")
 }
 
 func (s *Query) Capabilities(ctx context.Context, p Principal) (directory.Capabilities, error) {
@@ -106,14 +144,62 @@ func redactEntries(in []directory.SearchEntry) []directory.SearchEntry {
 func redactAttrs(in []directory.AttrKV) []directory.AttrKV {
 	var out []directory.AttrKV
 	for _, a := range in {
-		name := config.CanonicalAttr(a.Name)
-		if config.ForbiddenUserAttr(a.Name) || name == "userpassword" {
-			continue
-		}
-		if strings.HasPrefix(name, "nsslapd-rootpw") {
+		if secretOrDeniedAttr(a.Name) {
 			continue
 		}
 		out = append(out, a)
 	}
 	return out
+}
+
+func redactSchema(in directory.Schema) directory.Schema {
+	out := directory.Schema{}
+	for _, oc := range in.ObjectClasses {
+		oc.Must = filterSecretNames(oc.Must)
+		oc.May = filterSecretNames(oc.May)
+		out.ObjectClasses = append(out.ObjectClasses, oc)
+	}
+	for _, at := range in.Attributes {
+		if secretSchemaAttr(at.Name) {
+			continue
+		}
+		out.Attributes = append(out.Attributes, at)
+	}
+	return out
+}
+
+func filterSecretNames(in []string) []string {
+	if in == nil {
+		return nil
+	}
+	var out []string
+	for _, n := range in {
+		if secretSchemaAttr(n) {
+			continue
+		}
+		out = append(out, n)
+	}
+	if out == nil {
+		return []string{}
+	}
+	return out
+}
+
+func secretOrDeniedAttr(name string) bool {
+	canon := config.CanonicalAttr(name)
+	if config.ForbiddenUserAttr(name) || canon == "userpassword" {
+		return true
+	}
+	return secretSchemaAttr(name)
+}
+
+func secretSchemaAttr(name string) bool {
+	switch config.CanonicalAttr(name) {
+	case "nsslapd-rootpw", "nsslapd-rootpwstoragescheme",
+		"nsmultiplexorbindcred", "nsmultiplexorcredentials",
+		"nsds5replicacredentials", "userpassword":
+		return true
+	default:
+		return strings.HasPrefix(config.CanonicalAttr(name), "nsslapd-rootpw")
+	}
 }
