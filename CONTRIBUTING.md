@@ -29,7 +29,7 @@ Critical vulnerability, secret, and license policy is documented in [docs/securi
 
 ## Source versus generated files
 
-See [docs/generated-files.md](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/generated-files.md). In M0 nothing is generated. Later, `api/openapi.yaml` is the OpenAPI source and `api/generated/` must not be hand-edited. Update generated files only through committed `make generate` commands, then confirm with `make generate-drift`.
+See [docs/generated-files.md](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/generated-files.md). `api/openapi.yaml` is the OpenAPI source and `api/generated/` must not be hand-edited. Update generated files only through committed `make generate` commands, then confirm with `make generate-drift`.
 
 ## Task reports
 

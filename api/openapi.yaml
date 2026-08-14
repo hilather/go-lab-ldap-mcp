@@ -1,0 +1,1739 @@
+openapi: 3.0.3
+info:
+  title: LabLDAP Management API
+  version: 1.0.0
+  description: |
+    Versioned control-plane REST contract for LabLDAP.
+
+    OpenAPI 3.0.3 is the documented compatible subset of 3.1 (OD-009).
+    Payload shapes follow design §3.8 (`x-labldap-contract: proposed`
+    stand-in dated 2026-08-13). Architecture-named (binding) routes are
+    unmarked. Every other operation is marked `x-labldap-contract: proposed`.
+
+    There is no `PATCH /api/v1/groups/{id}` in v1. Membership mutations
+    are the group update path.
+
+    Examples use lab placeholders only. They are not usable credentials.
+  license:
+    name: UNLICENSED
+    url: https://github.com/hilather/go-lab-ldap-mcp
+x-labldap-openapi-subset: "3.0.3"
+x-labldap-generator: oapi-codegen@v2.8.0
+servers:
+  - url: /
+    description: Same-origin control listener
+tags:
+  - name: Health
+  - name: Metrics
+  - name: System
+  - name: Session
+  - name: Users
+  - name: Groups
+  - name: Search
+  - name: Schema
+  - name: Audit
+  - name: Reset
+  - name: Export
+  - name: MCP
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      tags: [Health]
+      summary: Process liveness
+      description: Binding `/health` prefix. Independent of LDAP.
+      security: []
+      responses:
+        "200":
+          description: Process is live
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+              example:
+                status: live
+  /health/ready:
+    get:
+      operationId: getReady
+      tags: [Health]
+      summary: Readiness
+      description: Proposed `/health` subdivision. 503 until the directory is ready.
+      x-labldap-contract: proposed
+      security: []
+      responses:
+        "200":
+          description: Ready to serve directory operations
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+        "503":
+          description: Not ready
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /metrics:
+    get:
+      operationId: getMetrics
+      tags: [Metrics]
+      summary: Prometheus text
+      description: Binding `/metrics`. Auth optional via spec.management.metrics.requireAuth.
+      security: []
+      responses:
+        "200":
+          description: Prometheus 0.0.4 text
+          content:
+            text/plain:
+              schema:
+                type: string
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /mcp:
+    post:
+      operationId: mcpStreamableHTTP
+      tags: [MCP]
+      summary: MCP Streamable HTTP
+      description: Binding `/mcp`. Implemented by T-085. Not a REST JSON API.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: MCP Streamable HTTP response
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "501":
+          description: MCP transport not registered
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /api/v1/version:
+    get:
+      operationId: getVersion
+      tags: [System]
+      summary: Build information
+      x-labldap-contract: proposed
+      x-required-scope: directory:read
+      security:
+        - bearerAuth: [directory:read]
+        - cookieAuth: []
+      responses:
+        "200":
+          description: BuildInfo JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BuildInfo"
+              example:
+                version: dev
+                revision: unknown
+                time: unknown
+                component: labldap
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /api/v1/capabilities:
+    get:
+      operationId: getCapabilities
+      tags: [System]
+      summary: Measured engine capabilities
+      x-labldap-contract: proposed
+      x-required-scope: directory:read
+      security:
+        - bearerAuth: [directory:read]
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Capabilities
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Capabilities"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /api/v1/baseline:
+    get:
+      operationId: getBaseline
+      tags: [System]
+      summary: Compiled versus applied baseline
+      x-labldap-contract: proposed
+      x-required-scope: directory:read
+      security:
+        - bearerAuth: [directory:read]
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Baseline
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Baseline"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /api/v1/session:
+    post:
+      operationId: createSession
+      tags: [Session]
+      summary: Exchange a static token for a browser session
+      description: |
+        Binding `POST /api/v1/session`. Body is `{ "token": "<secret>" }` only.
+        Sets cookie `labldap_session` and returns `{ "csrfToken": "..." }`.
+        Never returns the raw token. Login rotates any existing session.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessionCreate"
+            example:
+              token: lab-example-static-token
+      responses:
+        "200":
+          description: Session created
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+              description: labldap_session HttpOnly SameSite=Strict Path=/
+            Cache-Control:
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionCreated"
+              example:
+                csrfToken: lab-example-csrf-not-a-secret-from-prod
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    get:
+      operationId: getSession
+      tags: [Session]
+      summary: Current session
+      x-labldap-contract: proposed
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Non-secret session view
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionView"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    delete:
+      operationId: deleteSession
+      tags: [Session]
+      summary: Logout
+      x-labldap-contract: proposed
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CSRFToken"
+      responses:
+        "204":
+          description: Session invalidated and cookie cleared
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /api/v1/users:
+    get:
+      operationId: listUsers
+      tags: [Users]
+      summary: List users
+      x-labldap-contract: proposed
+      x-required-scope: directory:read
+      security:
+        - bearerAuth: [directory:read]
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/Cursor"
+        - name: q
+          in: query
+          schema:
+            type: string
+          description: Optional substring on id or uid
+      responses:
+        "200":
+          description: User page
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserPage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      operationId: createUser
+      tags: [Users]
+      summary: Create a user
+      description: Binding `POST /api/v1/users`. Returns 201, Location, and ETag.
+      x-required-scope: directory:write
+      security:
+        - bearerAuth: [directory:write]
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CSRFToken"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserSpec"
+            example:
+              id: alice
+              uid: alice
+              enabled: true
+              password: lab-example-password
+              attributes: {}
+      responses:
+        "201":
+          description: Created
+          headers:
+            Location:
+              schema:
+                type: string
+                example: /api/v1/users/alice
+            ETag:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /api/v1/users/{id}:
+    parameters:
+      - $ref: "#/components/parameters/UserID"
+    get:
+      operationId: getUser
+      tags: [Users]
+      summary: Get a user
+      x-labldap-contract: proposed
+      x-required-scope: directory:read
+      security:
+        - bearerAuth: [directory:read]
+        - cookieAuth: []
+      responses:
+        "200":
+          description: User
+          headers:
+            ETag:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: updateUser
+      tags: [Users]
+      summary: Patch a user (not password)
+      x-labldap-contract: proposed
+      x-required-scope: directory:write
+      security:
+        - bearerAuth: [directory:write]
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CSRFToken"
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserPatch"
+      responses:
+        "200":
+          description: Updated
+          headers:
+            ETag:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "412":
+          $ref: "#/components/responses/PreconditionFailed"
+    delete:
+      operationId: deleteUser
+      tags: [Users]
+      summary: Delete a user
+      x-labldap-contract: proposed
+      x-required-scope: directory:write
+      security:
+        - bearerAuth: [directory:write]
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CSRFToken"
+        - $ref: "#/components/parameters/IfMatch"
+      responses:
+        "204":
+          description: Deleted
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "412":
+          $ref: "#/components/responses/PreconditionFailed"
+  /api/v1/users/{id}/password:
+    post:
+      operationId: setUserPassword
+      tags: [Users]
+      summary: Set a user password
+      x-labldap-contract: proposed
+      x-required-scope: directory:password
+      security:
+        - bearerAuth: [directory:password]
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/UserID"
+        - $ref: "#/components/parameters/CSRFToken"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PasswordBody"
+            example:
+              password: lab-example-password
+              revision: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      responses:
+        "204":
+          description: Password updated
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "412":
+          $ref: "#/components/responses/PreconditionFailed"
+  /api/v1/users/{id}/enable:
+    post:
+      operationId: enableUser
+      tags: [Users]
+      summary: Enable a user
+      x-labldap-contract: proposed
+      x-required-scope: directory:write
+      security:
+        - bearerAuth: [directory:write]
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/UserID"
+        - $ref: "#/components/parameters/CSRFToken"
+      responses:
+        "200":
+          description: Enabled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /api/v1/users/{id}/disable:
+    post:
+      operationId: disableUser
+      tags: [Users]
+      summary: Disable a user
+      x-labldap-contract: proposed
+      x-required-scope: directory:write
+      security:
+        - bearerAuth: [directory:write]
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/UserID"
+        - $ref: "#/components/parameters/CSRFToken"
+      responses:
+        "200":
+          description: Disabled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /api/v1/users/{id}/groups:
+    get:
+      operationId: listUserGroups
+      tags: [Users]
+      summary: Groups for a user
+      x-labldap-contract: proposed
+      x-required-scope: directory:read
+      security:
+        - bearerAuth: [directory:read]
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/UserID"
+      responses:
+        "200":
+          description: Group list envelope
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupPage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /api/v1/groups:
+    get:
+      operationId: listGroups
+      tags: [Groups]
+      summary: List groups
+      x-labldap-contract: proposed
+      x-required-scope: directory:read
+      security:
+        - bearerAuth: [directory:read]
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/Cursor"
+        - name: q
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Group page
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupPage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      operationId: createGroup
+      tags: [Groups]
+      summary: Create a group
+      x-labldap-contract: proposed
+      x-required-scope: directory:write
+      security:
+        - bearerAuth: [directory:write]
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CSRFToken"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GroupSpec"
+            example:
+              id: staff
+              members:
+                - kind: user
+                  id: alice
+      responses:
+        "201":
+          description: Created
+          headers:
+            Location:
+              schema:
+                type: string
+                example: /api/v1/groups/staff
+            ETag:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Group"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /api/v1/groups/{id}:
+    parameters:
+      - $ref: "#/components/parameters/GroupID"
+    get:
+      operationId: getGroup
+      tags: [Groups]
+      summary: Get a group
+      x-labldap-contract: proposed
+      x-required-scope: directory:read
+      security:
+        - bearerAuth: [directory:read]
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Group
+          headers:
+            ETag:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Group"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      operationId: deleteGroup
+      tags: [Groups]
+      summary: Delete a group
+      x-labldap-contract: proposed
+      x-required-scope: directory:write
+      security:
+        - bearerAuth: [directory:write]
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CSRFToken"
+        - $ref: "#/components/parameters/IfMatch"
+      responses:
+        "204":
+          description: Deleted
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "412":
+          $ref: "#/components/responses/PreconditionFailed"
+  /api/v1/groups/{id}/members:
+    parameters:
+      - $ref: "#/components/parameters/GroupID"
+    post:
+      operationId: addGroupMembers
+      tags: [Groups]
+      summary: Add members
+      x-labldap-contract: proposed
+      x-required-scope: directory:write
+      security:
+        - bearerAuth: [directory:write]
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CSRFToken"
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MemberList"
+      responses:
+        "200":
+          description: Membership summary
+          headers:
+            ETag:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MembershipSummary"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "412":
+          $ref: "#/components/responses/PreconditionFailed"
+    delete:
+      operationId: removeGroupMembers
+      tags: [Groups]
+      summary: Remove members
+      x-labldap-contract: proposed
+      x-required-scope: directory:write
+      security:
+        - bearerAuth: [directory:write]
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CSRFToken"
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MemberList"
+      responses:
+        "200":
+          description: Membership summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MembershipSummary"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "412":
+          $ref: "#/components/responses/PreconditionFailed"
+    put:
+      operationId: replaceGroupMembers
+      tags: [Groups]
+      summary: Replace members
+      x-labldap-contract: proposed
+      x-required-scope: directory:write
+      security:
+        - bearerAuth: [directory:write]
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CSRFToken"
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MemberList"
+      responses:
+        "200":
+          description: Membership summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MembershipSummary"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "412":
+          $ref: "#/components/responses/PreconditionFailed"
+  /api/v1/search:
+    post:
+      operationId: searchEntries
+      tags: [Search]
+      summary: Search the managed suffix
+      x-labldap-contract: proposed
+      x-required-scope: directory:read
+      security:
+        - bearerAuth: [directory:read]
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CSRFToken"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SearchQuery"
+            example:
+              base: ""
+              scope: sub
+              filter: "(uid=alice)"
+              attributes: [uid, cn]
+              pageSize: 50
+      responses:
+        "200":
+          description: Search page
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchPage"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /api/v1/auth-tests:
+    post:
+      operationId: createAuthTest
+      tags: [Search]
+      summary: Bind-test diagnostic
+      description: Invalid credentials are an authorized diagnostic result, not HTTP 401.
+      x-labldap-contract: proposed
+      x-required-scope: directory:password
+      security:
+        - bearerAuth: [directory:password]
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CSRFToken"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BindTestBody"
+            example:
+              identity: alice
+              password: lab-example-password
+              transport: ldaps
+      responses:
+        "200":
+          description: Diagnostic result
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BindTestResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /api/v1/rootdse:
+    get:
+      operationId: getRootDSE
+      tags: [Schema]
+      summary: Root DSE
+      x-labldap-contract: proposed
+      x-required-scope: schema:read
+      security:
+        - bearerAuth: [schema:read]
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Root DSE
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RootDSE"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /api/v1/schema:
+    get:
+      operationId: getSchema
+      tags: [Schema]
+      summary: Schema
+      x-labldap-contract: proposed
+      x-required-scope: schema:read
+      security:
+        - bearerAuth: [schema:read]
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Schema
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Schema"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /api/v1/schema/objectclasses/{name}:
+    get:
+      operationId: getObjectClass
+      tags: [Schema]
+      summary: Object class
+      x-labldap-contract: proposed
+      x-required-scope: schema:read
+      security:
+        - bearerAuth: [schema:read]
+        - cookieAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Object class
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ObjectClass"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /api/v1/schema/attributes/{name}:
+    get:
+      operationId: getAttributeType
+      tags: [Schema]
+      summary: Attribute type
+      x-labldap-contract: proposed
+      x-required-scope: schema:read
+      security:
+        - bearerAuth: [schema:read]
+        - cookieAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Attribute type
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttributeType"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /api/v1/audit:
+    get:
+      operationId: listAudit
+      tags: [Audit]
+      summary: Query audit events
+      x-labldap-contract: proposed
+      x-required-scope: audit:read
+      security:
+        - bearerAuth: [audit:read]
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/Cursor"
+        - name: action
+          in: query
+          schema:
+            type: string
+        - name: actor
+          in: query
+          schema:
+            type: string
+          description: Non-secret token or session ID
+      responses:
+        "200":
+          description: Audit page
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditPage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /api/v1/reset:
+    post:
+      operationId: createReset
+      tags: [Reset]
+      summary: Start a soft suffix reset
+      x-labldap-contract: proposed
+      x-required-scope: lab:reset
+      security:
+        - bearerAuth: [lab:reset]
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CSRFToken"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResetRequest"
+            example:
+              name: example-lab
+              expectedRevision: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      responses:
+        "202":
+          description: Reset accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResetStatus"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+    get:
+      operationId: getReset
+      tags: [Reset]
+      summary: Current or last reset
+      x-labldap-contract: proposed
+      x-required-scope: lab:reset
+      security:
+        - bearerAuth: [lab:reset]
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Reset status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResetStatus"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /api/v1/export:
+    get:
+      operationId: exportLDIF
+      tags: [Export]
+      summary: Stream a redacted LDIF export
+      x-labldap-contract: proposed
+      x-required-scope: lab:export
+      security:
+        - bearerAuth: [lab:export]
+        - cookieAuth: []
+      parameters:
+        - name: omitSecrets
+          in: query
+          schema:
+            type: boolean
+            default: true
+      responses:
+        "200":
+          description: LDIF attachment
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+                example: attachment; filename="labldap-export.ldif"
+            Cache-Control:
+              schema:
+                type: string
+                example: no-store
+          content:
+            text/plain:
+              schema:
+                type: string
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /api/v1/diagnostics:
+    get:
+      operationId: getDiagnostics
+      tags: [System]
+      summary: Secret-free diagnostics
+      x-labldap-contract: proposed
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Diagnostics
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Diagnostics"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
+      description: |
+        Static lab token from a secret file (OD-013). Compared in constant
+        time. Only the non-secret token ID is exposed after authentication.
+        Scopes: directory:read, directory:write, directory:password,
+        lab:reset, lab:export, schema:read, audit:read.
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: labldap_session
+      description: |
+        Opaque in-memory session cookie. HttpOnly, SameSite=Strict,
+        Secure when TLS, Path=/. Cookie-authenticated mutations require
+        header X-CSRF-Token and a valid Origin.
+  parameters:
+    UserID:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+    GroupID:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+    PageSize:
+      name: pageSize
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+    Cursor:
+      name: cursor
+      in: query
+      schema:
+        type: string
+    IfMatch:
+      name: If-Match
+      in: header
+      required: true
+      schema:
+        type: string
+      description: Quoted revision hex
+    CSRFToken:
+      name: X-CSRF-Token
+      in: header
+      required: false
+      schema:
+        type: string
+      description: Required for cookie-authenticated unsafe methods
+  responses:
+    BadRequest:
+      description: Invalid JSON or field error
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    Unauthorized:
+      description: Missing, malformed, or invalid credentials
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+          example:
+            type: https://labldap.dev/problems/auth
+            title: authentication required
+            status: 401
+            extensions:
+              requestId: 00000000000000000000000000000000
+    Forbidden:
+      description: Missing scope, CSRF, or Origin
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    NotFound:
+      description: Unknown resource
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    Conflict:
+      description: Duplicate or in-progress operation
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    PreconditionFailed:
+      description: If-Match revision mismatch
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+  schemas:
+    HealthStatus:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [live, ready, not_ready]
+    BuildInfo:
+      type: object
+      additionalProperties: false
+      required: [version, revision, time, component]
+      properties:
+        version:
+          type: string
+        revision:
+          type: string
+        time:
+          type: string
+        component:
+          type: string
+    Capabilities:
+      type: object
+      additionalProperties: false
+      required: [engineVendor, engineVersion, adapterVersion, transports, plugins, passwordScheme, controls, requiredOK]
+      properties:
+        engineVendor:
+          type: string
+        engineVersion:
+          type: string
+        adapterVersion:
+          type: string
+        transports:
+          type: array
+          items:
+            type: string
+        plugins:
+          type: array
+          items:
+            type: string
+        passwordScheme:
+          type: string
+        controls:
+          type: array
+          items:
+            type: string
+        requiredOK:
+          type: boolean
+    Baseline:
+      type: object
+      additionalProperties: false
+      required: [expectedRevision, appliedRevision, controlRevision, match]
+      properties:
+        expectedRevision:
+          type: string
+        appliedRevision:
+          type: string
+        controlRevision:
+          type: string
+        markerDN:
+          type: string
+        applyVersion:
+          type: string
+        appliedAt:
+          type: string
+        match:
+          type: boolean
+    SessionCreate:
+      type: object
+      additionalProperties: false
+      required: [token]
+      properties:
+        token:
+          type: string
+          format: password
+          description: Static token secret. Never logged or returned.
+    SessionCreated:
+      type: object
+      additionalProperties: false
+      required: [csrfToken]
+      properties:
+        csrfToken:
+          type: string
+    SessionView:
+      type: object
+      additionalProperties: false
+      required: [id, kind, scopes, expiresAt]
+      properties:
+        id:
+          type: string
+          description: Non-secret session ID
+        kind:
+          type: string
+          enum: [session]
+        scopes:
+          type: array
+          items:
+            $ref: "#/components/schemas/Scope"
+        expiresAt:
+          type: string
+          format: date-time
+    Scope:
+      type: string
+      enum:
+        - directory:read
+        - directory:write
+        - directory:password
+        - lab:reset
+        - lab:export
+        - schema:read
+        - audit:read
+    AttrKV:
+      type: object
+      additionalProperties: false
+      required: [name, value]
+      properties:
+        name:
+          type: string
+        value:
+          type: string
+    User:
+      type: object
+      additionalProperties: false
+      required: [id, uid, dn, enabled, objectClasses, attributes, revision]
+      properties:
+        id:
+          type: string
+        uid:
+          type: string
+        dn:
+          type: string
+        enabled:
+          type: boolean
+        objectClasses:
+          type: array
+          items:
+            type: string
+        attributes:
+          type: array
+          items:
+            $ref: "#/components/schemas/AttrKV"
+        groups:
+          type: array
+          items:
+            type: string
+        revision:
+          type: string
+    UserSpec:
+      type: object
+      additionalProperties: false
+      required: [id, password]
+      properties:
+        id:
+          type: string
+        uid:
+          type: string
+        enabled:
+          type: boolean
+        password:
+          type: string
+          format: password
+        attributes:
+          type: object
+          additionalProperties:
+            type: string
+    UserPatch:
+      type: object
+      additionalProperties: false
+      properties:
+        enabled:
+          type: boolean
+        attributes:
+          type: object
+          additionalProperties:
+            type: string
+    UserPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/User"
+        nextCursor:
+          type: string
+    MemberRef:
+      type: object
+      additionalProperties: false
+      required: [kind, id]
+      properties:
+        kind:
+          type: string
+          enum: [user, group]
+        id:
+          type: string
+        dn:
+          type: string
+    MemberList:
+      type: object
+      additionalProperties: false
+      required: [members]
+      properties:
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/MemberRef"
+    Group:
+      type: object
+      additionalProperties: false
+      required: [id, dn, members, revision]
+      properties:
+        id:
+          type: string
+        dn:
+          type: string
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/MemberRef"
+        revision:
+          type: string
+    GroupSpec:
+      type: object
+      additionalProperties: false
+      required: [id, members]
+      properties:
+        id:
+          type: string
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/MemberRef"
+    GroupPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Group"
+        nextCursor:
+          type: string
+    MembershipSummary:
+      type: object
+      additionalProperties: false
+      required: [added, removed, unchanged, rejected, revision]
+      properties:
+        added:
+          type: array
+          items:
+            $ref: "#/components/schemas/MemberRef"
+        removed:
+          type: array
+          items:
+            $ref: "#/components/schemas/MemberRef"
+        unchanged:
+          type: array
+          items:
+            $ref: "#/components/schemas/MemberRef"
+        rejected:
+          type: array
+          items:
+            $ref: "#/components/schemas/MemberRef"
+        revision:
+          type: string
+    SearchQuery:
+      type: object
+      additionalProperties: false
+      properties:
+        base:
+          type: string
+        scope:
+          type: string
+          enum: [base, one, sub, children]
+        filter:
+          type: string
+        attributes:
+          type: array
+          items:
+            type: string
+        pageSize:
+          type: integer
+        cursor:
+          type: string
+    SearchEntry:
+      type: object
+      additionalProperties: false
+      required: [dn, attributes]
+      properties:
+        dn:
+          type: string
+        attributes:
+          type: array
+          items:
+            $ref: "#/components/schemas/AttrKV"
+    SearchPage:
+      type: object
+      additionalProperties: false
+      required: [entries]
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/SearchEntry"
+        nextCursor:
+          type: string
+    PasswordBody:
+      type: object
+      additionalProperties: false
+      required: [password, revision]
+      properties:
+        password:
+          type: string
+          format: password
+        revision:
+          type: string
+    BindTestBody:
+      type: object
+      additionalProperties: false
+      required: [identity, password]
+      properties:
+        identity:
+          type: string
+        password:
+          type: string
+          format: password
+        transport:
+          type: string
+          enum: [ldap, ldaps, starttls]
+    BindTestResult:
+      type: object
+      additionalProperties: false
+      required: [outcome]
+      properties:
+        outcome:
+          type: string
+          enum: [success, invalid_credentials, locked, disabled, unavailable]
+    RootDSE:
+      type: object
+      additionalProperties: false
+      properties:
+        namingContexts:
+          type: array
+          items:
+            type: string
+        vendorName:
+          type: string
+        vendorVersion:
+          type: string
+        supportedControls:
+          type: array
+          items:
+            type: string
+        supportedSASL:
+          type: array
+          items:
+            type: string
+    ObjectClass:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name:
+          type: string
+        oid:
+          type: string
+        kind:
+          type: string
+        must:
+          type: array
+          items:
+            type: string
+        may:
+          type: array
+          items:
+            type: string
+        sup:
+          type: array
+          items:
+            type: string
+    AttributeType:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name:
+          type: string
+        oid:
+          type: string
+        syntax:
+          type: string
+        singleValue:
+          type: boolean
+    Schema:
+      type: object
+      additionalProperties: false
+      required: [objectClasses, attributes]
+      properties:
+        objectClasses:
+          type: array
+          items:
+            $ref: "#/components/schemas/ObjectClass"
+        attributes:
+          type: array
+          items:
+            $ref: "#/components/schemas/AttributeType"
+    ResetRequest:
+      type: object
+      additionalProperties: false
+      required: [name, expectedRevision]
+      properties:
+        name:
+          type: string
+        expectedRevision:
+          type: string
+    ResetStatus:
+      type: object
+      additionalProperties: false
+      properties:
+        phase:
+          type: string
+        state:
+          type: string
+        counts:
+          type: object
+          additionalProperties:
+            type: integer
+        expectedRevision:
+          type: string
+        appliedRevision:
+          type: string
+        error:
+          type: string
+    Diagnostics:
+      type: object
+      additionalProperties: false
+      required: [ready, markerMatch, pool, reset]
+      properties:
+        ready:
+          type: boolean
+        markerMatch:
+          type: boolean
+        pool:
+          $ref: "#/components/schemas/PoolStats"
+        reset:
+          $ref: "#/components/schemas/ResetHint"
+    PoolStats:
+      type: object
+      additionalProperties: false
+      required: [active, idle, max]
+      properties:
+        active:
+          type: integer
+        idle:
+          type: integer
+        max:
+          type: integer
+    ResetHint:
+      type: object
+      additionalProperties: false
+      required: [state]
+      properties:
+        state:
+          type: string
+          enum: [Ready, PreparingReset, Resetting, Verifying, Failed]
+    AuditEvent:
+      type: object
+      additionalProperties: false
+      required: [time, action, actor, target, result, requestId]
+      properties:
+        time:
+          type: string
+          format: date-time
+        action:
+          type: string
+        actor:
+          type: string
+        target:
+          type: string
+        result:
+          type: string
+        requestId:
+          type: string
+        revisions:
+          type: object
+          additionalProperties: false
+          properties:
+            before:
+              type: string
+            after:
+              type: string
+    AuditPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditEvent"
+        nextCursor:
+          type: string
+    FieldError:
+      type: object
+      additionalProperties: false
+      required: [path, code, message]
+      properties:
+        path:
+          type: string
+        code:
+          type: string
+        message:
+          type: string
+    Problem:
+      type: object
+      additionalProperties: false
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          format: uri
+          example: https://labldap.dev/problems/auth
+        title:
+          type: string
+        status:
+          type: integer
+        errors:
+          type: array
+          items:
+            $ref: "#/components/schemas/FieldError"
+        extensions:
+          type: object
+          additionalProperties: false
+          properties:
+            requestId:
+              type: string
+security:
+  - bearerAuth: []
+  - cookieAuth: []

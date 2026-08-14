@@ -688,49 +688,49 @@ Acceptance:
 
 # M4 - REST, authentication, security, audit, and health
 
-## [ ] T-060 Write OpenAPI v1 contract and generation pipeline
+## [x] T-060 Write OpenAPI v1 contract and generation pipeline
 
 Priority: P0 | Size: L | Depends on: T-045 to T-057
 
 Deliverables: `api/openapi.yaml`, operation IDs, security schemes, scopes, schemas, examples, linter, Go and TypeScript generation.
 
 Acceptance:
-- [ ] Every endpoint in `docs/04-rest-api.md` is represented or explicitly marked deferred.
-- [ ] Generated code is reproducible and drift-checked.
-- [ ] Examples contain no real credentials.
+- [x] Every endpoint in `docs/04-rest-api.md` is represented or explicitly marked deferred.
+- [x] Generated code is reproducible and drift-checked.
+- [x] Examples contain no real credentials.
 
-## [ ] T-061 Implement static token registry and bearer middleware
+## [x] T-061 Implement static token registry and bearer middleware
 
 Priority: P0 | Size: L | Depends on: T-019, T-057
 
 Deliverables: token loading, constant-time matching, principal creation, bearer parsing, authentication errors, startup failure, and metrics hooks.
 
 Acceptance:
-- [ ] Missing, malformed, and invalid tokens return 401 without revealing token IDs.
-- [ ] Valid token produces only its non-secret ID and scopes.
-- [ ] Constant-time matcher and duplicate-token tests pass.
+- [x] Missing, malformed, and invalid tokens return 401 without revealing token IDs.
+- [x] Valid token produces only its non-secret ID and scopes.
+- [x] Constant-time matcher and duplicate-token tests pass.
 
-## [ ] T-062 Implement browser session store, login, logout, cookie, and CSRF
+## [x] T-062 Implement browser session store, login, logout, cookie, and CSRF
 
 Priority: P0 | Size: L | Depends on: T-061
 
 Deliverables: cryptographic sessions, idle and absolute expiry, count limit, token exchange, secure cookie, CSRF, Origin checks, and cleanup.
 
 Acceptance:
-- [ ] Login rotates session and never returns raw token.
-- [ ] Unsafe cookie-authenticated requests fail without valid CSRF and Origin.
-- [ ] Logout and expiry invalidate session and tests inspect required cookie flags.
+- [x] Login rotates session and never returns raw token.
+- [x] Unsafe cookie-authenticated requests fail without valid CSRF and Origin.
+- [x] Logout and expiry invalidate session and tests inspect required cookie flags.
 
-## [ ] T-063 Implement HTTP server foundation and security middleware
+## [x] T-063 Implement HTTP server foundation and security middleware
 
 Priority: P0 | Size: L | Depends on: T-005, T-006, T-061, T-062
 
 Deliverables: `net/http` server, routing, graceful shutdown, read and write timeouts, body limit, strict JSON, panic recovery, CORS, Host and Origin policy, headers, and rate-limit framework.
 
 Acceptance:
-- [ ] Unknown JSON fields and trailing content fail.
-- [ ] Same-origin is default and wildcard credentialed CORS is impossible.
-- [ ] Liveness remains available during LDAP outage.
+- [x] Unknown JSON fields and trailing content fail.
+- [x] Same-origin is default and wildcard credentialed CORS is impossible.
+- [x] Liveness remains available during LDAP outage.
 
 ## [ ] T-064 Implement system, version, capability, baseline, and session endpoints
 

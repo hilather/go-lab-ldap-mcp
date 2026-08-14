@@ -157,6 +157,7 @@ func TestKDR15DS389ImportEdges(t *testing.T) {
 	for _, rel := range []string{
 		"internal/directory/ds389",
 		"cmd/labldap-bootstrap",
+		"cmd/labldap",
 		"test/integration/dirsrv",
 	} {
 		if forbiddenDS389Admin(rel, ds) {
@@ -173,7 +174,6 @@ func TestKDR15DS389ImportEdges(t *testing.T) {
 		"internal/audit",
 		"internal/reset",
 		"internal/web",
-		"cmd/labldap",
 	} {
 		if !forbiddenDS389Admin(rel, ds) {
 			t.Errorf("%s must not import ds389", rel)
@@ -222,6 +222,8 @@ func forbiddenDS389Admin(rel string, imps []string) bool {
 	case strings.HasPrefix(rel, "test/"):
 		return false
 	case rel == "cmd/labldap-bootstrap" || strings.HasPrefix(rel, "cmd/labldap-bootstrap/"):
+		return false
+	case rel == "cmd/labldap" || strings.HasPrefix(rel, "cmd/labldap/"):
 		return false
 	case rel == "internal/directory/ds389" || strings.HasPrefix(rel, "internal/directory/ds389/"):
 		return false

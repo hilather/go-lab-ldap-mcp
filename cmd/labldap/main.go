@@ -24,6 +24,7 @@ Commands:
   validate   Compile a scenario YAML (exit 0 if valid)
   normalize  Print redacted normalized JSON
   plan       Print a redacted engine/data plan (JSON)
+  serve      Start the management HTTP listener
 
 Structured logs go to stderr. Set LABLDAP_LOG_FORMAT=json for JSON logs.
 
@@ -47,6 +48,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 	switch args[0] {
 	case "validate", "normalize", "plan":
 		return runConfigCommand(args[0], args[1:], stdout, stderr)
+	case "serve":
+		return runServe(args[1:], stdout, stderr)
 	}
 	fmt.Fprintf(stderr, "labldap: unknown command %q\n\n", args[0])
 	fmt.Fprint(stderr, usage)

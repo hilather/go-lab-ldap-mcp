@@ -1,4 +1,5 @@
 # API contracts
 
-`openapi.yaml` and generated clients land in T-060. Do not hand-edit generated
-files once the generation pipeline exists.
+`openapi.yaml` is the OpenAPI 3.0.3 source (documented 3.0 subset of 3.1,
+OD-009). Generate Go and TypeScript artifacts with `make generate`. Do not
+hand-edit files under `generated/`.

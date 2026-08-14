@@ -6,6 +6,8 @@ export GOTOOLCHAIN ?= go1.26.5
 export GOPROXY    ?= https://proxy.golang.org,direct
 
 GOVULNCHECK_MOD  := golang.org/x/vuln/cmd/govulncheck@v1.1.4
+OAPI_CODEGEN_MOD := github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.8.0
+OPENAPI_TS_PKG   := openapi-typescript@7.13.0
 
 .PHONY: help format lint generate generate-drift test test-unit \
 	test-integration test-e2e test-security compose-up compose-down \
@@ -16,7 +18,7 @@ help:
 		'LabLDAP Make targets (versions: see docs/toolchain.md)' \
 		'  format             go fmt ./...' \
 		'  lint               go vet + frontend pin lint' \
-		'  generate           regenerate committed artifacts (none in M0)' \
+		'  generate           regenerate OpenAPI Go and TypeScript artifacts' \
 		'  generate-drift     fail if generate would change the tree' \
 		'  test               alias for test-unit' \
 		'  test-unit          Go tests + frontend placeholder tests' \
@@ -37,7 +39,9 @@ lint:
 	cd frontend && $(PNPM) lint
 
 generate:
-	@printf '%s\n' 'generate: no generated sources in M0 (OpenAPI lands in T-060)'
+	@mkdir -p api/generated/typescript
+	$(GO) run $(OAPI_CODEGEN_MOD) -config api/oapi-codegen.yaml api/openapi.yaml
+	cd frontend && $(PNPM) dlx --package $(OPENAPI_TS_PKG) openapi-typescript ../api/openapi.yaml -o ../api/generated/typescript/schema.d.ts
 
 generate-drift: generate
 	$(GO) run ./tools/gencheck
