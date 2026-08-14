@@ -40,6 +40,8 @@ type Options struct {
 	MetricsEnabled  bool
 	Limiter         Limiter
 	System          System
+	Users           Users
+	Groups          Groups
 	Build           observability.BuildInfo
 	PageSizeDefault int
 	PageSizeMax     int
@@ -59,6 +61,8 @@ type Server struct {
 	metricsEnabled  bool
 	limiter         Limiter
 	system          System
+	users           Users
+	groups          Groups
 	build           observability.BuildInfo
 	pageSizeDefault int
 	pageSizeMax     int
@@ -112,6 +116,8 @@ func New(opt Options) (*Server, error) {
 		metricsEnabled:  opt.MetricsEnabled,
 		limiter:         lim,
 		system:          opt.System,
+		users:           opt.Users,
+		groups:          opt.Groups,
 		build:           build,
 		pageSizeDefault: pageDef,
 		pageSizeMax:     pageMax,
@@ -130,6 +136,25 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/session", s.handleCreateSession)
 	mux.HandleFunc("GET /api/v1/session", s.handleGetSession)
 	mux.HandleFunc("DELETE /api/v1/session", s.handleDeleteSession)
+
+	mux.HandleFunc("GET /api/v1/users", s.handleListUsers)
+	mux.HandleFunc("POST /api/v1/users", s.handleCreateUser)
+	mux.HandleFunc("GET /api/v1/users/{id}", s.handleGetUser)
+	mux.HandleFunc("PATCH /api/v1/users/{id}", s.handlePatchUser)
+	mux.HandleFunc("DELETE /api/v1/users/{id}", s.handleDeleteUser)
+	mux.HandleFunc("POST /api/v1/users/{id}/password", s.handleSetUserPassword)
+	mux.HandleFunc("POST /api/v1/users/{id}/enable", s.handleEnableUser)
+	mux.HandleFunc("POST /api/v1/users/{id}/disable", s.handleDisableUser)
+	mux.HandleFunc("GET /api/v1/users/{id}/groups", s.handleListUserGroups)
+
+	// No PATCH /api/v1/groups/{id} in v1 — membership writes are the update path.
+	mux.HandleFunc("GET /api/v1/groups", s.handleListGroups)
+	mux.HandleFunc("POST /api/v1/groups", s.handleCreateGroup)
+	mux.HandleFunc("GET /api/v1/groups/{id}", s.handleGetGroup)
+	mux.HandleFunc("DELETE /api/v1/groups/{id}", s.handleDeleteGroup)
+	mux.HandleFunc("POST /api/v1/groups/{id}/members", s.handleAddGroupMembers)
+	mux.HandleFunc("DELETE /api/v1/groups/{id}/members", s.handleRemoveGroupMembers)
+	mux.HandleFunc("PUT /api/v1/groups/{id}/members", s.handleReplaceGroupMembers)
 
 	var h http.Handler = mux
 	h = s.authMiddleware(h)

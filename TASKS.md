@@ -754,38 +754,38 @@ Acceptance:
 - [x] Request ID is present in every error.
 - [x] Stale or missing required preconditions return documented status and code.
 
-## [ ] T-066 Implement user REST handlers
+## [x] T-066 Implement user REST handlers
 
 Priority: P0 | Size: L | Depends on: T-054, T-060, T-061, T-063, T-065
 
 Deliverables: list, create, get, patch, delete handlers, scope mapping, OpenAPI types, and integration tests.
 
 Acceptance:
-- [ ] User passwords never appear in response or debug serialization.
-- [ ] Create returns Location and ETag.
-- [ ] Patch and delete enforce revision preconditions.
+- [x] User passwords never appear in response or debug serialization.
+- [x] Create returns Location and ETag.
+- [x] Patch and delete enforce revision preconditions.
 
-## [ ] T-067 Implement password, enable, disable, and user-group REST handlers
+## [x] T-067 Implement password, enable, disable, and user-group REST handlers
 
 Priority: P0 | Size: M | Depends on: T-054, T-060 to T-065
 
 Deliverables: password set, enable, disable, and list-groups endpoints with independent scopes and rate limits.
 
 Acceptance:
-- [ ] Write-only token without password scope cannot set password.
-- [ ] Password endpoint returns no secret content.
-- [ ] Bind with new password succeeds in real-engine test.
+- [x] Write-only token without password scope cannot set password.
+- [x] Password endpoint returns no secret content.
+- [x] Bind with new password succeeds in real-engine test.
 
-## [ ] T-068 Implement group and membership REST handlers
+## [x] T-068 Implement group and membership REST handlers
 
 Priority: P0 | Size: L | Depends on: T-055, T-060 to T-065
 
 Deliverables: group list, create, get, patch, delete, add, remove, replace members, and summaries.
 
 Acceptance:
-- [ ] Empty group create fails with field error.
-- [ ] Membership writes require group revision.
-- [ ] Idempotent add and remove return correct unchanged counts.
+- [x] Empty group create fails with field error.
+- [x] Membership writes require group revision.
+- [x] Idempotent add and remove return correct unchanged counts.
 
 ## [ ] T-069 Implement constrained search and bind-test REST handlers
 
