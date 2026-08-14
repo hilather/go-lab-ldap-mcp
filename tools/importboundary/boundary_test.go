@@ -46,7 +46,7 @@ func TestAGENTSImportBoundaries(t *testing.T) {
 			t.Errorf("%s (MCP transport) must not import internal/api", rel)
 		}
 		if forbiddenGoLDAP(rel, imps) {
-			t.Errorf("%s must not import github.com/go-ldap/ldap (only internal/directory/ds389 may)", rel)
+			t.Errorf("%s must not import github.com/go-ldap/ldap (only internal/directory/ds389 and internal/directory/ldapclient may)", rel)
 		}
 		if forbiddenDS389Admin(rel, imps) {
 			t.Errorf("%s must not import internal/directory/ds389 (bootstrap helper is command-only)", rel)
@@ -125,6 +125,62 @@ func hasImportPrefix(imps []string, prefix string) bool {
 	return false
 }
 
+func TestKDR15LDAPImportEdges(t *testing.T) {
+	t.Parallel()
+	ldap := []string{"github.com/go-ldap/ldap/v3"}
+	if forbiddenGoLDAP("internal/directory/ldapclient", ldap) {
+		t.Fatal("ldapclient must be allowed to import go-ldap")
+	}
+	if forbiddenGoLDAP("internal/directory/ds389", ldap) {
+		t.Fatal("ds389 must remain allowed to import go-ldap")
+	}
+	for _, rel := range []string{
+		"internal/directory",
+		"internal/app",
+		"internal/api",
+		"internal/mcpserver",
+		"internal/auth",
+		"internal/audit",
+		"internal/reset",
+		"internal/web",
+		"cmd/labldap",
+	} {
+		if !forbiddenGoLDAP(rel, ldap) {
+			t.Errorf("%s must not import go-ldap", rel)
+		}
+	}
+}
+
+func TestKDR15DS389ImportEdges(t *testing.T) {
+	t.Parallel()
+	ds := []string{"github.com/hilather/go-lab-ldap-mcp/internal/directory/ds389"}
+	for _, rel := range []string{
+		"internal/directory/ds389",
+		"cmd/labldap-bootstrap",
+		"test/integration/dirsrv",
+	} {
+		if forbiddenDS389Admin(rel, ds) {
+			t.Errorf("%s must remain allowed to import ds389", rel)
+		}
+	}
+	for _, rel := range []string{
+		"internal/directory",
+		"internal/directory/ldapclient",
+		"internal/app",
+		"internal/api",
+		"internal/mcpserver",
+		"internal/auth",
+		"internal/audit",
+		"internal/reset",
+		"internal/web",
+		"cmd/labldap",
+	} {
+		if !forbiddenDS389Admin(rel, ds) {
+			t.Errorf("%s must not import ds389", rel)
+		}
+	}
+}
+
 func TestForbiddenConfigImport(t *testing.T) {
 	t.Parallel()
 	allow := []string{
@@ -152,7 +208,10 @@ func TestForbiddenConfigImport(t *testing.T) {
 }
 
 func forbiddenGoLDAP(rel string, imps []string) bool {
-	if rel == "internal/directory/ds389" || strings.HasPrefix(rel, "internal/directory/ds389/") {
+	switch {
+	case rel == "internal/directory/ds389" || strings.HasPrefix(rel, "internal/directory/ds389/"):
+		return false
+	case rel == "internal/directory/ldapclient" || strings.HasPrefix(rel, "internal/directory/ldapclient/"):
 		return false
 	}
 	return hasImportPrefix(imps, "github.com/go-ldap/ldap")

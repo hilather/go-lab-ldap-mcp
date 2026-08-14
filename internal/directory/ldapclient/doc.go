@@ -1,4 +1,5 @@
-// Package ldapclient is the low-level LDAP connection, escaping, control,
-// and result-code adapter. Application code uses internal/directory
-// interfaces, not this package's library types.
+// Package ldapclient is the runtime LDAP dialer, TLS, pool, escaping, and
+// result-code adapter. It is the only runtime package allowed to import
+// go-ldap. The bootstrap Directory Manager helper remains in ds389 and
+// must not be deleted or reused by app/api/mcpserver.
 package ldapclient

@@ -521,38 +521,38 @@ Acceptance:
 
 # M3 - Runtime directory and application services
 
-## [ ] T-045 Define runtime domain types, repository interfaces, and directory errors
+## [x] T-045 Define runtime domain types, repository interfaces, and directory errors
 
 Priority: P0 | Size: L | Depends on: T-006, T-015, T-016, T-044
 
 Deliverables: transport-neutral user, group, member, entry, search, schema, capability, revision, and repository contracts.
 
 Acceptance:
-- [ ] No public interface exposes `go-ldap`, HTTP, or MCP SDK types.
-- [ ] Structured errors map common LDAP result categories.
-- [ ] Consumer-owned interfaces are small and mockable.
+- [x] No public interface exposes `go-ldap`, HTTP, or MCP SDK types.
+- [x] Structured errors map common LDAP result categories.
+- [x] Consumer-owned interfaces are small and mockable.
 
-## [ ] T-046 Implement LDAP dialer, TLS, bind, and operation deadlines
+## [x] T-046 Implement LDAP dialer, TLS, bind, and operation deadlines
 
 Priority: P0 | Size: L | Depends on: T-026, T-045
 
 Deliverables: connection factory for LDAPS and StartTLS, CA and name verification, runtime bind, timeouts, cancellation strategy, and safe diagnostics.
 
 Acceptance:
-- [ ] Correct TLS succeeds and wrong CA or name fails.
-- [ ] Context cancellation closes or invalidates blocked connections.
-- [ ] Simple bind never occurs before configured TLS protection.
+- [x] Correct TLS succeeds and wrong CA or name fails.
+- [x] Context cancellation closes or invalidates blocked connections.
+- [x] Simple bind never occurs before configured TLS protection.
 
-## [ ] T-047 Implement bounded LDAP pool, reconnect, and leak protection
+## [x] T-047 Implement bounded LDAP pool, reconnect, and leak protection
 
 Priority: P0 | Size: L | Depends on: T-046
 
 Deliverables: maximum connections, idle and lifetime limits, wait queue, broken-connection eviction, metrics hooks, and shutdown.
 
 Acceptance:
-- [ ] Pool never exceeds configured connection count under concurrency tests.
-- [ ] Directory restart recovers without process restart.
-- [ ] Soak test shows no growing goroutine, file descriptor, or connection leak.
+- [x] Pool never exceeds configured connection count under concurrency tests.
+- [x] Directory restart recovers without process restart.
+- [x] Soak test shows no growing goroutine, file descriptor, or connection leak.
 
 ## [ ] T-048 Implement user repository
 

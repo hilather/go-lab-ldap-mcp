@@ -4,19 +4,11 @@ import (
 	"context"
 
 	"github.com/hilather/go-lab-ldap-mcp/internal/config"
+	"github.com/hilather/go-lab-ldap-mcp/internal/directory"
 )
 
-// Capabilities is the T-044 measured engine report. Secret-free.
-type Capabilities struct {
-	EngineVendor   string   `json:"engineVendor"`
-	EngineVersion  string   `json:"engineVersion"`
-	AdapterVersion string   `json:"adapterVersion"`
-	Transports     []string `json:"transports"`
-	Plugins        []string `json:"plugins"`
-	PasswordScheme string   `json:"passwordScheme"`
-	Controls       []string `json:"controls"`
-	RequiredOK     bool     `json:"requiredOK"`
-}
+// Capabilities is the T-044 measured engine report. Owned by directory.
+type Capabilities = directory.Capabilities
 
 // CapabilityRequest is the inspect input for Engine.Capabilities.
 type CapabilityRequest struct {
