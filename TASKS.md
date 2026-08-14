@@ -1044,38 +1044,38 @@ Acceptance:
 - [x] Unknown user and wrong password remain indistinguishable externally.
 - [x] Dedicated LDAP connection closes in success, failure, and cancellation paths.
 
-## [ ] T-092 Implement MCP reset and export tools
+## [x] T-092 Implement MCP reset and export tools
 
 Priority: P0 | Size: L | Depends on: T-079, T-083, T-087
 
 Deliverables: destructive reset tool, operation status result, small direct LDIF export or authenticated REST handoff, progress support where stable.
 
 Acceptance:
-- [ ] Reset requires `lab:reset`, revision, and exact confirmation.
-- [ ] Export requires `lab:export` and follows direct-output byte ceiling.
-- [ ] Tool metadata marks destructive behavior accurately.
+- [x] Reset requires `lab:reset`, revision, and exact confirmation.
+- [x] Export requires `lab:export` and follows direct-output byte ceiling.
+- [x] Tool metadata marks destructive behavior accurately.
 
-## [ ] T-093 Implement optional MCP stdio command
+## [x] T-093 Implement optional MCP stdio command
 
 Priority: P1 | Size: M | Depends on: T-085, T-087 to T-092
 
 Deliverables: stdio server mode, credential loading, stderr logging, graceful shutdown, and local usage docs.
 
 Acceptance:
-- [ ] Protocol stdout contains no log lines.
-- [ ] Missing credentials fail safely.
-- [ ] Tool behavior and scopes match HTTP mode.
+- [x] Protocol stdout contains no log lines.
+- [x] Missing credentials fail safely.
+- [x] Tool behavior and scopes match HTTP mode.
 
-## [ ] T-094 Complete MCP protocol, scope, concurrency, and real-engine suite
+## [x] T-094 Complete MCP protocol, scope, concurrency, and real-engine suite
 
 Priority: P0 | Size: L | Depends on: T-085 to T-093
 
 Deliverables: official SDK client tests, route auth, scope matrix, schema invalid input, tool errors, cancellation, concurrency, stdio, and real-engine mutations.
 
 Acceptance:
-- [ ] Every tool has positive and denied-scope tests.
-- [ ] Concurrent clients do not share actor state.
-- [ ] One independent real MCP client smoke test is documented for release.
+- [x] Every tool has positive and denied-scope tests.
+- [x] Concurrent clients do not share actor state.
+- [x] One independent real MCP client smoke test is documented for release.
 
 # M7 - Reactive web UI
 

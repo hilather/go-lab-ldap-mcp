@@ -72,7 +72,7 @@ func TestMCPCreateVisibleOnREST(t *testing.T) {
 	users := &memUsers{}
 	svc := app.New(app.Deps{Users: users, Groups: nil, Search: nil})
 	reg, err := auth.NewRegistry([]auth.Token{{
-		ID: "admin",
+		ID:     "admin",
 		Scopes: []string{auth.ScopeDirectoryRead, auth.ScopeDirectoryWrite},
 		Secret: observability.Secret(crossToken),
 	}})

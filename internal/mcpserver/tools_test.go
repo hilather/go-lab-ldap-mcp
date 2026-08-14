@@ -216,7 +216,7 @@ func TestMissingReadScopeDenied(t *testing.T) {
 
 func TestMutationsRegisterOnlyWhenEnabled(t *testing.T) {
 	t.Parallel()
-	flags := RegisterFlags{Mutations: true, Password: true}
+	flags := RegisterFlags{Mutations: true, Password: true, Reset: true, Export: true}
 	s, err := New(Options{
 		Registry: testRegistry(t),
 		Services: testServices(&fakeSearch{}, fakeCaps{}, fakeMarker{}, fakeSchema{}),
@@ -234,13 +234,10 @@ func TestMutationsRegisterOnlyWhenEnabled(t *testing.T) {
 			t.Fatal(err)
 		}
 		names = append(names, tool.Name)
-		if tool.Name == ToolDeleteUser || tool.Name == ToolDeleteGroup {
+		if tool.Name == ToolDeleteUser || tool.Name == ToolDeleteGroup || tool.Name == ToolResetSuffix {
 			if tool.Annotations == nil || tool.Annotations.DestructiveHint == nil || !*tool.Annotations.DestructiveHint {
 				t.Fatalf("%s missing destructive hint", tool.Name)
 			}
-		}
-		if tool.Name == ToolResetSuffix || tool.Name == ToolExportLDIF {
-			t.Fatalf("T-092 tool registered before handlers: %s", tool.Name)
 		}
 	}
 	want := registeredTools(flags)

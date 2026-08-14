@@ -1,6 +1,7 @@
 package mcpserver
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -13,6 +14,11 @@ import (
 	"github.com/hilather/go-lab-ldap-mcp/internal/apperr"
 	"github.com/hilather/go-lab-ldap-mcp/internal/directory"
 	"github.com/hilather/go-lab-ldap-mcp/internal/observability"
+)
+
+const (
+	mcpExportCeiling = 64 * 1024
+	exportHandoff    = "GET /api/v1/export"
 )
 
 func (s *Server) registerTools(ms *mcp.Server) {
@@ -49,6 +55,10 @@ func (s *Server) registerTools(ms *mcp.Server) {
 			mcp.AddTool(ms, toolMeta(d), s.callReplaceMembers)
 		case ToolBindTest:
 			mcp.AddTool(ms, toolMeta(d), s.callBindTest)
+		case ToolResetSuffix:
+			mcp.AddTool(ms, toolMeta(d), s.callResetSuffix)
+		case ToolExportLDIF:
+			mcp.AddTool(ms, toolMeta(d), s.callExportLDIF)
 		}
 	}
 }
@@ -261,6 +271,38 @@ func (s *Server) callBindTest(ctx context.Context, _ *mcp.CallToolRequest, in Bi
 	return toolResult(ctx), res, nil
 }
 
+func (s *Server) callResetSuffix(ctx context.Context, _ *mcp.CallToolRequest, in ResetSuffixInput) (*mcp.CallToolResult, app.ResetStatus, error) {
+	p, rst, err := s.readyReset(ctx, ToolResetSuffix)
+	if err != nil {
+		return nil, app.ResetStatus{}, err
+	}
+	if err := requireConfirm(in.Confirm); err != nil {
+		return nil, app.ResetStatus{}, err
+	}
+	st, err := rst.Start(ctx, p, app.ResetRequest{Name: in.Name, ExpectedRevision: in.ExpectedRevision})
+	if err != nil {
+		return nil, st, publicToolErr(err)
+	}
+	return toolResult(ctx), st, nil
+}
+
+func (s *Server) callExportLDIF(ctx context.Context, _ *mcp.CallToolRequest, in ExportLDIFInput) (*mcp.CallToolResult, ExportLDIFOutput, error) {
+	p, exp, err := s.readyExport(ctx, ToolExportLDIF)
+	if err != nil {
+		return nil, ExportLDIFOutput{}, err
+	}
+	var buf bytes.Buffer
+	req := app.ExportRequest{OmitSecrets: in.OmitSecrets, MaxBytes: mcpExportCeiling}
+	err = exp.Write(ctx, p, &buf, req)
+	if exportLimit(err) {
+		return toolResult(ctx), ExportLDIFOutput{Handoff: exportHandoff}, nil
+	}
+	if err != nil {
+		return nil, ExportLDIFOutput{}, publicToolErr(err)
+	}
+	return toolResult(ctx), ExportLDIFOutput{LDIF: buf.String(), Bytes: buf.Len()}, nil
+}
+
 func (s *Server) ready(ctx context.Context, tool string) (app.Principal, *app.Query, error) {
 	p, err := s.principal(ctx)
 	if err != nil {
@@ -296,6 +338,46 @@ func (s *Server) readyGroups(ctx context.Context, tool string) (app.Principal, *
 		return app.Principal{}, nil, directoryUnavailable()
 	}
 	return p, s.svc.Groups, nil
+}
+
+func (s *Server) readyReset(ctx context.Context, tool string) (app.Principal, *app.Reset, error) {
+	p, err := s.principal(ctx)
+	if err != nil {
+		return app.Principal{}, nil, err
+	}
+	s.logTool(ctx, tool, p)
+	if s == nil || s.svc == nil || s.svc.Reset == nil {
+		return app.Principal{}, nil, directoryUnavailable()
+	}
+	return p, s.svc.Reset, nil
+}
+
+func (s *Server) readyExport(ctx context.Context, tool string) (app.Principal, *app.Export, error) {
+	p, err := s.principal(ctx)
+	if err != nil {
+		return app.Principal{}, nil, err
+	}
+	s.logTool(ctx, tool, p)
+	if s == nil || s.svc == nil || s.svc.Export == nil {
+		return app.Principal{}, nil, directoryUnavailable()
+	}
+	return p, s.svc.Export, nil
+}
+
+func exportLimit(err error) bool {
+	if apperr.CodeOf(err) != apperr.CodeExport {
+		return false
+	}
+	var e *apperr.Error
+	if !errors.As(err, &e) {
+		return false
+	}
+	for _, f := range e.Fields() {
+		if f.Code == "limit" {
+			return true
+		}
+	}
+	return false
 }
 
 func requireConfirm(ok bool) error {

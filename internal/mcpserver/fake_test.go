@@ -3,6 +3,7 @@ package mcpserver
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"strings"
 	"sync"
 	"time"
@@ -325,6 +326,45 @@ func (f *fakeBind) BindTest(ctx context.Context, identity string, password obser
 	}
 	// Unknown user and wrong password share this outcome.
 	return directory.BindTestResult{Outcome: directory.BindOutcomeInvalidCredentials}, nil
+}
+
+type fakeResetDir struct {
+	ldif    string
+	limit   bool
+	deleted []string
+	exportN int
+}
+
+func (f *fakeResetDir) Inventory(context.Context) (directory.ManagedInventory, error) {
+	return directory.ManagedInventory{
+		Preserve: []string{
+			"uid=rt,ou=people,dc=example,dc=test",
+			"ou=people,dc=example,dc=test",
+			"ou=groups,dc=example,dc=test",
+			"cn=labldap-baseline,dc=example,dc=test",
+		},
+	}, nil
+}
+
+func (f *fakeResetDir) DeleteManaged(_ context.Context, dn string) error {
+	f.deleted = append(f.deleted, dn)
+	return nil
+}
+
+func (f *fakeResetDir) Export(_ context.Context, w io.Writer, opts directory.ExportOptions) error {
+	f.exportN++
+	if f.limit {
+		return directory.ExportLimit("export.bytes", "export byte limit exceeded")
+	}
+	body := f.ldif
+	if body == "" {
+		body = "dn: dc=example,dc=test\nobjectClass: top\n\n"
+	}
+	if opts.MaxBytes > 0 && int64(len(body)) > opts.MaxBytes {
+		return directory.ExportLimit("export.bytes", "export byte limit exceeded")
+	}
+	_, err := io.WriteString(w, body)
+	return err
 }
 
 func kvFromMap(in map[string]string) []directory.AttrKV {

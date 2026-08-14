@@ -37,6 +37,8 @@ type Server struct {
 	maxBody        int64
 	flags          RegisterFlags
 	inner          http.Handler
+	mcp            *mcp.Server
+	actor          auth.Principal
 }
 
 func New(opt Options) (*Server, error) {
@@ -69,6 +71,7 @@ func New(opt Options) (*Server, error) {
 	}, nil)
 	s.registerTools(ms)
 	s.registerResources(ms)
+	s.mcp = ms
 	s.inner = mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server {
 		return ms
 	}, &mcp.StreamableHTTPOptions{
@@ -224,10 +227,34 @@ func hostInList(host string, allowed []string) bool {
 
 func (s *Server) principal(ctx context.Context) (app.Principal, error) {
 	p, ok := auth.PrincipalFrom(ctx)
-	if !ok || p.ID == "" {
-		return app.Principal{}, auth.AuthRequired()
+	if ok && p.ID != "" {
+		return app.Principal{Kind: p.Kind, ID: p.ID, Scopes: p.Scopes}, nil
 	}
-	return app.Principal{Kind: p.Kind, ID: p.ID, Scopes: p.Scopes}, nil
+	if s != nil && s.actor.ID != "" {
+		return app.Principal{Kind: s.actor.Kind, ID: s.actor.ID, Scopes: s.actor.Scopes}, nil
+	}
+	return app.Principal{}, auth.AuthRequired()
+}
+
+// SetActor pins the stdio process actor. HTTP requests still use the bearer.
+func (s *Server) SetActor(p auth.Principal) {
+	if s == nil {
+		return
+	}
+	s.actor = p
+}
+
+// Run serves one MCP session on t (stdio or in-process IO).
+func (s *Server) Run(ctx context.Context, t mcp.Transport) error {
+	if s == nil || s.mcp == nil {
+		return directoryUnavailable()
+	}
+	return s.mcp.Run(ctx, t)
+}
+
+// RunStdio serves MCP on stdin/stdout. Logs must go to stderr only.
+func (s *Server) RunStdio(ctx context.Context) error {
+	return s.Run(ctx, &mcp.StdioTransport{})
 }
 
 func (s *Server) query() (*app.Query, error) {
