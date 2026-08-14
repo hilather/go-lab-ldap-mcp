@@ -36,6 +36,8 @@ func (s *Users) Create(ctx context.Context, p Principal, spec CreateUser) (direc
 	if err := s.hooks.allowWrite(ctx); err != nil {
 		return directory.User{}, err
 	}
+	unlock := s.hooks.lock(userLockKey(spec.ID))
+	defer unlock()
 	if err := validateCreateUser(spec); err != nil {
 		s.hooks.record(ctx, p, OpUserCreate.Name, spec.ID, AuditFailure, "", "")
 		return directory.User{}, err
@@ -73,6 +75,8 @@ func (s *Users) Update(ctx context.Context, p Principal, id directory.UserID, pa
 	if err := s.hooks.allowWrite(ctx); err != nil {
 		return directory.User{}, err
 	}
+	unlock := s.hooks.lock(userLockKey(string(id)))
+	defer unlock()
 	if err := requireRevision(patch.Revision); err != nil {
 		s.hooks.record(ctx, p, OpUserUpdate.Name, string(id), AuditFailure, string(patch.Revision), "")
 		return directory.User{}, err
@@ -106,6 +110,8 @@ func (s *Users) Delete(ctx context.Context, p Principal, id directory.UserID, re
 	if err := s.hooks.allowWrite(ctx); err != nil {
 		return err
 	}
+	unlock := s.hooks.lock(userLockKey(string(id)))
+	defer unlock()
 	if err := requireRevision(rev); err != nil {
 		s.hooks.record(ctx, p, OpUserDelete.Name, string(id), AuditFailure, string(rev), "")
 		return err
@@ -126,6 +132,8 @@ func (s *Users) SetEnabled(ctx context.Context, p Principal, id directory.UserID
 	if err := s.hooks.allowWrite(ctx); err != nil {
 		return directory.User{}, err
 	}
+	unlock := s.hooks.lock(userLockKey(string(id)))
+	defer unlock()
 	if err := requireRevision(rev); err != nil {
 		s.hooks.record(ctx, p, OpUserSetEnabled.Name, string(id), AuditFailure, string(rev), "")
 		return directory.User{}, err
@@ -149,6 +157,8 @@ func (s *Users) SetPassword(ctx context.Context, p Principal, id directory.UserI
 	if err := s.hooks.rateLimit(ctx, "password:"+p.ID); err != nil {
 		return err
 	}
+	unlock := s.hooks.lock(userLockKey(string(id)))
+	defer unlock()
 	if err := requireRevision(rev); err != nil {
 		s.hooks.record(ctx, p, OpUserPassword.Name, string(id), AuditFailure, string(rev), "")
 		return err

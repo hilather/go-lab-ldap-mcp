@@ -5,12 +5,11 @@ package dirsrv
 import (
 	"encoding/json"
 	"errors"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/go-ldap/ldap/v3"
 
 	"github.com/hilather/go-lab-ldap-mcp/internal/apperr"
 	"github.com/hilather/go-lab-ldap-mcp/internal/directory"
@@ -720,13 +719,7 @@ func testRuntimeAssertionControl(t *testing.T, env *runtimeEnv) {
 	if err != nil {
 		t.Fatalf("add: %v", err)
 	}
-	if err := env.pool.Do(t.Context(), func(c *ldapclient.Conn) error {
-		mod := ldap.NewModifyRequest(u.DN, nil)
-		mod.Replace("userPassword", []string{repoUserPass + "x"})
-		return c.Modify(t.Context(), mod)
-	}); err != nil {
-		t.Fatalf("direct password write: %v", err)
-	}
+	runtimeReplace(t, env.inst, u.DN, "userPassword", repoUserPass+"x")
 	afterPW, err := users.Get(t.Context(), "assert-a")
 	if err != nil {
 		t.Fatal(err)
@@ -747,6 +740,19 @@ func testRuntimeAssertionControl(t *testing.T, env *runtimeEnv) {
 	}
 	if fieldCode(err) != directory.FieldConflict {
 		t.Fatalf("assertion fail: %v", err)
+	}
+}
+
+func runtimeReplace(t *testing.T, inst *Instance, dn, attr, value string) {
+	t.Helper()
+	ldif := "dn: " + dn + "\nchangetype: modify\nreplace: " + attr + "\n" + attr + ": " + value + "\n"
+	cmd := exec.Command("docker", "exec", "-i", inst.Name,
+		"ldapmodify", "-x", "-H", "ldaps://127.0.0.1:3636", "-o", "tls_reqcert=never",
+		"-D", "uid=rt,ou=people,dc=example,dc=test", "-w", "runtime-secret")
+	cmd.Stdin = strings.NewReader(ldif)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("direct ldap replace %s: %v\n%s", attr, err, redactLogs(string(out), value, "runtime-secret"))
 	}
 }
 

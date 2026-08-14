@@ -653,38 +653,38 @@ Acceptance:
 - [x] Baseline response separates expected, applied, and control revisions.
 - [x] Search output applies all redaction and limit rules.
 
-## [ ] T-057 Define principal, scope, authorization, and operation policy model
+## [x] T-057 Define principal, scope, authorization, and operation policy model
 
 Priority: P0 | Size: M | Depends on: T-019, T-045
 
 Deliverables: principal type, scope set, operation definitions, application authorization checks, and test matrix generator.
 
 Acceptance:
-- [ ] Password, reset, and export scopes remain independent.
-- [ ] Every application mutation checks authorization even when transport middleware exists.
-- [ ] Missing scope errors identify required scope safely.
+- [x] Password, reset, and export scopes remain independent.
+- [x] Every application mutation checks authorization even when transport middleware exists.
+- [x] Missing scope errors identify required scope safely.
 
-## [ ] T-058 Implement mutation coordination and application audit hooks
+## [x] T-058 Implement mutation coordination and application audit hooks
 
 Priority: P0 | Size: M | Depends on: T-054 to T-057
 
 Deliverables: keyed entry or group locks where needed, global mutation-gate interface, audit event interface, and operation context metadata.
 
 Acceptance:
-- [ ] Concurrent membership writes to one group do not silently lose updates in tested paths.
-- [ ] Reset-ready global gate can block ordinary writes.
-- [ ] Audit hook receives request ID, actor, action, target, result, and revisions without secrets.
+- [x] Concurrent membership writes to one group do not silently lose updates in tested paths.
+- [x] Reset-ready global gate can block ordinary writes.
+- [x] Audit hook receives request ID, actor, action, target, result, and revisions without secrets.
 
-## [ ] T-059 Complete runtime service unit and real-engine integration tests
+## [x] T-059 Complete runtime service unit and real-engine integration tests
 
 Priority: P0 | Size: L | Depends on: T-045 to T-058
 
 Deliverables: service fakes, repository integration tests, outage, concurrency, cancellation, direct-LDAP visibility, and redaction coverage.
 
 Acceptance:
-- [ ] Every supported operation has success, validation, conflict, forbidden, and unavailable coverage where applicable.
-- [ ] Direct LDAP mutation appears in a fresh service read.
-- [ ] Test logs contain none of the generated passwords or management tokens.
+- [x] Every supported operation has success, validation, conflict, forbidden, and unavailable coverage where applicable.
+- [x] Direct LDAP mutation appears in a fresh service read.
+- [x] Test logs contain none of the generated passwords or management tokens.
 
 # M4 - REST, authentication, security, audit, and health
 

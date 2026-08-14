@@ -35,6 +35,8 @@ func (s *Groups) Create(ctx context.Context, p Principal, spec directory.GroupSp
 	if err := s.hooks.allowWrite(ctx); err != nil {
 		return directory.Group{}, err
 	}
+	unlock := s.hooks.lock(groupLockKey(spec.ID))
+	defer unlock()
 	if spec.ID == "" {
 		s.hooks.record(ctx, p, OpGroupCreate.Name, spec.ID, AuditFailure, "", "")
 		return directory.Group{}, apperr.New(apperr.CodeConfiguration, "id is required").WithField(apperr.Field{
@@ -67,6 +69,8 @@ func (s *Groups) Delete(ctx context.Context, p Principal, id directory.GroupID, 
 	if err := s.hooks.allowWrite(ctx); err != nil {
 		return err
 	}
+	unlock := s.hooks.lock(groupLockKey(string(id)))
+	defer unlock()
 	if err := requireRevision(rev); err != nil {
 		s.hooks.record(ctx, p, OpGroupDelete.Name, string(id), AuditFailure, string(rev), "")
 		return err
@@ -115,6 +119,8 @@ func (s *Groups) mutateMembers(ctx context.Context, p Principal, id directory.Gr
 	if err := s.hooks.allowWrite(ctx); err != nil {
 		return directory.MembershipSummary{}, err
 	}
+	unlock := s.hooks.lock(groupLockKey(string(id)))
+	defer unlock()
 	if err := requireRevision(rev); err != nil {
 		s.hooks.record(ctx, p, action, string(id), AuditFailure, string(rev), "")
 		return directory.MembershipSummary{}, err

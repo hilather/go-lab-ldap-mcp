@@ -4,7 +4,8 @@ import (
 	"context"
 	"sync"
 
-	"github.com/hilather/go-lab-ldap-mcp/internal/apperr"
+	"github.com/hilather/go-lab-ldap-mcp/internal/audit"
+	"github.com/hilather/go-lab-ldap-mcp/internal/auth"
 	"github.com/hilather/go-lab-ldap-mcp/internal/observability"
 )
 
@@ -19,17 +20,7 @@ type Authorizer interface {
 type ScopeAuthorizer struct{}
 
 func (ScopeAuthorizer) Authorize(p Principal, op Operation) error {
-	if op.Scope == "" {
-		return nil
-	}
-	if p.Scopes.Has(op.Scope) {
-		return nil
-	}
-	return apperr.New(apperr.CodeAuth, "missing required scope").WithField(apperr.Field{
-		Path:    "scope",
-		Code:    "forbidden",
-		Message: op.Scope,
-	})
+	return auth.Require(p.Scopes, op.Scope)
 }
 
 // Auditor receives success and failure intents without secrets.
@@ -77,6 +68,25 @@ type MutationGate interface {
 type OpenGate struct{}
 
 func (OpenGate) Allow(context.Context) error { return nil }
+
+// HookAuditor forwards application intents to audit.Hook without secrets.
+type HookAuditor struct {
+	Hook audit.Hook
+}
+
+func (h HookAuditor) Record(ctx context.Context, ev AuditIntent) {
+	if h.Hook == nil {
+		return
+	}
+	h.Hook.Emit(ctx, audit.Event{
+		RequestID: ev.RequestID,
+		Actor:     ev.Actor,
+		Action:    ev.Action,
+		Target:    ev.Target,
+		Result:    ev.Result,
+		Revisions: audit.Revisions{Before: ev.Before, After: ev.After},
+	})
+}
 
 func actorOf(p Principal) string {
 	if p.ID == "" {

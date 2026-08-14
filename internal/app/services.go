@@ -28,6 +28,7 @@ type Deps struct {
 	Audit Auditor
 	Gate  MutationGate
 	Limit RateLimiter
+	Locks *Coordinator
 
 	// ExpectedRevision is the compiled directory revision.
 	ExpectedRevision string
@@ -42,7 +43,10 @@ func New(d Deps) *Services {
 	if d.Gate == nil {
 		d.Gate = OpenGate{}
 	}
-	h := hooks{authz: d.Authz, audit: d.Audit, gate: d.Gate, limit: d.Limit}
+	if d.Locks == nil {
+		d.Locks = NewCoordinator()
+	}
+	h := hooks{authz: d.Authz, audit: d.Audit, gate: d.Gate, limit: d.Limit, locks: d.Locks}
 	return &Services{
 		Users:  &Users{repo: d.Users, hooks: h},
 		Groups: &Groups{repo: d.Groups, hooks: h},
@@ -60,6 +64,14 @@ type hooks struct {
 	audit Auditor
 	gate  MutationGate
 	limit RateLimiter
+	locks *Coordinator
+}
+
+func (h hooks) lock(key string) func() {
+	if h.locks == nil {
+		return func() {}
+	}
+	return h.locks.Lock(key)
 }
 
 func (h hooks) authorize(p Principal, op Operation) error {
