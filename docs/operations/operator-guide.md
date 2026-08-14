@@ -15,7 +15,7 @@ Local images only (OD-004). No distribution LICENSE file (OD-003).
 | REST | `https://127.0.0.1:8443/api/v1` (OpenAPI: `api/openapi.yaml`) |
 | Embedded UI | `https://127.0.0.1:8443/` |
 | Direct LDAP | `ldap://127.0.0.1:3389` and `ldaps://127.0.0.1:3636` |
-| MCP | **Not shipped** on this branch (`internal/mcpserver` is a package stub). See [MCP catalog](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/mcp/catalog.md). |
+| MCP | `POST /mcp` (bearer) and `labldap mcp-stdio`. Read tools on by default; mutations off until `register*`. Catalog: [docs/mcp/catalog.md](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/mcp/catalog.md). |
 
 389 Directory Server is the directory engine. The Go service does **not**
 implement the LDAP wire protocol.
@@ -33,6 +33,9 @@ implement the LDAP wire protocol.
 - **Directory Manager never goes to control.** DM is bootstrap-only.
 - **Advertised architecture is `linux/amd64` only.** See
   [architectures.md](https://github.com/hilather/go-lab-ldap-mcp/blob/main/deploy/docker/architectures.md).
+- **Host checks:** Compose listens on `0.0.0.0:8443` inside the container
+  but still allow-lists `127.0.0.1` / `localhost` / `control` (loopback
+  publish). A spoofed `Host: evil.test` is rejected.
 
 ## Prerequisites
 

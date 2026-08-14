@@ -19,8 +19,8 @@ LABLDAP_SOAK_MEDIUM=1 go test -tags=integration ./test/integration/dirsrv -run S
 
 | Profile | Users | Groups | First-page list | Soak | Result |
 | --- | ---: | ---: | --- | --- | --- |
-| Small (CI default) | 50 | 5 | see `TestSoakSmallProfile` log | 8 workers × ~400ms pool acquire/release | no unbounded goroutine/FD/pool growth |
-| Medium (§14) | 10_000 | 1_000 | **not measured in this environment** | generator + test exist (`LABLDAP_SOAK_MEDIUM=1`) | residual: medium bootstrap/list was not run to completion here |
+| Small (CI default) | ~20 extra + seed | 1 seed | **not recorded** (live `TestSoakSmallProfile` not run here) | 8 workers × 400ms pool `Ping` (short leak probe) | residual: no first-page / reset / export / membership numbers |
+| Medium (§14) | 10_000 | 1_000 | **not measured in this environment** | generator + compile only (`LABLDAP_SOAK_MEDIUM=1`) | residual: medium bootstrap/list was not run |
 
 Unit evidence already landed with T-047: `internal/directory/ldapclient.TestPoolShortLeak`.
 

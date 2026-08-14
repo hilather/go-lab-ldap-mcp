@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 )
 
 const govulncheckMod = "golang.org/x/vuln/cmd/govulncheck@v1.1.4"
@@ -65,7 +66,15 @@ func runGovulncheck(root string, exceptions map[string]bool, stdout, stderr *os.
 	if err == nil {
 		return nil
 	}
-	ids := unique(govulnIDs(string(out)))
+	text := string(out)
+	ids := unique(govulnIDs(text))
+	marked := strings.Count(text, "Vulnerability #")
+	if marked != len(ids) {
+		return fmt.Errorf("govulncheck failed and %d Vulnerability lines did not parse to GO- IDs", marked)
+	}
+	if len(ids) == 0 {
+		return fmt.Errorf("govulncheck failed without parseable IDs: %w", err)
+	}
 	var unapproved []string
 	for _, id := range ids {
 		if exceptions[id] {
@@ -76,9 +85,6 @@ func runGovulncheck(root string, exceptions map[string]bool, stdout, stderr *os.
 	}
 	if len(unapproved) > 0 {
 		return fmt.Errorf("unapproved findings: %s", strings.Join(unapproved, ", "))
-	}
-	if len(ids) == 0 {
-		return fmt.Errorf("govulncheck failed without parseable IDs: %w", err)
 	}
 	return nil
 }
@@ -190,6 +196,18 @@ func loadExceptions(path string) (map[string]bool, error) {
 		id := strings.TrimSpace(cols[1])
 		if id == "" || id == "ID" || strings.HasPrefix(id, "---") {
 			continue
+		}
+		if len(cols) >= 5 {
+			exp := strings.TrimSpace(cols[3])
+			if exp != "" && exp != "Expires" && exp != "—" {
+				day, perr := time.Parse("2006-01-02", exp)
+				if perr != nil {
+					return nil, fmt.Errorf("exception %s expires %q: %w", id, exp, perr)
+				}
+				if !time.Now().UTC().Before(day.Add(24 * time.Hour)) {
+					continue
+				}
+			}
 		}
 		out[id] = true
 	}

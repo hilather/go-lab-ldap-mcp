@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/hilather/go-lab-ldap-mcp/internal/auth"
 	"github.com/hilather/go-lab-ldap-mcp/internal/directory"
 )
 
@@ -124,5 +125,12 @@ func TestLoopbackListenWiresHostAllowList(t *testing.T) {
 	}
 	if len(opt.AllowedHosts) == 0 {
 		t.Fatal("example-lab listens on 127.0.0.1 and must set Host allow-list")
+	}
+}
+
+func TestComposeBindAllWiresHostAllowList(t *testing.T) {
+	hosts := publishedHosts("0.0.0.0:8443")
+	if !auth.HostAllowed("127.0.0.1:8443", hosts) || auth.HostAllowed("evil.test", hosts) {
+		t.Fatalf("compose 0.0.0.0 listen hosts = %v", hosts)
 	}
 }

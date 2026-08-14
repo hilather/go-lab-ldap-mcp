@@ -34,7 +34,16 @@ func TestRunWritesProvenanceAndSums(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(sums), "openapi.yaml") {
+	if !strings.Contains(string(sums), "api/openapi.yaml") {
 		t.Fatalf("checksums:\n%s", sums)
+	}
+	for _, line := range strings.Split(strings.TrimSpace(string(sums)), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 2 {
+			continue
+		}
+		if filepath.IsAbs(fields[len(fields)-1]) {
+			t.Fatalf("checksum path must be relative: %s", line)
+		}
 	}
 }

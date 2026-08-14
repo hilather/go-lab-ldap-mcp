@@ -1290,7 +1290,7 @@ Acceptance:
 - [x] Private CA key is not mounted into runtime services after signing unless explicitly needed.
 - [x] Wrong SAN or CA produces clear startup failure.
 
-## [x] T-114 Verify deployment hardening, secret separation, and network exposure
+## [~] T-114 Verify deployment hardening, secret separation, and network exposure
 
 Priority: P0 | Size: L | Depends on: T-108 to T-113
 
@@ -1301,7 +1301,10 @@ Acceptance:
 - [x] Default management and LDAP host ports bind loopback.
 - [x] Test values do not appear in container environment or image history where avoidable.
 
-## [x] T-115 Complete LDAP client compatibility matrix
+Residual: live `TestComposeControlInspectHardening` was not executed in the
+PR29 exec environment. Static compose/image contract tests did run.
+
+## [~] T-115 Complete LDAP client compatibility matrix
 
 Priority: P0 | Size: L | Depends on: T-043, T-059, T-110
 
@@ -1311,6 +1314,9 @@ Acceptance:
 - [x] LDAP, LDAPS, and StartTLS cases pass as configured.
 - [x] Authentication, search, group membership, and write behavior match documented ACIs.
 - [x] Compatibility report records exact client and engine versions.
+
+Residual: live `TestCompatibilityLDAPClients` was not executed here.
+Report + unit client tests ran. Table lists only exercised transports.
 
 ## [x] T-116 Add supported multi-architecture image builds and smoke tests
 
@@ -1323,7 +1329,7 @@ Acceptance:
 - [x] Unsupported architecture is not advertised.
 - [x] Both application images report identical contract versions.
 
-## [x] T-117 Run performance, resource-bound, and soak qualification
+## [~] T-117 Run performance, resource-bound, and soak qualification
 
 Priority: P1 | Size: L | Depends on: T-084, T-094, T-107, T-110
 
@@ -1333,6 +1339,10 @@ Acceptance:
 - [x] Documented limits are based on measurements.
 - [x] Medium reference profile meets agreed first-page and stability goals or limitations are explicit.
 - [x] No unbounded memory, goroutine, descriptor, or connection growth appears in soak tests.
+
+Residual: small/medium live 389 DS soak and first-page numbers were not
+recorded. Generator + compile and the short leak probe exist; see
+`docs/operations/limits.md`.
 
 ## [x] T-118 Produce SBOM, vulnerability, provenance, checksum, and signing workflow
 
@@ -1356,7 +1366,7 @@ Acceptance:
 - [x] Examples validate and contain no real secrets.
 - [x] Limitations distinguish generic LDAP from Active Directory behavior.
 
-## [x] T-120 Execute release verification, persistent upgrade test, and tag checklist
+## [~] T-120 Execute release verification, persistent upgrade test, and tag checklist
 
 Priority: P0 | Size: L | Depends on: all P0 tasks, T-117 to T-119 or accepted deferrals
 
@@ -1368,9 +1378,10 @@ Acceptance:
 - [x] No unapproved high or critical security finding remains.
 - [x] Release notes list versions, supported platforms, known limitations, and migration guidance.
 
-Residual (accepted for T-120's "or accepted deferrals"): MCP protocol
-acceptance is documented in `docs/mcp/catalog.md` because `internal/mcpserver`
-is still a package stub. REST, UI, and direct LDAP acceptance are implemented.
+Residual: `make verify` pieces ran (unit, security, SBOM, checksums,
+archcheck). Live compose inspect/upgrade, `test-integration` MCP mutate,
+and Playwright against Compose were not re-run on this merge. MCP tools
+are in tree (`docs/mcp/catalog.md`).
 
 # Backlog completion checklist
 

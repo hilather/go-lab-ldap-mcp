@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/hilather/go-lab-ldap-mcp/internal/config"
+	"github.com/hilather/go-lab-ldap-mcp/internal/mcpserver"
 )
 
 func TestExamplesValidateAndHaveNoRealSecrets(t *testing.T) {
@@ -131,8 +132,19 @@ func TestReleaseNotesAndChecklist(t *testing.T) {
 		}
 	}
 	cat := read(t, filepath.Join(root, "docs", "mcp", "catalog.md"))
-	if !strings.Contains(cat, "not shipped") {
-		t.Fatal("MCP catalog must record the stub residual")
+	for _, d := range mcpserver.Catalog() {
+		if !strings.Contains(cat, d.Name) {
+			t.Fatalf("MCP catalog.md missing tool %s from Catalog()", d.Name)
+		}
+	}
+	for _, r := range mcpserver.ResourceCatalog() {
+		uri := r.URI
+		if uri == "" {
+			uri = r.URITemplate
+		}
+		if uri != "" && !strings.Contains(cat, uri) {
+			t.Fatalf("MCP catalog.md missing resource %s", uri)
+		}
 	}
 }
 

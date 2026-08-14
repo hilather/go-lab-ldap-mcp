@@ -1,15 +1,15 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
 	"strings"
 )
 
-// Denylist matches docs/security/dependency-policy.md.
-var denied = []string{"AGPL-3.0", "AGPL-3.0-only", "AGPL-3.0-or-later", "SSPL-1.0", "BUSL-1.1"}
+// Denylist matches docs/security/dependency-policy.md. We scan module
+// paths (and versions) for these tokens because go-licenses is not pinned.
+var denied = []string{"agpl-3.0", "agpl", "sspl-1.0", "sspl", "busl-1.1", "busl"}
 
 func main() {
 	if err := run(); err != nil {
@@ -26,16 +26,27 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("go list: %w", err)
 	}
-	// Fail if a denylisted token appears in any module path. Full
-	// go-licenses attribution is not required for the private first
-	// release (OD-003). The source SBOM (T-118) lists module paths.
-	_ = denied
-	if bytes.Contains(out, []byte("github.com/agpl/")) {
-		return fmt.Errorf("denied module path")
-	}
-	mods := strings.Count(string(out), "\n")
-	if mods < 1 {
+	lines := strings.Split(string(out), "\n")
+	if len(lines) < 1 || strings.TrimSpace(string(out)) == "" {
 		return fmt.Errorf("go list returned no modules")
 	}
+	for _, line := range lines {
+		if tok := deniedToken(line); tok != "" {
+			return fmt.Errorf("denied license token %q in module %s", tok, strings.TrimSpace(line))
+		}
+	}
 	return nil
+}
+
+func deniedToken(line string) string {
+	low := strings.ToLower(line)
+	if low == "" {
+		return ""
+	}
+	for _, tok := range denied {
+		if strings.Contains(low, tok) {
+			return tok
+		}
+	}
+	return ""
 }

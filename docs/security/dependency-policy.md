@@ -6,7 +6,9 @@ CI (`make test-security`) fails the build when:
 
 - `govulncheck` reports a vulnerability in a reachable package of this module, or
 - the secret scanner finds a high-confidence credential pattern in tracked source, or
-- a Go module path matches the license denylist below.
+- a Go module path or version string contains a denylist token
+  (AGPL / SSPL / BUSL; see `tools/licensecheck`). This is a path-token
+  scan, not a full `go-licenses` attribution pass.
 
 Unapproved **critical** findings block merge. Exceptions require a dated note in this file naming the finding, the reason, and the expiry.
 

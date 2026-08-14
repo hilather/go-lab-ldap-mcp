@@ -452,8 +452,9 @@ func TestHostsFromListen(t *testing.T) {
 	if !hostInList("127.0.0.1:8443", got) || !hostInList("localhost:8443", got) {
 		t.Fatalf("loopback listen = %v", got)
 	}
-	if HostsFromListen("0.0.0.0:8443") != nil {
-		t.Fatal("bind-all must not invent a tight allowlist")
+	all := HostsFromListen("0.0.0.0:8443")
+	if !hostInList("127.0.0.1:8443", all) || hostInList("evil.test", all) {
+		t.Fatalf("bind-all must allow-list loopback hosts, got %v", all)
 	}
 	if len(HostsFromListen("10.0.0.5:9000")) != 1 || HostsFromListen("10.0.0.5:9000")[0] != "10.0.0.5:9000" {
 		t.Fatalf("public listen = %v", HostsFromListen("10.0.0.5:9000"))

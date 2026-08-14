@@ -106,8 +106,7 @@ func Disabled(reg *auth.Registry) http.Handler {
 }
 
 // HostsFromListen builds the MCP Host allowlist from spec.management.listen.
-// Bind-all addresses return nil so the empty-list allow-all path stays
-// test-only / wildcard-bind only; loopback listen also accepts localhost.
+// Bind-all and loopback listens share the published loopback Host list.
 func HostsFromListen(listen string) []string {
 	listen = strings.TrimSpace(listen)
 	if listen == "" {
@@ -117,18 +116,10 @@ func HostsFromListen(listen string) []string {
 	if err != nil {
 		return []string{listen}
 	}
-	switch host {
-	case "", "0.0.0.0", "::":
-		return nil
+	if hosts := auth.LoopbackHosts(listen); len(hosts) > 0 {
+		return hosts
 	}
-	out := []string{net.JoinHostPort(host, port)}
-	if host == "127.0.0.1" || host == "::1" {
-		loc := net.JoinHostPort("localhost", port)
-		if !hostInList(loc, out) {
-			out = append(out, loc)
-		}
-	}
-	return out
+	return []string{net.JoinHostPort(host, port)}
 }
 
 func (s *Server) recoverPanic(next http.Handler) http.Handler {

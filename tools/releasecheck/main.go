@@ -97,7 +97,11 @@ func provenance(root string) (provenanceDoc, error) {
 	return doc, nil
 }
 
-func checksumTargets(root, extraDir string) []string {
+type checksumFile struct {
+	abs, rel string
+}
+
+func checksumTargets(root, extraDir string) []checksumFile {
 	rels := []string{
 		"api/openapi.yaml",
 		"deploy/compose/compose.yaml",
@@ -111,30 +115,32 @@ func checksumTargets(root, extraDir string) []string {
 		"go.mod",
 		"go.sum",
 	}
-	var out []string
+	var out []checksumFile
 	for _, rel := range rels {
-		out = append(out, filepath.Join(root, rel))
+		out = append(out, checksumFile{abs: filepath.Join(root, rel), rel: filepath.ToSlash(rel)})
 	}
-	sbom := filepath.Join(root, "dist", "sbom", "source.cdx.json")
-	if _, err := os.Stat(sbom); err == nil {
-		out = append(out, sbom)
+	sbomRel := filepath.ToSlash(filepath.Join("dist", "sbom", "source.cdx.json"))
+	if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(sbomRel))); err == nil {
+		out = append(out, checksumFile{abs: filepath.Join(root, filepath.FromSlash(sbomRel)), rel: sbomRel})
 	}
-	prov := filepath.Join(extraDir, "provenance.json")
-	if _, err := os.Stat(prov); err == nil {
-		out = append(out, prov)
+	if _, err := os.Stat(filepath.Join(extraDir, "provenance.json")); err == nil {
+		out = append(out, checksumFile{abs: filepath.Join(extraDir, "provenance.json"), rel: "dist/release/provenance.json"})
 	}
 	return out
 }
 
-func writeChecksums(path string, files []string) error {
+func writeChecksums(path string, files []checksumFile) error {
 	type row struct{ sum, name string }
 	var rows []row
 	for _, f := range files {
-		sum, err := fileSHA256(f)
+		sum, err := fileSHA256(f.abs)
 		if err != nil {
 			return err
 		}
-		rows = append(rows, row{sum: sum, name: f})
+		if filepath.IsAbs(f.rel) {
+			return fmt.Errorf("checksum path must be repo-relative: %s", f.rel)
+		}
+		rows = append(rows, row{sum: sum, name: f.rel})
 	}
 	sort.Slice(rows, func(i, j int) bool { return rows[i].name < rows[j].name })
 	var b strings.Builder

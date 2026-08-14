@@ -281,7 +281,7 @@ func serverOptionsFromCompiled(c *config.Compiled, flags serveFlags, log *slog.L
 		Ready:           ready,
 		Logger:          log,
 		AllowedOrigins:  append([]string(nil), c.Public.Spec.Management.CORS.AllowedOrigins...),
-		AllowedHosts:    auth.LoopbackHosts(c.Public.Spec.Management.Listen),
+		AllowedHosts:    publishedHosts(c.Public.Spec.Management.Listen),
 		MaxBody:         c.Public.Spec.Limits.MaxRequestBodyBytes,
 		ForceSecure:     false, // cookie Secure follows r.TLS until serve terminates TLS (OD-014)
 		MetricsAuth:     c.Public.Spec.Management.Metrics.RequireAuth,
@@ -330,7 +330,7 @@ func mcpHandlerFromCompiled(c *config.Compiled, reg *auth.Registry, svc *app.Ser
 		Services:       svc,
 		Logger:         log,
 		AllowedOrigins: append([]string(nil), c.Public.Spec.Management.CORS.AllowedOrigins...),
-		AllowedHosts:   mcpserver.HostsFromListen(c.Public.Spec.Management.Listen),
+		AllowedHosts:   publishedHosts(c.Public.Spec.Management.Listen),
 		MaxBody:        c.Public.Spec.Limits.MaxRequestBodyBytes,
 		Flags: mcpserver.RegisterFlags{
 			Mutations: mcpCfg.RegisterMutations,
@@ -362,6 +362,13 @@ func runtimeConfigFromCompiled(c *config.Compiled) ds389.RuntimeConfig {
 		ExportMaxEntries: c.Public.Spec.Limits.ExportMaxEntries,
 		ExportMaxBytes:   c.Public.Spec.Limits.ExportMaxBytes,
 	}
+}
+
+func publishedHosts(listen string) []string {
+	if hosts := auth.LoopbackHosts(listen); len(hosts) > 0 {
+		return hosts
+	}
+	return mcpserver.HostsFromListen(listen)
 }
 
 const insecureLabWarning = "insecureLabMode is enabled: cleartext LDAP bind and skipped TLS verification are allowed; this is a lab-only setting"

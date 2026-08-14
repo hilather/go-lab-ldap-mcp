@@ -29,11 +29,12 @@ func TestCompatibilityLDAPClients(t *testing.T) {
 		if _, err := exec.LookPath("ldapsearch"); err != nil {
 			t.Skip("ldapsearch not on PATH")
 		}
+		pw := writePW(t, inst.Password().Reveal())
 		cmd := exec.Command("ldapsearch", "-x", "-LLL",
 			"-H", "ldaps://"+inst.LDAPSAddr,
 			"-o", "tls_reqcert=demand",
 			"-o", "tls_cacert="+ca,
-			"-D", "cn=Directory Manager", "-w", inst.Password().Reveal(),
+			"-D", "cn=Directory Manager", "-y", pw,
 			"-b", "dc=example,dc=test", "-s", "sub", "(uid=alice)", "uid", "memberOf")
 		got, err := cmd.CombinedOutput()
 		if err != nil {
@@ -48,11 +49,12 @@ func TestCompatibilityLDAPClients(t *testing.T) {
 		if _, err := exec.LookPath("ldapwhoami"); err != nil {
 			t.Skip("ldapwhoami not on PATH")
 		}
+		pw := writePW(t, seedCanary)
 		cmd := exec.Command("ldapwhoami", "-x", "-ZZ",
 			"-H", "ldap://"+inst.LDAPAddr,
 			"-o", "tls_reqcert=demand",
 			"-o", "tls_cacert="+ca,
-			"-D", "uid=alice,ou=people,dc=example,dc=test", "-w", seedCanary)
+			"-D", "uid=alice,ou=people,dc=example,dc=test", "-y", pw)
 		got, err := cmd.CombinedOutput()
 		if err != nil {
 			t.Fatalf("%v\n%s", err, redactLogs(string(got), seedCanary))
@@ -66,11 +68,12 @@ func TestCompatibilityLDAPClients(t *testing.T) {
 		if _, err := exec.LookPath("ldapsearch"); err != nil {
 			t.Skip("ldapsearch not on PATH")
 		}
+		pw := writePW(t, inst.Password().Reveal())
 		cmd := exec.Command("ldapsearch", "-x", "-LLL",
 			"-H", "ldaps://"+inst.LDAPSAddr,
 			"-o", "tls_reqcert=demand",
 			"-o", "tls_cacert="+ca,
-			"-D", "cn=Directory Manager", "-w", inst.Password().Reveal(),
+			"-D", "cn=Directory Manager", "-y", pw,
 			"-E", "pr=2/noprompt",
 			"-b", "dc=example,dc=test", "(objectClass=inetOrgPerson)", "uid")
 		got, err := cmd.CombinedOutput()
@@ -84,10 +87,15 @@ func TestCompatibilityLDAPClients(t *testing.T) {
 
 	t.Run("password_modify_and_rebind", func(t *testing.T) {
 		neu := seedCanary + "X"
+		guestPW := "/tmp/labldap-dm.pw"
+		hostPW := writePW(t, inst.Password().Reveal())
+		if out, err := exec.Command("docker", "cp", hostPW, inst.Name+":"+guestPW).CombinedOutput(); err != nil {
+			t.Fatalf("cp dm.pw: %v\n%s", err, out)
+		}
 		ldif := "dn: uid=alice,ou=people,dc=example,dc=test\nchangetype: modify\nreplace: userPassword\nuserPassword: " + neu + "\n"
 		cmd := exec.Command("docker", "exec", "-i", inst.Name,
 			"ldapmodify", "-x", "-H", "ldaps://127.0.0.1:3636", "-o", "tls_reqcert=never",
-			"-D", "cn=Directory Manager", "-w", inst.Password().Reveal())
+			"-D", "cn=Directory Manager", "-y", guestPW)
 		cmd.Stdin = strings.NewReader(ldif)
 		if out, err := cmd.CombinedOutput(); err != nil {
 			t.Fatalf("ldapmodify: %v\n%s", err, out)
@@ -95,11 +103,10 @@ func TestCompatibilityLDAPClients(t *testing.T) {
 		if err := userBind(t, inst, "uid=alice,ou=people,dc=example,dc=test", neu); err != nil {
 			t.Fatalf("rebind: %v", err)
 		}
-		// restore
 		ldif = "dn: uid=alice,ou=people,dc=example,dc=test\nchangetype: modify\nreplace: userPassword\nuserPassword: " + seedCanary + "\n"
 		cmd = exec.Command("docker", "exec", "-i", inst.Name,
 			"ldapmodify", "-x", "-H", "ldaps://127.0.0.1:3636", "-o", "tls_reqcert=never",
-			"-D", "cn=Directory Manager", "-w", inst.Password().Reveal())
+			"-D", "cn=Directory Manager", "-y", guestPW)
 		cmd.Stdin = strings.NewReader(ldif)
 		if out, err := cmd.CombinedOutput(); err != nil {
 			t.Fatalf("restore: %v\n%s", err, out)
@@ -129,10 +136,35 @@ func TestCompatibilityLDAPClients(t *testing.T) {
 		if !found {
 			t.Fatalf("whoami=%q dns=%v", who, dns)
 		}
+		_, _, err = goindep.SearchWhoami(goindep.Config{
+			URL:        "ldap://" + inst.LDAPAddr,
+			StartTLS:   true,
+			CAFile:     ca,
+			ServerName: "localhost",
+			BindDN:     "cn=Directory Manager",
+			Password:   inst.Password().Reveal(),
+			BaseDN:     "dc=example,dc=test",
+			Filter:     "(uid=alice)",
+			PageSize:   2,
+		})
+		if err != nil {
+			t.Fatalf("go starttls: %v", err)
+		}
+		_, _, err = goindep.SearchWhoami(goindep.Config{
+			URL:      "ldap://" + inst.LDAPAddr,
+			BindDN:   "cn=Directory Manager",
+			Password: inst.Password().Reveal(),
+			BaseDN:   "dc=example,dc=test",
+			Filter:   "(uid=alice)",
+		})
+		if err == nil {
+			t.Fatal("cleartext LDAP bind must fail when allowCleartextBind is false")
+		}
 	})
 
 	t.Run("python_ldap3", func(t *testing.T) {
-		runPythonClient(t, inst, ca)
+		runPythonClient(t, inst, ca, false)
+		runPythonClient(t, inst, ca, true)
 	})
 
 	t.Run("aci_alice_read_no_config", func(t *testing.T) {
@@ -149,6 +181,30 @@ func TestCompatibilityLDAPClients(t *testing.T) {
 			t.Fatalf("membership missing:\n%s", staff)
 		}
 	})
+
+	t.Run("anonymous_denied", func(t *testing.T) {
+		if _, err := exec.LookPath("ldapsearch"); err != nil {
+			t.Skip("ldapsearch not on PATH")
+		}
+		cmd := exec.Command("ldapsearch", "-x", "-LLL",
+			"-H", "ldaps://"+inst.LDAPSAddr,
+			"-o", "tls_reqcert=demand",
+			"-o", "tls_cacert="+ca,
+			"-b", "dc=example,dc=test", "(uid=alice)", "uid")
+		got, err := cmd.CombinedOutput()
+		if err == nil && strings.Contains(string(got), "uid: alice") {
+			t.Fatalf("anonymous search must not return alice:\n%s", got)
+		}
+	})
+}
+
+func writePW(t *testing.T, value string) string {
+	t.Helper()
+	p := filepath.Join(t.TempDir(), "pw")
+	if err := os.WriteFile(p, []byte(value+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return p
 }
 
 func recordClientVersions(t *testing.T) {
@@ -161,7 +217,7 @@ func recordClientVersions(t *testing.T) {
 	}
 }
 
-func runPythonClient(t *testing.T, inst *Instance, ca string) {
+func runPythonClient(t *testing.T, inst *Instance, ca string, startTLS bool) {
 	t.Helper()
 	if _, err := exec.LookPath("python3"); err != nil {
 		t.Skip("python3 not on PATH")
@@ -184,14 +240,18 @@ func runPythonClient(t *testing.T, inst *Instance, ca string) {
 		t.Fatal(err)
 	}
 	script := filepath.Join(root, "test", "compatibility", "clients", "python", "client.py")
-	cmd := exec.Command(py, script,
-		"--url", "ldaps://"+inst.LDAPSAddr,
-		"--ca-file", ca,
+	args := []string{script, "--ca-file", ca,
 		"--bind-dn", "cn=Directory Manager",
 		"--password-file", pw,
 		"--base", "dc=example,dc=test",
 		"--filter", "(uid=alice)",
-	)
+	}
+	if startTLS {
+		args = append(args, "--url", "ldap://"+inst.LDAPAddr, "--starttls")
+	} else {
+		args = append(args, "--url", "ldaps://"+inst.LDAPSAddr)
+	}
+	cmd := exec.Command(py, args...)
 	got, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("python client: %v\n%s", err, redactLogs(string(got), inst.password))

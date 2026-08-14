@@ -26,3 +26,12 @@ func TestRunFromModuleRoot(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestDeniedTokens(t *testing.T) {
+	if hit := deniedToken("github.com/foo/bar v1.0.0"); hit != "" {
+		t.Fatalf("clean path hit %q", hit)
+	}
+	if hit := deniedToken("github.com/evil/agpl-lib v0.1.0"); hit == "" {
+		t.Fatal("expected agpl token")
+	}
+}

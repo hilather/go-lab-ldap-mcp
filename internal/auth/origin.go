@@ -66,15 +66,17 @@ func HostAllowed(host string, allowed []string) bool {
 	return false
 }
 
-// LoopbackHosts returns Host values accepted when listen is loopback-only.
-// A non-loopback listen (including 0.0.0.0) returns nil so Host is not restricted.
+// LoopbackHosts returns Host values accepted when listen is loopback or
+// bind-all (0.0.0.0 / ::). Compose publishes those listeners on loopback,
+// so DNS-rebinding Host: evil.test is rejected. A specific non-loopback
+// listen returns nil (no Host restriction from this helper).
 func LoopbackHosts(listen string) []string {
 	host, port, err := net.SplitHostPort(strings.TrimSpace(listen))
 	if err != nil || port == "" {
 		return nil
 	}
 	switch strings.ToLower(host) {
-	case "127.0.0.1", "localhost", "::1", "[::1]":
+	case "127.0.0.1", "localhost", "::1", "[::1]", "0.0.0.0", "::", "":
 	default:
 		return nil
 	}
@@ -82,5 +84,6 @@ func LoopbackHosts(listen string) []string {
 		net.JoinHostPort("127.0.0.1", port),
 		net.JoinHostPort("localhost", port),
 		net.JoinHostPort("::1", port),
+		net.JoinHostPort("control", port),
 	}
 }

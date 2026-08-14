@@ -31,7 +31,9 @@ Build both application images with the same `VERSION` so
 ## Known limitations
 
 - Active Directory emulation is out of scope.
-- MCP transport is a package stub (see `docs/mcp/catalog.md`).
+- MCP is shipped (`POST /mcp`, `labldap mcp-stdio`). Mutation tools stay
+  off unless `spec.management.mcp.register*` is true. Catalog:
+  `docs/mcp/catalog.md`.
 - Medium soak profile (~10k users / ~1k groups) is generated and
   compile-tested; live first-page numbers were not measured here
   (`docs/operations/limits.md`).

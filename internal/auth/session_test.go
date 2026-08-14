@@ -194,7 +194,8 @@ func TestHostAllowedAndLoopback(t *testing.T) {
 	if len(got) == 0 || !HostAllowed("localhost:8443", got) {
 		t.Fatalf("loopback hosts = %v", got)
 	}
-	if LoopbackHosts("0.0.0.0:8443") != nil {
-		t.Fatal("wildcard listen must not restrict Host")
+	gotAll := LoopbackHosts("0.0.0.0:8443")
+	if !HostAllowed("127.0.0.1:8443", gotAll) || HostAllowed("evil.test", gotAll) {
+		t.Fatalf("bind-all listen must still allow-list loopback hosts, got %v", gotAll)
 	}
 }
