@@ -99,9 +99,6 @@ func (s *Reset) Start(ctx context.Context, p Principal, req ResetRequest) (Reset
 	if err := s.hooks.authorize(ctx, p, OpReset); err != nil {
 		return s.Status(), err
 	}
-	if err := s.hooks.rateLimit(ctx, "reset:"+actorOf(p)); err != nil {
-		return s.Status(), err
-	}
 	if !s.soft {
 		err := reset.Disabled()
 		s.hooks.record(ctx, p, OpReset.Name, "reset", AuditFailure, "", "")
@@ -125,6 +122,11 @@ func (s *Reset) Start(ctx context.Context, p Principal, req ResetRequest) (Reset
 		return s.Status(), apperr.New(apperr.CodeReset, "expected revision does not match").
 			WithField(apperr.Field{Path: "expectedRevision", Code: "conflict", Message: "expected revision does not match compiled directory revision"})
 	}
+	// Charge the reset budget only after confirmation matches so typos
+	// and stale revisions do not burn resetPerHour.
+	if err := s.hooks.rateLimit(ctx, "reset:"+actorOf(p)); err != nil {
+		return s.Status(), err
+	}
 
 	seeds, err := s.reloadSeeds(ctx)
 	if err != nil {
@@ -136,13 +138,19 @@ func (s *Reset) Start(ctx context.Context, p Principal, req ResetRequest) (Reset
 		return s.Status(), apperr.New(apperr.CodeReset, "reset gate is not configured").
 			WithField(apperr.Field{Path: "reset", Code: "unavailable", Message: "reset gate is not configured"})
 	}
+	// Honor cancel only before the exclusive lock. After Begin, mutation
+	// must finish or Failed — a client disconnect / HTTP write timeout
+	// must not tear the suffix mid-delete.
+	if err := ctx.Err(); err != nil {
+		return s.Status(), err
+	}
 	tok, err := s.gate.Begin()
 	if err != nil {
 		s.hooks.record(ctx, p, OpReset.Name, "reset", AuditFailure, "", "")
 		return s.Status(), err
 	}
 
-	st, err := s.run(ctx, tok, seeds)
+	st, err := s.run(context.WithoutCancel(ctx), tok, seeds)
 	if err != nil {
 		// Pre-mutation failures release the lock. After delete/reapply
 		// starts, Failed keeps readiness false (T-080).

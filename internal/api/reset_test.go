@@ -154,6 +154,38 @@ func TestResetDuplicateReturnsCurrentOperation(t *testing.T) {
 	}
 }
 
+func TestResetHTTPCancelAfterDeleteDoesNotFail(t *testing.T) {
+	t.Parallel()
+	s, svc, inv := resetServer(t)
+	block := make(chan struct{}, 1)
+	unblock := make(chan struct{})
+	inv.block = block
+	inv.unblock = unblock
+	h := s.Handler()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan int, 1)
+	go func() {
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/reset", strings.NewReader(`{"name":"lab","expectedRevision":"rev-dir"}`))
+		req = req.WithContext(ctx)
+		req.Header.Set("Authorization", "Bearer "+resetToken)
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		done <- rec.Code
+	}()
+	<-block
+	cancel()
+	close(unblock)
+	code := <-done
+	if code != http.StatusAccepted {
+		t.Fatalf("canceled HTTP reset %d", code)
+	}
+	if svc.Reset.State() != string(reset.Ready) {
+		t.Fatalf("state %s", svc.Reset.State())
+	}
+}
+
 type liveAPIReset struct {
 	mu        sync.Mutex
 	users     *memUsers

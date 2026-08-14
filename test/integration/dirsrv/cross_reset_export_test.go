@@ -4,7 +4,9 @@ package dirsrv
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -233,5 +235,135 @@ func assertNoSeedSecrets(t *testing.T, parts ...string) {
 	}
 	if strings.Contains(strings.ToLower(joined), "userpassword:") || strings.Contains(strings.ToLower(joined), "userpassword::") {
 		t.Fatalf("userPassword in export/logs")
+	}
+}
+
+type blockingResetDir struct {
+	inner   directory.ResetSupport
+	block   chan struct{}
+	unblock chan struct{}
+}
+
+func (b *blockingResetDir) Inventory(ctx context.Context) (directory.ManagedInventory, error) {
+	return b.inner.Inventory(ctx)
+}
+
+func (b *blockingResetDir) DeleteManaged(ctx context.Context, dn string) error {
+	if b.block != nil {
+		select {
+		case b.block <- struct{}{}:
+		default:
+		}
+	}
+	if b.unblock != nil {
+		<-b.unblock
+	}
+	return b.inner.DeleteManaged(ctx, dn)
+}
+
+func (b *blockingResetDir) Export(ctx context.Context, w io.Writer, opts directory.ExportOptions) error {
+	return b.inner.Export(ctx, w, opts)
+}
+
+func TestResetInProgressBlocksRESTAndExport(t *testing.T) {
+	env := startRuntimeEnv(t)
+	before, err := env.rt.ReadMarker(t.Context())
+	if err != nil || strings.TrimSpace(before.AppliedRevision) == "" {
+		t.Fatalf("marker %+v %v", before, err)
+	}
+	addExtraPerson(t, env.inst, "uid=runtime-extra,ou=people,dc=example,dc=test")
+	sec := config.ResolvedSecret{Path: "alice.pw", Value: observability.Secret(crossSeedPass)}
+	block := make(chan struct{}, 1)
+	unblock := make(chan struct{})
+	dir := &blockingResetDir{inner: env.rt, block: block, unblock: unblock}
+	gate := reset.NewGate()
+	svc := app.New(app.Deps{
+		Users:            env.rt.Users(),
+		Groups:           env.rt.Groups(),
+		Bind:             env.rt,
+		Marker:           env.rt,
+		ResetDir:         dir,
+		Gate:             gate,
+		ResetLock:        gate,
+		SoftReset:        true,
+		ScenarioName:     "lab",
+		ExpectedRevision: before.AppliedRevision,
+		PeopleDN:         "ou=people,dc=example,dc=test",
+		GroupsDN:         "ou=groups,dc=example,dc=test",
+		Suffix:           "dc=example,dc=test",
+		RuntimeDN:        "uid=rt,ou=people,dc=example,dc=test",
+		MarkerDN:         "cn=labldap-baseline,dc=example,dc=test",
+		Secrets:          config.MapResolver{"alice.pw": crossSeedPass},
+		ResetUsers: []config.NormalizedUser{{
+			ID: "alice", UID: "alice", DN: "uid=alice,ou=people,dc=example,dc=test",
+			Enabled: true, Password: &sec,
+			Attributes: []config.AttrKV{{Name: "sn", Value: "Seed"}},
+		}},
+		BindTransport: directory.TransportLDAPS,
+	})
+	reg, err := auth.NewRegistry([]auth.Token{{
+		ID: "admin",
+		Scopes: []string{
+			auth.ScopeDirectoryRead, auth.ScopeDirectoryWrite, auth.ScopeLabReset, auth.ScopeLabExport,
+		},
+		Secret: observability.Secret(crossAdminToken),
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv, err := api.New(api.Options{
+		Registry: reg,
+		Sessions: auth.NewStore(auth.DefaultSessionConfig()),
+		Users:    svc.Users,
+		Groups:   svc.Groups,
+		Reset:    svc.Reset,
+		Export:   svc.Export,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := srv.Handler()
+	done := make(chan int, 1)
+	go func() {
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/reset", strings.NewReader(`{"name":"lab","expectedRevision":"`+before.AppliedRevision+`"}`))
+		req.Header.Set("Authorization", "Bearer "+crossAdminToken)
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		done <- rec.Code
+	}()
+	<-block
+
+	get := httptest.NewRequest(http.MethodGet, "/api/v1/users", nil)
+	get.Header.Set("Authorization", "Bearer "+crossAdminToken)
+	gr := httptest.NewRecorder()
+	h.ServeHTTP(gr, get)
+	if gr.Code != http.StatusServiceUnavailable || !strings.Contains(gr.Body.String(), "reset_in_progress") {
+		t.Fatalf("get during reset %d %s", gr.Code, gr.Body.String())
+	}
+
+	create := httptest.NewRequest(http.MethodPost, "/api/v1/users", strings.NewReader(`{"id":"during","password":"`+crossAppPass+`","attributes":{"sn":"X"}}`))
+	create.Header.Set("Authorization", "Bearer "+crossAdminToken)
+	create.Header.Set("Content-Type", "application/json")
+	cr := httptest.NewRecorder()
+	h.ServeHTTP(cr, create)
+	if cr.Code != http.StatusServiceUnavailable || !strings.Contains(cr.Body.String(), "reset_in_progress") {
+		t.Fatalf("create during reset %d %s", cr.Code, cr.Body.String())
+	}
+
+	exp := httptest.NewRequest(http.MethodGet, "/api/v1/export", nil)
+	exp.Header.Set("Authorization", "Bearer "+crossAdminToken)
+	er := httptest.NewRecorder()
+	h.ServeHTTP(er, exp)
+	if er.Code != http.StatusServiceUnavailable || !strings.Contains(er.Body.String(), "reset_in_progress") {
+		t.Fatalf("export during reset %d %s", er.Code, er.Body.String())
+	}
+
+	close(unblock)
+	if code := <-done; code != http.StatusAccepted {
+		t.Fatalf("reset %d", code)
+	}
+	if svc.Reset.State() != string(reset.Ready) {
+		t.Fatalf("state %s", svc.Reset.State())
 	}
 }

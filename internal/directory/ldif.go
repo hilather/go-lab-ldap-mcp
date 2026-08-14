@@ -219,6 +219,11 @@ func needsBase64(v []byte) bool {
 	if len(v) == 0 {
 		return false
 	}
+	// RFC 2849: a value that ends with SPACE must be base64 so
+	// readers do not strip the trailing blank as fold whitespace.
+	if v[len(v)-1] == ' ' {
+		return true
+	}
 	if !safeInitChar(v[0]) {
 		return true
 	}

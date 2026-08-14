@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"github.com/hilather/go-lab-ldap-mcp/internal/app"
 	"github.com/hilather/go-lab-ldap-mcp/internal/auth"
@@ -21,15 +22,16 @@ func (s *Server) handleStartReset(w http.ResponseWriter, r *http.Request) {
 	if !ok || !s.requireReset(w, r) || !requireJSONBody(w, r) {
 		return
 	}
-	if err := s.allowReset(r, p); err != nil {
-		writeProblem(w, r, err)
-		return
-	}
 	var body app.ResetRequest
 	if err := DecodeJSON(r.Body, &body); err != nil {
 		writeProblem(w, r, err)
 		return
 	}
+	// Soft reset of the reference profile exceeds the 30s request
+	// WriteTimeout. Clear the per-request write deadline so a connected
+	// client can wait; Start also detaches from r.Context() after Begin
+	// so disconnect/timeout cannot Finish(false) mid-delete.
+	clearWriteDeadline(w)
 	st, err := s.reset.Start(r.Context(), p, body)
 	if err != nil {
 		if isDuplicateReset(err, st) {
@@ -67,21 +69,15 @@ func (s *Server) requireReset(w http.ResponseWriter, r *http.Request) bool {
 	return true
 }
 
-func (s *Server) allowReset(r *http.Request, p app.Principal) error {
-	if s == nil || s.limiter == nil {
-		return nil
-	}
-	if !s.limiter.Allow("reset:ip:" + requestIP(r)) {
-		return rateLimited()
-	}
-	if p.ID != "" && !s.limiter.Allow("reset:actor:"+p.ID) {
-		return rateLimited()
-	}
-	return nil
-}
-
 func resetView(st app.ResetStatus) app.ResetStatus {
 	return st
+}
+
+func clearWriteDeadline(w http.ResponseWriter) {
+	if w == nil {
+		return
+	}
+	_ = http.NewResponseController(w).SetWriteDeadline(time.Time{})
 }
 
 func isDuplicateReset(err error, st app.ResetStatus) bool {

@@ -503,6 +503,51 @@ func TestResetRecoversPartialState(t *testing.T) {
 	}
 }
 
+func TestResetClientCancelAfterDeleteDoesNotFail(t *testing.T) {
+	t.Parallel()
+	users, groups := newFakeUsers(), newFakeGroups()
+	users.put(directory.User{ID: "alice", UID: "alice", DN: "uid=alice,ou=people,dc=example,dc=test", Enabled: true})
+	inv := newLiveReset(users, groups)
+	inv.extras = []string{"uid=runtime-extra,ou=people,dc=example,dc=test"}
+	block := make(chan struct{}, 1)
+	unblock := make(chan struct{})
+	inv.block = block
+	inv.unblock = unblock
+	svc := New(resetDeps(users, groups, inv, reset.NewGate()))
+	ctx, cancel := context.WithCancel(t.Context())
+	errc := make(chan error, 1)
+	go func() {
+		_, err := svc.Reset.Start(ctx, resetter(), ResetRequest{Name: "lab", ExpectedRevision: "rev-dir"})
+		errc <- err
+	}()
+	<-block
+	cancel()
+	close(unblock)
+	if err := <-errc; err != nil {
+		t.Fatalf("cancel after mutation started: %v", err)
+	}
+	if svc.Reset.State() != string(reset.Ready) {
+		t.Fatalf("state %s", svc.Reset.State())
+	}
+}
+
+func TestResetWrongConfirmationDoesNotConsumeRateLimit(t *testing.T) {
+	t.Parallel()
+	users, groups := newFakeUsers(), newFakeGroups()
+	inv := newLiveReset(users, groups)
+	d := resetDeps(users, groups, inv, reset.NewGate())
+	d.Limit = NewWindow(0, 0, 0, 1)
+	svc := New(d)
+	for i := 0; i < 3; i++ {
+		if _, err := svc.Reset.Start(t.Context(), resetter(), ResetRequest{Name: "other", ExpectedRevision: "rev-dir"}); err == nil {
+			t.Fatal("name")
+		}
+	}
+	if _, err := svc.Reset.Start(t.Context(), resetter(), ResetRequest{Name: "lab", ExpectedRevision: "rev-dir"}); err != nil {
+		t.Fatalf("valid reset after failed confirmations: %v", err)
+	}
+}
+
 func TestResetCancelBeforeMutationReleasesGate(t *testing.T) {
 	t.Parallel()
 	users, groups := newFakeUsers(), newFakeGroups()

@@ -80,6 +80,32 @@ func TestLDIFRoundTripIndependentParser(t *testing.T) {
 	}
 }
 
+func TestLDIFTrailingSpaceUsesBase64(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	enc := NewEncoder(&buf, ExportOptions{OmitSecrets: true})
+	if err := enc.WriteEntry(t.Context(), SearchEntry{
+		DN:         "cn=pad,dc=example,dc=test",
+		Attributes: []AttrKV{{Name: "description", Value: "ends with "}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := enc.Close(); err != nil {
+		t.Fatal(err)
+	}
+	raw := buf.String()
+	if !strings.Contains(raw, "description:: ") {
+		t.Fatalf("expected base64 trailing space:\n%s", raw)
+	}
+	if strings.Contains(raw, "description: ends with ") {
+		t.Fatalf("unsafe trailing space:\n%s", raw)
+	}
+	got, err := ParseLDIF(strings.NewReader(raw))
+	if err != nil || len(got) != 1 || attrOf(got[0], "description") != "ends with " {
+		t.Fatalf("round-trip %+v %v\n%s", got, err, raw)
+	}
+}
+
 func TestLDIFEncoderOmitsSecretsAndStreams(t *testing.T) {
 	t.Parallel()
 	var writes int
