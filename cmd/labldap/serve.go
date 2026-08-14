@@ -77,6 +77,8 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 			Ready:          func() bool { return false },
 			Logger:         log,
 			MetricsEnabled: true,
+			Build:          observability.CurrentBuild("labldap"),
+			CursorKey:      config.NewCursorKey(),
 		})
 		if err != nil {
 			fmt.Fprintf(stderr, "labldap serve: %v\n", err)
@@ -177,15 +179,19 @@ func serverOptionsFromCompiled(c *config.Compiled, log *slog.Logger) (api.Option
 		sessCfg.Max = c.Public.Spec.Management.Session.MaxSessions
 	}
 	return api.Options{
-		Registry:       reg,
-		Sessions:       auth.NewStore(sessCfg),
-		Ready:          func() bool { return false },
-		Logger:         log,
-		AllowedOrigins: append([]string(nil), c.Public.Spec.Management.CORS.AllowedOrigins...),
-		MaxBody:        c.Public.Spec.Limits.MaxRequestBodyBytes,
-		ForceSecure:    false, // cookie Secure follows r.TLS until serve terminates TLS (OD-014)
-		MetricsAuth:    c.Public.Spec.Management.Metrics.RequireAuth,
-		MetricsEnabled: c.Public.Spec.Management.Metrics.Enabled == nil || *c.Public.Spec.Management.Metrics.Enabled,
+		Registry:        reg,
+		Sessions:        auth.NewStore(sessCfg),
+		Ready:           func() bool { return false },
+		Logger:          log,
+		AllowedOrigins:  append([]string(nil), c.Public.Spec.Management.CORS.AllowedOrigins...),
+		MaxBody:         c.Public.Spec.Limits.MaxRequestBodyBytes,
+		ForceSecure:     false, // cookie Secure follows r.TLS until serve terminates TLS (OD-014)
+		MetricsAuth:     c.Public.Spec.Management.Metrics.RequireAuth,
+		MetricsEnabled:  c.Public.Spec.Management.Metrics.Enabled == nil || *c.Public.Spec.Management.Metrics.Enabled,
+		Build:           observability.CurrentBuild("labldap"),
+		PageSizeDefault: c.Public.Spec.Limits.PageSizeDefault,
+		PageSizeMax:     c.Public.Spec.Limits.PageSizeMax,
+		CursorKey:       config.NewCursorKey(),
 	}, nil
 }
 

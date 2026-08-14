@@ -732,27 +732,27 @@ Acceptance:
 - [x] Same-origin is default and wildcard credentialed CORS is impossible.
 - [x] Liveness remains available during LDAP outage.
 
-## [ ] T-064 Implement system, version, capability, baseline, and session endpoints
+## [x] T-064 Implement system, version, capability, baseline, and session endpoints
 
 Priority: P0 | Size: M | Depends on: T-056, T-060 to T-063
 
 Deliverables: liveness, readiness placeholder, version, capabilities, baseline, session create/get/delete handlers.
 
 Acceptance:
-- [ ] Responses validate against OpenAPI.
-- [ ] Capability and baseline endpoints require intended scope.
-- [ ] Sensitive responses use no-store caching.
+- [x] Responses validate against OpenAPI.
+- [x] Capability and baseline endpoints require intended scope.
+- [x] Sensitive responses use no-store caching.
 
-## [ ] T-065 Implement Problem Details, pagination, ETag, and cursor HTTP helpers
+## [x] T-065 Implement Problem Details, pagination, ETag, and cursor HTTP helpers
 
 Priority: P0 | Size: L | Depends on: T-006, T-053, T-060, T-063
 
 Deliverables: stable problem renderer, field errors, status mapping, pagination parameters, cursor errors, ETag output, and `If-Match` parsing.
 
 Acceptance:
-- [ ] All application error families map consistently.
-- [ ] Request ID is present in every error.
-- [ ] Stale or missing required preconditions return documented status and code.
+- [x] All application error families map consistently.
+- [x] Request ID is present in every error.
+- [x] Stale or missing required preconditions return documented status and code.
 
 ## [ ] T-066 Implement user REST handlers
 

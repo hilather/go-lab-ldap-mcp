@@ -14,10 +14,10 @@ var (
 )
 
 type BuildInfo struct {
-	Version   string
-	Revision  string
-	Time      string
-	Component string
+	Version   string `json:"version"`
+	Revision  string `json:"revision"`
+	Time      string `json:"time"`
+	Component string `json:"component"`
 }
 
 func (b BuildInfo) LogValue() slog.Value {

@@ -57,7 +57,7 @@ func (s *Server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 	}
 	secure := auth.CookieSecure(r, s.forceSecure)
 	http.SetCookie(w, auth.NewSessionCookie(cookie, secure, 0))
-	w.Header().Set("Cache-Control", "no-store")
+	setNoStore(w)
 	writeJSON(w, r, http.StatusOK, "application/json", sessionCreatedBody{CSRFToken: csrf})
 }
 
@@ -72,11 +72,15 @@ func (s *Server) handleGetSession(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, r, bearerOrSession401(r))
 		return
 	}
-	w.Header().Set("Cache-Control", "no-store")
+	scopes := append([]string(nil), sess.Scopes...)
+	if scopes == nil {
+		scopes = []string{}
+	}
+	setNoStore(w)
 	writeJSON(w, r, http.StatusOK, "application/json", sessionViewBody{
 		ID:        sess.ID,
 		Kind:      auth.KindSession,
-		Scopes:    append([]string(nil), sess.Scopes...),
+		Scopes:    scopes,
 		ExpiresAt: s.sessions.ExpiresAt(sess).UTC().Format(time.RFC3339),
 	})
 }
@@ -93,7 +97,7 @@ func (s *Server) handleDeleteSession(w http.ResponseWriter, r *http.Request) {
 	}
 	s.sessions.Delete(c.Value)
 	http.SetCookie(w, auth.ClearSessionCookie(auth.CookieSecure(r, s.forceSecure)))
-	w.WriteHeader(http.StatusNoContent)
+	writeNoContent(w, r)
 }
 
 func bearerOrSession401(r *http.Request) error {

@@ -8,6 +8,7 @@ import (
 
 	"github.com/hilather/go-lab-ldap-mcp/internal/apperr"
 	"github.com/hilather/go-lab-ldap-mcp/internal/auth"
+	"github.com/hilather/go-lab-ldap-mcp/internal/config"
 	"github.com/hilather/go-lab-ldap-mcp/internal/observability"
 )
 
@@ -28,30 +29,40 @@ func (NopLimiter) Allow(string) bool { return true }
 
 // Options configure the net/http management plane.
 type Options struct {
-	Registry       *auth.Registry
-	Sessions       *auth.Store
-	Ready          func() bool
-	Logger         *slog.Logger
-	AllowedOrigins []string
-	MaxBody        int64
-	ForceSecure    bool
-	MetricsAuth    bool
-	MetricsEnabled bool
-	Limiter        Limiter
+	Registry        *auth.Registry
+	Sessions        *auth.Store
+	Ready           func() bool
+	Logger          *slog.Logger
+	AllowedOrigins  []string
+	MaxBody         int64
+	ForceSecure     bool
+	MetricsAuth     bool
+	MetricsEnabled  bool
+	Limiter         Limiter
+	System          System
+	Build           observability.BuildInfo
+	PageSizeDefault int
+	PageSizeMax     int
+	CursorKey       config.CursorKey
 }
 
 // Server is the REST transport. It does not import mcpserver or LDAP.
 type Server struct {
-	registry       *auth.Registry
-	sessions       *auth.Store
-	ready          func() bool
-	log            *slog.Logger
-	allowedOrigins []string
-	maxBody        int64
-	forceSecure    bool
-	metricsAuth    bool
-	metricsEnabled bool
-	limiter        Limiter
+	registry        *auth.Registry
+	sessions        *auth.Store
+	ready           func() bool
+	log             *slog.Logger
+	allowedOrigins  []string
+	maxBody         int64
+	forceSecure     bool
+	metricsAuth     bool
+	metricsEnabled  bool
+	limiter         Limiter
+	system          System
+	build           observability.BuildInfo
+	pageSizeDefault int
+	pageSizeMax     int
+	cursorKey       config.CursorKey
 }
 
 func New(opt Options) (*Server, error) {
@@ -77,17 +88,34 @@ func New(opt Options) (*Server, error) {
 	if lim == nil {
 		lim = NopLimiter{}
 	}
+	build := opt.Build
+	if build.Component == "" {
+		build = currentBuild()
+	}
+	pageDef := opt.PageSizeDefault
+	if pageDef <= 0 {
+		pageDef = defaultPageSize
+	}
+	pageMax := opt.PageSizeMax
+	if pageMax <= 0 {
+		pageMax = defaultPageMax
+	}
 	return &Server{
-		registry:       opt.Registry,
-		sessions:       opt.Sessions,
-		ready:          ready,
-		log:            log,
-		allowedOrigins: append([]string(nil), opt.AllowedOrigins...),
-		maxBody:        maxBody,
-		forceSecure:    opt.ForceSecure,
-		metricsAuth:    opt.MetricsAuth,
-		metricsEnabled: opt.MetricsEnabled,
-		limiter:        lim,
+		registry:        opt.Registry,
+		sessions:        opt.Sessions,
+		ready:           ready,
+		log:             log,
+		allowedOrigins:  append([]string(nil), opt.AllowedOrigins...),
+		maxBody:         maxBody,
+		forceSecure:     opt.ForceSecure,
+		metricsAuth:     opt.MetricsAuth,
+		metricsEnabled:  opt.MetricsEnabled,
+		limiter:         lim,
+		system:          opt.System,
+		build:           build,
+		pageSizeDefault: pageDef,
+		pageSizeMax:     pageMax,
+		cursorKey:       append(config.CursorKey(nil), opt.CursorKey...),
 	}, nil
 }
 
@@ -96,6 +124,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /health", s.handleLive)
 	mux.HandleFunc("GET /health/ready", s.handleReady)
 	mux.HandleFunc("GET /metrics", s.handleMetrics)
+	mux.HandleFunc("GET /api/v1/version", s.handleVersion)
+	mux.HandleFunc("GET /api/v1/capabilities", s.handleCapabilities)
+	mux.HandleFunc("GET /api/v1/baseline", s.handleBaseline)
 	mux.HandleFunc("POST /api/v1/session", s.handleCreateSession)
 	mux.HandleFunc("GET /api/v1/session", s.handleGetSession)
 	mux.HandleFunc("DELETE /api/v1/session", s.handleDeleteSession)
