@@ -126,20 +126,9 @@ func resultFromError(err error) Result {
 	}
 }
 
-// --- Operation handler stubs (T-125). The real bind (T-126), search
-// (T-127), and write operations (T-128) replace these; extended operations
-// land in T-133 (StartTLS) and T-142 (WhoAmI). ---
-
-func (s *Server) handleSearch(ctx context.Context, c *conn, m *Message, req *SearchRequest) ResultCode {
-	code := ResultUnwillingToPerform
-	if ctx.Err() == nil {
-		c.sendResult(m.ID, &SearchResultDone{Result: Result{
-			Code:              code,
-			DiagnosticMessage: "search lands in T-127",
-		}})
-	}
-	return code
-}
+// --- Operation handler stubs (T-125). The write operations (T-128)
+// replace these; extended operations land in T-133 (StartTLS) and T-142
+// (WhoAmI). ---
 
 func (s *Server) handleAdd(ctx context.Context, c *conn, m *Message, req *AddRequest) ResultCode {
 	code := ResultUnwillingToPerform
