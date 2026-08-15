@@ -44,7 +44,7 @@ The following have safe defaults and should not trigger clarification during ord
 - Naming remains LabLDAP.
 - The frontend uses `pnpm` and strict TypeScript.
 - The Go service uses `net/http`.
-- The initial engine profile is 389 DS only.
+- The initial engine profile is 389 DS only **until M9**. Dual engines (`389ds` | `native`) are accepted in ADR-0008; default remains `389ds`. Native is not ready until T-150.
 - Static bearer authorization is the initial remote-management mode.
 - Default MCP exposure is read-only.
 - Default directory anonymous bind is disabled.
@@ -55,7 +55,7 @@ The following have safe defaults and should not trigger clarification during ord
 
 An implementation agent must propose an ADR before changing:
 
-- The selected directory engine or adding a second engine to the first release.
+- The selected directory engine or adding a second engine to the first release. **Resolved for dual engines by ADR-0008 / ADR-0009.** Further engines (OpenLDAP, Samba AD) still require an ADR.
 - The source-of-truth model.
 - Bootstrap and runtime privilege separation.
 - The reset boundary.

@@ -19,6 +19,7 @@ The detailed issue backlog is in `../TASKS.md`. This plan groups those tasks int
 | M6 - MCP | T-085 to T-094 | Official-SDK Streamable HTTP and stdio MCP surfaces over the shared services. |
 | M7 - Web UI | T-095 to T-107 | Reactive, accessible UI covering all supported workflows. |
 | M8 - Deployment and release | T-108 to T-120 | Hardened images, Compose profiles, setup tools, compatibility evidence, and release package. |
+| M9 - Native Go engine and dual-mode parity | T-121 to T-150 | `labldapd` with LabLDAP-surface parity vs 389 DS (ADR-0008). |
 
 ## 3. Milestone M0 - Repository and quality foundation
 
@@ -313,12 +314,34 @@ Package, harden, verify, and document a reproducible release.
 - Release security gates have no unapproved critical findings.
 - Complete acceptance scenario passes through REST, MCP, UI, and direct LDAP.
 
+## 11a. Milestone M9 - Native Go engine and dual-mode parity
+
+### Objective
+
+Ship `labldapd` as a selectable directory engine with LabLDAP-surface parity against 389 DS (oracle), without putting an LDAP listener in the control plane.
+
+### Deliverables
+
+- ADR-0008 / ADR-0009 and the parity contract (T-121).
+- `internal/ldapserver` + bbolt store + `cmd/labldapd`.
+- Native bootstrap reconcilers and `make compose-up-native`.
+- `test/parity` dual-engine harness.
+
+### Exit criteria
+
+- Contract-tier cases in `docs/design/native-engine-parity-contract.md` pass against both engines.
+- `labldap` / `labldap-bootstrap` do not import `internal/ldapserver`.
+- Default `engine: 389ds` behavior is unchanged.
+- Native mode is not advertised as ready until T-150.
+
 ## 12. Critical path
 
 ```text
 T-001 -> T-009 -> T-014 -> T-020 -> T-024 -> T-029 -> T-034 -> T-041
       -> T-045 -> T-049 -> T-054 -> T-060 -> T-064 -> T-069 -> T-076
       -> T-080 -> T-085 -> T-089 -> T-095 -> T-099 -> T-108 -> T-120
+M9:   T-121 -> T-122 -> T-124 -> T-125 -> T-128 -> T-135 -> T-139
+      -> T-143 -> T-144 -> T-147 -> T-150
 ```
 
 The exact task descriptions and dependencies are in `TASKS.md`.
@@ -346,6 +369,8 @@ A single implementation agent should:
 
 Multiple agents should own separate packages only after public interfaces and generated contracts are merged. Do not have separate agents invent overlapping user, group, auth, or error models.
 
+M9 (native engine) is designed for parallel cloud agents after **T-122** merges. Follow the wave table in `TASKS.md` §M9. Do not farm T-124+ until `Codec`, `Store`, `Schema`, `ACIEngine`, and `Server` interfaces are on `main`. Best-of-2 is appropriate for T-124 (BER) and T-138 (ACI parser). Keep Delta adjudication (T-147 failures that might be Deltas) local.
+
 ## 15. Design review checkpoints
 
 Conduct explicit review at:
@@ -357,6 +382,7 @@ Conduct explicit review at:
 - End of M6: MCP spec conformance.
 - End of M7: UI security and accessibility.
 - End of M8: release evidence.
+- End of M9: native engine Contract parity vs 389; privilege separation still holds; `labldap` does not import `internal/ldapserver`.
 
 ## 16. Completion definition
 

@@ -11,8 +11,10 @@ stubs in `docs/adr/*.stub.md` are placeholders, not decisions.
 
 These are the lines the project does not cross:
 
-- Do not implement an LDAP listener or BER engine in Go. 389 DS is the
-  directory.
+- Do not implement an LDAP listener or BER engine in `labldap` or
+  `labldap-bootstrap`. The native daemon `labldapd` is the only in-repo
+  LDAP server ([ADR-0008](docs/adr/0008-dual-directory-engines.md)).
+  Default engine remains 389 DS.
 - Do not store users, groups, or memberships in an application-only map.
 - Do not mount `/var/run/docker.sock` into any application container.
 - Do not give Directory Manager to the long-running `labldap` process.

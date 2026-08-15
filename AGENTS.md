@@ -4,7 +4,7 @@ This file governs implementation by automated coding agents and human contributo
 
 ## Mission
 
-Implement LabLDAP as a safe, deterministic laboratory directory platform using the architecture and requirements in this package. The goal is not to create a new LDAP server. The goal is to combine a mature LDAP engine with a small, well-tested management plane.
+Implement LabLDAP as a safe, deterministic laboratory directory platform using the architecture and requirements in this package. The control plane is not an LDAP server. Directory data lives in a selected engine: pinned 389 Directory Server (default) or the in-repo native engine (`labldapd`). Dual-engine work follows ADR-0008, ADR-0009, and `docs/design/native-engine-parity-contract.md`.
 
 ## Required reading before changes
 
@@ -19,8 +19,8 @@ Before implementing a task, read:
 
 ## Non-negotiable architecture rules
 
-- Do not implement an LDAP listener or BER protocol engine in Go.
-- Do not store users, groups, or memberships in an application-only in-memory map.
+- Do not implement an LDAP listener or BER protocol engine in the control plane (`labldap`) or bootstrap (`labldap-bootstrap`). The sole permitted LDAP server in this repository is `cmd/labldapd` / `internal/ldapserver` (ADR-0008, ADR-0009). Production control and bootstrap binaries must not import `internal/ldapserver`.
+- Do not store users, groups, or memberships in an application-only in-memory map. Directory data lives in the selected engine (389 DS or the native bbolt store).
 - Do not mount `/var/run/docker.sock` into any application container.
 - Do not provide Directory Manager credentials to the long-running control service.
 - Do not make the REST handlers call MCP handlers or the MCP handlers call REST handlers.
@@ -61,7 +61,8 @@ The implementation should converge on this structure:
 |-- go.sum
 |-- cmd/
 |   |-- labldap/
-|   `-- labldap-bootstrap/
+|   |-- labldap-bootstrap/
+|   `-- labldapd/
 |-- internal/
 |   |-- api/
 |   |-- app/
@@ -71,7 +72,10 @@ The implementation should converge on this structure:
 |   |-- config/
 |   |-- directory/
 |   |   |-- ldapclient/
-|   |   `-- ds389/
+|   |   |-- ds389/
+|   |   `-- native/
+|   |-- ldapserver/
+|   |   `-- store/
 |   |-- mcpserver/
 |   |-- observability/
 |   |-- reset/
@@ -91,6 +95,7 @@ The implementation should converge on this structure:
 |   |-- integration/
 |   |-- e2e/
 |   |-- compatibility/
+|   |-- parity/
 |   `-- fixtures/
 |-- docs/
 `-- tools/
@@ -103,7 +108,10 @@ A different layout requires an ADR and must preserve package boundaries.
 - `internal/config`: parse, default, validate, normalize, hash, and compile configuration. It must not connect to LDAP.
 - `internal/directory`: transport-neutral interfaces and domain types.
 - `internal/directory/ldapclient`: low-level LDAP connection, escaping, controls, and error translation.
-- `internal/directory/ds389`: 389 DS bootstrap and capability implementation.
+- `internal/directory/ds389`: 389 DS bootstrap and runtime LDAP adapter.
+- `internal/directory/native`: native-engine bootstrap reconcilers and capability inspect. Must not import `ds389`.
+- `internal/ldapserver`: native LDAPv3 listener, codec, dispatch, schema, ACI evaluation, and plugins. Must not import `internal/api`, `internal/mcpserver`, `internal/web`, `internal/auth`, or `internal/directory/ds389`.
+- `internal/ldapserver/store`: bbolt entry store behind the ldapserver `Store` interface.
 - `internal/apperr`: structured error taxonomy and test helpers. Leaf package; no LDAP, HTTP, or MCP imports.
 - `internal/app`: use cases, policy checks, transactions, reset orchestration, and audit calls.
 - `internal/api`: HTTP transport only.
@@ -191,6 +199,8 @@ Every behavior change requires the lowest applicable test level:
 
 - Pure parsing or mapping: unit test.
 - LDAP operation or 389 DS configuration: integration test with a real 389 DS container.
+- Native engine protocol or store behavior: in-process unit/integration test against `internal/ldapserver` (no Docker required until compose-native).
+- Dual-engine Contract behavior: `test/parity` with 389 as oracle (see `docs/design/native-engine-parity-contract.md`).
 - REST contract: OpenAPI contract and handler test.
 - MCP tool: SDK-level protocol test and application-service test.
 - Browser workflow: Playwright end-to-end test.
@@ -212,6 +222,7 @@ A task is done only when:
 - Sensitive data is covered by logging-redaction tests.
 - Errors are stable and actionable.
 - The implementation works in both ephemeral and persistent Compose modes when applicable.
+- Contract-tier native-engine behavior has a 389 oracle case in `test/parity` unless the task is explicitly native-only infrastructure.
 - `make verify` passes.
 - No new high or critical vulnerability is introduced by dependency scanning.
 

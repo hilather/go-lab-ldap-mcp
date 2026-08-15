@@ -28,6 +28,7 @@
 | M6 MCP | T-085 to T-094 | Official-SDK MCP server over shared services. |
 | M7 Web UI | T-095 to T-107 | Complete operator workflows and accessibility. |
 | M8 Deployment and release | T-108 to T-120 | Hardened reproducible release package. |
+| M9 Native Go engine and dual-mode parity | T-121 to T-150 | `labldapd` + LabLDAP-surface parity vs 389 DS (ADR-0008). |
 
 # M0 - Repository and quality foundation
 
@@ -1388,9 +1389,364 @@ T-117 medium soak remains deferred (P1). Playwright default is the
 contract mock (`LABLDAP_E2E_BASE_URL` for live UI). MCP catalog:
 `docs/mcp/catalog.md`.
 
+# M9 - Native Go LDAP engine and dual-mode parity
+
+Post-v0.1.0. Binding docs: [ADR-0008](docs/adr/0008-dual-directory-engines.md), [ADR-0009](docs/adr/0009-native-engine-topology-and-storage.md), [parity contract](docs/design/native-engine-parity-contract.md).
+
+**Farming:** T-121 (this change) pins the ADRs. T-122 must merge to `main` before parallel cloud agents start. Then: Wave 1 = T-124–T-128 (one agent, or best-of-2 on T-124); Wave 2 = T-129 ∥ T-130 ∥ T-131 ∥ T-132; Wave 3 = T-133–T-134 ∥ T-135–T-137; Wave 4 = T-138–T-139 (best-of-2 candidate); Wave 5 = T-140–T-142 ∥ T-143–T-146; Wave 6 = T-147–T-150 (adjudicate Deltas locally). Production `labldap` / `labldap-bootstrap` must not import `internal/ldapserver`.
+
+## [x] T-121 Land dual-engine ADRs and parity contract
+
+Priority: P0 | Size: M | Depends on: T-120 | Wave 0 | Cloud fit: low (owner docs)
+
+Deliverables: ADR-0008, ADR-0009, `docs/design/native-engine-parity-contract.md`, AGENTS/README/architecture/open-decisions amendments, M9 task list.
+
+Acceptance:
+- [x] ADR-0008 and ADR-0009 are Accepted with owner as decider.
+- [x] Parity contract lists Contract / Delta / Excluded tiers with test obligations.
+- [x] `AGENTS.md` permits `labldapd` and forbids LDAP-in-control-plane.
+- [x] Stub ADR-0001/0002 point at ADR-0008 rather than occupying rank 1.
+
+## [x] T-122 Pin native package interfaces
+
+Priority: P0 | Size: M | Depends on: T-121 | Wave 0 | Cloud fit: high
+
+Deliverables: `internal/ldapserver` exported interfaces only (no protocol impl yet): `Codec`, `Store`, `Schema`, `ACIEngine`, `Plugin`, `Server` config, plus fakes for unit tests. `internal/directory/native` package doc. `cmd/labldapd` stub `--help`. Import-boundary test: `internal/api` / `cmd/labldap` do not import `ldapserver`.
+
+Acceptance:
+- [x] Interfaces compile and are documented with package comments matching ADR-0009.
+- [x] Fakes satisfy the interfaces; a table test constructs a Server with fakes.
+- [x] Archcheck or equivalent fails if `cmd/labldap` or `cmd/labldap-bootstrap` imports `internal/ldapserver`.
+- [x] No BER listener, no bbolt, no ACI evaluation in this task.
+
+## [x] T-123 Add `spec.directory.engine` configuration
+
+Priority: P0 | Size: M | Depends on: T-121 | Wave 0 | Cloud fit: high
+
+Deliverables: `v1alpha1` field `directory.engine` enum `389ds` | `native`, default `389ds`; JSON Schema; `EnginePlan.Engine`; examples; compile/validate tests; compatibility note in `config/schema/v1alpha1-stand-in.md`. Serve/bootstrap still ignore `native` until T-146 (fail closed with a stable error if `native` is selected before wiring).
+
+Acceptance:
+- [x] Omitted field defaults to `389ds`; unknown values fail at a documented path.
+- [x] Schema enum matches Go constants (drift test).
+- [x] Engine selection is mixed into the compiled plan; document whether it changes directory revision (prefer yes — different engine is a different lab).
+- [x] Existing fixtures without the field still compile.
+
+## [ ] T-124 BER codec, LDAPMessage framing, and fuzz
+
+Priority: P0 | Size: L | Depends on: T-122 | Wave 1 | Cloud fit: high (best-of-2 candidate)
+
+Deliverables: `internal/ldapserver` codec wrapping `github.com/go-asn1-ber/asn1-ber`; encode/decode LDAPMessage; max PDU size; golden RFC 4511 PDUs; go-fuzz corpus.
+
+Acceptance:
+- [ ] Round-trip BindRequest, SearchRequest, SearchResultEntry, LDAPResult, UnbindRequest, AbandonRequest.
+- [ ] Oversized PDU is rejected before allocation growth beyond the limit.
+- [ ] Fuzz target is wired; seed corpus committed without secrets.
+- [ ] No TCP listener in this task.
+
+## [ ] T-125 Listener, connection lifecycle, dispatch, and pre-auth limits
+
+Priority: P0 | Size: L | Depends on: T-124 | Wave 1 | Cloud fit: high
+
+Deliverables: loopback listener; per-connection read/write/idle deadlines; max outstanding ops; graceful shutdown; request dispatch to handlers; metrics hooks without DNs.
+
+Acceptance:
+- [ ] In-process test dials loopback, sends a Bind, receives a result (handler may be a stub).
+- [ ] Context cancel closes blocked connections within tested bounds.
+- [ ] Default bind address is loopback when unspecified.
+- [ ] Logging redaction test: no raw PDU dump of passwords.
+
+## [ ] T-126 Simple Bind, Unbind, and Abandon
+
+Priority: P0 | Size: M | Depends on: T-125 | Wave 1 | Cloud fit: high
+
+Deliverables: simple bind against Store (fake is enough); anonymous bind gated; Unbind closes; Abandon cancels in-flight search on that conn.
+
+Acceptance:
+- [ ] Valid simple bind succeeds; wrong password → `invalidCredentials`.
+- [ ] Anonymous bind fails when disabled.
+- [ ] Abandon of a blocked search unblocks the worker in tests.
+- [ ] DM identity bypass flag is present on the bind result for later ACI (T-139).
+
+## [ ] T-127 Search operation and RFC 4515 filter parse
+
+Priority: P0 | Size: L | Depends on: T-125, T-126 | Wave 1 | Cloud fit: high
+
+Deliverables: SearchRequest handling against Store; filter parser; base/one/sub scopes; size/time limits; attribute selection.
+
+Acceptance:
+- [ ] Malformed filters fail with a protocol/filter error, not a panic.
+- [ ] Base search of a missing DN → `noSuchObject`.
+- [ ] Size limit is enforced in the server, not only the client.
+- [ ] Matching-rule evaluation may be stubbed (equality on exact bytes) until T-131; document the stub.
+
+## [ ] T-128 Add, Modify, Delete, Compare, ModifyDN
+
+Priority: P0 | Size: L | Depends on: T-127 | Wave 1 | Cloud fit: high
+
+Deliverables: write ops against Store transactions; Compare; ModifyDN (rename within suffix).
+
+Acceptance:
+- [ ] Add duplicate DN → `entryAlreadyExists`; delete missing → `noSuchObject`.
+- [ ] Modify of missing attribute follows RFC 4511 (or 389-observed; record if Delta).
+- [ ] Compare true/false result codes match RFC 4511.
+- [ ] Schema enforcement may be stubbed until T-132.
+
+## [ ] T-129 bbolt entry store (dn2id / id2entry)
+
+Priority: P0 | Size: L | Depends on: T-122 | Wave 2 | Cloud fit: high
+
+Deliverables: `internal/ldapserver/store` bbolt implementation; pin module version; file mode 0600; crash-safe commit; open/close.
+
+Acceptance:
+- [ ] Restart reopens the same file and reads prior entries.
+- [ ] Concurrent read during write does not corrupt (transaction test).
+- [ ] Empty path / permission errors are stable and secret-free.
+- [ ] In-memory fake remains available for protocol tests.
+
+## [ ] T-130 Equality indices and transactional snapshots
+
+Priority: P0 | Size: L | Depends on: T-129 | Wave 2 | Cloud fit: high
+
+Deliverables: equality indices for `uid`, `cn`, `member`, `objectClass`; snapshot reads for Search; single-commit mutate.
+
+Acceptance:
+- [ ] Indexed equality search does not scan all entries in a 1k-entry fixture (assert via counter or bounded time).
+- [ ] RFC 4528-ready: a transaction can read-then-write atomically (used by T-141).
+- [ ] Index updates on add/modify/delete stay consistent after simulated crash (re-open).
+
+## [ ] T-131 Matching rules and DN canonicalization
+
+Priority: P0 | Size: L | Depends on: T-122 | Wave 2 | Cloud fit: high
+
+Deliverables: `caseIgnoreMatch` / IA5 as required by the parity contract; reuse `internal/config` DN helpers; no forked DN parser.
+
+Acceptance:
+- [ ] `uid=Alice` and `uid=alice` match when the rule is case-ignore (389-oracle case in T-147 may come later; unit tests vs golden pairs here).
+- [ ] DN equality uses canonical DN, not string suffix.
+- [ ] T-127 stub equality is replaced when this merges (or Search calls matching rules behind an interface).
+
+## [ ] T-132 Schema registry, MUST/MAY, subschema, Root DSE
+
+Priority: P0 | Size: L | Depends on: T-122 | Wave 2 | Cloud fit: high
+
+Deliverables: RFC 4512 subset for Contract object classes (C5); add/modify schema checks; Root DSE; subschema search; `nsmemberof` and `device` present.
+
+Acceptance:
+- [ ] Add user without `sn` fails `objectClassViolation`.
+- [ ] Root DSE advertises namingContexts, supportedControl, supportedExtension, vendorName (Delta D1 values, not 389 strings).
+- [ ] Subschema includes `inetOrgPerson`, `groupOfNames`, `nsAccountLock` attribute type, `nsmemberof`.
+- [ ] `requiredOK` capability inspect can consume this Root DSE.
+
+## [ ] T-133 TLS, StartTLS, and bind-transport policy
+
+Priority: P0 | Size: L | Depends on: T-125, T-126 | Wave 3 | Cloud fit: high
+
+Deliverables: LDAPS listener; StartTLS extended op; require-secure-binds; anonymous off; CA/name verification using existing test CA helpers.
+
+Acceptance:
+- [ ] LDAPS succeeds with correct trust and name; wrong CA and wrong name fail closed.
+- [ ] Cleartext simple bind rejected when `allowCleartextBind` is false (`confidentialityRequired` or 389-observed code; record).
+- [ ] StartTLS then bind succeeds in-process.
+- [ ] Private keys absent from test logs.
+
+## [ ] T-134 Password hashing and policy engine
+
+Priority: P0 | Size: L | Depends on: T-126, T-128, T-129 | Wave 3 | Cloud fit: high
+
+Deliverables: `PBKDF2-SHA256` and `SSHA512` verify; min length, history, max age, lockout; `pwdAccountLockedTime`; never log or return hashes.
+
+Acceptance:
+- [ ] Seed password bind succeeds; reuse of a history password fails.
+- [ ] Lockout after N failures sets `pwdAccountLockedTime` and fails subsequent binds until duration elapses (use fake clock).
+- [ ] Hash blobs are not required to match 389 (Delta D3); bind with plaintext is the test.
+- [ ] Password values absent from logs.
+
+## [ ] T-135 MemberOf write-path plugin
+
+Priority: P0 | Size: L | Depends on: T-128, T-129, T-132 | Wave 3 | Cloud fit: high
+
+Deliverables: on member add/remove/replace, update `memberOf`; auto-add `nsmemberof`; fixup equivalent for bootstrap/reset.
+
+Acceptance:
+- [ ] After group member add, user search returns `memberOf` of that group DN.
+- [ ] Remove member drops `memberOf`.
+- [ ] Nested-group behavior follows a constructor flag matching `spec.directory.nestedGroups`.
+- [ ] Same-commit: Search after the write in one test client sees `memberOf`.
+
+## [ ] T-136 Referential integrity plugin
+
+Priority: P0 | Size: M | Depends on: T-135 | Wave 3 | Cloud fit: high
+
+Deliverables: on user/group delete, repair `member` on groups in suffix; update-delay 0.
+
+Acceptance:
+- [ ] Deleting a member removes that DN from groups; groups that would become empty fail or are handled as documented (groupOfNames cannot be empty — match 389 observed).
+- [ ] Delete outside suffix does not rewrite foreign entries (no foreign entries in v1).
+- [ ] Fixup is suffix-scoped.
+
+## [ ] T-137 nsAccountLock, operational attributes, marker schema
+
+Priority: P0 | Size: M | Depends on: T-126, T-132, T-134 | Wave 3 | Cloud fit: high
+
+Deliverables: `nsAccountLock: true` bind fail (LDAP 53 / 389-observed); `createTimestamp`, `modifyTimestamp`, `modifiersName`, `entryUUID` on add; `device` marker OC allowed.
+
+Acceptance:
+- [ ] Disabled user cannot bind; entry still exists.
+- [ ] Modify updates `modifyTimestamp`.
+- [ ] Marker add with `device` + `description` JSON succeeds.
+- [ ] Bind-test can read `pwdAccountLockedTime` and `nsAccountLock`.
+
+## [ ] T-138 ACI parser for the compiler subset
+
+Priority: P0 | Size: L | Depends on: T-122 | Wave 4 | Cloud fit: high (best-of-2 candidate)
+
+Deliverables: parse ACI text emitted by `internal/config` (golden `testdata/runtime-acis.txt` + operator fixtures); reject unknown clauses rather than ignore.
+
+Acceptance:
+- [ ] All four runtime ACIs parse.
+- [ ] Compiler golden operator ACIs parse.
+- [ ] Injection characters in DN/attr are treated as data, not extra clauses.
+- [ ] Out-of-grammar raw ACI fails with a stable error (C8).
+
+## [ ] T-139 ACI evaluator and T-036 allow/deny matrix
+
+Priority: P0 | Size: L | Depends on: T-138, T-126, T-128, T-135 | Wave 4 | Cloud fit: high
+
+Deliverables: evaluate parsed ACIs on Search/Add/Modify/Delete/Compare; DM bypass; deny-wins per 389 observed; runtime account matrix from T-036.
+
+Acceptance:
+- [ ] Runtime can read people/groups and cannot read `userPassword`.
+- [ ] Runtime can write people/groups except `aci`.
+- [ ] Runtime can write `userPassword` on people.
+- [ ] Runtime cannot modify engine-admin tree (`cn=config` absent is Delta D2; operation still `insufficientAccessRights`).
+- [ ] Operator `groupdn` ACL allows a member and denies a non-member.
+
+## [ ] T-140 Simple Paged Results control
+
+Priority: P0 | Size: M | Depends on: T-127, T-130 | Wave 5 | Cloud fit: high
+
+Deliverables: control OID `1.2.840.113556.1.4.319`; cookie integrity; advertised on Root DSE.
+
+Acceptance:
+- [ ] Page size 2 over 5 entries returns 3 pages and ends.
+- [ ] Tampered cookie fails.
+- [ ] Critical unknown control → `unavailableCriticalExtension`.
+
+## [ ] T-141 RFC 4528 assertion control
+
+Priority: P0 | Size: M | Depends on: T-128, T-130, T-132 | Wave 5 | Cloud fit: high
+
+Deliverables: advertise `1.3.6.1.1.12`; transactional If-Match-style modify; do not advertise if not honored.
+
+Acceptance:
+- [ ] Matching assertion allows modify; failing assertion does not apply the write.
+- [ ] Concurrent conflicting assertions: at most one commit (txn test).
+- [ ] Root DSE lists the OID.
+
+## [ ] T-142 WhoAmI extended operation
+
+Priority: P0 | Size: S | Depends on: T-126, T-132 | Wave 5 | Cloud fit: high
+
+Deliverables: RFC 4532 `1.3.6.1.4.1.4203.1.11.3`; advertise on Root DSE.
+
+Acceptance:
+- [ ] After simple bind, WhoAmI returns the bound DN (authzid form matching 389 observed or RFC; record Delta if formatting differs).
+- [ ] T-115 `ldapwhoami` case can be pointed at native after T-148.
+
+## [ ] T-143 `labldapd` daemon command
+
+Priority: P0 | Size: M | Depends on: T-133, T-134, T-132 | Wave 5 | Cloud fit: medium
+
+Deliverables: `cmd/labldapd` flags: config/engine-plan path, data dir, listen, TLS files, DM password file, health; structured logs; graceful shutdown.
+
+Acceptance:
+- [ ] `--help` documents flags; missing DM password file exits non-zero without protocol start.
+- [ ] Process applies engine plan at start (suffix, policy, plugin hooks).
+- [ ] Logs contain no secrets.
+
+## [ ] T-144 Native bootstrap reconcilers
+
+Priority: P0 | Size: L | Depends on: T-123, T-143, T-139 | Wave 5 | Cloud fit: medium
+
+Deliverables: `internal/directory/native` implements **engine-plan read-back** reconcilers only (`BackendReconciler`, `TLSReconciler`, `PolicyReconciler`, `PluginReconciler`) per ADR-0009. Wait, tree, ACI, seed, verify, drift, and marker stay the existing LDAP-as-DM implementations (they already speak LDAP, not `dsconf`) wired by `cmd/labldap-bootstrap`. Fail closed if the daemon’s applied engine plan does not match. Known boundary amendment: `tools/importboundary` `forbiddenLDAPClient` currently bars `internal/directory/native` from importing `ldapclient` — this task amends that edge (native reconcilers read back over LDAP), with a boundary-test edge update.
+
+Acceptance:
+- [ ] `labldap-bootstrap apply` against a running `labldapd` with `engine: native` exits 0 on a minimal scenario.
+- [ ] Mismatch (wrong suffix / policy) fails with a phase code, no marker commit.
+- [ ] No `dsconf` invocation in the native path (test spy).
+
+## [ ] T-145 Native image and compose-native profile
+
+Priority: P0 | Size: L | Depends on: T-143 | Wave 5 | Cloud fit: medium (needs Docker)
+
+Deliverables: `labldapd` image (non-root, read-only root, `/data` volume); `deploy/compose` native overlay replacing `dirsrv` with `labldapd`; `make image-native`; `make compose-up-native`; healthcheck.
+
+Acceptance:
+- [ ] Image contains no DM secret, no Docker socket, no source.
+- [ ] `make compose-up-native` brings directory → bootstrap → control on loopback 3389/3636/8443.
+- [ ] Floating tags absent from release compose.
+- [ ] Pin base image by digest.
+
+## [ ] T-146 Control-plane engine selection wiring
+
+Priority: P0 | Size: M | Depends on: T-123, T-144 | Wave 5 | Cloud fit: high
+
+Deliverables: `labldap serve` and `labldap-bootstrap` switch reconciler set on `EnginePlan.Engine`; runtime remains `ds389.Runtime` + `ldapclient` pointed at the configured LDAP URL. `native` before T-144 landed already fails closed (T-123); this task makes it succeed.
+
+Acceptance:
+- [ ] `engine: 389ds` path unchanged (existing IT still pass).
+- [ ] `engine: native` uses native reconcilers only.
+- [ ] Control still has no DM secret.
+
+## [ ] T-147 Dual-engine parity harness
+
+Priority: P0 | Size: L | Depends on: T-144, T-145 | Wave 6 | Cloud fit: medium
+
+Deliverables: `test/parity` starts 389 (existing harness) and native (in-process or `labldapd`); compiles one scenario; runs Contract cases from the parity contract; `make test-parity`.
+
+Acceptance:
+- [ ] At least: seed bind, memberOf, nsAccountLock, runtime ACI allow/deny, paged search, LDAPS bind.
+- [ ] Failures attach redacted logs from both engines.
+- [ ] Secret scan of the run passes.
+- [ ] D1 vendor strings are asserted different, not equal.
+
+## [ ] T-148 Parametrize existing integration tests
+
+Priority: P0 | Size: L | Depends on: T-147 | Wave 6 | Cloud fit: medium
+
+Deliverables: run the T-043 observed suite and T-115 client matrix against native where Contract applies; skip Deltas by ID; `ldapwhoami` / `ldapsearch` / go-ldap / ldap3 vs native.
+
+Acceptance:
+- [ ] Documented skip list is only Delta/Excluded IDs from the parity contract.
+- [ ] Compatibility report records native engine version beside 389.
+- [ ] 389-only tests remain the default `make test-integration`.
+
+## [ ] T-149 Differential fuzzing
+
+Priority: P0 | Size: L | Depends on: T-124, T-127, T-138, T-147 | Wave 6 | Cloud fit: high (oracle step may be local)
+
+Deliverables: shared corpus of BER/filter/DN/ACI; native must not panic; optional 389 comparison for parse-accept vs evaluate.
+
+Acceptance:
+- [ ] Native fuzz of codec, filter, ACI runs under `go test -fuzz` with a time-boxed CI job or documented nightly.
+- [ ] No crashers committed; any 389/native parse divergence is a Delta or a native bug.
+
+## [ ] T-150 Soak, leak, redaction, delta ledger, verify gate
+
+Priority: P0 | Size: M | Depends on: T-147, T-148 | Wave 6 | Cloud fit: medium
+
+Deliverables: short native soak (goroutine/FD/bolt growth); log redaction; `docs/design/parity-delta-log.md`; `make verify` includes native unit tests; M9 exit evidence.
+
+Acceptance:
+- [ ] No unbounded growth in the short soak.
+- [ ] Delta ledger lists every accepted skip with test name.
+- [ ] `make verify` green without requiring Docker native compose (compose-native stays `test-parity` / integration).
+- [ ] README/docs only advertise native as ready after this task.
+
 # Backlog completion checklist
 
-- [x] All P0 tasks are complete.
+- [x] All P0 tasks for M0–M8 are complete (v0.1.0).
+- [ ] M9 (native engine) P0 tasks T-122–T-150 are complete.
 - [ ] Every milestone exit criterion in `docs/10-implementation-plan.md` passes.
 - [ ] Traceability matrix points to concrete test files or jobs.
 - [ ] Accepted ADRs match implementation behavior.

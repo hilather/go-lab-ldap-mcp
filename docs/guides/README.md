@@ -16,4 +16,6 @@ Related:
 - [Troubleshooting](../operations/troubleshooting.md)
 - [MCP catalog](../mcp/catalog.md)
 - [Release notes](../release/notes.md)
+- Dual-engine ADRs: [0008](../adr/0008-dual-directory-engines.md), [0009](../adr/0009-native-engine-topology-and-storage.md)
+- [Native parity contract](../design/native-engine-parity-contract.md) (M9; native mode not in v0.1.0)
 - Public site: https://hilather.github.io/go-lab-ldap-mcp/ (GitHub Pages from this `docs/` tree)

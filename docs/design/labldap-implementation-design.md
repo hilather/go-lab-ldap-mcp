@@ -1323,7 +1323,7 @@ No pre-existing application schema. Authoritative models:
 | Approach | Speak LDAP in-process; optional persistence. |
 | Pros | Single binary; no 389 DS image contract. |
 | Cons | Protocol/schema/ACI/password-policy correctness is a multi-year project; violates KD-1/KD-2. |
-| Outcome | **Rejected.** ADR 0001. |
+| Outcome | **Rejected for v0.1.0** (control plane must not speak LDAP; no in-memory SoT). **Superseded in scope by [ADR-0008](../adr/0008-dual-directory-engines.md):** a separate `labldapd` daemon may implement LDAP; `labldap` still must not. |
 
 ### A2 — Single container with Directory Manager in the control process
 

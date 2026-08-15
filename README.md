@@ -28,10 +28,14 @@
 
 ![LabLDAP console](docs/assets/console.jpg)
 
-LabLDAP is not another LDAP server. 389 Directory Server remains the engine of
-record. The Go process is a control plane: it bootstraps a lab suffix, then
-exposes the same authorized operations over HTTPS, Model Context Protocol, and
-an embedded UI.
+LabLDAP is a control plane around a directory engine. v0.1.0 ships **389 Directory
+Server** as the engine of record. [ADR-0008](docs/adr/0008-dual-directory-engines.md)
+adds a second, Go-native engine (`labldapd`) with [LabLDAP-surface parity](docs/design/native-engine-parity-contract.md);
+native mode is milestone M9 and is not ready until those tasks complete.
+
+The Go process bootstraps a lab suffix, then exposes the same authorized
+operations over HTTPS, Model Context Protocol, and an embedded UI. Directory
+Manager never touches the long-running control service.
 
 Use it when you need a **real directory** to exercise clients, agents, bind
 paths, ACIs, and schema — without standing up production 389 DS by hand, and
@@ -157,15 +161,16 @@ restores this file. Full rules and ACL example:
 
 LabLDAP is a laboratory. It is not a production identity system.
 
-1. **LDAP bind is against 389 DS, not the Go process.** Point `ldapsearch`, apps, and simple bind at `ldap://127.0.0.1:3389` / `ldaps://127.0.0.1:3636`. The Go control plane is HTTPS only (UI, REST, MCP). It is an LDAP *client* of 389 DS. It does not listen for LDAP.
-2. 389 DS is the source of truth.
+1. **LDAP bind is against the directory engine, not the Go control plane.** Point `ldapsearch`, apps, and simple bind at `ldap://127.0.0.1:3389` / `ldaps://127.0.0.1:3636`. The control plane is HTTPS only (UI, REST, MCP). It is an LDAP *client*. In 389 mode the listener is 389 DS; in native mode (M9) it is `labldapd`. Neither `labldap` nor `labldap-bootstrap` listens for LDAP.
+2. The selected engine is the source of truth for users, groups, memberships, and passwords.
 3. The control plane never mounts the Docker socket.
 4. Directory Manager is bootstrap-only.
 5. Static bearer tokens are an explicit lab mode, not an accident.
 6. Ephemeral tmpfs is not a forensic wipe — host swap can still hold pages.
 7. Soft reset restores the compiled suffix. It does not delete the volume.
-8. First release: one managed suffix, one 389 DS instance.
+8. First usable release: one managed suffix, one engine instance. Engine default is 389 DS.
 9. Active Directory emulation is out of scope.
+10. Native Go engine (`labldapd`) is a dual-mode lab option under ADR-0008; it is not a silent replacement for 389 DS and is not advertised ready until M9 exit criteria pass.
 
 Management TLS in the shipped compose stack is a **lab certificate**. Trust
 `secrets/tls/instance-ca.crt` (ephemeral) or `secrets/tls/ca.crt` (persistent).
@@ -201,8 +206,11 @@ not pushed to a public registry.
 ## Status
 
 **v0.1.0** — first usable release. One suffix, one 389 DS, REST + UI + MCP,
-ephemeral and persistent compose. No project license file yet; treat it as
-source-available until one is added.
+ephemeral and persistent compose. Dual-engine native mode is accepted in
+[ADR-0008](docs/adr/0008-dual-directory-engines.md) and implemented as
+milestone M9 in [`TASKS.md`](TASKS.md); it is not part of v0.1.0.
+
+No project license file yet; treat it as source-available until one is added.
 
 ```
 github.com/hilather/go-lab-ldap-mcp

@@ -2,11 +2,11 @@
 
 ## 1. Architecture summary
 
-LabLDAP is a control plane around 389 Directory Server. The architecture deliberately separates engine bootstrap privileges from runtime management privileges.
+LabLDAP is a control plane around a directory engine. The architecture deliberately separates engine bootstrap privileges from runtime management privileges. v0.1.0 ships 389 Directory Server as the sole engine. [ADR-0008](adr/0008-dual-directory-engines.md) adds a second engine (`native` / `labldapd`) with the same three lifecycle roles; native mode is milestone M9.
 
 There are three lifecycle roles:
 
-- **Directory:** the long-running 389 DS engine and the authoritative data store.
+- **Directory:** the long-running engine (389 DS or `labldapd`) and the authoritative data store.
 - **Bootstrap:** a one-shot process that validates configuration, creates the backend, configures engine features, applies baseline data, creates the runtime service account, and verifies the resulting system.
 - **Control:** the long-running Go service that serves REST, MCP, UI assets, sessions, audit, health, and metrics while reading and writing directory data with a restricted LDAP identity.
 
@@ -461,8 +461,8 @@ A future multi-replica control plane would require shared sessions or stateless 
 
 ## 15. Extension points
 
-- `DirectoryRepository` allows future OpenLDAP, Samba AD, or embedded-test implementations.
-- Capability reporting allows engine-specific UI and tool behavior.
+- `DirectoryRepository` allows a second in-repo engine (`native` / `labldapd`, ADR-0008) and future OpenLDAP, Samba AD, or embedded-test implementations.
+- Capability reporting allows engine-specific UI and tool behavior. Vendor strings differ by engine (parity Delta D1).
 - `TokenAuthenticator` allows OAuth-compatible resource-server validation later.
 - `AuditSink` allows file, syslog, OpenTelemetry, or database sinks.
 - `SecretResolver` allows Docker secrets, environment variables for development, or external secret stores.
@@ -478,3 +478,4 @@ Before moving to the next implementation milestone, prove:
 4. The same application command can be invoked by a unit test, REST handler, and MCP tool without transport coupling.
 5. Reset restores the baseline after direct LDAP and API mutations.
 6. The control container has no Directory Manager secret and no Docker socket.
+7. When native mode is enabled, Contract-tier behaviors in `docs/design/native-engine-parity-contract.md` match 389 DS (oracle) in `test/parity`.
