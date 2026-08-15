@@ -1,12 +1,15 @@
 # LabLDAP operator guide
 
-This is the first-usable-release operator package (T-119). Deploy from
+Day-2 reference for a running lab. New here? Start with the
+[quick start](../guides/quickstart.md), [user guide](../guides/user-guide.md),
+and [deploy](../guides/deploy.md).
+
+This is the first-usable-release operator package. Deploy from
 these files plus the Make targets. Bootstrap (`labldap-bootstrap apply`)
 is the only supported engine configuration path. Do not run extra
 directory-engine CLI by hand.
 
-Working names (OD-001): LabLDAP, `labldap`, `labldap-bootstrap`.
-Local images only (OD-004). No distribution LICENSE file (OD-003).
+Local images only. No distribution LICENSE file yet.
 
 ## What you get
 

@@ -1,7 +1,8 @@
 # Deployment
 
-Operator package: [`docs/operations/operator-guide.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/operations/operator-guide.md).
-Release notes: [`docs/release/notes.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/release/notes.md).
+Start here: **[docs/guides/deploy.md](../docs/guides/deploy.md)**.
+Operator package: [docs/operations/operator-guide.md](../docs/operations/operator-guide.md).
+Release notes: [docs/release/notes.md](../docs/release/notes.md).
 
 Compose topology: directory (pinned 389 DS) → CA publish or lab TLS import
 → bootstrap one-shot → hardened `labldap-control:dev`.
