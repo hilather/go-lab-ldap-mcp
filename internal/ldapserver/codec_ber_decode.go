@@ -349,7 +349,7 @@ func decodeFilter(p *ber.Packet) (Filter, error) {
 		if p.TagType != ber.TypeConstructed {
 			return nil, malformed("filter and/or")
 		}
-		children := make([]Filter, 0, len(p.Children))
+		var children []Filter // nil when empty: decoder output is canonical
 		for _, ch := range p.Children {
 			f, err := decodeFilter(ch)
 			if err != nil {
@@ -788,7 +788,7 @@ func decodeControls(p *ber.Packet) ([]Control, error) {
 	if err := shape(p, ber.ClassContext, ber.TypeConstructed, 0, "controls"); err != nil {
 		return nil, err
 	}
-	controls := make([]Control, 0, len(p.Children))
+	var controls []Control // nil when empty: decoder output is canonical
 	for _, cp := range p.Children {
 		if err := shape(cp, ber.ClassUniversal, ber.TypeConstructed, ber.TagSequence, "control"); err != nil {
 			return nil, err

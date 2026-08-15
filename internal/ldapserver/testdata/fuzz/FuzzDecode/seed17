@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("0-\x02\x01\x02`(\x02\x01\x03\x04\x14cn=Directory Manager\x80\rtest-password")

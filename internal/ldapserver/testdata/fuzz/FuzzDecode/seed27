@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("0:\x02\x01\x0el5\x04$uid=bob,ou=people,dc=example,dc=test\x04\nuid=robert\x01\x01\x00")

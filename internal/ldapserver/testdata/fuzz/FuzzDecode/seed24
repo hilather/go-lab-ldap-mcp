@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("0\x81\x8f\x02\x01\af\x81\x89\x04&uid=alice,ou=people,dc=example,dc=test0_0$\n\x01\x020\x1f\x04\vdisplayName1\x10\x04\x0eAlice A. Adams0%\n\x01\x000 \x04\vdescription1\x11\x04\x0ffixture account0\x10\n\x01\x010\v\x04\aseeAlso1\x00")

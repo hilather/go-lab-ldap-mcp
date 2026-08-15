@@ -3,7 +3,6 @@ package ldapserver
 import (
 	"errors"
 	"fmt"
-	"strings"
 
 	ber "github.com/go-asn1-ber/asn1-ber"
 )
@@ -29,7 +28,7 @@ func encodeMessage(m *Message) ([]byte, error) {
 		return nil, errors.New("ldapserver: encode message: nil message or operation")
 	}
 	if m.ID < 0 || m.ID > maxInt32 {
-		return nil, errors.New("ldapserver: encode message: message id out of range")
+		return nil, fmt.Errorf("ldapserver: encode message: message id out of range: %w", ErrMalformedPDU)
 	}
 	op, err := encodeOp(m.Op)
 	if err != nil {
@@ -388,7 +387,7 @@ func encodeExtendedResponse(r *ExtendedResponse) (*ber.Packet, error) {
 func encodeControls(controls []Control) (*ber.Packet, error) {
 	p := ber.Encode(ber.ClassContext, ber.TypeConstructed, 0, nil, "Controls")
 	for _, c := range controls {
-		if c.OID == "" || !strings.Contains(c.OID, ".") {
+		if c.OID == "" {
 			return nil, errors.New("ldapserver: encode control: invalid OID")
 		}
 		cp := ber.NewSequence("Control")
