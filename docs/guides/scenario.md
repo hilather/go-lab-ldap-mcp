@@ -12,6 +12,19 @@ Shipped examples:
 - [`config/examples/example-lab.yaml`](../../config/examples/example-lab.yaml) — commented host-path example
 - Schema: [`config/schema/v1alpha1.json`](../../config/schema/v1alpha1.json)
 
+## Directory engine
+
+`spec.directory.engine` selects the directory engine (ADR-0008):
+
+| Value | Meaning |
+| --- | --- |
+| `389ds` | Pinned 389 Directory Server container. **Default** when the field is omitted. |
+| `native` | In-repo Go engine (`labldapd`). **Accepted but not ready**: the control plane and bootstrap fail closed with `engine_not_available` until milestone M9 completes (T-146/T-150). See [`docs/design/native-engine-parity-contract.md`](../design/native-engine-parity-contract.md). |
+
+The field is optional and backward-compatible; omitting it keeps the `389ds`
+behavior. Engine is part of the compiled plan (`labldap plan` output) and the
+directory revision, so switching engines is a re-bootstrap, not a live change.
+
 ## Declare users and groups
 
 ```yaml

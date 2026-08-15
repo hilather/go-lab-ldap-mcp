@@ -67,6 +67,7 @@ type NormalizedRuntime struct {
 
 type Normalized struct {
 	frozen       bool
+	Engine       string
 	Suffix       DN
 	PeopleDN     DN
 	GroupsDN     DN

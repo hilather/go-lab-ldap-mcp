@@ -2,9 +2,13 @@ package config
 
 import (
 	"sort"
+
+	"github.com/hilather/go-lab-ldap-mcp/internal/apperr"
+	"github.com/hilather/go-lab-ldap-mcp/internal/config/v1alpha1"
 )
 
 type EnginePlan struct {
+	Engine         string           `json:"engine"`
 	Suffix         string           `json:"suffix"`
 	BackendName    string           `json:"backendName"`
 	PasswordPolicy NormalizedPolicy `json:"passwordPolicy"`
@@ -30,11 +34,34 @@ type DataPlan struct {
 
 func buildEnginePlan(n *Normalized) EnginePlan {
 	return EnginePlan{
+		Engine:         n.Engine,
 		Suffix:         n.Suffix.String(),
 		BackendName:    "userroot",
 		PasswordPolicy: n.Policy,
 		Plugins:        []string{"memberof", "referint", "account-disable"},
 	}
+}
+
+// wiredEngines lists the directory engines this build of labldap and
+// labldap-bootstrap can actually run. T-123 ships the selection surface
+// only: 389ds is wired; native lands in milestone M9 (T-146 wires it).
+var wiredEngines = []string{v1alpha1.Engine389DS}
+
+// RequireAvailableEngine fails closed when the compiled engine is not wired
+// into this build. Call it after a successful Compile and before any
+// directory dial so engine: native never reaches the network half-configured.
+func RequireAvailableEngine(engine string) error {
+	if contains(wiredEngines, engine) {
+		return nil
+	}
+	return apperr.New(apperr.CodeConfiguration, "directory engine is not available in this build").
+		WithField(apperr.Field{
+			Path: "spec.directory.engine",
+			Code: "engine_not_available",
+			Message: "engine " + engine + " is accepted but not wired in this build; " +
+				"native mode arrives in milestone M9 (see docs/design/native-engine-parity-contract.md); " +
+				"use engine: " + v1alpha1.Engine389DS,
+		})
 }
 
 func buildDataPlan(n *Normalized, acis []NamedACI) DataPlan {

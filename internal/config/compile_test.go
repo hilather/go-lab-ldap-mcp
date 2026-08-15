@@ -342,6 +342,125 @@ func TestManagedRuntimeACIsDenyACI(t *testing.T) {
 	apperr.EqualGolden(t, "runtime-acis.txt", []byte(b.String()))
 }
 
+// engineScenario builds a minimal scenario; engine == "" omits the field.
+func engineScenario(t *testing.T, engine string) []byte {
+	t.Helper()
+	line := ""
+	if engine != "" {
+		line = ", engine: " + engine
+	}
+	return []byte(`
+apiVersion: labldap.dev/v1alpha1
+kind: LabScenario
+metadata: { name: x }
+spec:
+  directory: { suffix: "dc=example,dc=test"` + line + ` }
+  transport: { ldaps: { enabled: true, port: 3636 } }
+  runtimeAccount: { id: rt, passwordFile: secrets/runtime-ldap }
+  users:
+    - id: alice
+      passwordFile: secrets/user-alice
+`)
+}
+
+func TestEngineDefaultAndRedactedPlan(t *testing.T) {
+	c, err := config.Compile(t.Context(), engineScenario(t, ""), "eng-default.yaml", config.LoadOptions{
+		Caller:  config.CallerCLI,
+		Secrets: fixtureSecrets(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Public.Spec.Directory.Engine != v1alpha1.Engine389DS {
+		t.Fatalf("public engine = %q", c.Public.Spec.Directory.Engine)
+	}
+	if c.Normalized.Engine != v1alpha1.Engine389DS {
+		t.Fatalf("normalized engine = %q", c.Normalized.Engine)
+	}
+	if c.Engine.Engine != v1alpha1.Engine389DS {
+		t.Fatalf("plan engine = %q", c.Engine.Engine)
+	}
+	plan, err := c.RedactedJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(plan, []byte(`"engine": "`+v1alpha1.Engine389DS+`"`)) {
+		t.Fatalf("redacted plan missing engine:\n%s", plan)
+	}
+	if bytes.Contains(plan, []byte("lab-fixture")) {
+		t.Fatal("plan leaked secrets")
+	}
+}
+
+func TestEngineUnknownValue(t *testing.T) {
+	_, err := config.Compile(t.Context(), engineScenario(t, "openldap"), "eng-unknown.yaml", config.LoadOptions{
+		Caller:  config.CallerCLI,
+		Secrets: fixtureSecrets(),
+	})
+	if err == nil {
+		t.Fatal("expected unknown engine to fail")
+	}
+	apperr.Assert(t, err).Code(apperr.CodeConfiguration).FieldPath("spec.directory.engine")
+	fs := mustFields(t, err)
+	if !hasCode(fs, "invalid_enum") {
+		t.Fatalf("fields = %#v", fs)
+	}
+	for _, f := range fs {
+		if f.Path == "spec.directory.engine" && f.Code != "invalid_enum" {
+			t.Fatalf("engine field code = %s", f.Code)
+		}
+	}
+}
+
+func TestEngineMixesIntoDirectoryRevision(t *testing.T) {
+	opt := config.LoadOptions{Caller: config.CallerCLI, Secrets: fixtureSecrets()}
+	omitted, err := config.Compile(t.Context(), engineScenario(t, ""), "eng-a.yaml", opt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	explicit, err := config.Compile(t.Context(), engineScenario(t, v1alpha1.Engine389DS), "eng-b.yaml", opt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	native, err := config.Compile(t.Context(), engineScenario(t, v1alpha1.EngineNative), "eng-c.yaml", opt)
+	if err != nil {
+		t.Fatal(err) // native compiles; serve/bootstrap fail closed, not the compiler
+	}
+	if omitted.Revisions.Directory != explicit.Revisions.Directory {
+		t.Fatal("omitted engine must equal explicit 389ds after defaulting")
+	}
+	if omitted.Revisions.Directory == native.Revisions.Directory {
+		t.Fatal("a different engine is a different lab: directory revision must change")
+	}
+	if omitted.Revisions.Control != native.Revisions.Control {
+		t.Fatal("engine is not control-plane state: control revision must not change")
+	}
+}
+
+func TestRequireAvailableEngine(t *testing.T) {
+	if err := config.RequireAvailableEngine(v1alpha1.Engine389DS); err != nil {
+		t.Fatal(err)
+	}
+	err := config.RequireAvailableEngine(v1alpha1.EngineNative)
+	if err == nil {
+		t.Fatal("native must fail closed until T-146")
+	}
+	apperr.Assert(t, err).Code(apperr.CodeConfiguration).FieldPath("spec.directory.engine")
+	for _, f := range mustFields(t, err) {
+		if f.Path != "spec.directory.engine" {
+			continue
+		}
+		if f.Code != "engine_not_available" {
+			t.Fatalf("field code = %s", f.Code)
+		}
+		for _, want := range []string{"M9", "engine: 389ds"} {
+			if !strings.Contains(f.Message, want) {
+				t.Fatalf("message %q missing %q", f.Message, want)
+			}
+		}
+	}
+}
+
 func TestInvalidFixtureFiles(t *testing.T) {
 	dir := filepath.Join("..", "..", "test", "fixtures", "config", "invalid")
 	ents, err := os.ReadDir(dir)

@@ -96,6 +96,7 @@ func normalizeAll(ctx context.Context, p *Parsed, opt LoadOptions) (*Normalized,
 		return nil, err
 	}
 	n := &Normalized{
+		Engine:       f.Spec.Directory.Engine,
 		Suffix:       suffix,
 		PeopleDN:     peopleDN,
 		GroupsDN:     groupsDN,

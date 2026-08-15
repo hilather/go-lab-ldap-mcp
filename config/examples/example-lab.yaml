@@ -4,6 +4,10 @@ metadata:
   name: example-lab
 spec:
   directory:
+    # engine selects the directory engine: 389ds (default) or native.
+    # native is accepted but not wired until milestone M9 (T-146); selecting
+    # it fails closed with engine_not_available. See ADR-0008/ADR-0009.
+    engine: 389ds
     suffix: "dc=example,dc=test"
     peopleRDN: "ou=people"
     groupsRDN: "ou=groups"

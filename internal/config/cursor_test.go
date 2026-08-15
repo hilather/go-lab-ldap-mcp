@@ -43,7 +43,15 @@ func TestProtectCursorRejectsTamperExpiryAndOtherKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tampered := tok[:len(tok)-1] + "A"
+	// Tamper a middle character. The signed payload is 89 bytes, so the
+	// final base64 char carries only 4 meaningful bits and editing it can
+	// decode to the identical bytes (a no-op tamper in ~1/16 runs).
+	mid := len(tok) / 2
+	rep := "A"
+	if tok[mid] == 'A' {
+		rep = "B"
+	}
+	tampered := tok[:mid] + rep + tok[mid+1:]
 	if _, err := UnprotectCursor(key, tampered, time.Unix(1_900_000_000, 0)); err == nil || !cursorInvalid(err) {
 		t.Fatalf("tampered cursor: %v", err)
 	}

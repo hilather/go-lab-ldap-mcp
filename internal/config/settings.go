@@ -11,6 +11,9 @@ import (
 
 func applyDefaults(f *v1alpha1.File) {
 	d := &f.Spec.Directory
+	if d.Engine == "" {
+		d.Engine = v1alpha1.Engine389DS
+	}
 	if d.PeopleRDN == "" {
 		d.PeopleRDN = "ou=people"
 	}
@@ -93,6 +96,9 @@ func validateSettings(f *v1alpha1.File) error {
 	var acc []*apperr.Error
 	if f.Metadata.Name == "" {
 		acc = append(acc, fieldErr("metadata.name", "required", "name is required"))
+	}
+	if !contains(v1alpha1.Engines(), f.Spec.Directory.Engine) {
+		acc = append(acc, fieldErr("spec.directory.engine", "invalid_enum", "unknown engine"))
 	}
 	if f.Spec.Directory.Suffix == "" {
 		acc = append(acc, fieldErr("spec.directory.suffix", "required", "suffix is required"))

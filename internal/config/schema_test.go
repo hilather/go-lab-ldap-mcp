@@ -31,6 +31,7 @@ func TestSchemaEnumsMatchGo(t *testing.T) {
 	}{
 		{v1alpha1.APIVersions(), []string{"properties", "apiVersion", "enum"}},
 		{v1alpha1.Kinds(), []string{"properties", "kind", "enum"}},
+		{v1alpha1.Engines(), []string{"$defs", "directory", "properties", "engine", "enum"}},
 		{v1alpha1.StorageModes(), []string{"$defs", "lifecycle", "properties", "storageMode", "enum"}},
 		{v1alpha1.StartupModes(), []string{"$defs", "lifecycle", "properties", "startupMode", "enum"}},
 		{v1alpha1.TLSModes(), []string{"$defs", "management", "properties", "tls", "properties", "mode", "enum"}},

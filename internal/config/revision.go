@@ -8,8 +8,16 @@ import (
 )
 
 func hashRevisions(n *Normalized, data DataPlan) (Revisions, error) {
+	// T-123: engine is mixed into the directory revision. A different engine
+	// is a different lab: the directory contents must be re-applied, so the
+	// marker/revision gate must observe the change. The control revision is
+	// unchanged (engine is not control-plane state). Note for upgraders:
+	// existing 389ds scenarios get a one-time directory-revision change
+	// because the engine key is new; the compiler contract string is not
+	// bumped (backward-compatible addition, same apiVersion).
 	dir := map[string]any{
 		"contract":       CompilerContract,
+		"engine":         n.Engine,
 		"suffix":         n.Suffix.String(),
 		"users":          directoryUsers(n),
 		"groups":         directoryGroups(n),

@@ -214,10 +214,19 @@ func compileControl(ctx context.Context, path string) (*config.Compiled, error) 
 	if err != nil {
 		return nil, err
 	}
-	return config.Compile(ctx, src, path, config.LoadOptions{
+	built, err := config.Compile(ctx, src, path, config.LoadOptions{
 		Caller:  config.CallerControl,
 		Secrets: config.DirSecretResolver(filepath.Dir(path)),
 	})
+	if err != nil {
+		return nil, err
+	}
+	// T-123: fail closed after a successful compile and before any directory
+	// dial. engine: native is not wired until milestone M9 (T-146).
+	if err := config.RequireAvailableEngine(built.Engine.Engine); err != nil {
+		return nil, err
+	}
+	return built, nil
 }
 
 func serverOptionsFromCompiled(c *config.Compiled, flags serveFlags, log *slog.Logger) (api.Options, *app.Services, func(), error) {

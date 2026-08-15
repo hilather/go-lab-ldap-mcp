@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"log/slog"
 	"os"
@@ -133,4 +134,86 @@ func TestComposeBindAllWiresHostAllowList(t *testing.T) {
 	if !auth.HostAllowed("127.0.0.1:8443", hosts) || auth.HostAllowed("evil.test", hosts) {
 		t.Fatalf("compose 0.0.0.0 listen hosts = %v", hosts)
 	}
+}
+
+// writeNativeScenario writes a valid scenario that selects engine: native,
+// plus the lab-fixture secret files it references. It returns the config path.
+func writeNativeScenario(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "secrets"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for name, val := range map[string]string{
+		"runtime-ldap": "lab-fixture-runtime-password",
+		"user-alice":   "lab-fixture-alice-password",
+	} {
+		if err := os.WriteFile(filepath.Join(dir, "secrets", name), []byte(val+"\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	path := filepath.Join(dir, "native-lab.yaml")
+	src := `
+apiVersion: labldap.dev/v1alpha1
+kind: LabScenario
+metadata: { name: native-lab }
+spec:
+  directory:
+    suffix: "dc=example,dc=test"
+    engine: native
+  transport:
+    ldaps: { enabled: true, port: 3636 }
+  runtimeAccount: { id: rt, passwordFile: secrets/runtime-ldap }
+  users:
+    - id: alice
+      passwordFile: secrets/user-alice
+`
+	if err := os.WriteFile(path, []byte(src), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+func assertNativeGateError(t *testing.T, stderr string) {
+	t.Helper()
+	for _, want := range []string{"spec.directory.engine", "engine_not_available", "M9", "engine: 389ds"} {
+		if !strings.Contains(stderr, want) {
+			t.Fatalf("stderr missing %q:\n%s", want, stderr)
+		}
+	}
+	if strings.Contains(stderr, "lab-fixture") {
+		t.Fatalf("leaked secret: %s", stderr)
+	}
+}
+
+func TestServeFailsClosedOnNativeEngine(t *testing.T) {
+	t.Setenv("LABLDAP_LOG_FORMAT", "text")
+	t.Setenv("LABLDAP_LDAP_URL", "")
+	t.Setenv("LABLDAP_DIRECTORY_CA_FILE", "")
+	t.Setenv("LABLDAP_DIRECTORY_HOST", "")
+	path := writeNativeScenario(t)
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"serve", "--config", path}, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("exit %d, want 1; stderr=%s", code, stderr.String())
+	}
+	assertNativeGateError(t, stderr.String())
+}
+
+func TestMCPStdioFailsClosedOnNativeEngine(t *testing.T) {
+	t.Setenv("LABLDAP_LOG_FORMAT", "text")
+	t.Setenv("LABLDAP_LDAP_URL", "")
+	t.Setenv("LABLDAP_DIRECTORY_CA_FILE", "")
+	t.Setenv("LABLDAP_DIRECTORY_HOST", "")
+	t.Setenv("LABLDAP_MCP_TOKEN", "lab-fixture-admin-token")
+	path := writeNativeScenario(t)
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"mcp-stdio", "--config", path}, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("exit %d, want 1; stderr=%s", code, stderr.String())
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("protocol/logs on stdout: %q", stdout.String())
+	}
+	assertNativeGateError(t, stderr.String())
 }

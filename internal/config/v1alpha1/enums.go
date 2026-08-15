@@ -10,6 +10,13 @@ const (
 	StoragePersistent = "persistent"
 )
 
+// Directory engines (ADR-0008). EngineNative is accepted by the schema but
+// not wired into serve/bootstrap until milestone M9 (T-146).
+const (
+	Engine389DS  = "389ds"
+	EngineNative = "native"
+)
+
 const (
 	StartupValidate = "validate"
 	StartupMerge    = "merge"
@@ -69,6 +76,7 @@ const (
 )
 
 func StorageModes() []string { return []string{StorageEphemeral, StoragePersistent} }
+func Engines() []string      { return []string{Engine389DS, EngineNative} }
 func StartupModes() []string { return []string{StartupValidate, StartupMerge, StartupReset} }
 func TLSModes() []string     { return []string{TLSGenerated, TLSFiles, TLSDisabled} }
 func Scopes() []string {
