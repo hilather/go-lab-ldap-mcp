@@ -481,6 +481,10 @@ func TestRoundTripAllOps(t *testing.T) {
 		{ID: 22, Op: &ExtendedResponse{Result: Result{Code: ResultSuccess}, Name: OIDWhoAmI, Value: []byte("dn:")}},
 		{ID: 23, Op: &ExtendedResponse{Result: Result{Code: ResultUnavailableCriticalExtension, DiagnosticMessage: "unsupported"}}},
 		{ID: math.MaxInt32, Op: &UnbindRequest{}},
+		{ID: 25, Op: &SearchRequest{ // empty substring runs must round-trip
+			BaseDN: "dc=example,dc=test",
+			Filter: &FilterSubstrings{Attr: "cn", Initial: []byte{}, Any: [][]byte{{}}, Final: []byte{}},
+		}},
 		{
 			ID: 24,
 			Op: &SearchRequest{BaseDN: "dc=example,dc=test", Filter: &FilterPresent{Attr: "objectClass"}},

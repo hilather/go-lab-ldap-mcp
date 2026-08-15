@@ -449,7 +449,9 @@ func decodeSubstringFilter(p *ber.Packet) (Filter, error) {
 		if ch.ClassType != ber.ClassContext || ch.TagType != ber.TypePrimitive {
 			return nil, malformed("substring filter choice")
 		}
-		data := append([]byte(nil), ch.Data.Bytes()...)
+		// Preserve emptiness (non-nil zero-length): an empty run must
+		// re-encode to the empty [n] choice it came from.
+		data := append([]byte{}, ch.Data.Bytes()...)
 		switch int(ch.Tag) {
 		case 0:
 			if seenInitial {

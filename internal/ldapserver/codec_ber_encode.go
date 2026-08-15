@@ -99,7 +99,7 @@ func encodeOp(op Operation) (*ber.Packet, error) {
 		return encodeResultOp(ber.Tag(OpCompareResponse), o.Result, "CompareResponse"), nil
 	case *AbandonRequest:
 		if o.MessageID < 0 || o.MessageID > maxInt32 {
-			return nil, errors.New("ldapserver: encode abandon request: message id out of range")
+			return nil, fmt.Errorf("ldapserver: encode abandon request: message id out of range: %w", ErrMalformedPDU)
 		}
 		// [APPLICATION 16] MessageID is implicit-tagged: the primitive
 		// content is the bare INTEGER content octets, not a full INTEGER TLV.

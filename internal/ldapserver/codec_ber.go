@@ -136,11 +136,16 @@ func (c *BERCodec) ReadMessage(ctx context.Context, r io.Reader) (*Message, erro
 func (c *BERCodec) readFrame(r io.Reader) ([]byte, error) {
 	var hdr [maxHeaderBytes]byte
 	if _, err := io.ReadFull(r, hdr[:2]); err != nil {
-		if errors.Is(err, io.EOF) {
+		switch {
+		case errors.Is(err, io.EOF):
 			// No bytes of a new message: clean connection close.
 			return nil, fmt.Errorf("ldapserver: read message: %w", io.EOF)
+		case errors.Is(err, io.ErrUnexpectedEOF):
+			return nil, fmt.Errorf("ldapserver: read message header: %w", io.ErrUnexpectedEOF)
+		default:
+			// Network failure mid-header: preserve the underlying error.
+			return nil, fmt.Errorf("ldapserver: read message header: %w", err)
 		}
-		return nil, fmt.Errorf("ldapserver: read message header: %w", io.ErrUnexpectedEOF)
 	}
 	if hdr[0] != 0x30 {
 		// LDAPMessage ::= SEQUENCE, always universal/constructed/16.
@@ -161,7 +166,10 @@ func (c *BERCodec) readFrame(r io.Reader) ([]byte, error) {
 			return nil, fmt.Errorf("ldapserver: read message: long-form length of %d octets overflows: %w", n, ErrMalformedPDU)
 		}
 		if _, err := io.ReadFull(r, hdr[2:2+n]); err != nil {
-			return nil, fmt.Errorf("ldapserver: read message length: %w", io.ErrUnexpectedEOF)
+			if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+				return nil, fmt.Errorf("ldapserver: read message length: %w", io.ErrUnexpectedEOF)
+			}
+			return nil, fmt.Errorf("ldapserver: read message length: %w", err)
 		}
 		hdrLen += n
 		for _, b := range hdr[2 : 2+n] {
@@ -179,7 +187,10 @@ func (c *BERCodec) readFrame(r io.Reader) ([]byte, error) {
 	copy(buf, hdr[:hdrLen])
 	if _, err := io.ReadFull(r, buf[hdrLen:]); err != nil {
 		clear(buf)
-		return nil, fmt.Errorf("ldapserver: read message body: %w", io.ErrUnexpectedEOF)
+		if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+			return nil, fmt.Errorf("ldapserver: read message body: %w", io.ErrUnexpectedEOF)
+		}
+		return nil, fmt.Errorf("ldapserver: read message body: %w", err)
 	}
 	return buf, nil
 }
