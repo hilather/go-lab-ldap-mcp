@@ -54,6 +54,12 @@ func TestAGENTSImportBoundaries(t *testing.T) {
 		if forbiddenLDAPClient(rel, imps) {
 			t.Errorf("%s must not import internal/directory/ldapclient (composition stays in cmd/labldap)", rel)
 		}
+		if forbiddenLDAPServer(rel, imps) {
+			t.Errorf("%s must not import internal/ldapserver (only cmd/labldapd, internal/ldapserver itself, and test/ may; ADR-0009 decision 3)", rel)
+		}
+		if bad, found := forbiddenLDAPServerOutbound(rel, imps); found {
+			t.Errorf("%s must not import %s (ADR-0009 rule 14: no transports, auth, or ds389 in ldapserver)", rel, bad)
+		}
 	}
 }
 
@@ -239,6 +245,71 @@ func TestKDR8LDAPClientImportEdges(t *testing.T) {
 	}
 }
 
+func TestLDAPServerImportEdges(t *testing.T) {
+	t.Parallel()
+	ls := []string{"github.com/hilather/go-lab-ldap-mcp/internal/ldapserver"}
+	for _, rel := range []string{
+		"internal/ldapserver",
+		"internal/ldapserver/store",
+		"cmd/labldapd",
+		"test/parity",
+	} {
+		if forbiddenLDAPServer(rel, ls) {
+			t.Errorf("%s must remain allowed to import ldapserver", rel)
+		}
+	}
+	for _, rel := range []string{
+		"cmd/labldap",
+		"cmd/labldap-bootstrap",
+		"internal/directory",
+		"internal/directory/ds389",
+		"internal/directory/ldapclient",
+		"internal/directory/native",
+		"internal/app",
+		"internal/api",
+		"internal/mcpserver",
+		"internal/auth",
+		"internal/audit",
+		"internal/reset",
+		"internal/web",
+	} {
+		if !forbiddenLDAPServer(rel, ls) {
+			t.Errorf("%s must not import ldapserver", rel)
+		}
+	}
+}
+
+func TestLDAPServerOutboundEdges(t *testing.T) {
+	t.Parallel()
+	for _, bad := range []string{
+		"github.com/hilather/go-lab-ldap-mcp/internal/api",
+		"github.com/hilather/go-lab-ldap-mcp/internal/mcpserver",
+		"github.com/hilather/go-lab-ldap-mcp/internal/web",
+		"github.com/hilather/go-lab-ldap-mcp/internal/auth",
+		"github.com/hilather/go-lab-ldap-mcp/internal/directory/ds389",
+	} {
+		if _, found := forbiddenLDAPServerOutbound("internal/ldapserver", []string{bad}); !found {
+			t.Errorf("ldapserver importing %s must be flagged", bad)
+		}
+	}
+	for _, good := range []string{
+		"github.com/hilather/go-lab-ldap-mcp/internal/config",
+		"github.com/hilather/go-lab-ldap-mcp/internal/apperr",
+		"github.com/hilather/go-lab-ldap-mcp/internal/observability",
+		"github.com/go-asn1-ber/asn1-ber",
+	} {
+		if _, found := forbiddenLDAPServerOutbound("internal/ldapserver", []string{good}); found {
+			t.Errorf("ldapserver importing %s must stay allowed", good)
+		}
+	}
+	// The outbound rule applies to ldapserver only.
+	if _, found := forbiddenLDAPServerOutbound("internal/app", []string{
+		"github.com/hilather/go-lab-ldap-mcp/internal/api",
+	}); found {
+		t.Error("outbound rule must not constrain non-ldapserver packages")
+	}
+}
+
 func forbiddenGoLDAP(rel string, imps []string) bool {
 	switch {
 	case strings.HasPrefix(rel, "test/"):
@@ -278,6 +349,38 @@ func forbiddenLDAPClient(rel string, imps []string) bool {
 		return false
 	}
 	return hasImportPrefix(imps, "github.com/hilather/go-lab-ldap-mcp/internal/directory/ldapclient")
+}
+
+func forbiddenLDAPServer(rel string, imps []string) bool {
+	switch {
+	case strings.HasPrefix(rel, "test/"):
+		// In-process parity and engine tests may embed the server (ADR-0009
+		// decision 3).
+		return false
+	case rel == "cmd/labldapd" || strings.HasPrefix(rel, "cmd/labldapd/"):
+		return false
+	case rel == "internal/ldapserver" || strings.HasPrefix(rel, "internal/ldapserver/"):
+		return false
+	}
+	return hasImportPrefix(imps, "github.com/hilather/go-lab-ldap-mcp/internal/ldapserver")
+}
+
+func forbiddenLDAPServerOutbound(rel string, imps []string) (string, bool) {
+	if !strings.HasPrefix(rel, "internal/ldapserver") {
+		return "", false
+	}
+	for _, bad := range []string{
+		"github.com/hilather/go-lab-ldap-mcp/internal/api",
+		"github.com/hilather/go-lab-ldap-mcp/internal/mcpserver",
+		"github.com/hilather/go-lab-ldap-mcp/internal/web",
+		"github.com/hilather/go-lab-ldap-mcp/internal/auth",
+		"github.com/hilather/go-lab-ldap-mcp/internal/directory/ds389",
+	} {
+		if hasImportPrefix(imps, bad) {
+			return bad, true
+		}
+	}
+	return "", false
 }
 
 func forbiddenConfigImport(imp string) bool {
