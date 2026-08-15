@@ -44,6 +44,10 @@ make compose-up
 Security, secret, and license policy:
 [docs/security/dependency-policy.md](docs/security/dependency-policy.md).
 
+The public site is [GitHub Pages](https://hilather.github.io/go-lab-ldap-mcp/)
+from `docs/`. An admin enables it once (`build_type=workflow`). The
+`pages` workflow deploys; it cannot create the site.
+
 ## Generated files
 
 [`api/openapi.yaml`](api/openapi.yaml) is the OpenAPI source.

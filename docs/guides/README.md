@@ -15,3 +15,4 @@ Related:
 - [Troubleshooting](../operations/troubleshooting.md)
 - [MCP catalog](../mcp/catalog.md)
 - [Release notes](../release/notes.md)
+- Public site: https://hilather.github.io/go-lab-ldap-mcp/ (GitHub Pages from this `docs/` tree)

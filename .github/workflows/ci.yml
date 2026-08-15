@@ -19,6 +19,12 @@ on:
 permissions:
   contents: read
 
+# One run per ref. Rapid docs/CI pushes were stacking 25-minute
+# integration jobs; only the latest commit matters.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 env:
   GOTOOLCHAIN: go1.26.5
   GOPROXY: https://proxy.golang.org,direct

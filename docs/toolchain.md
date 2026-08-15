@@ -31,6 +31,12 @@ before `make test-integration`. The T-115 cases fail (they do not skip) when
 those tools are missing on GitHub Actions. Locally the same cases skip if the
 binary is absent.
 
+The public site is GitHub Pages from `docs/`
+(https://hilather.github.io/go-lab-ldap-mcp/). Enable it once with
+`build_type=workflow` (Settings → Pages → GitHub Actions). The deploy
+workflow must not pass `enablement: true`: `GITHUB_TOKEN` cannot create
+the Pages site.
+
 ## Dependency update policy
 
 - Go: bump the `toolchain` line when a new 1.26.x patch is adopted; bump the `go` line only for a new language version. Record the change here.
