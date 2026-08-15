@@ -125,7 +125,7 @@ Catalog: **[docs/mcp/catalog.md](docs/mcp/catalog.md)**.
 
 LabLDAP is a laboratory. It is not a production identity system.
 
-1. The Go service does not speak the LDAP wire protocol.
+1. **LDAP bind is against 389 DS, not the Go process.** Point `ldapsearch`, apps, and simple bind at `ldap://127.0.0.1:3389` / `ldaps://127.0.0.1:3636`. The Go control plane is HTTPS only (UI, REST, MCP). It is an LDAP *client* of 389 DS. It does not listen for LDAP.
 2. 389 DS is the source of truth.
 3. The control plane never mounts the Docker socket.
 4. Directory Manager is bootstrap-only.

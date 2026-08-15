@@ -120,6 +120,11 @@ return **412** on conflict.
 
 ## Direct LDAP
 
+Yes — you can authenticate against the lab as an LDAP server. The listener is
+**389 Directory Server**, not the Go control plane. Point clients at
+`127.0.0.1:3389` (StartTLS) or `127.0.0.1:3636` (LDAPS). Do not point an
+LDAP client at `:8443`; that port is HTTPS (UI / REST / MCP).
+
 | Port | Use |
 | --- | --- |
 | `127.0.0.1:3389` | LDAP, StartTLS (`-ZZ`) |

@@ -71,7 +71,8 @@ curl -sk -H "Authorization: Bearer $TOKEN" \
         <p><code>GET /health</code> never talks to LDAP. <code>GET /health/ready</code> does. <code>GET /metrics</code> is Prometheus text on loopback.</p>
 
         <h2 id="ldap">Direct LDAP</h2>
-        <p><code>127.0.0.1:3389</code> (StartTLS) and <code>127.0.0.1:3636</code> (LDAPS). Anonymous bind is off. Cleartext bind is off. Trust <code>secrets/tls/instance-ca.crt</code> (ephemeral) or <code>secrets/tls/ca.crt</code> (persistent). Wrong CA or SAN fails closed.</p>
+        <p>Yes — you can authenticate against the lab as an LDAP server. The listener is <strong>389 Directory Server</strong>, not the Go control plane. Point clients at <code>127.0.0.1:3389</code> (StartTLS) or <code>127.0.0.1:3636</code> (LDAPS). Do not point an LDAP client at <code>:8443</code>; that port is HTTPS.</p>
+        <p>Anonymous bind is off. Cleartext bind is off. Trust <code>secrets/tls/instance-ca.crt</code> (ephemeral) or <code>secrets/tls/ca.crt</code> (persistent). Wrong CA or SAN fails closed.</p>
 
         <h2 id="mcp">MCP</h2>
         <p>Two transports, one catalog, same scopes as REST.</p>

@@ -172,7 +172,7 @@ curl -sk -H "Authorization: Bearer $TOKEN" \
           <h2>Laboratory on purpose.</h2>
           <p>This is not a production identity system. The constraints are the product.</p>
           <ul class="list">
-            <li><strong>No LDAP engine in Go.</strong> 389 DS is the source of truth.</li>
+            <li><strong>LDAP bind hits 389 DS, not Go.</strong> <code>ldap://127.0.0.1:3389</code> is a real directory. The Go process is HTTPS only.</li>
             <li><strong>No Docker socket</strong> in the control plane.</li>
             <li><strong>Directory Manager is bootstrap-only.</strong></li>
             <li><strong>Static tokens are an explicit lab mode.</strong></li>
