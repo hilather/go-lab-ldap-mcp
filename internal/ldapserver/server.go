@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/hilather/go-lab-ldap-mcp/internal/apperr"
@@ -35,6 +37,17 @@ type Limits struct {
 	IdleTimeout       time.Duration
 	SearchSizeLimit   int
 	SearchTimeLimit   time.Duration
+	// MaxConnections bounds simultaneously open client connections. A
+	// connection arriving at the ceiling receives a busy notice of
+	// disconnection and is closed (ADR-0009 decision 10).
+	MaxConnections int
+	// MaxAuthAttempts is the pre-auth budget of failed bind attempts after
+	// which the server closes the connection with a notice of
+	// disconnection (ADR-0009 decision 10).
+	MaxAuthAttempts int
+	// ShutdownTimeout bounds graceful connection drain after Serve's context
+	// is canceled; remaining connections are force-closed when it expires.
+	ShutdownTimeout time.Duration
 }
 
 // DefaultLimits returns conservative ceilings applied when the scenario does
@@ -48,6 +61,9 @@ func DefaultLimits() Limits {
 		IdleTimeout:       5 * time.Minute,
 		SearchSizeLimit:   500,
 		SearchTimeLimit:   30 * time.Second,
+		MaxConnections:    256,
+		MaxAuthAttempts:   5,
+		ShutdownTimeout:   10 * time.Second,
 	}
 }
 
@@ -73,6 +89,15 @@ func (l Limits) withDefaults() Limits {
 	}
 	if l.SearchTimeLimit <= 0 {
 		l.SearchTimeLimit = d.SearchTimeLimit
+	}
+	if l.MaxConnections <= 0 {
+		l.MaxConnections = d.MaxConnections
+	}
+	if l.MaxAuthAttempts <= 0 {
+		l.MaxAuthAttempts = d.MaxAuthAttempts
+	}
+	if l.ShutdownTimeout <= 0 {
+		l.ShutdownTimeout = d.ShutdownTimeout
 	}
 	return l
 }
@@ -110,6 +135,10 @@ type Options struct {
 	Schema             Schema
 	ACI                ACIEngine
 	Plugins            []Plugin
+	// Metrics receives bounded-cardinality observations (op name + result
+	// code, connection open/close). Nil disables metrics. DNs and attribute
+	// values never cross this seam.
+	Metrics Metrics
 	// DirectoryManager is the bootstrap-root identity. An empty DN disables
 	// it; no other identity may bypass ACI (ADR-0009 decision 13).
 	DirectoryManager Identity
@@ -117,12 +146,21 @@ type Options struct {
 }
 
 // Server is the native directory engine. The constructor validates and
-// normalizes Options; listener lifecycle lands in T-125.
+// normalizes Options; Serve binds the listeners (T-125).
 type Server struct {
 	opts   Options
 	suffix config.DN
 	dmDN   config.DN
 	hasDM  bool
+
+	// ldapAddr and ldapsAddr hold the bound net.Addr once Serve has
+	// opened the listeners (atomic.Value of net.Addr).
+	ldapAddr  atomic.Value
+	ldapsAddr atomic.Value
+
+	connsMu sync.Mutex
+	conns   map[*conn]struct{}
+	connWG  sync.WaitGroup
 }
 
 // New validates opts and returns a Server. Configuration problems are
@@ -151,7 +189,7 @@ func New(opts Options) (*Server, error) {
 	if err != nil {
 		return nil, fieldErr("suffix", "invalid_dn", "suffix is not a valid DN")
 	}
-	s := &Server{opts: opts, suffix: suffix}
+	s := &Server{opts: opts, suffix: suffix, conns: map[*conn]struct{}{}}
 	if opts.DirectoryManager.DN != "" {
 		dm, err := config.ParseDN(opts.DirectoryManager.DN)
 		if err != nil {
@@ -197,14 +235,156 @@ func (s *Server) Suffix() config.DN { return s.suffix }
 // Limits returns the effective ceilings after defaults.
 func (s *Server) Limits() Limits { return s.opts.Limits }
 
-// Serve binds the configured listeners and serves until ctx is canceled.
-// The listener lifecycle lands in T-125; calling it before then fails with
-// ErrNotImplemented.
-func (s *Server) Serve(ctx context.Context) error {
-	return fmt.Errorf("ldapserver serve: %w (lands in T-125)", ErrNotImplemented)
+// LDAPAddr returns the bound LDAP listener address once Serve has opened
+// the listener; nil before that.
+func (s *Server) LDAPAddr() net.Addr {
+	if v, ok := s.ldapAddr.Load().(net.Addr); ok {
+		return v
+	}
+	return nil
 }
 
-// Close releases the store. Listener shutdown lands with Serve in T-125.
+// LDAPSAddr returns the bound LDAPS listener address once Serve has opened
+// the listener; nil before that.
+func (s *Server) LDAPSAddr() net.Addr {
+	if v, ok := s.ldapsAddr.Load().(net.Addr); ok {
+		return v
+	}
+	return nil
+}
+
+// Serve binds the configured listeners and serves until ctx is canceled
+// (T-125). On cancellation it stops accepting, waits up to
+// Limits.ShutdownTimeout for connections to drain, then force-closes the
+// rest and returns nil. Listener setup failures return a wrapped error.
+func (s *Server) Serve(ctx context.Context) error {
+	if s.opts.LDAPAddress == "" && s.opts.LDAPSAddress == "" {
+		return apperr.New(apperr.CodeConfiguration, "ldapserver: at least one listener address is required")
+	}
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	type binding struct {
+		listener net.Listener
+		tls      bool
+	}
+	var bindings []binding
+	var lc net.ListenConfig
+	if s.opts.LDAPAddress != "" {
+		l, err := lc.Listen(ctx, "tcp", s.opts.LDAPAddress)
+		if err != nil {
+			return fmt.Errorf("ldapserver: listen LDAP: %w", err)
+		}
+		bindings = append(bindings, binding{listener: l})
+		s.ldapAddr.Store(l.Addr())
+		s.opts.Logger.LogAttrs(ctx, slog.LevelInfo, "ldap listener bound",
+			slog.String("address", l.Addr().String()))
+	}
+	if s.opts.LDAPSAddress != "" {
+		l, err := lc.Listen(ctx, "tcp", s.opts.LDAPSAddress)
+		if err != nil {
+			for _, b := range bindings {
+				_ = b.listener.Close()
+			}
+			return fmt.Errorf("ldapserver: listen LDAPS: %w", err)
+		}
+		bindings = append(bindings, binding{listener: tls.NewListener(l, s.opts.TLSConfig), tls: true})
+		s.ldapsAddr.Store(l.Addr())
+		s.opts.Logger.LogAttrs(ctx, slog.LevelInfo, "ldaps listener bound",
+			slog.String("address", l.Addr().String()))
+	}
+
+	var acceptWG sync.WaitGroup
+	for _, b := range bindings {
+		acceptWG.Add(1)
+		go func() {
+			defer acceptWG.Done()
+			s.acceptLoop(ctx, b.listener, b.tls)
+		}()
+	}
+
+	<-ctx.Done()
+
+	// Graceful shutdown: stop accepting, then drain connections up to the
+	// shutdown deadline; force-close whatever is still open afterwards.
+	for _, b := range bindings {
+		_ = b.listener.Close()
+	}
+	acceptWG.Wait()
+	drained := make(chan struct{})
+	go func() {
+		s.connWG.Wait()
+		close(drained)
+	}()
+	timer := time.NewTimer(s.opts.Limits.ShutdownTimeout)
+	defer timer.Stop()
+	select {
+	case <-drained:
+	case <-timer.C:
+		s.opts.Logger.LogAttrs(context.Background(), slog.LevelInfo,
+			"shutdown drain deadline reached; force-closing connections")
+		s.closeAllConns()
+		<-drained
+	}
+	return nil
+}
+
+// acceptLoop accepts until the listener closes or ctx is canceled.
+func (s *Server) acceptLoop(ctx context.Context, l net.Listener, isTLS bool) {
+	for {
+		nc, err := l.Accept()
+		if err != nil {
+			if ctx.Err() != nil || errors.Is(err, net.ErrClosed) {
+				return
+			}
+			s.opts.Logger.LogAttrs(ctx, slog.LevelWarn, "ldap accept failed",
+				slog.String("error", err.Error()))
+			return
+		}
+		c := s.newConn(ctx, nc, isTLS)
+		if !s.addConn(c) {
+			// Connection ceiling: tell the client why, then close.
+			c.sendNoticeOfDisconnection(ResultBusy, "connection limit reached")
+			_ = nc.Close()
+			c.cancel()
+			continue
+		}
+		s.metrics().ObserveConnection(1)
+		go c.serve()
+	}
+}
+
+// addConn registers c, enforcing the MaxConnections ceiling.
+func (s *Server) addConn(c *conn) bool {
+	s.connsMu.Lock()
+	defer s.connsMu.Unlock()
+	if len(s.conns) >= s.opts.Limits.MaxConnections {
+		return false
+	}
+	s.conns[c] = struct{}{}
+	s.connWG.Add(1)
+	return true
+}
+
+// removeConn deregisters c at the end of its lifecycle.
+func (s *Server) removeConn(c *conn) {
+	s.connsMu.Lock()
+	delete(s.conns, c)
+	s.connsMu.Unlock()
+	s.connWG.Done()
+	s.metrics().ObserveConnection(-1)
+}
+
+// closeAllConns force-closes every open connection (shutdown deadline).
+func (s *Server) closeAllConns() {
+	s.connsMu.Lock()
+	defer s.connsMu.Unlock()
+	for c := range s.conns {
+		c.close()
+	}
+}
+
+// Close releases the store.
 func (s *Server) Close() error {
 	return s.opts.Store.Close()
 }

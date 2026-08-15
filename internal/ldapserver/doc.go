@@ -14,8 +14,9 @@
 // filter, and ACI-text helpers; it must not load YAML or act as an LDAP
 // client of itself.
 //
-// T-122 pins the interface skeletons only. There is no BER codec (T-124), no
-// listener or dispatch (T-125), no bbolt store (T-129), and no ACI parser or
-// evaluator (T-138, T-139) yet. The in-memory fakes in fakes.go satisfy the
-// interfaces for later tasks' unit tests.
+// T-124 landed the BER codec; T-125 the listener, connection lifecycle, and
+// dispatch skeleton. The bbolt store (T-129), matching rules (T-131), and
+// the ACI parser and evaluator (T-138, T-139) are still pending. The
+// in-memory fakes in fakes.go satisfy the interfaces for later tasks' unit
+// tests.
 package ldapserver

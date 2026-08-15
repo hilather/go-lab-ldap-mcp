@@ -7,6 +7,10 @@ const (
 	OIDWhoAmI             = "1.3.6.1.4.1.4203.1.11.3" // RFC 4532
 	OIDSimplePagedResults = "1.2.840.113556.1.4.319"  // RFC 2696
 	OIDAssertion          = "1.3.6.1.1.12"            // RFC 4528
+	// OIDNoticeOfDisconnection is the RFC 4511 section 4.4.1 unsolicited
+	// notice sent as an ExtendedResponse with message ID 0 when the server
+	// closes a connection on its own initiative.
+	OIDNoticeOfDisconnection = "1.3.6.1.4.1.1466.20036"
 )
 
 // OpCode is the RFC 4511 protocolOp tag (APPLICATION number).
@@ -76,6 +80,9 @@ const (
 	ResultAdminLimitExceeded           ResultCode = 11
 	ResultUnavailableCriticalExtension ResultCode = 12
 	ResultConfidentialityRequired      ResultCode = 13
+	ResultNoSuchAttribute              ResultCode = 16
+	ResultConstraintViolation          ResultCode = 19
+	ResultAttributeOrValueExists       ResultCode = 20
 	ResultNoSuchObject                 ResultCode = 32
 	ResultAliasProblem                 ResultCode = 33 // unused by LabLDAP; reserved for parity
 	ResultInvalidDNSyntax              ResultCode = 34
@@ -120,6 +127,12 @@ func (c ResultCode) String() string {
 		return "unavailableCriticalExtension"
 	case ResultConfidentialityRequired:
 		return "confidentialityRequired"
+	case ResultNoSuchAttribute:
+		return "noSuchAttribute"
+	case ResultConstraintViolation:
+		return "constraintViolation"
+	case ResultAttributeOrValueExists:
+		return "attributeOrValueExists"
 	case ResultNoSuchObject:
 		return "noSuchObject"
 	case ResultAliasProblem:

@@ -130,15 +130,16 @@ func TestNewServerLoopbackDefault(t *testing.T) {
 	}
 }
 
-func TestServerServeNotImplemented(t *testing.T) {
+func TestServerServeRequiresListener(t *testing.T) {
 	t.Parallel()
-	s, err := New(testOptions())
+	opts := testOptions()
+	opts.LDAPAddress = ""
+	s, err := New(opts)
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
-	err = s.Serve(context.Background())
-	if !errors.Is(err, ErrNotImplemented) {
-		t.Fatalf("Serve error = %v, want ErrNotImplemented", err)
+	if err := s.Serve(context.Background()); err == nil {
+		t.Fatal("Serve without listeners should fail with a configuration error")
 	}
 }
 
