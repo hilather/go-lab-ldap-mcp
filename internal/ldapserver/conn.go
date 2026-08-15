@@ -242,8 +242,12 @@ func (c *conn) abandon(msgID int64) {
 	}
 }
 
-// send writes one message under the write lock with the write deadline.
+// send writes one message under the write lock with the write deadline. A
+// nil nc (unit tests driving handlers without a socket) drops the write.
 func (c *conn) send(m *Message) error {
+	if c.nc == nil {
+		return nil
+	}
 	c.writeMu.Lock()
 	defer c.writeMu.Unlock()
 	if err := c.nc.SetWriteDeadline(time.Now().Add(c.srv.opts.Limits.WriteTimeout)); err != nil {

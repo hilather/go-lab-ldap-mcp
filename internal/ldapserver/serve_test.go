@@ -105,10 +105,10 @@ func TestServeBindStubOverTCP(t *testing.T) {
 	if !ok {
 		t.Fatalf("op = %T, want BindResponse", m.Op)
 	}
-	// The T-125 stub answers with a well-formed result; T-126 implements
-	// the real bind path.
-	if resp.Result.Code != ResultUnwillingToPerform {
-		t.Fatalf("code = %v, want unwillingToPerform stub", resp.Result.Code)
+	// The dispatch lifecycle test only needs a well-formed result; the
+	// default policy here is cleartext-disabled (C3).
+	if resp.Result.Code != ResultConfidentialityRequired {
+		t.Fatalf("code = %v, want confidentialityRequired", resp.Result.Code)
 	}
 }
 
