@@ -1,122 +1,177 @@
-# LabLDAP
+<p align="center">
+  <img src="docs/assets/mark.jpg" width="160" alt="LabLDAP mark" />
+</p>
 
-Disposable laboratory LDAP environment: 389 Directory Server as the directory
-engine, a Go control plane for REST / MCP / UI, and Docker Compose lifecycle
-roles that keep Directory Manager privileges out of the long-running service.
+<h1 align="center">LabLDAP</h1>
 
-This repository is the implementation of the LabLDAP design package. The Go
-service does **not** implement the LDAP wire protocol.
+<p align="center">
+  <strong>A disposable 389 Directory Server laboratory.</strong><br />
+  Real LDAP on the wire. A Go control plane for REST, MCP, and a browser UI.<br />
+  Directory Manager never touches the long-running service.
+</p>
+
+<p align="center">
+  <a href="https://hilather.github.io/go-lab-ldap-mcp/">Site</a> ·
+  <a href="docs/guides/quickstart.md">Quick start</a> ·
+  <a href="docs/guides/user-guide.md">User guide</a> ·
+  <a href="docs/guides/deploy.md">Deploy</a> ·
+  <a href="docs/mcp/catalog.md">MCP catalog</a>
+</p>
+
+<p align="center">
+  <img alt="Go" src="https://img.shields.io/badge/Go-1.26-00ADD8?style=flat-square&logo=go&logoColor=white" />
+  <img alt="389-ds" src="https://img.shields.io/badge/389--ds-2.4.6-3D9B8F?style=flat-square" />
+  <img alt="MCP" src="https://img.shields.io/badge/MCP-2026--07--28-111111?style=flat-square" />
+  <img alt="Release" src="https://img.shields.io/badge/release-v0.1.0-ecece8?style=flat-square&labelColor=111111" />
+</p>
+
+![LabLDAP console](docs/assets/console.jpg)
+
+LabLDAP is not another LDAP server. 389 Directory Server remains the engine of
+record. The Go process is a control plane: it bootstraps a lab suffix, then
+exposes the same authorized operations over HTTPS, Model Context Protocol, and
+an embedded UI.
+
+Use it when you need a **real directory** to exercise clients, agents, bind
+paths, ACIs, and schema — without standing up production 389 DS by hand, and
+without giving Directory Manager to a daemon that lives for the rest of the
+afternoon.
+
+## Why this exists
+
+Most LDAP “labs” are one of two things: an in-memory fake that lies about the
+protocol, or a raw 389 DS container that leaves Directory Manager sitting in an
+environment variable forever.
+
+LabLDAP splits the job the way an operator would:
 
 | Role | Process | Privilege |
 | --- | --- | --- |
-| `directory` | long-running 389 DS | owns `/data` |
-| `bootstrap` | one-shot `labldap-bootstrap` | Directory Manager via secret file |
-| `control` | long-running `labldap` | restricted service account; no DM secret; no Docker socket |
+| **directory** | long-running 389 DS | owns `/data` |
+| **bootstrap** | one-shot `labldap-bootstrap` | Directory Manager, via a secret file, then exits |
+| **control** | long-running `labldap` | restricted service account. No DM secret. No Docker socket. |
 
-Working names (OD-001): **LabLDAP**, `labldap`, `labldap-bootstrap`.
-Module path (OD-002): `github.com/hilather/go-lab-ldap-mcp`.
-No distribution license file (OD-003). Local images only (OD-004).
+REST, MCP, and the UI call the same application services and the same scope
+policy. Create a user in the browser, fetch it over `/api/v1`, search it with
+`ldapsearch`, and an agent can see it through `ldap_get_entry`.
+
+## Quick start
+
+You need Docker Engine 24+ and Compose v2.24+. From a clone:
+
+```bash
+git clone https://github.com/hilather/go-lab-ldap-mcp.git
+cd go-lab-ldap-mcp
+make compose-up
+```
+
+That builds the local images, mints lab secrets and a lab CA, starts 389 DS,
+runs bootstrap, and brings the control plane up.
+
+| Surface | Where |
+| --- | --- |
+| UI | https://127.0.0.1:8443/ |
+| REST | https://127.0.0.1:8443/api/v1 |
+| MCP (HTTP) | `POST https://127.0.0.1:8443/mcp` |
+| LDAP / StartTLS | `ldap://127.0.0.1:3389` |
+| LDAPS | `ldaps://127.0.0.1:3636` |
+| Health | `GET /health` · ready: `GET /health/ready` |
+
+Sign in to the UI with the contents of `secrets/token-admin` (generated, gitignored).
+The same value is the bearer for REST and HTTP MCP.
+
+```bash
+TOKEN=$(tr -d '\n' < secrets/token-admin)
+curl -sk -H "Authorization: Bearer $TOKEN" \
+  https://127.0.0.1:8443/api/v1/users
+```
+
+Tear it down with `make compose-down`. Wipe the lab with `make compose-reset`.
+
+Full walkthrough: **[docs/guides/quickstart.md](docs/guides/quickstart.md)**.
+
+## What you get
+
+- **A real 389 DS instance.** Pinned by digest. Users, groups, memberships, and
+  passwords live in the directory — not in Go maps.
+- **A browser UI.** Users, groups, search, bind test, schema, audit, LDIF
+  export, and a gated soft reset.
+- **A versioned REST API.** OpenAPI 3 at [`api/openapi.yaml`](api/openapi.yaml).
+- **MCP, two transports.** Streamable HTTP (`POST /mcp`) and `labldap mcp-stdio`.
+  Read tools are on by default. Mutations, passwords, reset, and export register
+  only when you ask for them.
+- **Declarative labs.** A `labldap.dev/v1alpha1` scenario file is the baseline.
+  Soft reset restores it. Hard reset is Compose volume removal, not an API.
+- **Ephemeral or persistent.** Default `make compose-up` uses tmpfs-backed
+  `/data`. `make compose-up-persistent` keeps a named volume.
+
+## Talk to it from an agent
+
+```bash
+labldap mcp-stdio --config /path/to/scenario.yaml --token-file secrets/token-admin
+```
+
+Protocol bytes go to stdout. Logs go to stderr. Missing credentials exit
+before the protocol starts. Point an MCP client at that command, or at
+`POST /mcp` with `Authorization: Bearer`.
+
+Read tools (`ldap_search_entries`, `ldap_get_entry`, capabilities, baseline)
+are registered when MCP is enabled. Write, password, reset, and export tools
+stay off until `spec.management.mcp.register*` is set in the scenario.
+
+Catalog: **[docs/mcp/catalog.md](docs/mcp/catalog.md)**.
+
+## Safety model
+
+LabLDAP is a laboratory. It is not a production identity system.
+
+1. The Go service does not speak the LDAP wire protocol.
+2. 389 DS is the source of truth.
+3. The control plane never mounts the Docker socket.
+4. Directory Manager is bootstrap-only.
+5. Static bearer tokens are an explicit lab mode, not an accident.
+6. Ephemeral tmpfs is not a forensic wipe — host swap can still hold pages.
+7. Soft reset restores the compiled suffix. It does not delete the volume.
+8. First release: one managed suffix, one 389 DS instance.
+9. Active Directory emulation is out of scope.
+
+Management TLS in the shipped compose stack is a **lab certificate**. Trust
+`secrets/tls/instance-ca.crt` (ephemeral) or `secrets/tls/ca.crt` (persistent).
+Bind the management listener to loopback, which compose already does.
+
+## Documentation
+
+| Guide | For |
+| --- | --- |
+| [Quick start](docs/guides/quickstart.md) | First lab in one sitting |
+| [User guide](docs/guides/user-guide.md) | UI, REST, LDAP clients, MCP, reset, export |
+| [Deploy](docs/guides/deploy.md) | Images, compose modes, secrets, TLS, operations |
+| [Operator guide](docs/operations/operator-guide.md) | Day-2 limits and failure modes |
+| [Troubleshooting](docs/operations/troubleshooting.md) | Ready checks, TLS, tokens, vanished entries |
+| [MCP catalog](docs/mcp/catalog.md) | Tools, resources, scopes |
+| [Release notes](docs/release/notes.md) | v0.1.0 contents and residuals |
+
+Architecture and design live under [`docs/`](docs/). Contributing:
+[`CONTRIBUTING.md`](CONTRIBUTING.md).
+
+## Develop
+
+```text
+make verify              # format, lint, generate, unit, security, SBOM, arch
+make test-integration    # real 389 DS (Docker)
+make image               # labldap-control:dev
+make image-bootstrap     # labldap-bootstrap:dev
+```
+
+Images are local (`labldap-control:dev`, `labldap-bootstrap:dev`). They are
+not pushed to a public registry.
 
 ## Status
 
-First usable release: **v0.1.0**. Milestones **M0–M8** P0 work is complete
-(T-001–T-116, T-118–T-120). T-117 soak measurements stay `[~]` (P1).
-Config `apiVersion` is `labldap.dev/v1alpha1`. MCP catalog:
-[`docs/mcp/catalog.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/mcp/catalog.md).
-Release notes: [`docs/release/notes.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/release/notes.md).
+**v0.1.0** — first usable release. One suffix, one 389 DS, REST + UI + MCP,
+ephemeral and persistent compose. No project license file yet; treat it as
+source-available until one is added.
 
-## Commands
-
-```text
-go run ./cmd/labldap --help
-go run ./cmd/labldap --version
-go run ./cmd/labldap serve --placeholder
-go run ./cmd/labldap-bootstrap --help
-make verify
-make image
-make image-bootstrap
-make compose-up
-make compose-reset
 ```
-
-Structured logs go to stderr. `LABLDAP_LOG_FORMAT=json` selects JSON.
-
-`labldap serve --config FILE` wires the LDAP pool and application services.
-Liveness is `GET /health` (never LDAP). Readiness is `GET /health/ready`.
-`GET /metrics` is Prometheus text. Default `requireAuth` is false: bind
-the listener to loopback or restrict it with network policy, or set
-`spec.management.metrics.requireAuth`. Directory flags: `--ldap-url`,
-`--directory-ca-file`, `--directory-host` (or `LABLDAP_LDAP_URL`,
-`LABLDAP_DIRECTORY_CA_FILE`, `LABLDAP_DIRECTORY_HOST`).
-
-`labldap mcp-stdio --config FILE` is the local MCP transport (T-093). Protocol
-bytes go **only** to stdout; logs go to stderr. The process actor is the
-compiled token from `LABLDAP_MCP_TOKEN` or `--token-file` (never `--token`).
-Missing credentials exit without starting the protocol. Tool scopes match
-`POST /mcp`. Mutation, password, reset, and export tools register only when
-`spec.management.mcp.register*` is true (OD-016).
-
-### MCP release smoke test
-
-Use an independent official MCP client (Go SDK `mcp.Client` +
-`CommandTransport` around `labldap mcp-stdio`, or Streamable HTTP
-`POST /mcp` with `Authorization: Bearer`). With mutations and password
-tools enabled:
-
-1. Call `ldap_create_user` with a unique id and password.
-2. `GET /api/v1/users/{id}` with the same bearer must return the user.
-3. `ldapsearch` / simple bind as that DN must succeed.
-4. Confirm stdout from `mcp-stdio` contains no log lines.
-
-See `docs/toolchain.md` for version pins. `make test-integration` starts the
-pinned 389 DS image (Docker required). `make image` builds `labldap-control:dev`.
-`make compose-up` is ephemeral tmpfs-backed `/data`; `make compose-up-persistent`
-uses a named volume. `make compose-reset` is the operator hard reset (volume
-removal). Host swap can still persist tmpfs pages — ephemeral is not a
-forensic wipe.
-
-## Layout
-
-See [`AGENTS.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/AGENTS.md)
-for package boundaries. Transports (`internal/api`, `internal/mcpserver`) stay
-thin and call `internal/app`. `internal/config` never connects to LDAP.
-`internal/web` embeds static assets only. `labldap serve` serves those
-assets at `GET /` with hashed-file cache headers and `index.html` SPA fallback.
-
-## Design documents
-
-| Path | Role |
-| --- | --- |
-| [`docs/design/labldap-implementation-design.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/design/labldap-implementation-design.md) | Implementation contract synthesized from the design package |
-| [`docs/design/remaining-work-t035-t120.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/design/remaining-work-t035-t120.md) | Remaining-work contract for T-035–T-120 |
-| [`docs/01-system-architecture.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/01-system-architecture.md) | System architecture (source package) |
-| [`docs/10-implementation-plan.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/10-implementation-plan.md) | Milestones M0–M8 |
-| [`docs/13-open-decisions.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/13-open-decisions.md) | Owner / verification / agent defaults |
-| [`TASKS.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/TASKS.md) | T-001–T-120 backlog |
-| [`docs/operations/operator-guide.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/operations/operator-guide.md) | Operator deploy, reset, TLS, limitations |
-| [`docs/release/notes.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/release/notes.md) | First-usable-release notes and residuals |
-| [`docs/adr/`](https://github.com/hilather/go-lab-ldap-mcp/tree/main/docs/adr) | Title-only ADR stubs until recovered ADR text exists |
-
-Eighteen inventoried design-package documents are absent from the source
-download. Do not fabricate them. Residual gaps are listed in the
-implementation design.
-
-## Non-negotiables
-
-1. The Go service does not implement the LDAP wire protocol.
-2. 389 DS is the source of truth for users, groups, memberships, and runtime mutations.
-3. The control plane must not mount the Docker socket.
-4. Directory Manager credentials are bootstrap-only.
-5. REST, MCP, and the UI share one application service layer and one authorization policy.
-6. Static bearer tokens are an explicit lab mode.
-7. Ephemeral mode uses a memory-backed `/data` mount; host swap can still persist pages.
-8. Runtime reset is a soft data reset of the managed suffix.
-9. First release: one managed suffix, one 389 DS instance.
-10. Active Directory emulation is out of scope.
-
-## Version baseline
-
-- Go language `1.26` with toolchain `go1.26.5`
-- MCP specification 2026-07-28; official Go SDK v1.7.0 or later
-- React 19.2; Node.js 22.12 or later; pnpm
-- `quay.io/389ds/dirsrv` pinned by digest (T-024; not invented here)
+github.com/hilather/go-lab-ldap-mcp
+```

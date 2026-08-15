@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Deploy — LabLDAP</title>
+  <meta name="description" content="Build, run, and operate LabLDAP on a single host." />
+  <meta name="theme-color" content="#0b0c0e" />
+  <link rel="icon" type="image/svg+xml" href="assets/mark.svg" />
+  <link rel="stylesheet" href="site.css" />
+</head>
+<body>
+  <header class="nav">
+    <div class="wrap nav-inner">
+      <a class="brand" href="./"><img src="assets/mark.svg" alt="" />LabLDAP</a>
+      <button class="menu-btn" type="button" data-menu>Menu</button>
+      <nav class="nav-links" data-links>
+        <a href="./">Overview</a>
+        <a href="start.html">Quick start</a>
+        <a href="use.html">User guide</a>
+        <a href="ship.html" aria-current="page">Deploy</a>
+        <a href="https://github.com/hilather/go-lab-ldap-mcp">GitHub</a>
+        <a class="nav-cta" href="start.html">Quick start</a>
+      </nav>
+    </div>
+  </header>
+  <main class="doc">
+    <div class="wrap doc-grid">
+      <aside class="toc">
+        <a href="#host">Host</a>
+        <a href="#topo">Topology</a>
+        <a href="#cmd">One command</a>
+        <a href="#images">Images</a>
+        <a href="#secrets">Secrets and TLS</a>
+        <a href="#reset">Reset</a>
+        <a href="#not">Not in v0.1.0</a>
+      </aside>
+      <article class="prose">
+        <div class="eyebrow">Guide 03</div>
+        <h1>Deploy</h1>
+        <p>LabLDAP is a laboratory. Images stay local. The management listener is bound to loopback. There is no public registry and no Helm chart in v0.1.0.</p>
+
+        <h2 id="host">Host</h2>
+        <ul>
+          <li>Linux amd64 (advertised). arm64 is not advertised.</li>
+          <li>Docker Engine 24+, Compose v2.24+</li>
+          <li>Loopback ports 8443, 3389, 3636</li>
+        </ul>
+
+        <h2 id="topo">Topology</h2>
+        <p>Three roles, plus a one-shot secret copier.</p>
+        <ul>
+          <li><code>directory</code> — pinned 389 DS, owns <code>/data</code></li>
+          <li><code>bootstrap</code> — <code>labldap-bootstrap:dev</code>, Directory Manager via a password file, then exits</li>
+          <li><code>control</code> — <code>labldap-control:dev</code>, non-root, no DM, no Docker socket</li>
+          <li><code>secret-prep</code> — copies secrets into a 0400 volume for uid 65532</li>
+        </ul>
+
+        <h2 id="cmd">One command</h2>
+        <pre><code>make compose-up              # ephemeral tmpfs /data
+make compose-up-persistent   # named volume + TLS import
+make compose-down
+make compose-reset           # down -v, then up</code></pre>
+        <p>Ephemeral is not a forensic wipe. Host swap can still hold pages. Persistent runtime entries survive restart. Soft reset restores the compiled baseline without deleting the volume.</p>
+
+        <h2 id="images">Images</h2>
+        <pre><code>make image-bootstrap
+make image</code></pre>
+        <p>Local tags only: <code>labldap-bootstrap:dev</code> and <code>labldap-control:dev</code>. Compose files pin digests, never floating tags. <code>make image</code> checks that both images report the same version and smokes <code>/health</code>.</p>
+
+        <h2 id="secrets">Secrets and TLS</h2>
+        <p>Generated on first compose-up, mode 0600, gitignored. Rotate with <code>go run ./tools/setupsecrets --dir secrets --force</code>, then recreate the stack so control sees the new files.</p>
+        <p>Directory Manager lives in <code>secrets/dm.pw</code> and is mounted only into bootstrap. Never pass it on a command line.</p>
+        <p>The private CA key stays on the host. Ephemeral labs trust <code>secrets/tls/instance-ca.crt</code>. Persistent labs import the lab CA into 389 DS after first boot. Wrong CA or SAN fails closed. Keep :8443 on loopback.</p>
+
+        <h2 id="reset">Reset</h2>
+        <ul>
+          <li><strong>Soft</strong> — UI Reset, <code>POST /api/v1/reset</code>, or <code>ldap_reset_suffix</code>. Needs scope, scenario name, revision.</li>
+          <li><strong>Hard</strong> — <code>make compose-reset</code> only. Not on the API.</li>
+        </ul>
+        <p><code>docker compose restart directory</code> on a persistent lab can drop published ports. Prefer <code>up -d --wait</code> and wait for <code>/health/ready</code>.</p>
+
+        <h2 id="not">Not in v0.1.0</h2>
+        <ul>
+          <li>No image push, Helm, or cloud module</li>
+          <li>No multi-suffix / multi-instance 389 DS</li>
+          <li>No Active Directory emulation</li>
+          <li>No project LICENSE file yet</li>
+        </ul>
+        <p class="note">Full version: <a href="https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/guides/deploy.md">docs/guides/deploy.md</a>. Day-2: <a href="https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/operations/operator-guide.md">operator guide</a>.</p>
+      </article>
+    </div>
+  </main>
+  <footer>
+    <div class="wrap foot">
+      <div>LabLDAP</div>
+      <div><a href="start.html">Quick start</a> · <a href="use.html">User guide</a></div>
+    </div>
+  </footer>
+  <script>
+    const btn = document.querySelector("[data-menu]");
+    const links = document.querySelector("[data-links]");
+    btn?.addEventListener("click", () => links.classList.toggle("open"));
+  </script>
+</body>
+</html>

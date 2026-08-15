@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LabLDAP — a disposable 389 DS laboratory</title>
+  <meta name="description" content="Real LDAP on the wire. A Go control plane for REST, MCP, and a browser UI. Directory Manager never touches the long-running service." />
+  <meta name="theme-color" content="#0b0c0e" />
+  <meta property="og:title" content="LabLDAP" />
+  <meta property="og:description" content="A disposable 389 Directory Server laboratory. REST, MCP, and a browser UI over a real directory." />
+  <meta property="og:image" content="assets/og.jpg" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <link rel="icon" type="image/svg+xml" href="assets/mark.svg" />
+  <link rel="stylesheet" href="site.css" />
+</head>
+<body>
+  <header class="nav">
+    <div class="wrap nav-inner">
+      <a class="brand" href="./">
+        <img src="assets/mark.svg" alt="" />
+        LabLDAP
+      </a>
+      <button class="menu-btn" type="button" aria-expanded="false" data-menu>Menu</button>
+      <nav class="nav-links" data-links>
+        <a href="./" aria-current="page">Overview</a>
+        <a href="start.html">Quick start</a>
+        <a href="use.html">User guide</a>
+        <a href="ship.html">Deploy</a>
+        <a href="https://github.com/hilather/go-lab-ldap-mcp">GitHub</a>
+        <a class="nav-cta" href="start.html">Get a lab running</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="wrap hero-grid">
+        <div>
+          <div class="eyebrow">v0.1.0 · first usable release</div>
+          <h1>A real directory.<br />A small control plane.</h1>
+          <p class="lead">
+            LabLDAP stands up 389 Directory Server, applies a declarative
+            scenario, then hands you REST, MCP, and a browser UI that share
+            one authorization policy. Directory Manager is bootstrap-only.
+          </p>
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="start.html">Quick start</a>
+            <a class="btn btn-ghost" href="https://github.com/hilather/go-lab-ldap-mcp">View the source</a>
+          </div>
+        </div>
+        <div class="hero-frame">
+          <img src="assets/console.jpg" alt="LabLDAP directory console on a laptop" />
+        </div>
+      </div>
+      <div class="wrap">
+        <div class="meta-row">
+          <div><span>Engine</span><strong>389-ds 2.4.6</strong></div>
+          <div><span>Control plane</span><strong>Go 1.26</strong></div>
+          <div><span>Agent surface</span><strong>MCP 2026-07-28</strong></div>
+          <div><span>Images</span><strong>Local only</strong></div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="eyebrow">Why it exists</div>
+          <h2>Not a fake. Not a naked 389 DS container.</h2>
+          <p>
+            In-memory mocks lie about the protocol. Raw directory containers
+            leave Directory Manager in an environment variable for the rest
+            of the afternoon. LabLDAP splits the job the way an operator would.
+          </p>
+        </div>
+        <div class="roles">
+          <div class="role">
+            <code>directory</code>
+            <strong>Long-running 389 DS</strong>
+            <p>Owns <code>/data</code>. Source of truth for users, groups, memberships, and passwords.</p>
+          </div>
+          <div class="role">
+            <code>bootstrap</code>
+            <strong>One-shot labldap-bootstrap</strong>
+            <p>Uses Directory Manager from a secret file, applies the scenario, then exits.</p>
+          </div>
+          <div class="role">
+            <code>control</code>
+            <strong>Long-running labldap</strong>
+            <p>Restricted service account. No DM secret. No Docker socket. Serves UI, REST, and MCP.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="alt">
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="eyebrow">Surfaces</div>
+          <h2>One policy. Four ways in.</h2>
+          <p>Create a user in the browser, fetch it over REST, bind with ldapsearch, and an agent can read it through MCP.</p>
+        </div>
+        <div class="cards">
+          <article class="card">
+            <h3>Browser UI</h3>
+            <p>Users, groups, search, bind test, schema, audit, LDIF export, and a gated soft reset. Session cookie, not a token in localStorage.</p>
+          </article>
+          <article class="card">
+            <h3>REST</h3>
+            <p>Versioned OpenAPI at <code>/api/v1</code>. Revisions, problem documents, the same scopes as every other transport.</p>
+          </article>
+          <article class="card">
+            <h3>MCP</h3>
+            <p>Streamable HTTP <code>POST /mcp</code> or <code>labldap mcp-stdio</code>. Reads on by default. Writes stay off until you enable them.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap split">
+        <div>
+          <div class="eyebrow">Ninety seconds</div>
+          <h2>Compose up. Sign in. Search.</h2>
+          <p>Docker Engine 24+ and Compose v2.24+. First run builds local images. Later runs reuse them.</p>
+          <ol class="list">
+            <li><strong>make compose-up</strong> — secrets, lab CA, 389 DS, bootstrap, control.</li>
+            <li><strong>https://127.0.0.1:8443/</strong> — trust the lab cert, paste <code>secrets/token-admin</code>.</li>
+            <li><strong>ldap://127.0.0.1:3389</strong> — bind as a directory user, not as Directory Manager.</li>
+          </ol>
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="start.html">Full quick start</a>
+            <a class="btn btn-ghost" href="ship.html">Deployment notes</a>
+          </div>
+        </div>
+        <div class="terminal">
+          <pre><code>git clone https://github.com/hilather/go-lab-ldap-mcp.git
+cd go-lab-ldap-mcp
+make compose-up
+
+TOKEN=$(tr -d '\n' < secrets/token-admin)
+curl -sk -H "Authorization: Bearer $TOKEN" \
+  https://127.0.0.1:8443/api/v1/users</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <section class="alt">
+      <div class="wrap">
+        <div class="sec-head">
+          <div class="eyebrow">On the host</div>
+          <h2>Loopback only. Lab certificates.</h2>
+        </div>
+        <table class="ports">
+          <thead>
+            <tr><th>Surface</th><th>Address</th><th>Notes</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>UI / REST / MCP</td><td>127.0.0.1:8443</td><td>Lab TLS. Bearer or session cookie.</td></tr>
+            <tr><td>LDAP / StartTLS</td><td>127.0.0.1:3389</td><td>Simple bind as a directory user.</td></tr>
+            <tr><td>LDAPS</td><td>127.0.0.1:3636</td><td>Trust the generated lab CA.</td></tr>
+            <tr><td>Health</td><td>/health · /health/ready</td><td>Liveness never talks to LDAP.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap split">
+        <div>
+          <div class="eyebrow">Safety</div>
+          <h2>Laboratory on purpose.</h2>
+          <p>This is not a production identity system. The constraints are the product.</p>
+          <ul class="list">
+            <li><strong>No LDAP engine in Go.</strong> 389 DS is the source of truth.</li>
+            <li><strong>No Docker socket</strong> in the control plane.</li>
+            <li><strong>Directory Manager is bootstrap-only.</strong></li>
+            <li><strong>Static tokens are an explicit lab mode.</strong></li>
+            <li><strong>Ephemeral tmpfs is not a wipe</strong> — host swap can persist pages.</li>
+            <li><strong>Active Directory emulation is out of scope.</strong></li>
+          </ul>
+        </div>
+        <div>
+          <div class="eyebrow">Guides</div>
+          <h2>Read these first.</h2>
+          <div class="roles" style="margin-top:20px">
+            <a class="role" href="start.html" style="text-decoration:none">
+              <code>01</code><strong>Quick start</strong><p>First lab, first token, first search.</p>
+            </a>
+            <a class="role" href="use.html" style="text-decoration:none">
+              <code>02</code><strong>User guide</strong><p>UI, REST, LDAP clients, MCP, reset, export.</p>
+            </a>
+            <a class="role" href="ship.html" style="text-decoration:none">
+              <code>03</code><strong>Deploy</strong><p>Images, secrets, TLS, ephemeral vs persistent.</p>
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap foot">
+      <div>LabLDAP · source-available, no distribution license yet · local images only</div>
+      <div>
+        <a href="https://github.com/hilather/go-lab-ldap-mcp">Repository</a>
+        · <a href="https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/guides/quickstart.md">Markdown guides</a>
+        · <a href="https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/mcp/catalog.md">MCP catalog</a>
+      </div>
+    </div>
+  </footer>
+  <script>
+    const btn = document.querySelector("[data-menu]");
+    const links = document.querySelector("[data-links]");
+    btn?.addEventListener("click", () => {
+      const open = links.classList.toggle("open");
+      btn.setAttribute("aria-expanded", String(open));
+    });
+  </script>
+</body>
+</html>

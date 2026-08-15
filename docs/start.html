@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Quick start — LabLDAP</title>
+  <meta name="description" content="Stand up a disposable 389 DS lab in one sitting." />
+  <meta name="theme-color" content="#0b0c0e" />
+  <link rel="icon" type="image/svg+xml" href="assets/mark.svg" />
+  <link rel="stylesheet" href="site.css" />
+</head>
+<body>
+  <header class="nav">
+    <div class="wrap nav-inner">
+      <a class="brand" href="./"><img src="assets/mark.svg" alt="" />LabLDAP</a>
+      <button class="menu-btn" type="button" data-menu>Menu</button>
+      <nav class="nav-links" data-links>
+        <a href="./">Overview</a>
+        <a href="start.html" aria-current="page">Quick start</a>
+        <a href="use.html">User guide</a>
+        <a href="ship.html">Deploy</a>
+        <a href="https://github.com/hilather/go-lab-ldap-mcp">GitHub</a>
+        <a class="nav-cta" href="https://github.com/hilather/go-lab-ldap-mcp">Clone</a>
+      </nav>
+    </div>
+  </header>
+  <main class="doc">
+    <div class="wrap doc-grid">
+      <aside class="toc">
+        <a href="#need">What you need</a>
+        <a href="#start">Start the lab</a>
+        <a href="#up">Confirm it is up</a>
+        <a href="#ui">Open the UI</a>
+        <a href="#api">Call the API</a>
+        <a href="#ldap">Bind over LDAP</a>
+        <a href="#mcp">Attach MCP</a>
+        <a href="#stop">Stop and reset</a>
+      </aside>
+      <article class="prose">
+        <div class="eyebrow">Guide 01</div>
+        <h1>Quick start</h1>
+        <p>Stand up a disposable 389 DS lab, sign in, and make one change you can see over REST, LDAP, and MCP.</p>
+
+        <h2 id="need">What you need</h2>
+        <ul>
+          <li>Docker Engine 24+ and Compose v2.24+</li>
+          <li>A clone of the repository</li>
+          <li>Ports 8443, 3389, and 3636 free on loopback</li>
+        </ul>
+        <p>Go and Node are only required if you build from source. <code>make compose-up</code> builds the images.</p>
+
+        <h2 id="start">Start the lab</h2>
+        <pre><code>git clone https://github.com/hilather/go-lab-ldap-mcp.git
+cd go-lab-ldap-mcp
+make compose-up</code></pre>
+        <p>That builds local images, mints gitignored secrets, generates a lab CA, starts 389 DS on tmpfs, runs bootstrap, and brings the control plane up. First run is image-build heavy.</p>
+        <p>Persistent data: <code>make compose-up-persistent</code>.</p>
+
+        <h2 id="up">Confirm it is up</h2>
+        <pre><code>curl -sk https://127.0.0.1:8443/health
+curl -sk https://127.0.0.1:8443/health/ready</code></pre>
+        <p>Ready waits for a working runtime bind and a matching directory revision. If it never comes, check <code>docker compose logs bootstrap</code>.</p>
+
+        <h2 id="ui">Open the UI</h2>
+        <p>Browse to <strong>https://127.0.0.1:8443/</strong>. The cert is a lab cert — continue past the warning, or trust <code>secrets/tls/instance-ca.crt</code>.</p>
+        <p>Sign in with the contents of <code>secrets/token-admin</code>. The example scenario seeds user <code>alice</code> in group <code>staff</code>.</p>
+
+        <h2 id="api">Call the API</h2>
+        <pre><code>TOKEN=$(tr -d '\n' < secrets/token-admin)
+curl -sk -H "Authorization: Bearer $TOKEN" \
+  https://127.0.0.1:8443/api/v1/users</code></pre>
+
+        <h2 id="ldap">Bind over LDAP</h2>
+        <p>LDAP / StartTLS is <code>ldap://127.0.0.1:3389</code>. LDAPS is <code>ldaps://127.0.0.1:3636</code>. Bind as a directory user, not Directory Manager. A wrong CA fails closed.</p>
+
+        <h2 id="mcp">Attach MCP</h2>
+        <pre><code>labldap mcp-stdio --config deploy/compose/scenario.yaml \
+  --token-file secrets/token-admin</code></pre>
+        <p>Or <code>POST /mcp</code> with the same bearer. Read tools are on. Mutations stay off until the scenario sets <code>registerMutations</code>.</p>
+
+        <h2 id="stop">Stop and reset</h2>
+        <pre><code>make compose-down
+make compose-reset</code></pre>
+        <p>Soft reset (keep the volume, restore the baseline) is the Reset page in the UI.</p>
+        <p class="note">The same text lives in the repo as <a href="https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/guides/quickstart.md">docs/guides/quickstart.md</a>.</p>
+      </article>
+    </div>
+  </main>
+  <footer>
+    <div class="wrap foot">
+      <div>LabLDAP</div>
+      <div><a href="use.html">User guide</a> · <a href="ship.html">Deploy</a></div>
+    </div>
+  </footer>
+  <script>
+    const btn = document.querySelector("[data-menu]");
+    const links = document.querySelector("[data-links]");
+    btn?.addEventListener("click", () => links.classList.toggle("open"));
+  </script>
+</body>
+</html>

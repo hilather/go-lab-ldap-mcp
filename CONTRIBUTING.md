@@ -1,60 +1,78 @@
-# Contributing to LabLDAP
+# Contributing
 
-Read [README.md](https://github.com/hilather/go-lab-ldap-mcp/blob/main/README.md), [AGENTS.md](https://github.com/hilather/go-lab-ldap-mcp/blob/main/AGENTS.md), and [docs/13-open-decisions.md](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/13-open-decisions.md) before changing code. Work from [TASKS.md](https://github.com/hilather/go-lab-ldap-mcp/blob/main/TASKS.md). Accepted ADRs outrank other documents; title-only stubs under `docs/adr/*.stub.md` are **not** accepted ADRs.
+Thanks for looking under the hood. Read the [README](README.md) and the
+[user](docs/guides/user-guide.md) / [deploy](docs/guides/deploy.md) guides
+before changing behaviour a lab operator will feel.
 
-## Architecture rules
+Accepted architecture decision records outrank other documents. Title-only
+stubs in `docs/adr/*.stub.md` are placeholders, not decisions.
 
-These are non-negotiable:
+## Architecture
 
-- Do **not** implement an LDAP listener or BER / LDAP wire-protocol engine in Go. 389 DS is the directory engine.
-- Do **not** store users, groups, or memberships in an application-only in-memory map.
-- Do **not** mount `/var/run/docker.sock` into any application container.
-- Do **not** give Directory Manager credentials to the long-running control service (`labldap`). DM secrets are bootstrap-only (`labldap-bootstrap`).
-- REST and MCP must not call each other. Both call the same application service interfaces.
-- Do not commit plaintext secrets or generated test credentials. Lab secrets live in untracked `/secrets/` files.
+These are the lines the project does not cross:
 
-## Verify a change
+- Do not implement an LDAP listener or BER engine in Go. 389 DS is the
+  directory.
+- Do not store users, groups, or memberships in an application-only map.
+- Do not mount `/var/run/docker.sock` into any application container.
+- Do not give Directory Manager to the long-running `labldap` process.
+  DM is bootstrap-only (`labldap-bootstrap`).
+- REST and MCP do not call each other. Both call the same application
+  services.
+- Do not commit secrets. Lab files live in untracked `secrets/`.
 
-Toolchain pins are in [docs/toolchain.md](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/toolchain.md). From the repository root:
+## Verify
+
+Toolchain pins: [docs/toolchain.md](docs/toolchain.md).
 
 ```text
 make verify
 ```
 
-`make verify` is the release gate. It runs `format`, `lint`, `generate`, `generate-drift`, `test-unit`, `test-security`, `sbom`, `checksums`, and `archcheck`.
+That is the release gate: format, lint, generate, generate-drift, unit
+tests, security scans, SBOM, checksums, architecture check.
 
-Other stable targets: `make test-integration` (real 389 DS harness; needs Docker), `make test-e2e`, `make image-bootstrap`, `make image` (hardened `labldap-control:dev`), `make frontend-build`, `make compose-up` / `compose-up-persistent` / `compose-down` / `compose-reset`.
-
-Critical vulnerability, secret, and license policy is documented in [docs/security/dependency-policy.md](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/security/dependency-policy.md) and enforced by `make test-security` (CI `security` job).
-
-## Source versus generated files
-
-See [docs/generated-files.md](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/generated-files.md). `api/openapi.yaml` is the OpenAPI source and `api/generated/` must not be hand-edited. Update generated files only through committed `make generate` commands, then confirm with `make generate-drift`.
-
-## Task reports
-
-Every implementation task must end with the report format in [AGENTS.md](https://github.com/hilather/go-lab-ldap-mcp/blob/main/AGENTS.md) (also copied in [docs/task-report.md](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/task-report.md)):
+Other targets you will actually run:
 
 ```text
-Task: T-XXX
-Result: complete | partial | blocked
-Files changed: ...
-Tests run: ...
-Acceptance criteria: pass/fail by item
-Security notes: ...
-Follow-up tasks: ...
+make test-integration    # real 389 DS, needs Docker
+make test-e2e
+make image && make image-bootstrap
+make compose-up
 ```
 
-Do not claim completion when integration or acceptance tests were skipped.
+Security, secret, and license policy:
+[docs/security/dependency-policy.md](docs/security/dependency-policy.md).
+
+## Generated files
+
+[`api/openapi.yaml`](api/openapi.yaml) is the OpenAPI source.
+`api/generated/` is not hand-edited. Change the spec, run `make generate`,
+confirm with `make generate-drift`. See
+[docs/generated-files.md](docs/generated-files.md).
 
 ## Public contracts
 
-Changes to configuration, REST, MCP, or other public contracts require documentation and tests in the same change. New configuration fields need defaults, validation, schema, examples, and compatibility notes. New API operations belong in OpenAPI and generated clients. New MCP operations need input/output schema, scopes, annotations, and tests.
+If you change configuration, REST, or MCP, document and test it in the
+same change.
 
-Breaking configuration changes require a new `apiVersion`. Breaking REST changes require a new URL version. Breaking MCP tool changes require a new tool name or a documented version transition.
+- New config fields need defaults, validation, schema, an example, and a
+  compatibility note.
+- New REST operations belong in OpenAPI and the generated clients.
+- New MCP tools need input/output schema, scopes, annotations, and tests.
 
-If implementation discovery requires a design change, write an ADR from [docs/adr/template.md](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/adr/template.md) before changing the public contract. Recovered or newly accepted ADRs replace stubs; do not treat stubs as decisions.
+Breaking config → new `apiVersion`. Breaking REST → new URL version.
+Breaking MCP → new tool name, or a documented transition.
+
+If the implementation forces a design change, write an ADR from
+[docs/adr/template.md](docs/adr/template.md) before you change the
+contract.
 
 ## Pull requests
 
-Use the repository pull-request checklist. Include the task report, do not commit secrets, and keep `make verify` green.
+Use the repository checklist. Do not commit secrets. Keep `make verify`
+green. Say what you ran, what is still untested, and anything that
+touches credentials, reset, export, or browser state.
+
+Agent contributors follow [AGENTS.md](AGENTS.md). Humans can ignore the
+machine report format and write a normal PR description.

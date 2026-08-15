@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>User guide — LabLDAP</title>
+  <meta name="description" content="Operate a running LabLDAP lab from the browser, REST, LDAP, and MCP." />
+  <meta name="theme-color" content="#0b0c0e" />
+  <link rel="icon" type="image/svg+xml" href="assets/mark.svg" />
+  <link rel="stylesheet" href="site.css" />
+</head>
+<body>
+  <header class="nav">
+    <div class="wrap nav-inner">
+      <a class="brand" href="./"><img src="assets/mark.svg" alt="" />LabLDAP</a>
+      <button class="menu-btn" type="button" data-menu>Menu</button>
+      <nav class="nav-links" data-links>
+        <a href="./">Overview</a>
+        <a href="start.html">Quick start</a>
+        <a href="use.html" aria-current="page">User guide</a>
+        <a href="ship.html">Deploy</a>
+        <a href="https://github.com/hilather/go-lab-ldap-mcp">GitHub</a>
+        <a class="nav-cta" href="start.html">Quick start</a>
+      </nav>
+    </div>
+  </header>
+  <main class="doc">
+    <div class="wrap doc-grid">
+      <aside class="toc">
+        <a href="#auth">Sign-in</a>
+        <a href="#ui">Browser UI</a>
+        <a href="#rest">REST</a>
+        <a href="#ldap">Direct LDAP</a>
+        <a href="#mcp">MCP</a>
+        <a href="#dont">What not to do</a>
+      </aside>
+      <article class="prose">
+        <div class="eyebrow">Guide 02</div>
+        <h1>User guide</h1>
+        <p>How to operate a running lab. If you do not have one yet, start at the <a href="start.html">quick start</a>.</p>
+
+        <h2 id="auth">Sign-in</h2>
+        <p>Static bearer tokens are an explicit lab mode.</p>
+        <ul>
+          <li><strong>Browser</strong> — paste the token on <code>/login</code>. You get an HttpOnly session cookie. The CSRF secret stays in page memory, never in localStorage.</li>
+          <li><strong>REST / HTTP MCP</strong> — <code>Authorization: Bearer</code></li>
+          <li><strong>stdio MCP</strong> — <code>--token-file</code> or <code>LABLDAP_MCP_TOKEN</code>. Never <code>--token</code>.</li>
+          <li><strong>Direct LDAP</strong> — simple bind as a directory user. The control-plane token is not an LDAP password.</li>
+        </ul>
+
+        <h2 id="ui">Browser UI</h2>
+        <p>Open https://127.0.0.1:8443/. Trust the lab CA or accept the warning.</p>
+        <ul>
+          <li><code>/</code> dashboard — scenario, engine, baseline, transports, recent audit</li>
+          <li><code>/users</code> create, edit, enable/disable, set password, delete (type the id)</li>
+          <li><code>/groups</code> create with an initial member; add / remove / replace membership</li>
+          <li><code>/search</code> explicit-submit LDAP search; <code>userPassword</code> cannot be requested</li>
+          <li><code>/auth-test</code> bind diagnostic; password field clears after</li>
+          <li><code>/schema</code> read-only Root DSE and schema</li>
+          <li><code>/audit</code> in-memory ring, request-id copy</li>
+          <li><code>/export</code> LDIF without passwords</li>
+          <li><code>/reset</code> soft reset to the compiled baseline</li>
+        </ul>
+        <p>Updates carry a revision. A 412 means refresh and retry. Groups cannot be empty. Soft reset needs the exact scenario name. Hard reset is <code>make compose-reset</code> only.</p>
+
+        <h2 id="rest">REST</h2>
+        <p>Base URL <code>https://127.0.0.1:8443/api/v1</code>. Contract: <code>api/openapi.yaml</code>.</p>
+        <pre><code>TOKEN=$(tr -d '\n' < secrets/token-admin)
+curl -sk -H "Authorization: Bearer $TOKEN" \
+  https://127.0.0.1:8443/api/v1/users</code></pre>
+        <p><code>GET /health</code> never talks to LDAP. <code>GET /health/ready</code> does. <code>GET /metrics</code> is Prometheus text on loopback.</p>
+
+        <h2 id="ldap">Direct LDAP</h2>
+        <p><code>127.0.0.1:3389</code> (StartTLS) and <code>127.0.0.1:3636</code> (LDAPS). Anonymous bind is off. Cleartext bind is off. Trust <code>secrets/tls/instance-ca.crt</code> (ephemeral) or <code>secrets/tls/ca.crt</code> (persistent). Wrong CA or SAN fails closed.</p>
+
+        <h2 id="mcp">MCP</h2>
+        <p>Two transports, one catalog, same scopes as REST.</p>
+        <ul>
+          <li>HTTP: <code>POST /mcp</code> with a bearer. <code>GET /mcp</code> is 405.</li>
+          <li>Local: <code>labldap mcp-stdio</code> — protocol on stdout, logs on stderr.</li>
+        </ul>
+        <p>On by default: <code>ldap_search_entries</code>, <code>ldap_get_capabilities</code>, <code>ldap_get_baseline</code>, <code>ldap_get_entry</code>.</p>
+        <p>Off until <code>register*</code>: create/update/delete user and group, membership, passwords, reset, export.</p>
+        <p>Resources include <code>labldap://capabilities</code>, <code>labldap://baseline</code>, <code>labldap://schema</code>, and <code>labldap://entry{?dn}</code>.</p>
+
+        <h2 id="dont">What not to do</h2>
+        <ul>
+          <li>Do not put Directory Manager in the control container.</li>
+          <li>Do not mount the Docker socket.</li>
+          <li>Do not treat ephemeral tmpfs as a wipe.</li>
+          <li>Do not expect Active Directory semantics.</li>
+          <li>Do not log tokens, passwords, or session ids.</li>
+        </ul>
+        <p class="note">Full version: <a href="https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/guides/user-guide.md">docs/guides/user-guide.md</a>. MCP table: <a href="https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/mcp/catalog.md">docs/mcp/catalog.md</a>.</p>
+      </article>
+    </div>
+  </main>
+  <footer>
+    <div class="wrap foot">
+      <div>LabLDAP</div>
+      <div><a href="start.html">Quick start</a> · <a href="ship.html">Deploy</a></div>
+    </div>
+  </footer>
+  <script>
+    const btn = document.querySelector("[data-menu]");
+    const links = document.querySelector("[data-links]");
+    btn?.addEventListener("click", () => links.classList.toggle("open"));
+  </script>
+</body>
+</html>
