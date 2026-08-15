@@ -36,6 +36,9 @@ func TestCIWorkflowCancelsSupersededRuns(t *testing.T) {
 	if !strings.Contains(wf, "cancel-in-progress: true") {
 		t.Fatal("ci.yml must cancel superseded runs so docs pushes do not stack integration jobs")
 	}
+	if !strings.Contains(wf, "needs.changes.outputs.heavy") {
+		t.Fatal("ci.yml must skip integration/image when the compare range is docs-only")
+	}
 }
 
 func TestPagesSiteHasStaticEntryPoints(t *testing.T) {

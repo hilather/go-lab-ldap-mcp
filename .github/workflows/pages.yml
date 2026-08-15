@@ -40,7 +40,7 @@ jobs:
       - name: Check published site files
         run: |
           set -euo pipefail
-          for f in docs/index.html docs/.nojekyll docs/site.css docs/start.html docs/use.html docs/ship.html; do
+          for f in docs/index.html docs/.nojekyll docs/site.css docs/start.html docs/use.html docs/scenario.html docs/ship.html; do
             test -f "$f" || { echo "missing $f" >&2; exit 1; }
           done
 

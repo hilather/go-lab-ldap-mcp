@@ -31,6 +31,53 @@ env:
   COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
 
 jobs:
+  # Docs-only pushes were never finishing: each new docs commit
+  # cancelled a 25-minute integration job. Skip Docker-heavy jobs
+  # when the compare range is only site/docs/markdown.
+  changes:
+    name: changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      heavy: ${{ steps.filter.outputs.heavy }}
+    steps:
+      - id: filter
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
+            base="${{ github.event.pull_request.base.sha }}"
+            head="${{ github.event.pull_request.head.sha }}"
+          else
+            base="${{ github.event.before }}"
+            head="${{ github.sha }}"
+          fi
+          if [ -z "${base}" ] || [ "${base}" = "0000000000000000000000000000000000000000" ]; then
+            echo "heavy=true" >> "${GITHUB_OUTPUT}"
+            echo "no prior SHA; run integration and image"
+            exit 0
+          fi
+          if ! files=$(gh api "repos/${GITHUB_REPOSITORY}/compare/${base}...${head}" --jq '.files[].filename'); then
+            echo "heavy=true" >> "${GITHUB_OUTPUT}"
+            echo "compare failed; run integration and image"
+            exit 0
+          fi
+          printf '%s\n' "${files}"
+          list=$(mktemp)
+          printf '%s\n' "${files}" > "${list}"
+          heavy=false
+          while IFS= read -r f; do
+            [ -z "${f}" ] && continue
+            case "${f}" in
+              docs/*|*.md|.github/workflows/pages.yml) ;;
+              *) heavy=true ;;
+            esac
+          done < "${list}"
+          rm -f "${list}"
+          echo "heavy=${heavy}" >> "${GITHUB_OUTPUT}"
+          echo "heavy=${heavy}"
+
   static:
     name: static
     runs-on: ubuntu-latest
@@ -181,6 +228,8 @@ jobs:
 
   integration:
     name: integration
+    needs: [changes]
+    if: needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
@@ -228,6 +277,8 @@ jobs:
 
   image:
     name: image
+    needs: [changes]
+    if: needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
