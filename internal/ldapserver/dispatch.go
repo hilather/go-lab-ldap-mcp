@@ -126,64 +126,7 @@ func resultFromError(err error) Result {
 	}
 }
 
-// --- Operation handler stubs (T-125). The write operations (T-128)
-// replace these; extended operations land in T-133 (StartTLS) and T-142
-// (WhoAmI). ---
-
-func (s *Server) handleAdd(ctx context.Context, c *conn, m *Message, req *AddRequest) ResultCode {
-	code := ResultUnwillingToPerform
-	if ctx.Err() == nil {
-		c.sendResult(m.ID, &AddResponse{Result: Result{
-			Code:              code,
-			DiagnosticMessage: "add lands in T-128",
-		}})
-	}
-	return code
-}
-
-func (s *Server) handleModify(ctx context.Context, c *conn, m *Message, req *ModifyRequest) ResultCode {
-	code := ResultUnwillingToPerform
-	if ctx.Err() == nil {
-		c.sendResult(m.ID, &ModifyResponse{Result: Result{
-			Code:              code,
-			DiagnosticMessage: "modify lands in T-128",
-		}})
-	}
-	return code
-}
-
-func (s *Server) handleDelete(ctx context.Context, c *conn, m *Message, req *DeleteRequest) ResultCode {
-	code := ResultUnwillingToPerform
-	if ctx.Err() == nil {
-		c.sendResult(m.ID, &DeleteResponse{Result: Result{
-			Code:              code,
-			DiagnosticMessage: "delete lands in T-128",
-		}})
-	}
-	return code
-}
-
-func (s *Server) handleModifyDN(ctx context.Context, c *conn, m *Message, req *ModifyDNRequest) ResultCode {
-	code := ResultUnwillingToPerform
-	if ctx.Err() == nil {
-		c.sendResult(m.ID, &ModifyDNResponse{Result: Result{
-			Code:              code,
-			DiagnosticMessage: "modifydn lands in T-128",
-		}})
-	}
-	return code
-}
-
-func (s *Server) handleCompare(ctx context.Context, c *conn, m *Message, req *CompareRequest) ResultCode {
-	code := ResultUnwillingToPerform
-	if ctx.Err() == nil {
-		c.sendResult(m.ID, &CompareResponse{Result: Result{
-			Code:              code,
-			DiagnosticMessage: "compare lands in T-128",
-		}})
-	}
-	return code
-}
+// Extended operations land in T-133 (StartTLS) and T-142 (WhoAmI).
 
 func (s *Server) handleExtended(ctx context.Context, c *conn, m *Message, req *ExtendedRequest) ResultCode {
 	var code ResultCode
