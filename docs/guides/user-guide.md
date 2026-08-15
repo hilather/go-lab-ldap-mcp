@@ -3,7 +3,8 @@
 How to operate a running LabLDAP lab from the browser, REST, LDAP, and MCP.
 
 This page assumes you already have a stack up. If not, start at
-[Quick start](quickstart.md).
+[Quick start](quickstart.md). To seed users and groups from YAML, see
+[Scenario YAML](scenario.md).
 
 ## Sign-in model
 
@@ -18,6 +19,39 @@ LabLDAP uses **static bearer tokens** as an explicit lab mode.
 
 The shipped example token is `admin`, stored in `secrets/token-admin`, with
 scopes for read, write, password, reset, export, schema, and audit.
+
+The example scenario seeds directory user `alice` (password file
+`secrets/user-alice`) in group `staff` under `dc=example,dc=test`. That
+tree is YAML — [Scenario YAML](scenario.md).
+
+## Scenario YAML
+
+Users and groups can be declared in the LabScenario file before the lab
+starts. Bootstrap writes them into 389 DS.
+
+```yaml
+spec:
+  users:
+    - id: alice
+      uid: alice
+      passwordFile: /run/secrets/user-alice
+      enabled: true
+      attributes:
+        givenName: Alice
+        sn: Anderson
+  groups:
+    - id: staff
+      members:
+        - user: alice
+```
+
+No inline passwords. Groups cannot be empty. YAML is the compiled baseline
+(`startupMode: merge`); UI / REST / MCP mutations are live until soft reset
+or `make compose-reset`. Changing the file requires a re-bootstrap.
+
+Full mapping, ACL example, and apply steps: [Scenario YAML](scenario.md).
+
+## The browser UI
 
 Tokens never appear in logs. A 401 does not echo token ids. The UI does not
 put the bearer in `localStorage`, `sessionStorage`, IndexedDB, or the URL.
@@ -97,7 +131,7 @@ curl -sk -H "Authorization: Bearer $TOKEN" \
 # Search
 curl -sk -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"base":"dc=lab,dc=example","scope":"sub","filter":"(uid=alice)"}' \
+  -d '{"base":"dc=example,dc=test","scope":"sub","filter":"(uid=alice)"}' \
   https://127.0.0.1:8443/api/v1/search
 ```
 

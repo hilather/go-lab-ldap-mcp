@@ -46,13 +46,14 @@ func TestPagesSiteHasStaticEntryPoints(t *testing.T) {
 		"docs/site.css",
 		"docs/start.html",
 		"docs/use.html",
+		"docs/scenario.html",
 		"docs/ship.html",
 		"docs/assets/mark.svg",
 	} {
 		_ = read(t, filepath.Join(root, rel))
 	}
 	index := read(t, filepath.Join(root, "docs", "index.html"))
-	for _, want := range []string{"start.html", "use.html", "ship.html", "site.css"} {
+	for _, want := range []string{"start.html", "use.html", "scenario.html", "ship.html", "site.css"} {
 		if !strings.Contains(index, want) {
 			t.Fatalf("docs/index.html missing %q", want)
 		}

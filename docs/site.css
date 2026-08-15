@@ -189,6 +189,10 @@ pre { margin: 0; }
 .prose ul, .prose ol { color: var(--fg-muted); padding-left: 1.2rem; }
 .prose li { margin: 6px 0; }
 .prose a { color: var(--fg); text-underline-offset: 3px; }
+.prose table { width: 100%; border-collapse: collapse; margin: 16px 0 22px; font-size: 14px; }
+.prose th, .prose td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.prose th { color: var(--fg); font-weight: 500; }
+.prose td { color: var(--fg-muted); }
 .prose .note {
   border-left: 2px solid var(--accent); padding: 10px 14px; margin: 18px 0;
   color: var(--fg-muted); background: var(--bg-elevated); border-radius: 0 var(--radius-sm) var(--radius-sm) 0;

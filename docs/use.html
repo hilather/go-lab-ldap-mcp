@@ -18,6 +18,7 @@
         <a href="./">Overview</a>
         <a href="start.html">Quick start</a>
         <a href="use.html" aria-current="page">User guide</a>
+        <a href="scenario.html">Scenario</a>
         <a href="ship.html">Deploy</a>
         <a href="https://github.com/hilather/go-lab-ldap-mcp">GitHub</a>
         <a class="nav-cta" href="start.html">Quick start</a>
@@ -28,6 +29,7 @@
     <div class="wrap doc-grid">
       <aside class="toc">
         <a href="#auth">Sign-in</a>
+        <a href="#yaml">Scenario YAML</a>
         <a href="#ui">Browser UI</a>
         <a href="#rest">REST</a>
         <a href="#ldap">Direct LDAP</a>
@@ -37,7 +39,7 @@
       <article class="prose">
         <div class="eyebrow">Guide 02</div>
         <h1>User guide</h1>
-        <p>How to operate a running lab. If you do not have one yet, start at the <a href="start.html">quick start</a>.</p>
+        <p>How to operate a running lab. If you do not have one yet, start at the <a href="start.html">quick start</a>. To seed users and groups from YAML, see <a href="scenario.html">Scenario YAML</a>.</p>
 
         <h2 id="auth">Sign-in</h2>
         <p>Static bearer tokens are an explicit lab mode.</p>
@@ -47,6 +49,20 @@
           <li><strong>stdio MCP</strong> — <code>--token-file</code> or <code>LABLDAP_MCP_TOKEN</code>. Never <code>--token</code>.</li>
           <li><strong>Direct LDAP</strong> — simple bind as a directory user. The control-plane token is not an LDAP password.</li>
         </ul>
+
+        <h2 id="yaml">Scenario YAML</h2>
+        <p>Users and groups are declared in the LabScenario file. Bootstrap writes them into 389 DS. Passwords are file references. Groups cannot be empty. Soft reset restores that file.</p>
+        <pre><code>spec:
+  users:
+    - id: alice
+      uid: alice
+      passwordFile: /run/secrets/user-alice
+      enabled: true
+  groups:
+    - id: staff
+      members:
+        - user: alice</code></pre>
+        <p>Full mapping and ACL example: <a href="scenario.html">Scenario YAML</a>.</p>
 
         <h2 id="ui">Browser UI</h2>
         <p>Open https://127.0.0.1:8443/. Trust the lab CA or accept the warning.</p>

@@ -2,7 +2,7 @@
 
 Day-2 reference for a running lab. New here? Start with the
 [quick start](../guides/quickstart.md), [user guide](../guides/user-guide.md),
-and [deploy](../guides/deploy.md).
+[scenario YAML](../guides/scenario.md), and [deploy](../guides/deploy.md).
 
 This is the first-usable-release operator package. Deploy from
 these files plus the Make targets. Bootstrap (`labldap-bootstrap apply`)

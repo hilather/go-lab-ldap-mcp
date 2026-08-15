@@ -7,7 +7,8 @@ bound to loopback. There is no public registry push and no Kubernetes chart
 in v0.1.0.
 
 For the product contract see [Operator guide](../operations/operator-guide.md).
-This page is the short path.
+This page is the short path. Users and groups are declared in the scenario
+file — [Scenario YAML](scenario.md).
 
 ## Host requirements
 

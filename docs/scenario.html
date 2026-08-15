@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Scenario YAML — LabLDAP</title>
+  <meta name="description" content="Declare LabLDAP users, groups, ACLs, and tokens in a LabScenario YAML file." />
+  <meta name="theme-color" content="#0b0c0e" />
+  <link rel="icon" type="image/svg+xml" href="assets/mark.svg" />
+  <link rel="stylesheet" href="site.css" />
+</head>
+<body>
+  <header class="nav">
+    <div class="wrap nav-inner">
+      <a class="brand" href="./"><img src="assets/mark.svg" alt="" />LabLDAP</a>
+      <button class="menu-btn" type="button" data-menu>Menu</button>
+      <nav class="nav-links" data-links>
+        <a href="./">Overview</a>
+        <a href="start.html">Quick start</a>
+        <a href="use.html">User guide</a>
+        <a href="scenario.html" aria-current="page">Scenario</a>
+        <a href="ship.html">Deploy</a>
+        <a href="https://github.com/hilather/go-lab-ldap-mcp">GitHub</a>
+        <a class="nav-cta" href="start.html">Quick start</a>
+      </nav>
+    </div>
+  </header>
+  <main class="doc">
+    <div class="wrap doc-grid">
+      <aside class="toc">
+        <a href="#declare">Users and groups</a>
+        <a href="#map">What it becomes</a>
+        <a href="#rules">Rules</a>
+        <a href="#acls">ACLs</a>
+        <a href="#apply">Apply</a>
+        <a href="#baseline">Baseline vs runtime</a>
+      </aside>
+      <article class="prose">
+        <div class="eyebrow">Guide 04</div>
+        <h1>Scenario YAML</h1>
+        <p>Users, groups, ACLs, tokens, and lab policy are declared in a <code>labldap.dev/v1alpha1</code> LabScenario file. Bootstrap compiles that file and writes real 389 DS entries. The YAML is the lab definition — not an in-memory directory.</p>
+
+        <h2 id="declare">Users and groups</h2>
+        <pre><code>apiVersion: labldap.dev/v1alpha1
+kind: LabScenario
+metadata:
+  name: compose-lab
+spec:
+  directory:
+    suffix: "dc=example,dc=test"
+    peopleRDN: "ou=people"
+    groupsRDN: "ou=groups"
+
+  users:
+    - id: alice
+      uid: alice
+      passwordFile: /run/secrets/user-alice
+      enabled: true
+      attributes:
+        givenName: Alice
+        sn: Anderson
+        mail: alice@example.test
+
+  groups:
+    - id: staff
+      members:
+        - user: alice</code></pre>
+
+        <h2 id="map">What it becomes</h2>
+        <table>
+          <thead>
+            <tr><th>YAML</th><th>Directory</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>users[].id</code> / <code>uid</code></td><td><code>uid=<id>,ou=people,<suffix></code></td></tr>
+            <tr><td><code>passwordFile</code></td><td><code>userPassword</code> (hashed by 389 DS)</td></tr>
+            <tr><td><code>enabled: false</code></td><td><code>nsAccountLock</code></td></tr>
+            <tr><td><code>attributes</code></td><td>extra string attrs (<code>givenName</code>, <code>sn</code>, <code>mail</code>)</td></tr>
+            <tr><td><code>groups[].id</code></td><td><code>cn=<id>,ou=groups,<suffix></code> (<code>groupOfNames</code>)</td></tr>
+            <tr><td><code>members.user</code></td><td><code>member: uid=…</code></td></tr>
+          </tbody>
+        </table>
+        <p>The shipped Compose lab is <code>deploy/compose/scenario.yaml</code>. Schema: <code>config/schema/v1alpha1.json</code>.</p>
+
+        <h2 id="rules">Rules</h2>
+        <ul>
+          <li><strong>No inline passwords.</strong> Point at a <code>passwordFile</code>. <code>make compose-up</code> writes those files under <code>secrets/</code>.</li>
+          <li><strong>Groups cannot be empty.</strong> 389 <code>groupOfNames</code> needs a member. Nested groups stay off unless <code>nestedGroups: true</code>.</li>
+          <li><strong>YAML is the compiled baseline</strong>, not a live sync loop. UI / REST / MCP can add users later. Soft reset restores this file.</li>
+          <li><strong>Changing the file means re-bootstrap.</strong> The running control plane does not remount a new scenario on the fly.</li>
+          <li><strong><code>allowRawACI: false</code>.</strong> Declare <code>acls:</code> in YAML. Do not paste 389 ACI text.</li>
+        </ul>
+
+        <h2 id="acls">ACLs</h2>
+        <pre><code>  acls:
+    - id: staff-read
+      principal: { kind: group, ref: staff }
+      target: { kind: suffix }
+      permissions: [read, search, compare]
+      attributes:
+        allow: ["*"]
+        deny: [userPassword]</code></pre>
+        <p>That compiles to 389 ACIs. Seed user <code>alice</code> can search the suffix, bind as herself, and cannot read <code>userPassword</code>.</p>
+
+        <h2 id="apply">Apply</h2>
+        <p>Edit <code>deploy/compose/scenario.yaml</code> (or set <code>LABLDAP_SCENARIO_FILE</code>), then <code>make compose-up</code>. Bind as a seeded user, not Directory Manager:</p>
+        <pre><code>ldapsearch -H ldap://127.0.0.1:3389 -ZZ \
+  -x -D 'uid=alice,ou=people,dc=example,dc=test' \
+  -y secrets/user-alice \
+  -b 'dc=example,dc=test' '(uid=alice)'</code></pre>
+        <p>The shipped suffix is <code>dc=example,dc=test</code>.</p>
+
+        <h2 id="baseline">Baseline vs runtime</h2>
+        <table>
+          <thead>
+            <tr><th>Path</th><th>What happens</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Scenario YAML</td><td>Compiled at bootstrap. Soft reset target.</td></tr>
+            <tr><td>UI / REST / MCP</td><td>Live mutations on 389 DS until reset or volume wipe.</td></tr>
+            <tr><td><code>make compose-reset</code></td><td>Destroy the volume, apply the YAML again.</td></tr>
+          </tbody>
+        </table>
+        <p class="note">Full version: <a href="https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/guides/scenario.md">docs/guides/scenario.md</a>.</p>
+      </article>
+    </div>
+  </main>
+  <footer>
+    <div class="wrap foot">
+      <div>LabLDAP</div>
+      <div><a href="start.html">Quick start</a> · <a href="use.html">User guide</a> · <a href="ship.html">Deploy</a></div>
+    </div>
+  </footer>
+  <script>
+    const btn = document.querySelector("[data-menu]");
+    const links = document.querySelector("[data-links]");
+    btn?.addEventListener("click", () => links.classList.toggle("open"));
+  </script>
+</body>
+</html>

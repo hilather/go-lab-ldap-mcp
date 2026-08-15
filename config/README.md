@@ -1,6 +1,10 @@
 # Configuration
 
-JSON Schema, examples, and the `v1alpha1` stand-in land in T-009–T-023.
+Human guide: **[docs/guides/scenario.md](../docs/guides/scenario.md)**.
+Users, groups, ACLs, and tokens are declared in a `labldap.dev/v1alpha1`
+LabScenario YAML. Passwords are file references, never inline.
+
+JSON Schema, examples, and the `v1alpha1` stand-in live here.
 `internal/config` must not connect to LDAP.
 
 `spec.management.metrics.enabled` defaults to true. `requireAuth` defaults

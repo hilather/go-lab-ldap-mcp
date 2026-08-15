@@ -7,6 +7,7 @@ documents under `docs/design/` only when you are changing the product.
 | --- | --- |
 | [Quick start](quickstart.md) | First lab, first token, first search |
 | [User guide](user-guide.md) | UI, REST, LDAP, MCP, reset, export |
+| [Scenario YAML](scenario.md) | Declare users, groups, ACLs, and tokens |
 | [Deploy](deploy.md) | Images, compose, secrets, TLS, operations |
 
 Related:

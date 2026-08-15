@@ -14,6 +14,7 @@
   <a href="https://hilather.github.io/go-lab-ldap-mcp/">Site</a> ·
   <a href="docs/guides/quickstart.md">Quick start</a> ·
   <a href="docs/guides/user-guide.md">User guide</a> ·
+  <a href="docs/guides/scenario.md">Scenario YAML</a> ·
   <a href="docs/guides/deploy.md">Deploy</a> ·
   <a href="docs/mcp/catalog.md">MCP catalog</a>
 </p>
@@ -101,7 +102,9 @@ Full walkthrough: **[docs/guides/quickstart.md](docs/guides/quickstart.md)**.
   Read tools are on by default. Mutations, passwords, reset, and export register
   only when you ask for them.
 - **Declarative labs.** A `labldap.dev/v1alpha1` scenario file is the baseline.
-  Soft reset restores it. Hard reset is Compose volume removal, not an API.
+  Users, groups, ACLs, and tokens live in YAML. Soft reset restores it. Hard
+  reset is Compose volume removal, not an API. See
+  **[docs/guides/scenario.md](docs/guides/scenario.md)**.
 - **Ephemeral or persistent.** Default `make compose-up` uses tmpfs-backed
   `/data`. `make compose-up-persistent` keeps a named volume.
 
@@ -120,6 +123,35 @@ are registered when MCP is enabled. Write, password, reset, and export tools
 stay off until `spec.management.mcp.register*` is set in the scenario.
 
 Catalog: **[docs/mcp/catalog.md](docs/mcp/catalog.md)**.
+
+## Declare users and groups
+
+The lab tree is a YAML scenario, not a Go map. Bootstrap compiles
+[`deploy/compose/scenario.yaml`](deploy/compose/scenario.yaml) into real 389
+DS entries.
+
+```yaml
+spec:
+  directory:
+    suffix: "dc=example,dc=test"
+  users:
+    - id: alice
+      uid: alice
+      passwordFile: /run/secrets/user-alice
+      enabled: true
+      attributes:
+        givenName: Alice
+        sn: Anderson
+  groups:
+    - id: staff
+      members:
+        - user: alice
+```
+
+Passwords are file references, never inline. Groups cannot be empty
+(`groupOfNames`). The UI and REST can add more users after start; soft reset
+restores this file. Full rules and ACL example:
+**[docs/guides/scenario.md](docs/guides/scenario.md)**.
 
 ## Safety model
 

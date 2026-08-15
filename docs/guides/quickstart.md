@@ -67,8 +67,10 @@ cat secrets/token-admin
 
 That token is also the bearer for REST and HTTP MCP. Do not commit it.
 
-The example scenario seeds user `alice` in group `staff`. You should see them
-on the dashboard after sign-in.
+The example scenario seeds user `alice` in group `staff` under
+`dc=example,dc=test`. That seed is YAML — edit
+[`deploy/compose/scenario.yaml`](../../deploy/compose/scenario.yaml) before
+`make compose-up` to change it. See [Scenario YAML](scenario.md).
 
 ## 4. Call the API
 
@@ -92,13 +94,14 @@ From the host, with the lab CA:
 
 ```bash
 ldapsearch -H ldap://127.0.0.1:3389 -ZZ \
-  -x -D 'uid=alice,ou=people,dc=lab,dc=example' \
-  -W -b 'dc=lab,dc=example' '(uid=alice)'
+  -x -D 'uid=alice,ou=people,dc=example,dc=test' \
+  -y secrets/user-alice \
+  -b 'dc=example,dc=test' '(uid=alice)'
 ```
 
-Exact bind DNs follow the compiled scenario. Check the UI user detail page
-or `GET /api/v1/users/alice` if the example suffix differs from what you
-expect.
+Exact bind DNs follow the compiled scenario. The shipped suffix is
+`dc=example,dc=test`. Check the UI user detail page or
+`GET /api/v1/users/alice` if you changed it.
 
 LDAPS is `ldaps://127.0.0.1:3636`. Trust the same lab CA. A wrong CA or
 hostname fails closed.
@@ -137,5 +140,6 @@ page in the UI, or `POST /api/v1/reset` with scope `lab:reset`.
 ## Next
 
 - [User guide](user-guide.md) — every surface, every common job
+- [Scenario YAML](scenario.md) — declare users, groups, ACLs, tokens
 - [Deploy](deploy.md) — images, secrets, TLS, persistent mode
 - [Operator guide](../operations/operator-guide.md) — limits and failure modes

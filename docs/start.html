@@ -18,6 +18,7 @@
         <a href="./">Overview</a>
         <a href="start.html" aria-current="page">Quick start</a>
         <a href="use.html">User guide</a>
+        <a href="scenario.html">Scenario</a>
         <a href="ship.html">Deploy</a>
         <a href="https://github.com/hilather/go-lab-ldap-mcp">GitHub</a>
         <a class="nav-cta" href="https://github.com/hilather/go-lab-ldap-mcp">Clone</a>
@@ -63,7 +64,7 @@ curl -sk https://127.0.0.1:8443/health/ready</code></pre>
 
         <h2 id="ui">Open the UI</h2>
         <p>Browse to <strong>https://127.0.0.1:8443/</strong>. The cert is a lab cert — continue past the warning, or trust <code>secrets/tls/instance-ca.crt</code>.</p>
-        <p>Sign in with the contents of <code>secrets/token-admin</code>. The example scenario seeds user <code>alice</code> in group <code>staff</code>.</p>
+        <p>Sign in with the contents of <code>secrets/token-admin</code>. The example scenario seeds user <code>alice</code> in group <code>staff</code> under <code>dc=example,dc=test</code>. That seed is YAML — <a href="scenario.html">Scenario YAML</a>.</p>
 
         <h2 id="api">Call the API</h2>
         <pre><code>TOKEN=$(tr -d '\n' < secrets/token-admin)
