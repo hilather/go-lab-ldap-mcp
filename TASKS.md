@@ -1714,7 +1714,7 @@ Acceptance:
 - [x] `engine: native` uses native reconcilers only (`TestWireEngineReconcilersNative`; no ds389/runner in native path).
 - [x] Control still has no DM secret (`TestControlPlaneNeverLoadsDirectoryManagerSecret`).
 
-Engine-switch seam: `cmd/labldap-bootstrap/engine.go` `wireEngineReconcilers`. Note: no native `CapabilityInspector` existed (T-144 built reconcilers only; the ds389 one needs `cn=plugins,cn=config` + would exec dsconf), so the seam wires a measured `nativeCapabilities` inspector that proves plugins/scheme via the read-back reconcilers (keeps C10 "measured, not name-assumed"); Root DSE vendor strings left empty (parity harness owns vendor assertions). `labldap-bootstrap` usage text still says "389 Directory Server" — doc fix deferred to T-150.
+Engine-switch seam: `cmd/labldap-bootstrap/engine.go` `wireEngineReconcilers`. Note: no native `CapabilityInspector` existed (T-144 built reconcilers only; the ds389 one needs `cn=plugins,cn=config` + would exec dsconf), so the seam wires a measured `nativeCapabilities` inspector that proves plugins/scheme via the read-back reconcilers (keeps C10 "measured, not name-assumed"); Root DSE vendor strings left empty (parity harness owns vendor assertions). `cmd/labldap-bootstrap/main.go` usage names both engines.
 
 ## [x] T-147 Dual-engine parity harness
 
@@ -1723,10 +1723,14 @@ Priority: P0 | Size: L | Depends on: T-144, T-145 | Wave 6 | Cloud fit: medium
 Deliverables: `test/parity` starts 389 (existing harness) and native (in-process or `labldapd`); compiles one scenario; runs Contract cases from the parity contract; `make test-parity`.
 
 Acceptance:
-- [ ] At least: seed bind, memberOf, nsAccountLock, runtime ACI allow/deny, paged search, LDAPS bind.
-- [ ] Failures attach redacted logs from both engines.
-- [ ] Secret scan of the run passes.
-- [ ] D1 vendor strings are asserted different, not equal.
+- [x] At least: seed bind, memberOf, nsAccountLock, runtime ACI allow/deny, paged search, LDAPS bind.
+  Evidence: `test/parity/cases.go` — `caseTransportBindMatrix` (seed bind + LDAPS), `caseMemberOf` (`memberof-derivation`), `caseAccountDisable` (`nsAccountLock`), `caseRuntimeACIMatrix`, `casePagedResults`.
+- [x] Failures attach redacted logs from both engines.
+  Evidence: `test/parity/native.go` (`t.Cleanup` dumps native slog on failure); `test/parity/oracle.go` (`oracleRedact` on 389 `docker logs` when `t.Failed()`).
+- [x] Secret scan of the run passes.
+  Evidence: `test/parity/native_test.go` `TestNativeRunLogRedaction`; `make test-security` → `tools/secretscan`.
+- [x] D1 vendor strings are asserted different, not equal.
+  Evidence: `test/parity/compare_test.go` `assertDeltaD1`.
 
 ## [x] T-148 Parametrize existing integration tests
 
@@ -1748,8 +1752,10 @@ Priority: P0 | Size: L | Depends on: T-124, T-127, T-138, T-147 | Wave 6 | Cloud
 Deliverables: shared corpus of BER/filter/DN/ACI; native must not panic; optional 389 comparison for parse-accept vs evaluate.
 
 Acceptance:
-- [ ] Native fuzz of codec, filter, ACI runs under `go test -fuzz` with a time-boxed CI job or documented nightly.
-- [ ] No crashers committed; any 389/native parse divergence is a Delta or a native bug.
+- [x] Native fuzz of codec, filter, ACI runs under `go test -fuzz` with a time-boxed CI job or documented nightly.
+  Evidence: `Makefile` `test-fuzz-short` is the T-149 nightly (no dedicated nightly workflow exists to attach). Invoked from `verify-native` / `verify`. Targets: `FuzzDecode`, `FuzzDecodeStream`, `FuzzFilterWire`, `FuzzVerifyPassword`, `FuzzDispatchPDU`, `FuzzParseACITextA` plus config fuzzers.
+- [x] No crashers committed; any 389/native parse divergence is a Delta or a native bug.
+  Evidence: `internal/ldapserver/testdata/fuzz/` holds seed corpora only (no `crashers/` trees). Divergences live in `docs/design/parity-delta-log.md` / `test/parity/delta-ledger.json`.
 
 ## [x] T-150 Soak, leak, redaction, delta ledger, verify gate
 
@@ -1758,15 +1764,19 @@ Priority: P0 | Size: M | Depends on: T-147, T-148 | Wave 6 | Cloud fit: medium
 Deliverables: short native soak (goroutine/FD/bolt growth); log redaction; `docs/design/parity-delta-log.md`; `make verify` includes native unit tests; M9 exit evidence.
 
 Acceptance:
-- [ ] No unbounded growth in the short soak.
-- [ ] Delta ledger lists every accepted skip with test name.
-- [ ] `make verify` green without requiring Docker native compose (compose-native stays `test-parity` / integration).
-- [ ] README/docs only advertise native as ready after this task.
+- [x] No unbounded growth in the short soak.
+  Evidence: `internal/ldapserver/soak_test.go` `TestNativeSoakConnectionChurn`; `internal/ldapserver/store/soak_test.go` `TestBoltSoakWriteCycles`; `make test-native-soak`.
+- [x] Delta ledger lists every accepted skip with test name.
+  Evidence: `test/parity/delta-ledger.json` (machine SoT); `docs/design/parity-delta-log.md` (human record); skip ledger D2/D4/D5/E7 at top of `test/integration/dirsrv/engine.go`.
+- [x] `make verify` green without requiring Docker native compose (compose-native stays `test-parity` / integration).
+  Evidence: `Makefile` `verify` hard-gates hermetic `go test ./test/parity/` (via `verify-native`) and `make test-integration-native` (in-process, no compose). Dual-engine `go test -tags=integration ./test/parity/` hard-gates when Docker is present; Docker-less skip is an explicit note, not WARNING-on-failure.
+- [x] README/docs only advertise native as ready after this task.
+  Evidence: `README.md`, `docs/10-implementation-plan.md` §11a, `docs/13-open-decisions.md` §4, `docs/guides/scenario.md` — native is ready as opt-in `engine: native`; omitted-engine default remains `389ds`.
 
 # Backlog completion checklist
 
 - [x] All P0 tasks for M0–M8 are complete (v0.1.0).
-- [ ] M9 (native engine) P0 tasks T-122–T-150 are complete.
+- [x] M9 (native engine) P0 tasks T-122–T-150 are complete.
 - [ ] Every milestone exit criterion in `docs/10-implementation-plan.md` passes.
 - [ ] Traceability matrix points to concrete test files or jobs.
 - [ ] Accepted ADRs match implementation behavior.

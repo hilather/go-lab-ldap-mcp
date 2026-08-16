@@ -329,10 +329,11 @@ Ship `labldapd` as a selectable directory engine with LabLDAP-surface parity aga
 
 ### Exit criteria
 
-- Contract-tier cases in `docs/design/native-engine-parity-contract.md` pass against both engines.
+- Contract-tier cases in `docs/design/native-engine-parity-contract.md` pass against both engines (`test/parity`, hermetic native + Docker dual-engine when present).
 - `labldap` / `labldap-bootstrap` do not import `internal/ldapserver`.
-- Default `engine: 389ds` behavior is unchanged.
-- Native mode is not advertised as ready until T-150.
+- Default `engine: 389ds` behavior is unchanged. Native is ready as **opt-in** `engine: native` (T-150); the omitted-field default is not flipped here.
+- `make verify` hard-gates hermetic `go test ./test/parity/` and `make test-integration-native`. Dual-engine `go test -tags=integration ./test/parity/` hard-gates when Docker is present; Docker-less machines skip the oracle leg with an explicit note.
+- `make test-fuzz-short` is the T-149 nightly (no dedicated nightly workflow).
 
 ## 12. Critical path
 

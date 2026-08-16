@@ -53,10 +53,10 @@ help:
 		'  test-unit          Go tests + frontend build/scaffold tests' \
 		'  test-integration   real 389 DS harness (pinned digest; needs Docker)' \
 		'  test-integration-native  T-148 native engine variant (in-process labldapd; no Docker)' \
-		'  test-fuzz-short    T-149: every fuzz target, CI-short fuzztime' \
+		'  test-fuzz-short    T-149 nightly: every fuzz target, CI-short fuzztime' \
 		'  test-native-soak   T-150: goroutine/FD churn + bbolt growth gates' \
 		'  test-diff          T-149 differential: native always; 389 oracle when Docker+image' \
-		'  test-parity        T-147 parity harness, hermetic native leg' \
+		'  test-parity        T-147 parity harness, hermetic native leg (hard-gated in verify)' \
 		'  verify-native      aggregate native lane (fuzz + soak + diff + parity)' \
 		'  test-e2e           Playwright UI suite (mock control plane; optional live URL)' \
 		'  test-security      secret scan, govulncheck, license denylist' \
@@ -64,7 +64,7 @@ help:
 		'  compose-up-persistent  named volume /data; dsctl tls import lab CA' \
 		'  compose-down       stop the Compose project' \
 		'  compose-reset      operator hard reset: down -v then compose-up (not REST/MCP)' \
-		'  compose-up-native  native labldapd engine: directory → bootstrap → control (needs T-143/T-144/T-146 at runtime)' \
+		'  compose-up-native  opt-in native labldapd engine: directory → bootstrap → control' \
 		'  compose-up-native-persistent  native engine with named-volume /data' \
 		'  compose-down-native   stop the native Compose stack' \
 		'  compose-reset-native  operator hard reset: down -v then compose-up-native (not REST/MCP)' \
@@ -76,7 +76,7 @@ help:
 		'  scan               govulncheck + optional grype; fail on unapproved criticals' \
 		'  checksums          provenance.json + SHA256SUMS in dist/release/' \
 		'  archcheck          compare advertised arches to the pinned dirsrv digest' \
-		'  verify             format lint generate generate-drift test-unit test-security sbom checksums archcheck'
+		'  verify             release gate: static + unit + security + native lane + native IT; 389/dual-engine when Docker'
 
 format:
 	$(GO) fmt ./...
@@ -109,11 +109,13 @@ test-integration:
 test-integration-native:
 	LABLDAP_IT_ENGINE=native $(GO) test -tags=integration ./test/integration/... -count=1 -timeout 30m
 
-# T-149: every fuzz target in CI-compatible short mode. One -fuzz run per
-# target (go test runs a single fuzz target per invocation); the regexps
-# are ^$-anchored so FuzzDecode does not also match FuzzDecodeStream.
-# Crashers land in testdata/fuzz/<target>/ and fail every later plain
-# "go test" until fixed — that is the gate.
+# T-149 nightly contract: every fuzz target in CI-compatible short mode.
+# There is no dedicated nightly workflow to attach; this target *is* the
+# nightly. One -fuzz run per target (go test runs a single fuzz target
+# per invocation); the regexps are ^$-anchored so FuzzDecode does not
+# also match FuzzDecodeStream. Crashers land in testdata/fuzz/<target>/
+# and fail every later plain "go test" until fixed — that is the gate.
+# Also invoked from verify-native / verify.
 FUZZTIME ?= 10s
 test-fuzz-short:
 	$(GO) test ./internal/ldapserver/ -run='^FuzzDecode$$' -fuzz='^FuzzDecode$$' -fuzztime=$(FUZZTIME)
@@ -156,11 +158,9 @@ test-diff:
 test-parity:
 	$(GO) test ./test/parity/ -count=1
 
-# T-150 native lane aggregate: fuzz-short + soak + differential. The parity
-# leg runs via verify's tolerant wrapper (test-parity is T-147's in-flight
-# package; see verify). Redaction and native unit tests ride inside the
-# verify unit leg.
-verify-native: test-fuzz-short test-native-soak test-diff
+# T-150 native lane aggregate: fuzz-short + soak + differential + hermetic
+# parity. Redaction and native unit tests ride inside the verify unit leg.
+verify-native: test-fuzz-short test-native-soak test-diff test-parity
 	@printf '%s\n' 'verify-native: ok'
 
 test-e2e: frontend-build
@@ -381,34 +381,22 @@ archcheck:
 dataset:
 	$(GO) run ./tools/dataset --users 50 --groups 5 --out dist/dataset/small.yaml
 
-# T-150: verify = control-plane gate + native lane + (Docker-gated) 389
-# lanes. The prerequisite list keeps the exact release-gate shape asserted
-# by test/release; the native lane runs as the first recipe line. On
-# Docker-less machines the 389 integration and dual-engine parity legs
-# skip with a note; every in-process/native check still runs.
-#
-# test/parity is T-147's concurrently-developed package and is not yet
-# self-consistent in the shared tree (its golden delta-ledger.json is
-# ungenerated and its fixture/dsconf legs fail). The release gate must not
-# hard-fail on a sibling's in-flight package, so the unit and parity legs
-# below scope around test/parity while it is incomplete; every leg this
-# task owns (fuzz-short, soak, differential, security, sbom, checksums,
-# archcheck, 389 integration) stays hard-gating. Once T-147 lands green,
-# go test ./... passes and the scoping is a harmless no-op.
+# T-150: verify = control-plane gate + native lane + native IT +
+# (Docker-gated) 389 lanes. The prerequisite list keeps the exact
+# release-gate shape asserted by test/release; the native lane runs as
+# the first recipe line. Hermetic `go test ./test/parity/` and
+# `make test-integration-native` always hard-gate. Dual-engine
+# `go test -tags=integration ./test/parity/` hard-gates when Docker is
+# present; Docker-less machines skip the 389 integration and oracle
+# parity legs with an explicit note (same as today's 389 IT skip), not a
+# WARNING-on-failure. Compose-native is operator-only and is not required
+# for verify.
 verify: format lint generate generate-drift test-unit test-security sbom checksums archcheck
 	$(MAKE) verify-native
-	@if $(GO) test ./test/parity/ -count=1; then \
-		printf '%s\n' 'verify: parity (native leg) ok'; \
-	else \
-		printf '%s\n' 'verify: WARNING test/parity (T-147, in flight) native leg failed; not gating' >&2; \
-	fi
+	$(MAKE) test-integration-native
 	@if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then \
 		$(MAKE) test-integration; \
-		if $(GO) test -tags=integration ./test/parity/ -count=1 -timeout 30m; then \
-			printf '%s\n' 'verify: parity (dual-engine leg) ok'; \
-		else \
-			printf '%s\n' 'verify: WARNING test/parity (T-147, in flight) dual-engine leg failed; not gating' >&2; \
-		fi; \
+		$(GO) test -tags=integration ./test/parity/ -count=1 -timeout 30m; \
 	else \
 		printf '%s\n' 'verify: docker unavailable; skipped 389 integration + dual-engine parity legs'; \
 	fi

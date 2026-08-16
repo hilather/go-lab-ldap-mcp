@@ -76,6 +76,11 @@ make compose-reset    # down -v, then compose-up
 `make compose-up` runs `tools/composepreflight`, generates secrets, and
 generates TLS if they are missing.
 
+Native `labldapd` is ready as opt-in `engine: native` (`make compose-up-native`
+/ `make compose-up-native-persistent`). The omitted-field default remains
+389 DS. Switching engines on an existing volume is a hard reset
+(`compose-reset`), not a live migration.
+
 ## Images
 
 All local. Do not push.

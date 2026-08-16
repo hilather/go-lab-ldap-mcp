@@ -30,8 +30,9 @@
 
 LabLDAP is a control plane around a directory engine. v0.1.0 ships **389 Directory
 Server** as the engine of record. [ADR-0008](docs/adr/0008-dual-directory-engines.md)
-adds a second, Go-native engine (`labldapd`) with [LabLDAP-surface parity](docs/design/native-engine-parity-contract.md);
-native mode is milestone M9 and is not ready until those tasks complete.
+adds a second, Go-native engine (`labldapd`) with [LabLDAP-surface parity](docs/design/native-engine-parity-contract.md).
+Native is ready as **opt-in** `engine: native` (M9). Omitting the field still
+defaults to `389ds`.
 
 The Go process bootstraps a lab suffix, then exposes the same authorized
 operations over HTTPS, Model Context Protocol, and an embedded UI. Directory
@@ -170,7 +171,7 @@ LabLDAP is a laboratory. It is not a production identity system.
 7. Soft reset restores the compiled suffix. It does not delete the volume.
 8. First usable release: one managed suffix, one engine instance. Engine default is 389 DS.
 9. Active Directory emulation is out of scope.
-10. Native Go engine (`labldapd`) is a dual-mode lab option under ADR-0008; it is not a silent replacement for 389 DS and is not advertised ready until M9 exit criteria pass.
+10. Native Go engine (`labldapd`) is a dual-mode lab option under ADR-0008. It is ready as opt-in `engine: native` (`make compose-up-native`); it is not a silent replacement for 389 DS. The omitted-field default stays `389ds`.
 
 Management TLS in the shipped compose stack is a **lab certificate**. Trust
 `secrets/tls/instance-ca.crt` (ephemeral) or `secrets/tls/ca.crt` (persistent).
@@ -194,8 +195,11 @@ Architecture and design live under [`docs/`](docs/). Contributing:
 ## Develop
 
 ```text
-make verify              # format, lint, generate, unit, security, SBOM, arch
+make verify              # release gate: static, unit, security, native parity + native IT; 389/dual-engine when Docker
 make test-integration    # real 389 DS (Docker)
+make test-integration-native  # in-process labldapd (no Docker)
+make test-parity         # hermetic native Contract cases
+make test-fuzz-short     # T-149 nightly: every fuzz target, short fuzztime
 make image               # labldap-control:dev
 make image-bootstrap     # labldap-bootstrap:dev
 ```
@@ -207,8 +211,9 @@ not pushed to a public registry.
 
 **v0.1.0** — first usable release. One suffix, one 389 DS, REST + UI + MCP,
 ephemeral and persistent compose. Dual-engine native mode is accepted in
-[ADR-0008](docs/adr/0008-dual-directory-engines.md) and implemented as
-milestone M9 in [`TASKS.md`](TASKS.md); it is not part of v0.1.0.
+[ADR-0008](docs/adr/0008-dual-directory-engines.md) and ready as opt-in
+`engine: native` (M9 in [`TASKS.md`](TASKS.md)). The omitted-engine default
+remains 389 DS.
 
 No project license file yet; treat it as source-available until one is added.
 

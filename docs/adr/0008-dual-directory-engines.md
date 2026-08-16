@@ -56,7 +56,7 @@ Rejected options are listed below. Silence would otherwise re-open A1 as “embe
 - ADR-0009 records daemon topology, storage, codec, and package layout.
 - `AGENTS.md`, README, `docs/01-system-architecture.md`, and `docs/13-open-decisions.md` are amended in the same change as this ADR.
 - Stub ADR-0001 is marked superseded-in-intent by this ADR. Stub ADR-0002 is marked amended: SoT remains “the engine,” engine identity is dual.
-- Milestone M9 (`TASKS.md` T-121–T-150) implements the decision. Native mode must not be advertised as ready until M9 exit criteria pass.
+- Milestone M9 (`TASKS.md` T-121–T-150) implements the decision. Native is ready as opt-in `engine: native` after M9 exit (T-150). The omitted-field default remains `389ds`.
 - `test/enginesuite` stays a 389 observed-behavior inventory. Cross-engine comparison is `test/parity` (T-147).
 
 ## Alternatives considered

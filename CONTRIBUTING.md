@@ -32,15 +32,23 @@ make verify
 ```
 
 That is the release gate: format, lint, generate, generate-drift, unit
-tests, security scans, SBOM, checksums, architecture check.
+tests, security scans, SBOM, checksums, architecture check, hermetic
+native parity, and `make test-integration-native`. When Docker is
+present it also hard-gates 389 integration and dual-engine
+`go test -tags=integration ./test/parity/`. Docker-less machines skip
+those two legs with an explicit note.
 
 Other targets you will actually run:
 
 ```text
 make test-integration    # real 389 DS, needs Docker
+make test-integration-native  # in-process labldapd, no Docker
+make test-parity         # hermetic native Contract cases
+make test-fuzz-short     # T-149 nightly fuzz (also in verify-native)
 make test-e2e
 make image && make image-bootstrap
 make compose-up
+make compose-up-native   # opt-in native engine stack
 ```
 
 Security, secret, and license policy:

@@ -21,7 +21,7 @@ Compiler contract string (mixed into revisions in T-021): `labldap.config.v1alph
   The engine value is mixed into the **directory revision hash** (a different
   engine is a different lab), so existing `389ds` scenarios see a one-time
   directory-revision change on upgrade; the control revision and the compiler
-  contract string are unchanged. `native` is accepted by the schema but fails
-  closed (`configuration` / `engine_not_available`) in `labldap serve` and
-  `labldap-bootstrap` until milestone M9 wires it (T-146); see
+  contract string are unchanged. `native` is accepted by the schema and is
+  ready as opt-in `engine: native` (T-146 wiring, T-150 M9 exit). Omitting
+  the field still defaults to `389ds`. See
   `docs/design/native-engine-parity-contract.md`.

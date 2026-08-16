@@ -180,6 +180,15 @@ func TestMakefileVerifyIsReleaseGate(t *testing.T) {
 	if !strings.Contains(mk, "verify: format lint generate generate-drift test-unit test-security sbom checksums archcheck") {
 		t.Fatal("make verify must include SBOM, checksums, and archcheck")
 	}
+	if strings.Contains(mk, "WARNING test/parity") {
+		t.Fatal("make verify must hard-gate test/parity, not WARNING-on-failure")
+	}
+	if !strings.Contains(mk, "$(MAKE) test-integration-native") {
+		t.Fatal("make verify must hard-gate test-integration-native")
+	}
+	if !strings.Contains(mk, "go test -tags=integration ./test/parity/") {
+		t.Fatal("make verify must hard-gate dual-engine test/parity when Docker is present")
+	}
 }
 
 func read(t *testing.T, path string) string {

@@ -34,10 +34,11 @@ If that log disagrees with the JSON, the JSON wins.
 ## Running
 
 ```bash
-# Hermetic (native only, no Docker):
+# Hermetic (native only, no Docker). Hard-gated in `make verify` / `make test-parity`:
 go test ./test/parity/
 
-# Dual-engine (requires Docker; skips cleanly without it):
+# Dual-engine (requires Docker). Hard-gated in `make verify` when Docker is present;
+# Docker-less machines skip with an explicit note:
 go test -tags integration ./test/parity/
 
 # Re-adjudicate and rewrite the ledger after an intentional engine change:

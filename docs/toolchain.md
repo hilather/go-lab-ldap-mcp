@@ -31,6 +31,10 @@ before `make test-integration`. The T-115 cases fail (they do not skip) when
 those tools are missing on GitHub Actions. Locally the same cases skip if the
 binary is absent.
 
+`make test-fuzz-short` is the T-149 nightly contract (every fuzz target,
+`FUZZTIME=10s`). There is no dedicated nightly workflow; the target is also
+invoked from `make verify-native` / `make verify`.
+
 The public site is GitHub Pages from `docs/`
 (https://hilather.github.io/go-lab-ldap-mcp/). Enable it once with
 `build_type=workflow` (Settings → Pages → GitHub Actions). The deploy

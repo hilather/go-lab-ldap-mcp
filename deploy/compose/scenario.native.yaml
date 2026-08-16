@@ -4,8 +4,8 @@ metadata:
   name: compose-lab
 spec:
   directory:
-    # engine: native selects labldapd (ADR-0008/0009). Fails closed with
-    # engine_not_available in serve/bootstrap until T-146 wires it.
+    # engine: native selects labldapd (ADR-0008/0009). Opt-in; omitted
+    # engine still defaults to 389ds.
     engine: native
     suffix: "dc=example,dc=test"
     peopleRDN: "ou=people"

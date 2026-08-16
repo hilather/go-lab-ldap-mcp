@@ -44,7 +44,7 @@ The following have safe defaults and should not trigger clarification during ord
 - Naming remains LabLDAP.
 - The frontend uses `pnpm` and strict TypeScript.
 - The Go service uses `net/http`.
-- The initial engine profile is 389 DS only **until M9**. Dual engines (`389ds` | `native`) are accepted in ADR-0008; default remains `389ds`. Native is not ready until T-150.
+- The initial engine profile is 389 DS only **until M9**. Dual engines (`389ds` | `native`) are accepted in ADR-0008; default remains `389ds`. Native is ready as opt-in `engine: native` (T-150). The omitted-field default is not flipped.
 - Static bearer authorization is the initial remote-management mode.
 - Default MCP exposure is read-only.
 - Default directory anonymous bind is disabled.

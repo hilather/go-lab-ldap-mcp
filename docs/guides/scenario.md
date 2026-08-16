@@ -19,7 +19,7 @@ Shipped examples:
 | Value | Meaning |
 | --- | --- |
 | `389ds` | Pinned 389 Directory Server container. **Default** when the field is omitted. |
-| `native` | In-repo Go engine (`labldapd`). **Accepted but not ready**: the control plane and bootstrap fail closed with `engine_not_available` until milestone M9 completes (T-146/T-150). See [`docs/design/native-engine-parity-contract.md`](../design/native-engine-parity-contract.md). |
+| `native` | In-repo Go engine (`labldapd`). **Ready as opt-in** (M9 / T-150). Set `engine: native` or use `make compose-up-native`. Omitting the field still defaults to `389ds`. See [`docs/design/native-engine-parity-contract.md`](../design/native-engine-parity-contract.md). |
 
 The field is optional and backward-compatible; omitting it keeps the `389ds`
 behavior. Engine is part of the compiled plan (`labldap plan` output) and the
