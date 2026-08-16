@@ -1602,17 +1602,19 @@ Acceptance:
 - [x] Marker add with `device` + `description` JSON succeeds.
 - [x] Bind-test can read `pwdAccountLockedTime` and `nsAccountLock`.
 
-## [ ] T-138 ACI parser for the compiler subset
+## [x] T-138 ACI parser for the compiler subset
 
 Priority: P0 | Size: L | Depends on: T-122 | Wave 4 | Cloud fit: high (best-of-2 candidate)
 
 Deliverables: parse ACI text emitted by `internal/config` (golden `testdata/runtime-acis.txt` + operator fixtures); reject unknown clauses rather than ignore.
 
 Acceptance:
-- [ ] All four runtime ACIs parse.
-- [ ] Compiler golden operator ACIs parse.
-- [ ] Injection characters in DN/attr are treated as data, not extra clauses.
-- [ ] Out-of-grammar raw ACI fails with a stable error (C8).
+- [x] All four runtime ACIs parse.
+- [x] Compiler golden operator ACIs parse.
+- [x] Injection characters in DN/attr are treated as data, not extra clauses.
+- [x] Out-of-grammar raw ACI fails with a stable error (C8).
+
+Adjudicated best-of-2: kept attempt A (`aci_parse_a.go`, `ParseACITextA`) for case-insensitive keyword/permission matching faithful to 389's lexer; dropped attempt B (lowercase-only). `FuzzParseACITextA` seed corpus committed for T-149.
 
 ## [ ] T-139 ACI evaluator and T-036 allow/deny matrix
 
