@@ -16,10 +16,14 @@ import (
 // accessed through the small helpers so the concurrent op goroutines never
 // touch them bare.
 type conn struct {
-	srv    *Server
-	nc     net.Conn
-	codec  Codec
-	isTLS  bool // true on the LDAPS listener (StartTLS upgrades land in T-133)
+	srv   *Server
+	nc    net.Conn
+	codec Codec
+	// isTLS is true on the LDAPS listener or after a successful StartTLS
+	// upgrade. It is read and written only on the serve goroutine (bind
+	// and StartTLS both run inline), so it needs no lock; upgradeTLS
+	// flips it under mu purely to stay adjacent to the nc swap.
+	isTLS  bool
 	remote string
 
 	// sem bounds outstanding (dispatched, not yet completed) operations.
@@ -63,7 +67,17 @@ func (s *Server) newConn(ctx context.Context, nc net.Conn, isTLS bool) *conn {
 // close cancels in-flight work and closes the socket. It is idempotent.
 func (c *conn) close() {
 	c.cancel()
-	_ = c.nc.Close()
+	if nc := c.netConn(); nc != nil {
+		_ = nc.Close()
+	}
+}
+
+// netConn returns the current transport. StartTLS replaces it mid-life, so
+// callers on goroutines other than the read loop must go through here.
+func (c *conn) netConn() net.Conn {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.nc
 }
 
 // serve is the connection read loop: decode one LDAPMessage at a time,
@@ -78,10 +92,15 @@ func (c *conn) serve() {
 		if c.ctx.Err() != nil {
 			return
 		}
-		if err := c.nc.SetReadDeadline(c.nextReadDeadline()); err != nil {
+		// Read the transport each iteration: a StartTLS upgrade swaps it.
+		nc := c.netConn()
+		if nc == nil {
 			return
 		}
-		msg, err := c.codec.ReadMessage(c.ctx, c.nc)
+		if err := nc.SetReadDeadline(c.nextReadDeadline()); err != nil {
+			return
+		}
+		msg, err := c.codec.ReadMessage(c.ctx, nc)
 		if err != nil {
 			c.handleReadError(err)
 			return
@@ -99,6 +118,18 @@ func (c *conn) serve() {
 			return
 		case *AbandonRequest:
 			c.abandon(op.MessageID)
+		case *ExtendedRequest:
+			if op.Name == OIDStartTLS {
+				// StartTLS runs inline like bind: after the success
+				// response the read loop must read TLS records from the
+				// upgraded transport, so no other message may be
+				// dispatched between the response and the handshake.
+				if !c.srv.handleStartTLS(c.ctx, c, msg, op) {
+					return
+				}
+				continue
+			}
+			c.spawnOp(msg)
 		default:
 			c.spawnOp(msg)
 		}
@@ -245,15 +276,16 @@ func (c *conn) abandon(msgID int64) {
 // send writes one message under the write lock with the write deadline. A
 // nil nc (unit tests driving handlers without a socket) drops the write.
 func (c *conn) send(m *Message) error {
-	if c.nc == nil {
+	nc := c.netConn()
+	if nc == nil {
 		return nil
 	}
 	c.writeMu.Lock()
 	defer c.writeMu.Unlock()
-	if err := c.nc.SetWriteDeadline(time.Now().Add(c.srv.opts.Limits.WriteTimeout)); err != nil {
+	if err := nc.SetWriteDeadline(time.Now().Add(c.srv.opts.Limits.WriteTimeout)); err != nil {
 		return err
 	}
-	if err := c.codec.WriteMessage(c.ctx, c.nc, m); err != nil {
+	if err := c.codec.WriteMessage(c.ctx, nc, m); err != nil {
 		c.srv.opts.Logger.LogAttrs(c.ctx, slog.LevelDebug, "write failed",
 			slog.String("remote", c.remote), slog.String("error", err.Error()))
 		return err

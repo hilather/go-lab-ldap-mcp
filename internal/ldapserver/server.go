@@ -203,6 +203,12 @@ func New(opts Options) (*Server, error) {
 	if (opts.LDAPSAddress != "" || opts.AllowStartTLS) && opts.TLSConfig == nil {
 		return nil, fieldErr("tlsConfig", "required", "LDAPS or StartTLS requires a TLS config")
 	}
+	if opts.TLSConfig != nil {
+		// Clone so the caller's config is never mutated, and raise the
+		// protocol floor to TLS 1.2 (security posture: harden, never
+		// loosen).
+		s.opts.TLSConfig = serverTLSConfig(opts.TLSConfig)
+	}
 	if s.opts.LDAPAddress, err = loopbackDefault(opts.LDAPAddress); err != nil {
 		return nil, fieldErr("ldapAddress", "invalid_address", "LDAP listener address is invalid")
 	}
