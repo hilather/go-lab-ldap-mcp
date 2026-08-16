@@ -1541,52 +1541,54 @@ Acceptance:
 - [x] Subschema includes `inetOrgPerson`, `groupOfNames`, `nsAccountLock` attribute type, `nsmemberof`.
 - [x] `requiredOK` capability inspect can consume this Root DSE.
 
-## [ ] T-133 TLS, StartTLS, and bind-transport policy
+## [x] T-133 TLS, StartTLS, and bind-transport policy
 
 Priority: P0 | Size: L | Depends on: T-125, T-126 | Wave 3 | Cloud fit: high
 
 Deliverables: LDAPS listener; StartTLS extended op; require-secure-binds; anonymous off; CA/name verification using existing test CA helpers.
 
 Acceptance:
-- [ ] LDAPS succeeds with correct trust and name; wrong CA and wrong name fail closed.
-- [ ] Cleartext simple bind rejected when `allowCleartextBind` is false (`confidentialityRequired` or 389-observed code; record).
-- [ ] StartTLS then bind succeeds in-process.
-- [ ] Private keys absent from test logs.
+- [x] LDAPS succeeds with correct trust and name; wrong CA and wrong name fail closed.
+- [x] Cleartext simple bind rejected when `allowCleartextBind` is false (`confidentialityRequired` or 389-observed code; record).
+- [x] StartTLS then bind succeeds in-process.
+- [x] Private keys absent from test logs.
 
-## [ ] T-134 Password hashing and policy engine
+## [x] T-134 Password hashing and policy engine
 
 Priority: P0 | Size: L | Depends on: T-126, T-128, T-129 | Wave 3 | Cloud fit: high
 
 Deliverables: `PBKDF2-SHA256` and `SSHA512` verify; min length, history, max age, lockout; `pwdAccountLockedTime`; never log or return hashes.
 
 Acceptance:
-- [ ] Seed password bind succeeds; reuse of a history password fails.
-- [ ] Lockout after N failures sets `pwdAccountLockedTime` and fails subsequent binds until duration elapses (use fake clock).
-- [ ] Hash blobs are not required to match 389 (Delta D3); bind with plaintext is the test.
-- [ ] Password values absent from logs.
+- [x] Seed password bind succeeds; reuse of a history password fails.
+- [x] Lockout after N failures sets `pwdAccountLockedTime` and fails subsequent binds until duration elapses (use fake clock).
+- [x] Hash blobs are not required to match 389 (Delta D3); bind with plaintext is the test.
+- [x] Password values absent from logs.
 
-## [ ] T-135 MemberOf write-path plugin
+Follow-up: `cmd/labldapd` wiring from `config.NormalizedPolicy` → `PasswordPolicy` (T-143). Plugin ordering: `pwpolicy` is appended last in `New()` and re-reads entries before `Replace`; later plugins must follow the same re-read discipline.
+
+## [x] T-135 MemberOf write-path plugin
 
 Priority: P0 | Size: L | Depends on: T-128, T-129, T-132 | Wave 3 | Cloud fit: high
 
 Deliverables: on member add/remove/replace, update `memberOf`; auto-add `nsmemberof`; fixup equivalent for bootstrap/reset.
 
 Acceptance:
-- [ ] After group member add, user search returns `memberOf` of that group DN.
-- [ ] Remove member drops `memberOf`.
-- [ ] Nested-group behavior follows a constructor flag matching `spec.directory.nestedGroups`.
-- [ ] Same-commit: Search after the write in one test client sees `memberOf`.
+- [x] After group member add, user search returns `memberOf` of that group DN.
+- [x] Remove member drops `memberOf`.
+- [x] Nested-group behavior follows a constructor flag matching `spec.directory.nestedGroups`.
+- [x] Same-commit: Search after the write in one test client sees `memberOf`.
 
-## [ ] T-136 Referential integrity plugin
+## [x] T-136 Referential integrity plugin
 
 Priority: P0 | Size: M | Depends on: T-135 | Wave 3 | Cloud fit: high
 
 Deliverables: on user/group delete, repair `member` on groups in suffix; update-delay 0.
 
 Acceptance:
-- [ ] Deleting a member removes that DN from groups; groups that would become empty fail or are handled as documented (groupOfNames cannot be empty — match 389 observed).
-- [ ] Delete outside suffix does not rewrite foreign entries (no foreign entries in v1).
-- [ ] Fixup is suffix-scoped.
+- [x] Deleting a member removes that DN from groups; groups that would become empty fail or are handled as documented (groupOfNames cannot be empty — match 389 observed).
+- [x] Delete outside suffix does not rewrite foreign entries (no foreign entries in v1).
+- [x] Fixup is suffix-scoped.
 
 ## [ ] T-137 nsAccountLock, operational attributes, marker schema
 
