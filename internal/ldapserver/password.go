@@ -24,10 +24,9 @@ const (
 	attrPasswordHistory      = "passwordHistory"
 )
 
-// Policy rejections on the write path. They surface through runPlugins as
-// errPlugin, so the client sees unwillingToPerform(53) — 389 returns
-// constraintViolation(19) for the same conditions; pinned as a Delta
-// candidate for the T-147 oracle.
+// Policy rejections on the write path. runPlugins joins these with
+// errPlugin; mapWriteError must test them before the generic plugin arm
+// so the client sees constraintViolation(19), matching 389 (D18).
 var (
 	errPasswordTooShort  = errors.New("ldapserver: password below minimum length")
 	errPasswordInHistory = errors.New("ldapserver: password present in password history")
@@ -263,7 +262,7 @@ func (e *passwordEngine) AfterWrite(ctx context.Context, tx UpdateTx, ev WriteEv
 		if ev.Before == nil || ev.After == nil {
 			return nil
 		}
-		return e.applyModify(ctx, tx, ev.Before, ev.After)
+		return e.applyModify(ctx, tx, ev.Before, ev.After, ev.Subject)
 	default:
 		return nil
 	}
@@ -309,8 +308,10 @@ func (e *passwordEngine) applyAdd(ctx context.Context, tx UpdateTx, after *Entry
 // values are hashed, pwdChangedTime is stamped, and the previous passwords
 // move into passwordHistory (trimmed to HistoryCount). A pre-hashed value
 // passes through without checks — imports carry already-hashed blobs whose
-// plaintext cannot be validated.
-func (e *passwordEngine) applyModify(ctx context.Context, tx UpdateTx, before, after *Entry) error {
+// plaintext cannot be validated. Directory Manager (BypassACI) skips the
+// history check so seed merge / soft-reset can re-apply a secret that is
+// already in history (D29); minimum length still applies.
+func (e *passwordEngine) applyModify(ctx context.Context, tx UpdateTx, before, after *Entry, subj Subject) error {
 	beforeVals := before.Values(attrUserPassword)
 	afterVals := after.Values(attrUserPassword)
 	if sameByteSet(beforeVals, afterVals) {
@@ -335,9 +336,12 @@ func (e *passwordEngine) applyModify(ctx context.Context, tx UpdateTx, before, a
 
 	// History inputs: the recorded history plus the current values, which
 	// become history on success — so re-setting the current password is
-	// also rejected (stricter than 389 is known to be; Delta candidate).
-	history := append([][]byte(nil), cur.Values(attrPasswordHistory)...)
-	history = append(history, beforeVals...)
+	// also rejected (389 CAND-11). DM BypassACI skips the check entirely.
+	var history [][]byte
+	if !subj.BypassACI {
+		history = append([][]byte(nil), cur.Values(attrPasswordHistory)...)
+		history = append(history, beforeVals...)
+	}
 	out := make([][]byte, 0, len(afterVals))
 	for _, v := range afterVals {
 		if isPreHashed(v) {

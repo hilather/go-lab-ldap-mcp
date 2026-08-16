@@ -1868,7 +1868,7 @@
     {
       "id": "CAND-9",
       "topic": "password-policy-violation write code",
-      "verdict": "delta",
+      "verdict": "match",
       "oracle": [
         {
           "code": 19
@@ -1885,13 +1885,13 @@
       ],
       "native": [
         {
-          "code": 53
+          "code": 19
         },
         {
           "code": 0
         },
         {
-          "code": 53
+          "code": 19
         },
         {
           "code": 0
@@ -2038,7 +2038,7 @@
     {
       "id": "CAND-11",
       "topic": "re-setting the current password",
-      "verdict": "delta",
+      "verdict": "match",
       "oracle": [
         {
           "code": 19
@@ -2052,7 +2052,7 @@
       ],
       "native": [
         {
-          "code": 53
+          "code": 19
         },
         {
           "code": 0
@@ -2963,7 +2963,7 @@
     {
       "id": "CAND-27",
       "topic": "DM password reset vs history policy",
-      "verdict": "delta",
+      "verdict": "match",
       "oracle": [
         {
           "code": 0
@@ -2983,7 +2983,7 @@
           "code": 0
         },
         {
-          "code": 53
+          "code": 0
         },
         {
           "code": 0

@@ -483,6 +483,9 @@ func TestPluginRunsInCommit(t *testing.T) {
 	if evs[0].After.DN != "uid=frank,ou=people,dc=example,dc=test" {
 		t.Fatalf("plugin saw DN %q", evs[0].After.DN)
 	}
+	if evs[0].Subject.BypassACI {
+		t.Fatal("unbound write threaded BypassACI")
+	}
 
 	// A failing plugin rolls the write back: the entry must not exist.
 	bad := &FakePlugin{PluginName: "veto", Err: errTestVeto}
@@ -502,6 +505,34 @@ func TestPluginRunsInCommit(t *testing.T) {
 }
 
 var errTestVeto = errors.New("test veto")
+
+// TestMapWriteErrorPasswordPolicyBeforePlugin locks the D18 arm order:
+// policy sentinels joined with errPlugin must map to constraintViolation
+// (19), not the generic plugin unwillingToPerform (53).
+func TestMapWriteErrorPasswordPolicyBeforePlugin(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name string
+		err  error
+		want ResultCode
+	}{
+		{"too short joined with plugin", errors.Join(errPlugin, errPasswordTooShort), ResultConstraintViolation},
+		{"in history joined with plugin", errors.Join(errPlugin, errPasswordInHistory), ResultConstraintViolation},
+		{"too short alone", errPasswordTooShort, ResultConstraintViolation},
+		{"in history alone", errPasswordInHistory, ResultConstraintViolation},
+		{"generic plugin", errors.Join(errPlugin, errTestVeto), ResultUnwillingToPerform},
+		{"plugin sentinel only", errPlugin, ResultUnwillingToPerform},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got := mapWriteError(tc.err)
+			if got.Code != tc.want {
+				t.Fatalf("mapWriteError(%v).Code = %v, want %v", tc.err, got.Code, tc.want)
+			}
+		})
+	}
+}
 
 // TestWriteOpsOverTCPEndToEnd drives the full wire path once: bind, then
 // add, modify, compare, rename, delete — the T-128 protocol-level chain.

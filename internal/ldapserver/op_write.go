@@ -103,7 +103,7 @@ func (s *Server) handleAdd(ctx context.Context, c *conn, m *Message, req *AddReq
 		if err := tx.Add(ctx, entry); err != nil {
 			return err
 		}
-		return s.runPlugins(ctx, tx, WriteEvent{Op: WriteAdd, After: entry})
+		return s.runPlugins(ctx, tx, WriteEvent{Op: WriteAdd, After: entry, Subject: subj})
 	})
 	if err != nil {
 		return respond(mapWriteError(err))
@@ -145,9 +145,17 @@ func mapWriteError(err error) Result {
 			msg = "operational attribute " + oe.attr + " is not client-modifiable"
 		}
 		return Result{Code: ResultConstraintViolation, DiagnosticMessage: msg}
+	case errors.Is(err, errPasswordTooShort):
+		// D18: password-policy aborts join errPlugin, so this arm must
+		// precede the generic plugin case. 389 answers constraintViolation.
+		return Result{Code: ResultConstraintViolation, DiagnosticMessage: "password below minimum length"}
+	case errors.Is(err, errPasswordInHistory):
+		return Result{Code: ResultConstraintViolation, DiagnosticMessage: "password present in password history"}
 	case errors.Is(err, errPlugin):
 		// A plugin aborts the whole commit (C7); the client sees an
 		// unwillingToPerform, matching 389's plugin-failure surface.
+		// Do not globally remap 53: disabled-account, anonymous-off,
+		// and other plugin aborts stay unwillingToPerform.
 		return Result{Code: ResultUnwillingToPerform, DiagnosticMessage: "write rejected by plugin"}
 	case errors.Is(err, errAssertionFailed):
 		// RFC 4528: the entry did not match the assertion; nothing was
@@ -236,7 +244,7 @@ func (s *Server) handleModify(ctx context.Context, c *conn, m *Message, req *Mod
 		if err := tx.Replace(ctx, after); err != nil {
 			return err
 		}
-		return s.runPlugins(ctx, tx, WriteEvent{Op: WriteModify, Before: before, After: after})
+		return s.runPlugins(ctx, tx, WriteEvent{Op: WriteModify, Before: before, After: after, Subject: subj})
 	})
 	if err != nil {
 		return respond(mapWriteError(err))
@@ -368,7 +376,7 @@ func (s *Server) handleDelete(ctx context.Context, c *conn, m *Message, req *Del
 		if err := tx.Delete(ctx, dn); err != nil {
 			return err
 		}
-		return s.runPlugins(ctx, tx, WriteEvent{Op: WriteDelete, Before: before})
+		return s.runPlugins(ctx, tx, WriteEvent{Op: WriteDelete, Before: before, Subject: subj})
 	})
 	if err != nil {
 		return respond(mapWriteError(err))
@@ -500,7 +508,7 @@ func (s *Server) handleModifyDN(ctx context.Context, c *conn, m *Message, req *M
 		if err := tx.Replace(ctx, after); err != nil {
 			return err
 		}
-		return s.runPlugins(ctx, tx, WriteEvent{Op: WriteRename, Before: before, After: after})
+		return s.runPlugins(ctx, tx, WriteEvent{Op: WriteRename, Before: before, After: after, Subject: subj})
 	})
 	if err != nil {
 		return respond(mapWriteError(err))

@@ -30,11 +30,13 @@ func (op WriteOp) String() string {
 
 // WriteEvent describes one committed-shape write to a Plugin. Before is nil
 // for WriteAdd, After is nil for WriteDelete, and a rename reports the old
-// DN on Before and the new DN on After.
+// DN on Before and the new DN on After. Subject is the bind identity that
+// issued the write; BypassACI is the Directory Manager (D29).
 type WriteEvent struct {
-	Op     WriteOp
-	Before *Entry
-	After  *Entry
+	Op      WriteOp
+	Before  *Entry
+	After   *Entry
+	Subject Subject
 }
 
 // Plugin is a write-path hook running inside the same store transaction as

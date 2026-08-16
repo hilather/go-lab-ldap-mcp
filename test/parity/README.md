@@ -28,7 +28,7 @@ If that log disagrees with the JSON, the JSON wins.
 | `native_test.go` | always | Hermetic run: all cases/probes against native only, verified against the ledger's native columns; engine-log secret scan. |
 | `excluded_test.go` | always | Excluded-tier (E1–E8) inertness on the native surface. |
 | `ledger_test.go` | always | Structural validation of the committed ledger. |
-| `delta-ledger.json` | — | Machine observation SoT. Adjudicated golden ledger T-150 consumes. Delta verdicts CAND-2/6/8–11/15/17/21–28 are D15–D30 in the contract. |
+| `delta-ledger.json` | — | Machine observation SoT. Adjudicated golden ledger T-150 consumes. Delta verdicts CAND-2/6/8/10/15/17/21–26/28 are D15–D30 in the contract. CAND-9/11/27 match after the native password-policy write-path fix. |
 
 ## Running
 

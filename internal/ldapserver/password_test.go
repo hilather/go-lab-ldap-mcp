@@ -3,6 +3,7 @@ package ldapserver
 import (
 	"bytes"
 	"context"
+	"errors"
 	"log/slog"
 	"strings"
 	"sync"
@@ -57,7 +58,12 @@ func policyOptions(t *testing.T, clock *testNow, mutate func(*PasswordPolicy)) O
 	// DM bypasses ACI; everyone else is denied. This mirrors the ACI
 	// contract (aci.go: BypassACI subjects are allowed without evaluation).
 	opts.ACI = &FakeACI{Decide: func(ctx context.Context, tx ReadTx, check ACICheck) (bool, error) {
-		return check.Subject.BypassACI, nil
+		if check.Subject.BypassACI {
+			return true, nil
+		}
+		// Bound users may write so self-service history tests are not
+		// forced through Directory Manager (D29 skips history for DM).
+		return !check.Subject.Anonymous && check.Subject.DN.String() != "", nil
 	}}
 	p := &PasswordPolicy{Now: clock.Now, Hasher: fastHasher(t, "")}
 	if mutate != nil {
@@ -200,14 +206,14 @@ func TestPolicyMinLengthEnforcedOnWrite(t *testing.T) {
 	cl := dialTestClient(t, addr)
 	bindDM(t, cl)
 
-	if res := addAlice(t, cl, "short"); res.Code != ResultUnwillingToPerform {
-		t.Fatalf("short add = %v, want unwillingToPerform (plugin abort)", res)
+	if res := addAlice(t, cl, "short"); res.Code != ResultConstraintViolation {
+		t.Fatalf("short add = %v, want constraintViolation (D18)", res)
 	}
 	if res := addAlice(t, cl, "long-enough-password"); res.Code != ResultSuccess {
 		t.Fatalf("add = %v", res)
 	}
-	if res := setAlicePassword(t, cl, "tiny"); res.Code != ResultUnwillingToPerform {
-		t.Fatalf("short modify = %v, want unwillingToPerform", res)
+	if res := setAlicePassword(t, cl, "tiny"); res.Code != ResultConstraintViolation {
+		t.Fatalf("short modify = %v, want constraintViolation", res)
 	}
 	// The rejected change must not have landed: the old password still binds.
 	if res := bindResult(t, cl, "uid=alice,ou=people,dc=example,dc=test", "long-enough-password"); res.Code != ResultSuccess {
@@ -226,7 +232,7 @@ func TestPolicyHistoryRejectsReuse(t *testing.T) {
 		t.Fatalf("add: %v", res)
 	}
 
-	// Rotate A -> B: allowed.
+	// Rotate A -> B as DM: allowed (and would also be allowed as self).
 	if res := setAlicePassword(t, cl, "pw-two-bbbb"); res.Code != ResultSuccess {
 		t.Fatalf("rotate A->B = %v", res)
 	}
@@ -235,15 +241,18 @@ func TestPolicyHistoryRejectsReuse(t *testing.T) {
 		t.Fatalf("passwordHistory = %d values, want 1", got)
 	}
 
+	// History rejection is a non-DM (self) check: DM BypassACI skips it.
+	if res := bindResult(t, cl, "uid=alice,ou=people,dc=example,dc=test", "pw-two-bbbb"); res.Code != ResultSuccess {
+		t.Fatalf("alice bind B: %v", res)
+	}
 	// Reuse of A (now history) fails; the rejection aborts the commit, so B
 	// still binds afterwards.
-	if res := setAlicePassword(t, cl, "pw-one-aaaa"); res.Code != ResultUnwillingToPerform {
-		t.Fatalf("reuse A = %v, want unwillingToPerform", res)
+	if res := setAlicePassword(t, cl, "pw-one-aaaa"); res.Code != ResultConstraintViolation {
+		t.Fatalf("reuse A = %v, want constraintViolation (D18)", res)
 	}
-	// Re-setting the current password is also rejected (stricter than 389;
-	// Delta candidate).
-	if res := setAlicePassword(t, cl, "pw-two-bbbb"); res.Code != ResultUnwillingToPerform {
-		t.Fatalf("re-set current = %v, want unwillingToPerform", res)
+	// Re-setting the current password is rejected with 19 (389 CAND-11).
+	if res := setAlicePassword(t, cl, "pw-two-bbbb"); res.Code != ResultConstraintViolation {
+		t.Fatalf("re-set current = %v, want constraintViolation (D20)", res)
 	}
 	if res := bindResult(t, cl, "uid=alice,ou=people,dc=example,dc=test", "pw-two-bbbb"); res.Code != ResultSuccess {
 		t.Fatalf("bind B after rejections = %v", res)
@@ -252,9 +261,11 @@ func TestPolicyHistoryRejectsReuse(t *testing.T) {
 		t.Fatalf("bind A after rotation = %v, want invalidCredentials", res)
 	}
 
-	// A failed bind reset the connection to anonymous (RFC 4511 4.2.1), so
-	// re-bind DM before further writes.
-	bindDM(t, cl)
+	// A failed bind reset the connection to anonymous (RFC 4511 4.2.1).
+	// Rotations that prove history eviction must run as self, not DM.
+	if res := bindResult(t, cl, "uid=alice,ou=people,dc=example,dc=test", "pw-two-bbbb"); res.Code != ResultSuccess {
+		t.Fatalf("re-bind alice: %v", res)
+	}
 	// History trims to HistoryCount: rotate through C,D,E,F and A drops off.
 	for _, pw := range []string{"pw-c", "pw-d", "pw-e", "pw-f"} {
 		if res := setAlicePassword(t, cl, pw); res.Code != ResultSuccess {
@@ -267,6 +278,160 @@ func TestPolicyHistoryRejectsReuse(t *testing.T) {
 	}
 	if res := setAlicePassword(t, cl, "pw-one-aaaa"); res.Code != ResultSuccess {
 		t.Fatalf("reuse A after eviction = %v, want success (trimmed)", res)
+	}
+}
+
+// TestPolicyDMBypassesHistory proves Directory Manager can re-apply a
+// secret that is already in history (D29 / CAND-27). Minimum length still
+// applies to DM writes (constraintViolation).
+func TestPolicyDMBypassesHistory(t *testing.T) {
+	t.Parallel()
+	clock := newTestNow()
+	opts := policyOptions(t, clock, func(p *PasswordPolicy) {
+		p.HistoryCount = 4
+		p.MinLength = 8
+	})
+	_, addr := serveTestServerFrom(t, opts, nil)
+	cl := dialTestClient(t, addr)
+	bindDM(t, cl)
+	if res := addAlice(t, cl, "pw-one-aaaa"); res.Code != ResultSuccess {
+		t.Fatalf("add: %v", res)
+	}
+	if res := setAlicePassword(t, cl, "pw-two-bbbb"); res.Code != ResultSuccess {
+		t.Fatalf("rotate A->B = %v", res)
+	}
+	// DM replace of an in-history password must succeed (seed merge).
+	if res := setAlicePassword(t, cl, "pw-one-aaaa"); res.Code != ResultSuccess {
+		t.Fatalf("DM in-history reset = %v, want success (D29)", res)
+	}
+	if res := bindResult(t, cl, "uid=alice,ou=people,dc=example,dc=test", "pw-one-aaaa"); res.Code != ResultSuccess {
+		t.Fatalf("bind after DM history bypass = %v", res)
+	}
+	bindDM(t, cl)
+	// DM re-set of the current password also succeeds (current is history).
+	if res := setAlicePassword(t, cl, "pw-one-aaaa"); res.Code != ResultSuccess {
+		t.Fatalf("DM current re-set = %v, want success", res)
+	}
+	// DM still cannot set a too-short password.
+	if res := setAlicePassword(t, cl, "tiny"); res.Code != ResultConstraintViolation {
+		t.Fatalf("DM too-short = %v, want constraintViolation", res)
+	}
+}
+
+// TestPasswordEngineHistorySubject is the engine-level D29 matrix: DM
+// BypassACI skips history; runtime, self, and zero Subject do not.
+func TestPasswordEngineHistorySubject(t *testing.T) {
+	t.Parallel()
+	clock := newTestNow()
+	hasher := fastHasher(t, "")
+	eng, err := newPasswordEngine(PasswordPolicy{
+		HistoryCount: 4,
+		Hasher:       hasher,
+		Now:          clock.Now,
+	}, testLogger())
+	if err != nil {
+		t.Fatalf("newPasswordEngine: %v", err)
+	}
+	current, err := hasher.Hash([]byte("pw-current-aa"))
+	if err != nil {
+		t.Fatalf("hash current: %v", err)
+	}
+	old, err := hasher.Hash([]byte("pw-old-bbbbbb"))
+	if err != nil {
+		t.Fatalf("hash old: %v", err)
+	}
+	const aliceDN = "uid=alice,ou=people,dc=example,dc=test"
+	alice := mustParseDN(t, aliceDN)
+	runtime := mustParseDN(t, "uid=rt,ou=people,dc=example,dc=test")
+	before := NewEntry(aliceDN,
+		StringAttribute("objectClass", "top", "person"),
+		Attribute{Name: attrUserPassword, Values: [][]byte{current}},
+		Attribute{Name: attrPasswordHistory, Values: [][]byte{old}},
+	)
+	afterInHistory := NewEntry(aliceDN,
+		StringAttribute("objectClass", "top", "person"),
+		Attribute{Name: attrUserPassword, Values: [][]byte{[]byte("pw-old-bbbbbb")}},
+		Attribute{Name: attrPasswordHistory, Values: [][]byte{old}},
+	)
+	afterCurrent := NewEntry(aliceDN,
+		StringAttribute("objectClass", "top", "person"),
+		Attribute{Name: attrUserPassword, Values: [][]byte{[]byte("pw-current-aa")}},
+		Attribute{Name: attrPasswordHistory, Values: [][]byte{old}},
+	)
+
+	cases := []struct {
+		name    string
+		subj    Subject
+		after   *Entry
+		wantErr error
+	}{
+		{"dm in-history", Subject{DN: mustParseDN(t, "cn=Directory Manager"), BypassACI: true}, afterInHistory, nil},
+		{"dm current re-set", Subject{DN: mustParseDN(t, "cn=Directory Manager"), BypassACI: true}, afterCurrent, nil},
+		{"self in-history", Subject{DN: alice}, afterInHistory, errPasswordInHistory},
+		{"self current re-set", Subject{DN: alice}, afterCurrent, errPasswordInHistory},
+		{"runtime in-history", Subject{DN: runtime}, afterInHistory, errPasswordInHistory},
+		{"zero subject in-history", Subject{}, afterInHistory, errPasswordInHistory},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			store := NewFakeStore()
+			ctx := context.Background()
+			if err := store.Update(ctx, func(tx UpdateTx) error {
+				seed := cloneEntry(before)
+				if err := tx.Add(ctx, seed); err != nil {
+					return err
+				}
+				// AfterWrite re-reads the post-write entry.
+				live := cloneEntry(tc.after)
+				if err := tx.Replace(ctx, live); err != nil {
+					return err
+				}
+				return eng.AfterWrite(ctx, tx, WriteEvent{
+					Op:      WriteModify,
+					Before:  cloneEntry(before),
+					After:   cloneEntry(tc.after),
+					Subject: tc.subj,
+				})
+			}); !errors.Is(err, tc.wantErr) {
+				t.Fatalf("AfterWrite = %v, want %v", err, tc.wantErr)
+			}
+		})
+	}
+}
+
+// TestWriteEventThreadsSubject proves handleAdd/handleModify copy the bind
+// identity onto WriteEvent so the password plugin can see BypassACI.
+func TestWriteEventThreadsSubject(t *testing.T) {
+	t.Parallel()
+	recorder := &FakePlugin{PluginName: "recorder"}
+	clock := newTestNow()
+	opts := policyOptions(t, clock, nil)
+	opts.Plugins = []Plugin{recorder}
+	_, addr := serveTestServerFrom(t, opts, nil)
+	cl := dialTestClient(t, addr)
+	bindDM(t, cl)
+	if res := addAlice(t, cl, "alice-fixture-password"); res.Code != ResultSuccess {
+		t.Fatalf("add: %v", res)
+	}
+	evs := recorder.Events()
+	if len(evs) == 0 {
+		t.Fatal("plugin saw no events")
+	}
+	if !evs[0].Subject.BypassACI {
+		t.Fatalf("add subject = %+v, want BypassACI (DM)", evs[0].Subject)
+	}
+
+	if res := bindResult(t, cl, "uid=alice,ou=people,dc=example,dc=test", "alice-fixture-password"); res.Code != ResultSuccess {
+		t.Fatalf("alice bind: %v", res)
+	}
+	if res := setAlicePassword(t, cl, "alice-new-password"); res.Code != ResultSuccess {
+		t.Fatalf("self set: %v", res)
+	}
+	evs = recorder.Events()
+	last := evs[len(evs)-1]
+	if last.Op != WriteModify || last.Subject.BypassACI || last.Subject.DN.String() != "uid=alice,ou=people,dc=example,dc=test" {
+		t.Fatalf("modify subject = %+v, want alice without BypassACI", last.Subject)
 	}
 }
 

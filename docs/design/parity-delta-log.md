@@ -97,9 +97,9 @@ are also in contract section 3 (2026-08-16).
 | D15 (CAND-2) | `approxMatch` filter semantics | real approx matching, extra step returns the entry | folds to equality (one step returns nothing) | delta |
 | D16 (CAND-6) | ModifyDN rename into own subtree | rejects, `unwillingToPerform(53)`; subtree stays put | permits the rename; later subtree walks detach it (`noSuchObject(32)`) | delta |
 | D17 (CAND-8) | Schema MAY / unknown-attribute enforcement on writes | marker-extra and unknown-attr adds both `objectClassViolation(65)`; follow-up reads `noSuchObject(32)` | both adds `success(0)` | delta |
-| D18 (CAND-9) | Password-policy-violation write code | `constraintViolation(19)` | `unwillingToPerform(53)` (plugin-abort path) | delta |
+| D18 (CAND-9) | Password-policy-violation write code | `constraintViolation(19)` | ~~`unwillingToPerform(53)`~~ **Closed:** `constraintViolation(19)` | match |
 | D19 (CAND-10) | Lockout bind failure code | 5th failure → `constraintViolation(19)`; 389 stamps `accountUnlockTime`/`nsUniqueId`/`passwordRetryCount` | 5th failure → `invalidCredentials(49)`; native stamps `pwdAccountLockedTime`/`pwdChangedTime` | delta (C4 is lockout *effect* + bind-test `locked`, not a single marker attr) |
-| D20 (CAND-11) | Re-setting the current password | rejected, `constraintViolation(19)` | rejected as in-history, `unwillingToPerform(53)` | delta (both reject; codes differ; ledger, not the earlier “389 allows re-set” note) |
+| D20 (CAND-11) | Re-setting the current password | rejected, `constraintViolation(19)` | ~~rejected as in-history, `unwillingToPerform(53)`~~ **Closed:** same reject with 19 | match (both reject; codes agree) |
 | D21 (CAND-15) | self/all/anyone bind-rule semantics | anonymous under `anyone` denied `inappropriateAuthentication(48)` when anonymous is off | anonymous read of `ou=probe-anyone` allowed, `success(0)` | delta |
 | D22 (CAND-17) | groupdn membership scope (nesting) | nested groupdn grant resolves, leaf readable both times | second groupdn read returns empty (no nesting) | delta |
 | D23 (CAND-21) | Malformed-DN bind result code | `invalidDNSyntax(34)` | `invalidCredentials(49)` | delta (same divergence as D8; T-147's ledger records it as `CAND-21`) |
@@ -108,7 +108,7 @@ are also in contract section 3 (2026-08-16).
 | D26 (CAND-24) | memberOf auxiliary object class add/retract | **keeps** leftover `nsmemberof` after last-member removal (post-retract objectClass still lists it) | **retracts** today (post-retract objectClass has no `nsmemberof`) | delta (corrected 2026-08-16: earlier sentence swapped the engines) |
 | D27 (CAND-25) | `supportedLDAPVersion` advertises v2 | `2, 3` | `3` only | delta |
 | D28 (CAND-26) | Critical RFC 4528 assertion on Modify | `unavailableCriticalExtension(12)` on critical assertion; OID not advertised; non-critical fail is ignored and the modify commits (`description=assert-v3`) | advertised and honored: passing critical commits (`description=assert-v5`); fail → `assertionFailed(122)` | delta |
-| D29 (CAND-27) | DM password reset vs history policy | DM reset bypasses history, `success(0)` throughout | DM reset of an in-history password rejected, `unwillingToPerform(53)` | delta |
+| D29 (CAND-27) | DM password reset vs history policy | DM reset bypasses history, `success(0)` throughout | ~~DM reset of an in-history password rejected, `unwillingToPerform(53)`~~ **Closed:** DM BypassACI skips history, `success(0)` | match |
 | D30 (CAND-28) | Subschema publishes `pwdAccountLockedTime` | publishes only `nsAccountLock` | publishes `nsAccountLock` **and** `pwdAccountLockedTime` | delta |
 
 ## How the differential harness uses this log

@@ -359,10 +359,13 @@ func TestFakePlugin(t *testing.T) {
 		t.Fatal("default name should be fake")
 	}
 	ev := WriteEvent{Op: WriteAdd, After: NewEntry("cn=g,ou=groups,dc=example,dc=test")}
+	if ev.Subject.BypassACI {
+		t.Fatal("zero Subject must not be treated as DM")
+	}
 	if err := p.AfterWrite(context.Background(), nil, ev); err != nil {
 		t.Fatalf("AfterWrite: %v", err)
 	}
-	if got := p.Events(); len(got) != 1 || got[0].Op != WriteAdd {
+	if got := p.Events(); len(got) != 1 || got[0].Op != WriteAdd || got[0].Subject.BypassACI {
 		t.Fatalf("events = %+v", got)
 	}
 	boom := errors.New("plugin boom")

@@ -203,10 +203,9 @@ func probeCAND8(c *caseCtx) []opOutcome {
 // restores to this fresh value) and CAND-11 (which starts from it).
 const histProbeAfterCAND9 = "parity-hist-third-001"
 
-// CAND-9: exact result code for password-policy-violation writes (native
-// plugin-abort path surfaces unwillingToPerform(53); 389 is expected to
-// answer constraintViolation(19)). Recorded for both min-length and
-// history rejections on a dedicated account.
+// CAND-9: exact result code for password-policy-violation writes. Both
+// engines return constraintViolation(19) for min-length and history
+// rejections on a dedicated account (D18 closed).
 func probeCAND9(c *caseCtx) []opOutcome {
 	t, e := c.t, c.e
 	dm := e.dm(t)
@@ -259,9 +258,9 @@ func probeCAND10(c *caseCtx) []opOutcome {
 	return out
 }
 
-// CAND-11: re-setting the *current* password. Both engines reject;
-// 389 returns constraintViolation(19), native unwillingToPerform(53)
-// (history check includes the current password).
+// CAND-11: re-setting the *current* password. Both engines reject
+// with constraintViolation(19) (history check includes the current
+// password). Close-out is matching codes, not allowing the re-set.
 func probeCAND11(c *caseCtx) []opOutcome {
 	t, e := c.t, c.e
 	dm := e.dm(t)
@@ -571,10 +570,10 @@ func probeCAND26(c *caseCtx) []opOutcome {
 }
 
 // CAND-27: Directory Manager password reset against the history policy.
-// 389's rootdn bypasses password policy (in-history reset succeeds);
-// native applies history to DM writes (unwillingToPerform). Dedicated
-// account so history contents are deterministic: after the self-rotate,
-// history holds exactly the original password.
+// Both engines' DM (BypassACI / rootdn) skip history, so an in-history
+// reset succeeds. Dedicated account so history contents are
+// deterministic: after the self-rotate, history holds exactly the
+// original password.
 func probeCAND27(c *caseCtx) []opOutcome {
 	t, e := c.t, c.e
 	dm := e.dm(t)

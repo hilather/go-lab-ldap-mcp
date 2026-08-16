@@ -200,9 +200,9 @@ A user created through REST or MCP is visible to `ldapsearch` against the direct
 | D15 | `approxMatch` filter (`~=`) | Real approx matching; a near-miss can return the entry | Folds to equality (near-miss returns nothing) | `test/parity` CAND-2. |
 | D16 | ModifyDN rename into own subtree | Rejects `unwillingToPerform(53)`; tree intact | Permits the rename; later subtree walks detach (`noSuchObject(32)`) | `test/parity` CAND-6. |
 | D17 | Schema MAY / unknown-attribute writes | Rejects marker extras and unknown attrs with `objectClassViolation(65)` | Accepts both, `success(0)` | `test/parity` CAND-8. |
-| D18 | Password-policy-violation write code | `constraintViolation(19)` (min-length and history) | `unwillingToPerform(53)` via plugin-abort | `test/parity` CAND-9. |
+| D18 | Password-policy-violation write code | `constraintViolation(19)` (min-length and history) | **Closed:** same `constraintViolation(19)` | `test/parity` CAND-9 verdict `match`. |
 | D19 | Lockout bind code + lock markers | 5th failure → `constraintViolation(19)`; stamps `accountUnlockTime` / `passwordRetryCount` | 5th failure → `invalidCredentials(49)`; stamps `pwdAccountLockedTime` | `test/parity` CAND-10. C4 is lockout *effect* + bind-test `locked`, not a single marker. |
-| D20 | Re-setting the current password | Rejected with `constraintViolation(19)` | Rejected as in-history, `unwillingToPerform(53)` | `test/parity` CAND-11. Both reject; codes differ. |
+| D20 | Re-setting the current password | Rejected with `constraintViolation(19)` | **Closed:** same reject with `constraintViolation(19)` | `test/parity` CAND-11 verdict `match`. Both reject; codes agree. |
 | D21 | `anyone` / `all` / anonymous bind-rule | Anonymous `anyone` denied `inappropriateAuthentication(48)` when anonymous is off | Pre-bind read of an `anyone` ACI succeeds | `test/parity` CAND-15. |
 | D22 | `groupdn` membership nesting | Nested `groupdn` grant resolves | Direct `member` / `uniqueMember` only | `test/parity` CAND-17. |
 | D23 | Malformed-DN bind result code | `invalidDNSyntax(34)` | `invalidCredentials(49)` | `test/parity` CAND-21 (same divergence as D8). |
@@ -211,7 +211,7 @@ A user created through REST or MCP is visible to `ldapsearch` against the direct
 | D26 | memberOf auxiliary OC after retract | **Keeps** leftover `nsmemberof` after last-member removal | **Retracts** today (post-retract `objectClass` has no `nsmemberof`) | `test/parity` CAND-24. Do not invert: 389 keeps; native retracts. |
 | D27 | `supportedLDAPVersion` advertisement | `2, 3` | `3` only | `test/parity` CAND-25. Contract is “v3 is served.” |
 | D28 | Critical RFC 4528 assertion on Modify | `unavailableCriticalExtension(12)`; OID not advertised | Advertised and honored (`success(0)` / `assertionFailed(122)`) | `test/parity` CAND-26. Observed form of D7. |
-| D29 | DM password reset vs history | DM bypasses history, `success(0)` | DM in-history reset rejected, `unwillingToPerform(53)` | `test/parity` CAND-27. |
+| D29 | DM password reset vs history | DM bypasses history, `success(0)` | **Closed:** DM BypassACI skips history, `success(0)` | `test/parity` CAND-27 verdict `match`. |
 | D30 | Subschema publishes `pwdAccountLockedTime` | Publishes `nsAccountLock` only | Publishes `nsAccountLock` **and** `pwdAccountLockedTime` | `test/parity` CAND-28. Honest listing (see C4). |
 
 The adjudication record (observed values, rationale, controlling tests)
@@ -258,6 +258,7 @@ is [`docs/design/parity-delta-log.md`](https://github.com/hilather/go-lab-ldap-m
 | 2026-08-15 | Wave 1 (T-125–T-128) recorded Delta **candidates**; none were promoted to section 3 until adjudicated against the 389 oracle in T-147/T-150. |
 | 2026-08-15 | T-150 differential harness (`internal/ldapserver/differential_test.go`) adjudicated CAND-1, CAND-3, CAND-4, CAND-5, CAND-18, CAND-20 against the pinned 389 oracle: CAND-3 resolved as Contract; the rest promoted to section 3 as D8–D14 (with newly observed D10). Record: [parity-delta-log.md](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/design/parity-delta-log.md). |
 | 2026-08-16 | T-147 machine ledger ([`test/parity/delta-ledger.json`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/test/parity/delta-ledger.json) + [`probes.go`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/test/parity/probes.go)) promoted D15–D30 into section 3. Corrected D7 (pinned 389 omits RFC 4528; it does **not** honor it) and D26 (389 **keeps** leftover `nsmemberof`; native **retracts** today). Amended C4 (lockout *effect* + bind-test `locked`; native may publish extra lock attrs) and C9 (`assertionEnabledOn` + `checkRev`; assertion is Contract on native only). Struck the stale Wave-1 “pending adjudication” CAND table — no pending CAND rows remain. |
+| 2026-08-16 | Native password-policy write path: D18/D20/D29 closed. Policy errors map to `constraintViolation(19)`; current-password re-set stays rejected with 19; DM `BypassACI` skips history. Ledger CAND-9/11/27 verdict `match`. |
 
 ### Adjudicated Wave-1 candidates (no pending rows)
 
@@ -265,5 +266,5 @@ Wave-1 CAND rows are closed. Verdicts live in section 3 and in [parity-delta-log
 
 | Disposition | Refs |
 | --- | --- |
-| Promoted to Delta (section 3) | CAND-1 → D9; CAND-2 → D15; CAND-4 → D11; CAND-5/18 → D12; CAND-6 → D16; CAND-8 → D17; CAND-9 → D18; CAND-10 → D19; CAND-11 → D20; CAND-15 → D21; CAND-17 → D22; CAND-20 → D13/D14; CAND-21 → D8/D23; CAND-22 → D24; CAND-23 → D25; CAND-24 → D26; CAND-25 → D27; CAND-26 → D28; CAND-27 → D29; CAND-28 → D30 |
-| Resolved as Contract (engines agree; harness step untagged) | CAND-3, CAND-7, CAND-12, CAND-13, CAND-14, CAND-16, CAND-19 |
+| Promoted to Delta (section 3) | CAND-1 → D9; CAND-2 → D15; CAND-4 → D11; CAND-5/18 → D12; CAND-6 → D16; CAND-8 → D17; CAND-10 → D19; CAND-15 → D21; CAND-17 → D22; CAND-20 → D13/D14; CAND-21 → D8/D23; CAND-22 → D24; CAND-23 → D25; CAND-24 → D26; CAND-25 → D27; CAND-26 → D28; CAND-28 → D30 |
+| Resolved as Contract (engines agree) | CAND-3, CAND-7, CAND-9 (D18 closed), CAND-11 (D20 closed), CAND-12, CAND-13, CAND-14, CAND-16, CAND-19, CAND-27 (D29 closed) |

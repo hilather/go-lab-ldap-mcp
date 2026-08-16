@@ -658,8 +658,7 @@ func casePasswordPolicy(c *caseCtx) []opOutcome {
 	out = append(out, policyRejected(self2.Modify(reuse)))
 
 	// Restore to a fresh password as DM. (A DM reset to an in-history
-	// value is CAND-27: 389's rootdn bypasses policy, native applies
-	// history to DM writes.)
+	// value is CAND-27: both engines' DM skip history.)
 	restore := ldap.NewModifyRequest(dn, nil)
 	restore.Replace("userPassword", []string{"parity-pwprobe-RESTORED1"})
 	out = append(out, codeOutcome(dm.Modify(restore)))
