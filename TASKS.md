@@ -1514,16 +1514,18 @@ Acceptance:
 - [ ] RFC 4528-ready: a transaction can read-then-write atomically (used by T-141).
 - [ ] Index updates on add/modify/delete stay consistent after simulated crash (re-open).
 
-## [ ] T-131 Matching rules and DN canonicalization
+## [x] T-131 Matching rules and DN canonicalization
 
 Priority: P0 | Size: L | Depends on: T-122 | Wave 2 | Cloud fit: high
 
 Deliverables: `caseIgnoreMatch` / IA5 as required by the parity contract; reuse `internal/config` DN helpers; no forked DN parser.
 
 Acceptance:
-- [ ] `uid=Alice` and `uid=alice` match when the rule is case-ignore (389-oracle case in T-147 may come later; unit tests vs golden pairs here).
-- [ ] DN equality uses canonical DN, not string suffix.
-- [ ] T-127 stub equality is replaced when this merges (or Search calls matching rules behind an interface).
+- [x] `uid=Alice` and `uid=alice` match when the rule is case-ignore (389-oracle case in T-147 may come later; unit tests vs golden pairs here).
+- [x] DN equality uses canonical DN, not string suffix.
+- [x] T-127 stub equality is replaced when this merges (or Search calls matching rules behind an interface).
+
+Follow-up: `op_write.go` Compare/modify-dedup still uses fold-only `foldCase`/`valueEqual`; route through `Matcher` for DN-structural compare (fold into T-134 or T-139).
 
 ## [ ] T-132 Schema registry, MUST/MAY, subschema, Root DSE
 
