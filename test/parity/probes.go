@@ -331,7 +331,10 @@ func probeCAND14(c *caseCtx) []opOutcome {
 //
 //	self:    alice may write her own description, not bob's.
 //	all:     a bound user reads ou=probe-all; the runtime account too.
-//	anyone:  a pre-bind (anonymous wire-state) connection still matches.
+//	anyone:  with anonymous access off, a pre-bind connection is refused
+//	         (48) before ACI (KD-6 / D21 collapsed). `anyone` still
+//	         matches only when anonymous is on; this probe stays on the
+//	         production default (off).
 func probeCAND15(c *caseCtx) []opOutcome {
 	t, e := c.t, c.e
 	alice := mustDial(t, e, userSpec(userDN("alice"), userPasswords["alice"]))
@@ -460,8 +463,11 @@ func probeCAND19(c *caseCtx) []opOutcome {
 }
 
 // CAND-20: WhoAmI authzid rendering — canonical form for an exact-case
-// bind, case preservation for a case-variant bind DN, and the anonymous
-// form on a pre-bind connection.
+// bind and case preservation for a case-variant bind DN (D13). The
+// anonymous form is refused with 48 on native when anonymous access is
+// off (KD-6 / D14 collapsed on the differential pin). The committed
+// oracle column for that step is still the T-147 recorded success+empty
+// (not rewritten).
 func probeCAND20(c *caseCtx) []opOutcome {
 	t, e := c.t, c.e
 	exact := mustDial(t, e, userSpec(userDN("erin"), userPasswords["erin"]))
@@ -664,11 +670,12 @@ func probeCAND21(c *caseCtx) []opOutcome {
 	}
 }
 
-// CAND-22: pre-bind (anonymous wire state) root DSE read. 389's
-// nsslapd-allow-anonymous-access=off refuses the operation with
-// inappropriateAuthentication (48) before ACI evaluation; native
-// evaluates the DSE as world-readable. The authenticated control read
-// must succeed on both (that half is Contract, asserted in C10's case).
+// CAND-22: pre-bind (anonymous wire state) root DSE read. With
+// nsslapd-allow-anonymous-access=off / AllowAnonymousBind=false both
+// engines refuse the operation with inappropriateAuthentication (48)
+// before ACI evaluation (KD-6 / D24 collapsed). The authenticated
+// control read must succeed on both (that half is Contract, asserted in
+// C10's case).
 func probeCAND22(c *caseCtx) []opOutcome {
 	t, e := c.t, c.e
 	anon, err := e.dial(t, dialSpec{ldaps: true, noBind: true})

@@ -84,6 +84,42 @@ func TestAnonymousOffAllowsBoundSearch(t *testing.T) {
 	}
 }
 
+// TestAnonymousOffFailedBindThenSearch: a failed simple bind resets the
+// connection to Anonymous; the next suffix search must still be 48.
+func TestAnonymousOffFailedBindThenSearch(t *testing.T) {
+	t.Parallel()
+	_, addr := serveTestServerFrom(t, bindOptions(t), nil)
+	cl := dialTestClient(t, addr)
+	if res := bindResult(t, cl, "uid=alice,ou=people,dc=example,dc=test", "wrong"); res.Code != ResultInvalidCredentials {
+		t.Fatalf("wrong-password bind = %v, want invalidCredentials", res)
+	}
+	_, done := search(t, cl, &SearchRequest{
+		BaseDN: "dc=example,dc=test", Scope: ScopeBaseObject,
+		Filter: &FilterPresent{Attr: "objectClass"},
+	})
+	if done.Result.Code != ResultInappropriateAuthentication {
+		t.Fatalf("search after failed bind = %v, want inappropriateAuthentication", done.Result)
+	}
+}
+
+// TestAnonymousOffAnonymousBindThenSearch: anonymous bind stays 53 (D9);
+// the same connection's next Search is 48 (KD-6).
+func TestAnonymousOffAnonymousBindThenSearch(t *testing.T) {
+	t.Parallel()
+	_, addr := serveTestServerFrom(t, bindOptions(t), nil)
+	cl := dialTestClient(t, addr)
+	if res := bindResult(t, cl, "", ""); res.Code != ResultUnwillingToPerform {
+		t.Fatalf("anonymous bind = %v, want unwillingToPerform", res)
+	}
+	_, done := search(t, cl, &SearchRequest{
+		BaseDN: "dc=example,dc=test", Scope: ScopeBaseObject,
+		Filter: &FilterPresent{Attr: "objectClass"},
+	})
+	if done.Result.Code != ResultInappropriateAuthentication {
+		t.Fatalf("search after anonymous bind refusal = %v, want inappropriateAuthentication", done.Result)
+	}
+}
+
 // TestAnonymousOnAllowsRootDSE: when the flag is on, pre-bind Root DSE
 // (and subschema) remain readable — the current intended anonymous-on
 // behavior.

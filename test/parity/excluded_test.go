@@ -24,10 +24,9 @@ func TestExcludedSurfaceNative(t *testing.T) {
 		// E1 (replication), E2 (SASL), E4 (roles/CoS/...), E5 (AD/Samba),
 		// E7 (389 CLI compatibility) would all surface as extra Root DSE
 		// capabilities. The native DSE publishes exactly the contract set.
-		conn, err := ne.dial(t, dialSpec{ldaps: true, noBind: true})
-		if err != nil {
-			t.Fatalf("pre-bind dial: %v", err)
-		}
+		// Production inspect uses the bound pool (KD-6 / D24): pre-bind
+		// Root DSE is refused when anonymous access is off.
+		conn := mustDial(t, ne, userSpec(userDN("alice"), userPasswords["alice"]))
 		defer conn.Close()
 		res := readOutcome(conn, "") // no attr list → full published set
 		if res.Code != 0 || len(res.Entries) != 1 {

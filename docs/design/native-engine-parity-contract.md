@@ -196,17 +196,17 @@ A user created through REST or MCP is visible to `ldapsearch` against the direct
 | D11 | ModifyDN with out-of-suffix `newSuperior` | `affectsMultipleDSAs(71)` | `unwillingToPerform(53)` | `TestDifferential389Oracle/modifydn-cross-suffix`; CAND-4 adjudicated 2026-08-15. |
 | D12 | Paged-results cookie tamper | Accepts tampered cookie (`success`); no integrity protection | HMAC-signed cookie fails closed, `unwillingToPerform(53)` | `TestDifferential389Oracle/paged-tampered-cookie`; CAND-5/CAND-18 adjudicated 2026-08-15. |
 | D13 | WhoAmI bound authzId rendering | `dn: <case-folded dn>` | `dn:<as-bound dn>` | `TestDifferential389Oracle/whoami-bound`; CAND-20 bound case. |
-| D14 | WhoAmI anonymous with anonymous access off | `inappropriateAuthentication(48)` | `success` + empty authzId | `TestDifferential389Oracle/whoami-anonymous`; CAND-20 anonymous case. |
+| D14 | WhoAmI anonymous with anonymous access off | `inappropriateAuthentication(48)` | `inappropriateAuthentication(48)` — **collapsed** by KD-6 (PR-2B) | Was `TestDifferential389Oracle/whoami-anonymous`. Residual CAND-20 Delta is bound authzId rendering (D13). |
 | D15 | `approxMatch` filter (`~=`) | Real approx matching; a near-miss can return the entry | Folds to equality (near-miss returns nothing) | `test/parity` CAND-2. |
 | D16 | ModifyDN rename into own subtree | Rejects `unwillingToPerform(53)`; tree intact | Permits the rename; later subtree walks detach (`noSuchObject(32)`) | `test/parity` CAND-6. |
 | D17 | Schema MAY / unknown-attribute writes | Rejects marker extras and unknown attrs with `objectClassViolation(65)` | Accepts both, `success(0)` | `test/parity` CAND-8. |
 | D18 | Password-policy-violation write code | `constraintViolation(19)` (min-length and history) | **Closed:** same `constraintViolation(19)` | `test/parity` CAND-9 verdict `match`. |
 | D19 | Lockout bind code + lock markers | 5th failure → `constraintViolation(19)`; stamps `accountUnlockTime` / `passwordRetryCount` | 5th failure → `invalidCredentials(49)`; stamps `pwdAccountLockedTime` | `test/parity` CAND-10. C4 is lockout *effect* + bind-test `locked`, not a single marker. |
 | D20 | Re-setting the current password | Rejected with `constraintViolation(19)` | **Closed:** same reject with `constraintViolation(19)` | `test/parity` CAND-11 verdict `match`. Both reject; codes agree. |
-| D21 | `anyone` / `all` / anonymous bind-rule | Anonymous `anyone` denied `inappropriateAuthentication(48)` when anonymous is off | Pre-bind read of an `anyone` ACI succeeds | `test/parity` CAND-15. |
+| D21 | `anyone` / `all` / anonymous bind-rule | Anonymous `anyone` denied `inappropriateAuthentication(48)` when anonymous is off | Same 48 — **collapsed** by KD-6 (PR-2B) | `test/parity` CAND-15 now `match`. |
 | D22 | `groupdn` membership nesting | Nested `groupdn` grant resolves | Direct `member` / `uniqueMember` only | `test/parity` CAND-17. |
 | D23 | Malformed-DN bind result code | `invalidDNSyntax(34)` | `invalidCredentials(49)` | `test/parity` CAND-21 (same divergence as D8). |
-| D24 | Pre-bind Root DSE, anonymous off | Refused `inappropriateAuthentication(48)` | Pre-bind Root DSE read allowed, `success(0)` | `test/parity` CAND-22. |
+| D24 | Pre-bind Root DSE, anonymous off | Refused `inappropriateAuthentication(48)` | Same 48 — **collapsed** by KD-6 (PR-2B) | `test/parity` CAND-22 now `match`. |
 | D25 | Compare against an absent attribute | `noSuchAttribute(16)` | `compareFalse(5)` | `test/parity` CAND-23. |
 | D26 | memberOf auxiliary OC after retract | **Keeps** leftover `nsmemberof` after last-member removal | **Retracts** today (post-retract `objectClass` has no `nsmemberof`) | `test/parity` CAND-24. Do not invert: 389 keeps; native retracts. |
 | D27 | `supportedLDAPVersion` advertisement | `2, 3` | `3` only | `test/parity` CAND-25. Contract is “v3 is served.” |
@@ -259,6 +259,7 @@ is [`docs/design/parity-delta-log.md`](https://github.com/hilather/go-lab-ldap-m
 | 2026-08-15 | T-150 differential harness (`internal/ldapserver/differential_test.go`) adjudicated CAND-1, CAND-3, CAND-4, CAND-5, CAND-18, CAND-20 against the pinned 389 oracle: CAND-3 resolved as Contract; the rest promoted to section 3 as D8–D14 (with newly observed D10). Record: [parity-delta-log.md](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/design/parity-delta-log.md). |
 | 2026-08-16 | T-147 machine ledger ([`test/parity/delta-ledger.json`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/test/parity/delta-ledger.json) + [`probes.go`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/test/parity/probes.go)) promoted D15–D30 into section 3. Corrected D7 (pinned 389 omits RFC 4528; it does **not** honor it) and D26 (389 **keeps** leftover `nsmemberof`; native **retracts** today). Amended C4 (lockout *effect* + bind-test `locked`; native may publish extra lock attrs) and C9 (`assertionEnabledOn` + `checkRev`; assertion is Contract on native only). Struck the stale Wave-1 “pending adjudication” CAND table — no pending CAND rows remain. |
 | 2026-08-16 | Native password-policy write path: D18/D20/D29 closed. Policy errors map to `constraintViolation(19)`; current-password re-set stays rejected with 19; DM `BypassACI` skips history. Ledger CAND-9/11/27 verdict `match`. |
+| 2026-08-16 | KD-6 / PR-2B: native refuses unauthenticated directory operations (suffix search, Root DSE, subschema, Compare, writes, WhoAmI) with `inappropriateAuthentication(48)` when `allowAnonymousBind` is off. D14, D21, and D24 collapse. CAND-15 and CAND-22 native columns updated to 48 (`match`). CAND-20 remains a Delta for bound authzId rendering (D13); native anonymous WhoAmI is now 48 (oracle column not rewritten). |
 
 ### Adjudicated Wave-1 candidates (no pending rows)
 
@@ -266,5 +267,5 @@ Wave-1 CAND rows are closed. Verdicts live in section 3 and in [parity-delta-log
 
 | Disposition | Refs |
 | --- | --- |
-| Promoted to Delta (section 3) | CAND-1 → D9; CAND-2 → D15; CAND-4 → D11; CAND-5/18 → D12; CAND-6 → D16; CAND-8 → D17; CAND-10 → D19; CAND-15 → D21; CAND-17 → D22; CAND-20 → D13/D14; CAND-21 → D8/D23; CAND-22 → D24; CAND-23 → D25; CAND-24 → D26; CAND-25 → D27; CAND-26 → D28; CAND-28 → D30 |
-| Resolved as Contract (engines agree) | CAND-3, CAND-7, CAND-9 (D18 closed), CAND-11 (D20 closed), CAND-12, CAND-13, CAND-14, CAND-16, CAND-19, CAND-27 (D29 closed) |
+| Promoted to Delta (section 3) | CAND-1 → D9; CAND-2 → D15; CAND-4 → D11; CAND-5/18 → D12; CAND-6 → D16; CAND-8 → D17; CAND-10 → D19; CAND-17 → D22; CAND-20 → D13; CAND-21 → D8/D23; CAND-23 → D25; CAND-24 → D26; CAND-25 → D27; CAND-26 → D28; CAND-28 → D30 |
+| Resolved as Contract (engines agree) | CAND-3, CAND-7, CAND-9 (D18 closed), CAND-11 (D20 closed), CAND-12, CAND-13, CAND-14, CAND-15 (D21 collapsed), CAND-16, CAND-19, CAND-22 (D24 collapsed), CAND-27 (D29 closed) |

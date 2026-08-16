@@ -2234,7 +2234,7 @@
     {
       "id": "CAND-15",
       "topic": "self/all/anyone bind-rule semantics",
-      "verdict": "delta",
+      "verdict": "match",
       "oracle": [
         {
           "code": 0
@@ -2312,20 +2312,10 @@
           ]
         },
         {
-          "code": 0,
-          "entries": [
-            {
-              "dn": "ou=probe-anyone,dc=example,dc=test",
-              "attrs": {
-                "ou": [
-                  "probe-anyone"
-                ]
-              }
-            }
-          ]
+          "code": 48
         },
         {
-          "code": 0
+          "code": 48
         },
         {
           "code": 0
@@ -2536,8 +2526,7 @@
           "value": "dn:uid=ERIN,ou=PEOPLE,dc=EXAMPLE,dc=TEST"
         },
         {
-          "code": 0,
-          "value": "\u003cempty\u003e"
+          "code": 48
         }
       ]
     },
@@ -2565,7 +2554,7 @@
     {
       "id": "CAND-22",
       "topic": "pre-bind root DSE read under anonymous-off",
-      "verdict": "delta",
+      "verdict": "match",
       "oracle": [
         {
           "code": 48
@@ -2586,17 +2575,7 @@
       ],
       "native": [
         {
-          "code": 0,
-          "entries": [
-            {
-              "dn": "",
-              "attrs": {
-                "namingcontexts": [
-                  "dc=example,dc=test"
-                ]
-              }
-            }
-          ]
+          "code": 48
         },
         {
           "code": 0,

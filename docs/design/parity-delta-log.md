@@ -61,7 +61,7 @@ promoted into contract §3 on 2026-08-16 from the machine ledger.
 | D11 | ModifyDN with out-of-suffix `newSuperior` | `affectsMultipleDSAs(71)` | `unwillingToPerform(53)` | Single-suffix native engine has no DSA concept (CAND-4 adjudicated 2026-08-15) | `TestDifferential389Oracle/modifydn-cross-suffix` |
 | D12 | Paged-results cookie tamper | accepts tampered cookie, `success(0)` — no integrity protection | HMAC-SHA256 cookie (offset + base DN + scope + filter) fails closed with `unwillingToPerform(53)` | Native is deliberately stricter (T-140); 389's cookie is an opaque connection-slot index (CAND-5/CAND-18 adjudicated 2026-08-15) | `TestDifferential389Oracle/paged-tampered-cookie` |
 | D13 | WhoAmI bound authzId rendering | `dn: cn=directory manager` (space after `dn:`, case-folded) | `dn:cn=Directory Manager` (no space, as-bound case) | Both are valid RFC 4532 authzIds; rendering only (CAND-20 bound case, adjudicated 2026-08-15) | `TestDifferential389Oracle/whoami-bound` |
-| D14 | WhoAmI anonymous, anonymous access disabled | `inappropriateAuthentication(48)` — the op itself is refused | `success(0)` with present-empty responseValue | 389 gates the extended op on the anonymous-access switch; native answers truthfully per RFC 4532 (CAND-20 anonymous case, adjudicated 2026-08-15) | `TestDifferential389Oracle/whoami-anonymous` |
+| D14 | WhoAmI anonymous, anonymous access disabled | `inappropriateAuthentication(48)` — the op itself is refused | ~~`success(0)` with present-empty responseValue~~ **collapsed** (KD-6 / PR-2B): native now also refuses 48 | Both engines refuse the op when anonymous is off. Residual CAND-20 Delta is bound authzId rendering (D13). Committed ledger oracle WhoAmI-anonymous column is still the T-147 recorded success+empty (not rewritten). | `TestDifferential389Oracle/whoami-anonymous`; `TestWhoAmIAnonymousOffRefused` |
 
 ## Resolved candidates (Contract, not Delta)
 
@@ -78,6 +78,9 @@ engine fails as an undecided divergence.
 | CAND-14 | `userPassword` read under `ou=people` as runtime | granted by `runtime-people-write` on a person entry | `delta-ledger.json` verdict `match` |
 | CAND-16 | ACI entry-level add/delete `targetattr` scope | add/delete ignore `targetattr`; missing entry → `noSuchObject(32)` | `delta-ledger.json` verdict `match` |
 | CAND-19 | Assertion control scope on non-Modify ops | `unavailableCriticalExtension(12)` on critical non-Modify; `assertionFailed(122)` on mismatch | `delta-ledger.json` verdict `match` |
+| D14 / CAND-20 anonymous | WhoAmI with anonymous access off | `inappropriateAuthentication(48)` on both (differential pin). Residual CAND-20 Delta is bound authzId rendering (D13). | KD-6 / PR-2B; `TestWhoAmIAnonymousOffRefused` |
+| D21 / CAND-15 | self/all/anyone with anonymous off | pre-bind `anyone` / `all` reads refuse 48 on both | KD-6 / PR-2B; `delta-ledger.json` verdict `match` |
+| D24 / CAND-22 | Pre-bind Root DSE with anonymous off | `inappropriateAuthentication(48)` on both | KD-6 / PR-2B; `delta-ledger.json` verdict `match` |
 
 ## Deltas adjudicated by T-147's oracle probes
 
@@ -100,10 +103,10 @@ are also in contract section 3 (2026-08-16).
 | D18 (CAND-9) | Password-policy-violation write code | `constraintViolation(19)` | ~~`unwillingToPerform(53)`~~ **Closed:** `constraintViolation(19)` | match |
 | D19 (CAND-10) | Lockout bind failure code | 5th failure → `constraintViolation(19)`; 389 stamps `accountUnlockTime`/`nsUniqueId`/`passwordRetryCount` | 5th failure → `invalidCredentials(49)`; native stamps `pwdAccountLockedTime`/`pwdChangedTime` | delta (C4 is lockout *effect* + bind-test `locked`, not a single marker attr) |
 | D20 (CAND-11) | Re-setting the current password | rejected, `constraintViolation(19)` | ~~rejected as in-history, `unwillingToPerform(53)`~~ **Closed:** same reject with 19 | match (both reject; codes agree) |
-| D21 (CAND-15) | self/all/anyone bind-rule semantics | anonymous under `anyone` denied `inappropriateAuthentication(48)` when anonymous is off | anonymous read of `ou=probe-anyone` allowed, `success(0)` | delta |
+| D21 (CAND-15) | self/all/anyone bind-rule semantics | anonymous under `anyone` denied `inappropriateAuthentication(48)` when anonymous is off | ~~anonymous read of `ou=probe-anyone` allowed, `success(0)`~~ **collapsed** (KD-6 / PR-2B): native also refuses 48 | match |
 | D22 (CAND-17) | groupdn membership scope (nesting) | nested groupdn grant resolves, leaf readable both times | second groupdn read returns empty (no nesting) | delta |
 | D23 (CAND-21) | Malformed-DN bind result code | `invalidDNSyntax(34)` | `invalidCredentials(49)` | delta (same divergence as D8; T-147's ledger records it as `CAND-21`) |
-| D24 (CAND-22) | Pre-bind Root DSE read with anonymous off | anonymous op refused `inappropriateAuthentication(48)` | pre-bind Root DSE read allowed, `success(0)` | delta |
+| D24 (CAND-22) | Pre-bind Root DSE read with anonymous off | anonymous op refused `inappropriateAuthentication(48)` | ~~pre-bind Root DSE read allowed, `success(0)`~~ **collapsed** (KD-6 / PR-2B): native also refuses 48 | match |
 | D25 (CAND-23) | Compare against an absent attribute | `noSuchAttribute(16)` | `compareFalse(5)` | delta |
 | D26 (CAND-24) | memberOf auxiliary object class add/retract | **keeps** leftover `nsmemberof` after last-member removal (post-retract objectClass still lists it) | **retracts** today (post-retract objectClass has no `nsmemberof`) | delta (corrected 2026-08-16: earlier sentence swapped the engines) |
 | D27 (CAND-25) | `supportedLDAPVersion` advertises v2 | `2, 3` | `3` only | delta |

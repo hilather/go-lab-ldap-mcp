@@ -121,11 +121,10 @@ func caseAccountDisable(c *caseCtx) []opOutcome {
 }
 
 // caseRootDSE covers C10 publication on an authenticated connection
-// (pre-bind DSE access is CAND-22: 389's anonymous-access-off policy
-// refuses it before ACI evaluation, native evaluates the anyone-ACI
-// path). Vendor values are presence-only (D1: identity differs
-// intentionally; the inequality assertion lives in the dual-engine
-// runner); 389-specific extras are not requested (D6).
+// (pre-bind DSE access is CAND-22: both engines refuse it with 48 when
+// anonymous access is off). Vendor values are presence-only (D1:
+// identity differs intentionally; the inequality assertion lives in the
+// dual-engine runner); 389-specific extras are not requested (D6).
 func caseRootDSE(c *caseCtx) []opOutcome {
 	t, e := c.t, c.e
 	conn := mustDial(t, e, userSpec(userDN("alice"), userPasswords["alice"]))
