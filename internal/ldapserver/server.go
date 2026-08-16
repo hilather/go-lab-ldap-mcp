@@ -148,8 +148,15 @@ type Options struct {
 	Codec   Codec
 	Store   Store
 	Schema  Schema
-	ACI     ACIEngine
-	Plugins []Plugin
+	// ACI is the access-control engine (T-139); tests inject FakeACI. When
+	// nil, New builds the evaluating engine from ACITexts.
+	ACI ACIEngine
+	// ACITexts holds the compiled ACI set — the four runtime ACIs plus any
+	// operator ACLs (parity contract C8) — as compiler-emitted ACI text. It
+	// is consulted only when ACI is nil; a parse failure is a configuration
+	// error because a partial access policy must never be served.
+	ACITexts []string
+	Plugins  []Plugin
 	// Metrics receives bounded-cardinality observations (op name + result
 	// code, connection open/close). Nil disables metrics. DNs and attribute
 	// values never cross this seam.
@@ -199,7 +206,14 @@ func New(opts Options) (*Server, error) {
 		return nil, fieldErr("schema", "required", "a schema registry is required")
 	}
 	if opts.ACI == nil {
-		return nil, fieldErr("aci", "required", "an ACI engine is required")
+		if len(opts.ACITexts) == 0 {
+			return nil, fieldErr("aci", "required", "an ACI engine is required")
+		}
+		eng, err := NewACIEngine(opts.ACITexts, opts.Logger)
+		if err != nil {
+			return nil, fieldErr("aciTexts", "invalid_aci", "ACI text failed to parse: "+err.Error())
+		}
+		opts.ACI = eng
 	}
 	if opts.Logger == nil {
 		return nil, fieldErr("logger", "required", "a slog logger is required")
