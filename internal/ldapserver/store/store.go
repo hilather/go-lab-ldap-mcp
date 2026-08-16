@@ -296,7 +296,14 @@ func (t updateTx) Add(ctx context.Context, entry *ldapserver.Entry) error {
 	if err := t.tx.Bucket(bucketID2Entry).Put(idb, blob); err != nil {
 		return fmt.Errorf("store: add: %w", err)
 	}
-	return t.linkChild(d, idb)
+	if err := t.linkChild(d, idb); err != nil {
+		return err
+	}
+	// Equality postings commit in this same transaction (T-130).
+	if err := AddPostings(t.tx, id, stored); err != nil {
+		return fmt.Errorf("store: add: %w", err)
+	}
+	return nil
 }
 
 func (t updateTx) Replace(ctx context.Context, entry *ldapserver.Entry) error {
@@ -312,12 +319,20 @@ func (t updateTx) Replace(ctx context.Context, entry *ldapserver.Entry) error {
 	if id == nil {
 		return fmt.Errorf("store: replace: %w", ldapserver.ErrNoSuchObject)
 	}
+	old, err := decodeEntry(t.tx.Bucket(bucketID2Entry).Get(id))
+	if err != nil {
+		return fmt.Errorf("store: replace: %w", err)
+	}
 	stored := &ldapserver.Entry{DN: d.String(), Attributes: entry.Attributes}
 	blob, err := encodeEntry(stored)
 	if err != nil {
 		return fmt.Errorf("store: replace: %w", err)
 	}
 	if err := t.tx.Bucket(bucketID2Entry).Put(id, blob); err != nil {
+		return fmt.Errorf("store: replace: %w", err)
+	}
+	// Swap equality postings in the same transaction as the entry write.
+	if err := ReindexEntry(t.tx, idUint64(id), old, stored); err != nil {
 		return fmt.Errorf("store: replace: %w", err)
 	}
 	return nil
@@ -337,6 +352,10 @@ func (t updateTx) Delete(ctx context.Context, dn config.DN) error {
 			return fmt.Errorf("store: delete: %w", ldapserver.ErrNotLeaf)
 		}
 	}
+	old, err := decodeEntry(t.tx.Bucket(bucketID2Entry).Get(id))
+	if err != nil {
+		return fmt.Errorf("store: delete: %w", err)
+	}
 	if err := t.unlinkChild(dn, id); err != nil {
 		return err
 	}
@@ -347,6 +366,10 @@ func (t updateTx) Delete(ctx context.Context, dn config.DN) error {
 		return fmt.Errorf("store: delete: %w", err)
 	}
 	if err := t.tx.Bucket(bucketID2Entry).Delete(id); err != nil {
+		return fmt.Errorf("store: delete: %w", err)
+	}
+	// Drop equality postings in the same transaction as the entry delete.
+	if err := RemovePostings(t.tx, idUint64(id), old); err != nil {
 		return fmt.Errorf("store: delete: %w", err)
 	}
 	return nil
@@ -398,6 +421,11 @@ func (t updateTx) Rename(ctx context.Context, from, to config.DN) error {
 	// The subtree's internal parent-child links are keyed by ids and the
 	// moved parents' bucket keys; only the root's link to its parent
 	// changes.
+	//
+	// Equality postings need no work here (T-130): ids and attribute
+	// values are stable across Rename, so value -> id postings stay valid.
+	// The RDN attribute maintenance for deleteoldrdn is applied by
+	// handleModifyDN through a follow-up Replace, which reindexes.
 	return t.relinkRoot(from, to)
 }
 
