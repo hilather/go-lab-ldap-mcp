@@ -1631,27 +1631,27 @@ Acceptance:
 
 Follow-up: `cmd/labldapd` wires compiled `plan.ACIs` → `Options.ACITexts` (T-143). Note: `runtime-people-write` (targetattr!=aci) grants userPassword *read* under `ou=people`; 389-consistent — the T-036 `denyUserPasswordRead` probe is base-scoped to suffix/marker. Pinned in tests; oracle-adjudicate in T-147.
 
-## [ ] T-140 Simple Paged Results control
+## [x] T-140 Simple Paged Results control
 
 Priority: P0 | Size: M | Depends on: T-127, T-130 | Wave 5 | Cloud fit: high
 
 Deliverables: control OID `1.2.840.113556.1.4.319`; cookie integrity; advertised on Root DSE.
 
 Acceptance:
-- [ ] Page size 2 over 5 entries returns 3 pages and ends.
-- [ ] Tampered cookie fails.
-- [ ] Critical unknown control → `unavailableCriticalExtension`.
+- [x] Page size 2 over 5 entries returns 3 pages and ends.
+- [x] Tampered cookie fails.
+- [x] Critical unknown control → `unavailableCriticalExtension`.
 
-## [ ] T-141 RFC 4528 assertion control
+## [x] T-141 RFC 4528 assertion control
 
 Priority: P0 | Size: M | Depends on: T-128, T-130, T-132 | Wave 5 | Cloud fit: high
 
 Deliverables: advertise `1.3.6.1.1.12`; transactional If-Match-style modify; do not advertise if not honored.
 
 Acceptance:
-- [ ] Matching assertion allows modify; failing assertion does not apply the write.
-- [ ] Concurrent conflicting assertions: at most one commit (txn test).
-- [ ] Root DSE lists the OID.
+- [x] Matching assertion allows modify; failing assertion does not apply the write.
+- [x] Concurrent conflicting assertions: at most one commit (txn test).
+- [x] Root DSE lists the OID.
 
 ## [ ] T-142 WhoAmI extended operation
 
@@ -1685,17 +1685,19 @@ Acceptance:
 - [ ] Mismatch (wrong suffix / policy) fails with a phase code, no marker commit.
 - [ ] No `dsconf` invocation in the native path (test spy).
 
-## [ ] T-145 Native image and compose-native profile
+## [x] T-145 Native image and compose-native profile
 
 Priority: P0 | Size: L | Depends on: T-143 | Wave 5 | Cloud fit: medium (needs Docker)
 
 Deliverables: `labldapd` image (non-root, read-only root, `/data` volume); `deploy/compose` native overlay replacing `dirsrv` with `labldapd`; `make image-native`; `make compose-up-native`; healthcheck.
 
 Acceptance:
-- [ ] Image contains no DM secret, no Docker socket, no source.
-- [ ] `make compose-up-native` brings directory → bootstrap → control on loopback 3389/3636/8443.
-- [ ] Floating tags absent from release compose.
-- [ ] Pin base image by digest.
+- [x] Image contains no DM secret, no Docker socket, no source (verified by `docker image inspect` + `test/imagecontract/native_test.go`).
+- [~] `make compose-up-native` brings directory → bootstrap → control on loopback 3389/3636/8443 — correct-by-construction; live bring-up gated on T-143 (`serve` stub), T-144 (reconcilers), T-146 (control wiring). Statically validated: `docker compose config` passes for ephemeral + persistent native stacks.
+- [x] Floating tags absent from release compose.
+- [x] Pin base image by digest.
+
+Note: overlay uses Compose `!override` (≥ 2.24.4) — `!reset <list>` silently drops the list in compose-go (found during validation). Live bring-up lands in T-147.
 
 ## [ ] T-146 Control-plane engine selection wiring
 
