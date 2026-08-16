@@ -1,0 +1,3025 @@
+{
+  "version": "labldap.parity.v1",
+  "oracle": "quay.io/389ds/dirsrv@sha256:f2851654c5df545cd893d84bea8d08c28dc25f0930493fbfed1d8a6eacf657f7",
+  "contract": [
+    {
+      "id": "C2/C3",
+      "name": "transport-bind-matrix",
+      "agreed": [
+        {
+          "code": 0
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 13
+        },
+        {
+          "code": 13
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 49
+        },
+        {
+          "code": 49
+        },
+        {
+          "code": 200
+        },
+        {
+          "code": 200
+        },
+        {
+          "code": 200
+        }
+      ]
+    },
+    {
+      "id": "C3",
+      "name": "unknown-vs-wrong-password",
+      "agreed": [
+        {
+          "code": 49
+        },
+        {
+          "code": 49
+        },
+        {
+          "code": 0
+        }
+      ]
+    },
+    {
+      "id": "C3",
+      "name": "account-disable-lock",
+      "agreed": [
+        {
+          "code": 0
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 53
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "uid=pwprobe,ou=people,dc=example,dc=test"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "C10/D1/D6",
+      "name": "root-dse",
+      "agreed": [
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "",
+              "attrs": {
+                "namingcontexts": [
+                  "dc=example,dc=test"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 0,
+          "value": "v3-advertised"
+        },
+        {
+          "code": 0,
+          "value": "paged-advertised"
+        },
+        {
+          "code": 0,
+          "value": "starttls=true,whoami=true"
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "",
+              "attrs": {
+                "vendorname": [
+                  "PRESENT"
+                ],
+                "vendorversion": [
+                  "PRESENT"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "C10",
+      "name": "subschema-publication",
+      "agreed": [
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "oc:person"
+            },
+            {
+              "dn": "oc:inetOrgPerson"
+            },
+            {
+              "dn": "oc:groupOfNames"
+            },
+            {
+              "dn": "oc:device"
+            },
+            {
+              "dn": "oc:domain"
+            },
+            {
+              "dn": "oc:organizationalUnit"
+            },
+            {
+              "dn": "at:uid"
+            },
+            {
+              "dn": "at:cn"
+            },
+            {
+              "dn": "at:sn"
+            },
+            {
+              "dn": "at:givenName"
+            },
+            {
+              "dn": "at:mail"
+            },
+            {
+              "dn": "at:displayName"
+            },
+            {
+              "dn": "at:description"
+            },
+            {
+              "dn": "at:userPassword"
+            },
+            {
+              "dn": "at:member"
+            },
+            {
+              "dn": "at:memberOf"
+            },
+            {
+              "dn": "at:nsAccountLock"
+            },
+            {
+              "dn": "at:aci"
+            },
+            {
+              "dn": "at:entryUUID"
+            },
+            {
+              "dn": "at:createTimestamp"
+            },
+            {
+              "dn": "at:modifyTimestamp"
+            },
+            {
+              "dn": "at:modifiersName"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "C6",
+      "name": "search-scopes",
+      "agreed": [
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "ou=people,dc=example,dc=test",
+              "attrs": {
+                "ou": [
+                  "people"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "uid=alice,ou=people,dc=example,dc=test",
+              "attrs": {
+                "uid": [
+                  "alice"
+                ]
+              }
+            },
+            {
+              "dn": "uid=bob,ou=people,dc=example,dc=test",
+              "attrs": {
+                "uid": [
+                  "bob"
+                ]
+              }
+            },
+            {
+              "dn": "uid=carol,ou=people,dc=example,dc=test",
+              "attrs": {
+                "uid": [
+                  "carol"
+                ]
+              }
+            },
+            {
+              "dn": "uid=dave,ou=people,dc=example,dc=test",
+              "attrs": {
+                "uid": [
+                  "dave"
+                ]
+              }
+            },
+            {
+              "dn": "uid=dmpwprobe,ou=people,dc=example,dc=test",
+              "attrs": {
+                "uid": [
+                  "dmpwprobe"
+                ]
+              }
+            },
+            {
+              "dn": "uid=erin,ou=people,dc=example,dc=test",
+              "attrs": {
+                "uid": [
+                  "erin"
+                ]
+              }
+            },
+            {
+              "dn": "uid=histprobe,ou=people,dc=example,dc=test",
+              "attrs": {
+                "uid": [
+                  "histprobe"
+                ]
+              }
+            },
+            {
+              "dn": "uid=labldap-runtime,ou=people,dc=example,dc=test",
+              "attrs": {
+                "uid": [
+                  "labldap-runtime"
+                ]
+              }
+            },
+            {
+              "dn": "uid=lockprobe,ou=people,dc=example,dc=test",
+              "attrs": {
+                "uid": [
+                  "lockprobe"
+                ]
+              }
+            },
+            {
+              "dn": "uid=lockprobe2,ou=people,dc=example,dc=test",
+              "attrs": {
+                "uid": [
+                  "lockprobe2"
+                ]
+              }
+            },
+            {
+              "dn": "uid=norah,ou=people,dc=example,dc=test",
+              "attrs": {
+                "uid": [
+                  "norah"
+                ]
+              }
+            },
+            {
+              "dn": "uid=pwprobe,ou=people,dc=example,dc=test",
+              "attrs": {
+                "uid": [
+                  "pwprobe"
+                ]
+              }
+            },
+            {
+              "dn": "uid=soleuser,ou=people,dc=example,dc=test",
+              "attrs": {
+                "uid": [
+                  "soleuser"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "cn=innergrp,ou=groups,dc=example,dc=test",
+              "attrs": {
+                "cn": [
+                  "innergrp"
+                ]
+              }
+            },
+            {
+              "dn": "cn=lastmember,ou=groups,dc=example,dc=test",
+              "attrs": {
+                "cn": [
+                  "lastmember"
+                ]
+              }
+            },
+            {
+              "dn": "cn=ops,ou=groups,dc=example,dc=test",
+              "attrs": {
+                "cn": [
+                  "ops"
+                ]
+              }
+            },
+            {
+              "dn": "cn=probegrp,ou=groups,dc=example,dc=test",
+              "attrs": {
+                "cn": [
+                  "probegrp"
+                ]
+              }
+            },
+            {
+              "dn": "cn=staff,ou=groups,dc=example,dc=test",
+              "attrs": {
+                "cn": [
+                  "staff"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 32
+        },
+        {
+          "code": 32
+        }
+      ]
+    },
+    {
+      "id": "C6",
+      "name": "filter-equality-matching",
+      "agreed": [
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "uid=alice,ou=people,dc=example,dc=test",
+              "attrs": {
+                "uid": [
+                  "alice"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "uid=alice,ou=people,dc=example,dc=test",
+              "attrs": {
+                "cn": [
+                  "Alice Anderson"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "uid=alice,ou=people,dc=example,dc=test",
+              "attrs": {
+                "cn": [
+                  "Alice Anderson"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "uid=alice,ou=people,dc=example,dc=test",
+              "attrs": {
+                "uid": [
+                  "alice"
+                ]
+              }
+            },
+            {
+              "dn": "uid=bob,ou=people,dc=example,dc=test",
+              "attrs": {
+                "uid": [
+                  "bob"
+                ]
+              }
+            },
+            {
+              "dn": "uid=carol,ou=people,dc=example,dc=test",
+              "attrs": {
+                "uid": [
+                  "carol"
+                ]
+              }
+            },
+            {
+              "dn": "uid=dave,ou=people,dc=example,dc=test",
+              "attrs": {
+                "uid": [
+                  "dave"
+                ]
+              }
+            },
+            {
+              "dn": "uid=erin,ou=people,dc=example,dc=test",
+              "attrs": {
+                "uid": [
+                  "erin"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "uid=erin,ou=people,dc=example,dc=test",
+              "attrs": {
+                "uid": [
+                  "erin"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "uid=alice,ou=people,dc=example,dc=test",
+              "attrs": {
+                "uid": [
+                  "alice"
+                ]
+              }
+            },
+            {
+              "dn": "uid=bob,ou=people,dc=example,dc=test",
+              "attrs": {
+                "uid": [
+                  "bob"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "uid=dmpwprobe,ou=people,dc=example,dc=test",
+              "attrs": {
+                "uid": [
+                  "dmpwprobe"
+                ]
+              }
+            },
+            {
+              "dn": "uid=histprobe,ou=people,dc=example,dc=test",
+              "attrs": {
+                "uid": [
+                  "histprobe"
+                ]
+              }
+            },
+            {
+              "dn": "uid=labldap-runtime,ou=people,dc=example,dc=test",
+              "attrs": {
+                "uid": [
+                  "labldap-runtime"
+                ]
+              }
+            },
+            {
+              "dn": "uid=lockprobe,ou=people,dc=example,dc=test",
+              "attrs": {
+                "uid": [
+                  "lockprobe"
+                ]
+              }
+            },
+            {
+              "dn": "uid=lockprobe2,ou=people,dc=example,dc=test",
+              "attrs": {
+                "uid": [
+                  "lockprobe2"
+                ]
+              }
+            },
+            {
+              "dn": "uid=norah,ou=people,dc=example,dc=test",
+              "attrs": {
+                "uid": [
+                  "norah"
+                ]
+              }
+            },
+            {
+              "dn": "uid=pwprobe,ou=people,dc=example,dc=test",
+              "attrs": {
+                "uid": [
+                  "pwprobe"
+                ]
+              }
+            },
+            {
+              "dn": "uid=soleuser,ou=people,dc=example,dc=test",
+              "attrs": {
+                "uid": [
+                  "soleuser"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "cn=staff,ou=groups,dc=example,dc=test",
+              "attrs": {
+                "cn": [
+                  "staff"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "uid=alice,ou=people,dc=example,dc=test",
+              "attrs": {
+                "uid": [
+                  "alice"
+                ]
+              }
+            },
+            {
+              "dn": "uid=bob,ou=people,dc=example,dc=test",
+              "attrs": {
+                "uid": [
+                  "bob"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "C6",
+      "name": "client-size-limit",
+      "agreed": [
+        {
+          "code": 4,
+          "value": "3"
+        },
+        {
+          "code": 0,
+          "value": "13"
+        }
+      ]
+    },
+    {
+      "id": "C6/C9",
+      "name": "paged-results",
+      "agreed": [
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "uid=alice,ou=people,dc=example,dc=test",
+              "attrs": {
+                "cn": [
+                  "Alice Anderson"
+                ]
+              }
+            },
+            {
+              "dn": "uid=bob,ou=people,dc=example,dc=test",
+              "attrs": {
+                "cn": [
+                  "Bob Brown"
+                ]
+              }
+            },
+            {
+              "dn": "uid=carol,ou=people,dc=example,dc=test",
+              "attrs": {
+                "cn": [
+                  "Carol Carter"
+                ]
+              }
+            },
+            {
+              "dn": "uid=dave,ou=people,dc=example,dc=test",
+              "attrs": {
+                "cn": [
+                  "Dave Davis"
+                ]
+              }
+            },
+            {
+              "dn": "uid=dmpwprobe,ou=people,dc=example,dc=test",
+              "attrs": {
+                "cn": [
+                  "Dana Reset"
+                ]
+              }
+            },
+            {
+              "dn": "uid=erin,ou=people,dc=example,dc=test",
+              "attrs": {
+                "cn": [
+                  "Erin Evans"
+                ]
+              }
+            },
+            {
+              "dn": "uid=histprobe,ou=people,dc=example,dc=test",
+              "attrs": {
+                "cn": [
+                  "Hank Hist"
+                ]
+              }
+            },
+            {
+              "dn": "uid=labldap-runtime,ou=people,dc=example,dc=test",
+              "attrs": {
+                "cn": [
+                  "LabLDAP Runtime"
+                ]
+              }
+            },
+            {
+              "dn": "uid=lockprobe,ou=people,dc=example,dc=test",
+              "attrs": {
+                "cn": [
+                  "Larry Lock"
+                ]
+              }
+            },
+            {
+              "dn": "uid=lockprobe2,ou=people,dc=example,dc=test",
+              "attrs": {
+                "cn": [
+                  "Lucy Lock"
+                ]
+              }
+            },
+            {
+              "dn": "uid=norah,ou=people,dc=example,dc=test",
+              "attrs": {
+                "cn": [
+                  "Nora Nogroup"
+                ]
+              }
+            },
+            {
+              "dn": "uid=pwprobe,ou=people,dc=example,dc=test",
+              "attrs": {
+                "cn": [
+                  "Pete Probe"
+                ]
+              }
+            },
+            {
+              "dn": "uid=soleuser,ou=people,dc=example,dc=test",
+              "attrs": {
+                "cn": [
+                  "Solo User"
+                ]
+              }
+            }
+          ],
+          "value": "codes=[0 0 0 0] pages=4"
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "uid=alice,ou=people,dc=example,dc=test",
+              "attrs": {
+                "cn": [
+                  "Alice Anderson"
+                ]
+              }
+            },
+            {
+              "dn": "uid=bob,ou=people,dc=example,dc=test",
+              "attrs": {
+                "cn": [
+                  "Bob Brown"
+                ]
+              }
+            },
+            {
+              "dn": "uid=carol,ou=people,dc=example,dc=test",
+              "attrs": {
+                "cn": [
+                  "Carol Carter"
+                ]
+              }
+            },
+            {
+              "dn": "uid=dave,ou=people,dc=example,dc=test",
+              "attrs": {
+                "cn": [
+                  "Dave Davis"
+                ]
+              }
+            },
+            {
+              "dn": "uid=dmpwprobe,ou=people,dc=example,dc=test",
+              "attrs": {
+                "cn": [
+                  "Dana Reset"
+                ]
+              }
+            },
+            {
+              "dn": "uid=erin,ou=people,dc=example,dc=test",
+              "attrs": {
+                "cn": [
+                  "Erin Evans"
+                ]
+              }
+            },
+            {
+              "dn": "uid=histprobe,ou=people,dc=example,dc=test",
+              "attrs": {
+                "cn": [
+                  "Hank Hist"
+                ]
+              }
+            },
+            {
+              "dn": "uid=labldap-runtime,ou=people,dc=example,dc=test",
+              "attrs": {
+                "cn": [
+                  "LabLDAP Runtime"
+                ]
+              }
+            },
+            {
+              "dn": "uid=lockprobe,ou=people,dc=example,dc=test",
+              "attrs": {
+                "cn": [
+                  "Larry Lock"
+                ]
+              }
+            },
+            {
+              "dn": "uid=lockprobe2,ou=people,dc=example,dc=test",
+              "attrs": {
+                "cn": [
+                  "Lucy Lock"
+                ]
+              }
+            },
+            {
+              "dn": "uid=norah,ou=people,dc=example,dc=test",
+              "attrs": {
+                "cn": [
+                  "Nora Nogroup"
+                ]
+              }
+            },
+            {
+              "dn": "uid=pwprobe,ou=people,dc=example,dc=test",
+              "attrs": {
+                "cn": [
+                  "Pete Probe"
+                ]
+              }
+            },
+            {
+              "dn": "uid=soleuser,ou=people,dc=example,dc=test",
+              "attrs": {
+                "cn": [
+                  "Solo User"
+                ]
+              }
+            }
+          ],
+          "value": "codes=[0] pages=1"
+        }
+      ]
+    },
+    {
+      "id": "C9",
+      "name": "unknown-critical-control",
+      "agreed": [
+        {
+          "code": 12
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "ou=people,dc=example,dc=test",
+              "attrs": {
+                "ou": [
+                  "people"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 12
+        }
+      ]
+    },
+    {
+      "id": "C5/C7",
+      "name": "memberof-derivation",
+      "agreed": [
+        {
+          "code": 0
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "uid=zoe,ou=people,dc=example,dc=test"
+            }
+          ]
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "uid=zoe,ou=people,dc=example,dc=test",
+              "attrs": {
+                "memberof": [
+                  "cn=zapgroup,ou=groups,dc=example,dc=test"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "uid=alice,ou=people,dc=example,dc=test",
+              "attrs": {
+                "memberof": [
+                  "cn=staff,ou=groups,dc=example,dc=test",
+                  "cn=zapgroup,ou=groups,dc=example,dc=test"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "uid=zoe,ou=people,dc=example,dc=test"
+            }
+          ]
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "cn=zapgroup,ou=groups,dc=example,dc=test",
+              "attrs": {
+                "member": [
+                  "uid=alice,ou=people,dc=example,dc=test"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "C7",
+      "name": "group-rename",
+      "agreed": [
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "uid=carol,ou=people,dc=example,dc=test",
+              "attrs": {
+                "memberof": [
+                  "cn=ops,ou=groups,dc=example,dc=test"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "uid=carol,ou=people,dc=example,dc=test",
+              "attrs": {
+                "memberof": [
+                  "cn=ops-renamed,ou=groups,dc=example,dc=test"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "cn=ops-renamed,ou=groups,dc=example,dc=test",
+              "attrs": {
+                "member": [
+                  "uid=carol,ou=people,dc=example,dc=test"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 32
+        }
+      ]
+    },
+    {
+      "id": "C7",
+      "name": "referential-integrity",
+      "agreed": [
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "cn=staff,ou=groups,dc=example,dc=test",
+              "attrs": {
+                "member": [
+                  "uid=alice,ou=people,dc=example,dc=test",
+                  "uid=bob,ou=people,dc=example,dc=test"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "cn=staff,ou=groups,dc=example,dc=test",
+              "attrs": {
+                "member": [
+                  "uid=alice,ou=people,dc=example,dc=test"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 32
+        }
+      ]
+    },
+    {
+      "id": "C5",
+      "name": "add-error-codes",
+      "agreed": [
+        {
+          "code": 68
+        },
+        {
+          "code": 65
+        },
+        {
+          "code": 32
+        },
+        {
+          "code": 32
+        },
+        {
+          "code": 34
+        }
+      ]
+    },
+    {
+      "id": "C1",
+      "name": "modify-compare-semantics",
+      "agreed": [
+        {
+          "code": 0
+        },
+        {
+          "code": 20
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "uid=erin,ou=people,dc=example,dc=test",
+              "attrs": {
+                "description": [
+                  "final"
+                ],
+                "roomnumber": [
+                  "7A"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 6
+        },
+        {
+          "code": 5
+        },
+        {
+          "code": 32
+        }
+      ]
+    },
+    {
+      "id": "C1",
+      "name": "modifydn-semantics",
+      "agreed": [
+        {
+          "code": 0
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "cn=rename-dst,dc=example,dc=test",
+              "attrs": {
+                "cn": [
+                  "rename-dst"
+                ],
+                "description": [
+                  "rename me"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 32
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "cn=rename-dst,ou=people,dc=example,dc=test",
+              "attrs": {
+                "cn": [
+                  "rename-dst"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 32
+        },
+        {
+          "code": 68
+        },
+        {
+          "code": 32
+        },
+        {
+          "code": 0
+        }
+      ]
+    },
+    {
+      "id": "C8",
+      "name": "runtime-aci-matrix",
+      "agreed": [
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "dc=example,dc=test",
+              "attrs": {
+                "aci": [
+                  "(target=\"ldap:///dc=example,dc=test\")(targetattr!=\"userPassword\")(version 3.0; acl \"labldap:runtime-suffix-read\"; allow (read,search,compare) userdn=\"ldap:///uid=labldap-runtime,ou=people,dc=example,dc=test\";)",
+                  "(target=\"ldap:///ou=people,dc=example,dc=test\")(targetattr=\"description\")(version 3.0; acl \"labldap:probe-self-desc\"; allow (write) userdn=\"ldap:///self\";)",
+                  "(target=\"ldap:///ou=people,dc=example,dc=test\")(targetattr=\"userPassword\")(version 3.0; acl \"labldap:probe-self-pwd\"; allow (write) userdn=\"ldap:///self\";)",
+                  "(target=\"ldap:///ou=probe-all,dc=example,dc=test\")(targetattr=\"*\")(version 3.0; acl \"labldap:probe-all-read\"; allow (read,search,compare) userdn=\"ldap:///all\";)",
+                  "(target=\"ldap:///ou=probe-anyone,dc=example,dc=test\")(targetattr=\"*\")(version 3.0; acl \"labldap:probe-anyone-read\"; allow (read,search,compare) userdn=\"ldap:///anyone\";)",
+                  "(target=\"ldap:///ou=probe-groupdn,dc=example,dc=test\")(targetattr=\"*\")(version 3.0; acl \"labldap:probe-groupdn-read\"; allow (read,search,compare) groupdn=\"ldap:///cn=probegrp,ou=groups,dc=example,dc=test\";)"
+                ],
+                "dc": [
+                  "example"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "uid=alice,ou=people,dc=example,dc=test",
+              "attrs": {
+                "uid": [
+                  "alice"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "dc=example,dc=test"
+            }
+          ]
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 50
+        },
+        {
+          "code": 50
+        },
+        {
+          "code": 50
+        },
+        {
+          "code": -100,
+          "note": "admin-tree-unreachable"
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 0
+        }
+      ]
+    },
+    {
+      "id": "C4",
+      "name": "password-policy-effects",
+      "agreed": [
+        {
+          "code": -100,
+          "note": "policy-rejected"
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 49
+        },
+        {
+          "code": -100,
+          "note": "policy-rejected"
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 0
+        }
+      ]
+    },
+    {
+      "id": "C4",
+      "name": "bind-lockout",
+      "agreed": [
+        {
+          "code": 0
+        },
+        {
+          "code": 49
+        },
+        {
+          "code": 49
+        },
+        {
+          "code": 49
+        },
+        {
+          "code": -100,
+          "note": "rejected"
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "uid=lockprobe,ou=people,dc=example,dc=test",
+              "attrs": {
+                "uid": [
+                  "lockprobe"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "C5",
+      "name": "tree-shape-objectclasses",
+      "agreed": [
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "dc=example,dc=test",
+              "attrs": {
+                "objectclass": [
+                  "domain",
+                  "top"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "ou=people,dc=example,dc=test",
+              "attrs": {
+                "objectclass": [
+                  "organizationalUnit",
+                  "top"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "ou=groups,dc=example,dc=test",
+              "attrs": {
+                "objectclass": [
+                  "organizationalUnit",
+                  "top"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "uid=labldap-runtime,ou=people,dc=example,dc=test",
+              "attrs": {
+                "objectclass": [
+                  "inetOrgPerson",
+                  "organizationalPerson",
+                  "person",
+                  "top"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "uid=pwprobe,ou=people,dc=example,dc=test",
+              "attrs": {
+                "objectclass": [
+                  "inetOrgPerson",
+                  "organizationalPerson",
+                  "person",
+                  "top"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "uid=histprobe,ou=people,dc=example,dc=test",
+              "attrs": {
+                "objectclass": [
+                  "inetOrgPerson",
+                  "organizationalPerson",
+                  "person",
+                  "top"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "uid=norah,ou=people,dc=example,dc=test",
+              "attrs": {
+                "objectclass": [
+                  "inetOrgPerson",
+                  "organizationalPerson",
+                  "person",
+                  "top"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "cn=staff,ou=groups,dc=example,dc=test",
+              "attrs": {
+                "objectclass": [
+                  "groupOfNames",
+                  "top"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "cn=ops-renamed,ou=groups,dc=example,dc=test",
+              "attrs": {
+                "objectclass": [
+                  "groupOfNames",
+                  "top"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "cn=probegrp,ou=groups,dc=example,dc=test",
+              "attrs": {
+                "objectclass": [
+                  "groupOfNames",
+                  "top"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "cn=labldap-baseline,dc=example,dc=test",
+              "attrs": {
+                "objectclass": [
+                  "device",
+                  "top"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "C1",
+      "name": "whoami-contract",
+      "agreed": [
+        {
+          "code": 0,
+          "value": "dn:uid=erin,ou=people,dc=example,dc=test"
+        }
+      ]
+    }
+  ],
+  "candidates": [
+    {
+      "id": "CAND-1",
+      "topic": "anonymous-bind-disabled result code",
+      "verdict": "delta",
+      "oracle": [
+        {
+          "code": 48
+        },
+        {
+          "code": 48
+        },
+        {
+          "code": 48
+        }
+      ],
+      "native": [
+        {
+          "code": 53
+        },
+        {
+          "code": 53
+        },
+        {
+          "code": 53
+        }
+      ]
+    },
+    {
+      "id": "CAND-2",
+      "topic": "approxMatch filter semantics",
+      "verdict": "delta",
+      "oracle": [
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "uid=alice,ou=people,dc=example,dc=test",
+              "attrs": {
+                "uid": [
+                  "alice"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "uid=alice,ou=people,dc=example,dc=test",
+              "attrs": {
+                "uid": [
+                  "alice"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "uid=alice,ou=people,dc=example,dc=test",
+              "attrs": {
+                "uid": [
+                  "alice"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "native": [
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "uid=alice,ou=people,dc=example,dc=test",
+              "attrs": {
+                "uid": [
+                  "alice"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "uid=alice,ou=people,dc=example,dc=test",
+              "attrs": {
+                "uid": [
+                  "alice"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "CAND-3",
+      "topic": "modify delete/replace of missing attribute",
+      "verdict": "match",
+      "oracle": [
+        {
+          "code": 16
+        },
+        {
+          "code": 16
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "uid=erin,ou=people,dc=example,dc=test",
+              "attrs": {
+                "telephonenumber": [
+                  "+1 555 0100"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 0
+        }
+      ],
+      "native": [
+        {
+          "code": 16
+        },
+        {
+          "code": 16
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "uid=erin,ou=people,dc=example,dc=test",
+              "attrs": {
+                "telephonenumber": [
+                  "+1 555 0100"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 0
+        }
+      ]
+    },
+    {
+      "id": "CAND-4",
+      "topic": "out-of-suffix ModifyDN result code",
+      "verdict": "delta",
+      "oracle": [
+        {
+          "code": 71
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "uid=zoe,ou=people,dc=example,dc=test",
+              "attrs": {
+                "uid": [
+                  "zoe"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "native": [
+        {
+          "code": 53
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "uid=zoe,ou=people,dc=example,dc=test",
+              "attrs": {
+                "uid": [
+                  "zoe"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "CAND-5",
+      "topic": "paged-cookie scope binding",
+      "verdict": "delta",
+      "oracle": [
+        {
+          "code": 0
+        },
+        {
+          "code": 0
+        }
+      ],
+      "native": [
+        {
+          "code": 53
+        },
+        {
+          "code": 0
+        }
+      ]
+    },
+    {
+      "id": "CAND-6",
+      "topic": "rename into own subtree",
+      "verdict": "delta",
+      "oracle": [
+        {
+          "code": 53
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "ou=movedemo,dc=example,dc=test",
+              "attrs": {
+                "ou": [
+                  "movedemo"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "ou=movedemo,dc=example,dc=test",
+              "attrs": {
+                "ou": [
+                  "movedemo"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "native": [
+        {
+          "code": 0
+        },
+        {
+          "code": 32
+        },
+        {
+          "code": 0
+        }
+      ]
+    },
+    {
+      "id": "CAND-7",
+      "topic": "supportedExtension truthful (resolved)",
+      "verdict": "match",
+      "oracle": [
+        {
+          "code": 0,
+          "value": "dn:uid=dave,ou=people,dc=example,dc=test"
+        },
+        {
+          "code": 0
+        }
+      ],
+      "native": [
+        {
+          "code": 0,
+          "value": "dn:uid=dave,ou=people,dc=example,dc=test"
+        },
+        {
+          "code": 0
+        }
+      ]
+    },
+    {
+      "id": "CAND-8",
+      "topic": "schema MAY/unknown-attribute enforcement",
+      "verdict": "delta",
+      "oracle": [
+        {
+          "code": 65
+        },
+        {
+          "code": 65
+        },
+        {
+          "code": 32
+        },
+        {
+          "code": 32
+        },
+        {
+          "code": 32
+        },
+        {
+          "code": 32
+        }
+      ],
+      "native": [
+        {
+          "code": 0
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "cn=markerdemo,dc=example,dc=test",
+              "attrs": {
+                "destinationindicator": [
+                  "lab"
+                ],
+                "owner": [
+                  "cn=directory manager"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "cn=unknownattr,dc=example,dc=test",
+              "attrs": {
+                "cn": [
+                  "unknownattr"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 0
+        }
+      ]
+    },
+    {
+      "id": "CAND-9",
+      "topic": "password-policy-violation write code",
+      "verdict": "delta",
+      "oracle": [
+        {
+          "code": 19
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 19
+        },
+        {
+          "code": 0
+        }
+      ],
+      "native": [
+        {
+          "code": 53
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 53
+        },
+        {
+          "code": 0
+        }
+      ]
+    },
+    {
+      "id": "CAND-10",
+      "topic": "lockout bind failure code",
+      "verdict": "delta",
+      "oracle": [
+        {
+          "code": 0
+        },
+        {
+          "code": 49
+        },
+        {
+          "code": 49
+        },
+        {
+          "code": 49
+        },
+        {
+          "code": 19
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "uid=lockprobe2,ou=people,dc=example,dc=test",
+              "attrs": {
+                "accountunlocktime": [
+                  "PRESENT"
+                ],
+                "cn": [
+                  "Lucy Lock"
+                ],
+                "createtimestamp": [
+                  "PRESENT"
+                ],
+                "creatorsname": [
+                  "PRESENT"
+                ],
+                "entryuuid": [
+                  "PRESENT"
+                ],
+                "modifiersname": [
+                  "PRESENT"
+                ],
+                "modifytimestamp": [
+                  "PRESENT"
+                ],
+                "nsuniqueid": [
+                  "PRESENT"
+                ],
+                "objectclass": [
+                  "inetOrgPerson",
+                  "organizationalPerson",
+                  "person",
+                  "top"
+                ],
+                "passwordretrycount": [
+                  "PRESENT"
+                ],
+                "retrycountresettime": [
+                  "PRESENT"
+                ],
+                "sn": [
+                  "Lock"
+                ],
+                "uid": [
+                  "lockprobe2"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "native": [
+        {
+          "code": 0
+        },
+        {
+          "code": 49
+        },
+        {
+          "code": 49
+        },
+        {
+          "code": 49
+        },
+        {
+          "code": 49
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "uid=lockprobe2,ou=people,dc=example,dc=test",
+              "attrs": {
+                "cn": [
+                  "Lucy Lock"
+                ],
+                "createtimestamp": [
+                  "PRESENT"
+                ],
+                "creatorsname": [
+                  "PRESENT"
+                ],
+                "entryuuid": [
+                  "PRESENT"
+                ],
+                "modifiersname": [
+                  "PRESENT"
+                ],
+                "modifytimestamp": [
+                  "PRESENT"
+                ],
+                "objectclass": [
+                  "inetOrgPerson",
+                  "organizationalPerson",
+                  "person",
+                  "top"
+                ],
+                "pwdaccountlockedtime": [
+                  "PRESENT"
+                ],
+                "pwdchangedtime": [
+                  "PRESENT"
+                ],
+                "sn": [
+                  "Lock"
+                ],
+                "uid": [
+                  "lockprobe2"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "CAND-11",
+      "topic": "re-setting the current password",
+      "verdict": "delta",
+      "oracle": [
+        {
+          "code": 19
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 0
+        }
+      ],
+      "native": [
+        {
+          "code": 53
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 0
+        }
+      ]
+    },
+    {
+      "id": "CAND-12",
+      "topic": "groupOfNames emptied by RI member removal",
+      "verdict": "match",
+      "oracle": [
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "cn=lastmember,ou=groups,dc=example,dc=test",
+              "attrs": {
+                "member": [
+                  "uid=soleuser,ou=people,dc=example,dc=test"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "cn=lastmember,ou=groups,dc=example,dc=test",
+              "attrs": {
+                "objectclass": [
+                  "groupOfNames",
+                  "top"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "native": [
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "cn=lastmember,ou=groups,dc=example,dc=test",
+              "attrs": {
+                "member": [
+                  "uid=soleuser,ou=people,dc=example,dc=test"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "cn=lastmember,ou=groups,dc=example,dc=test",
+              "attrs": {
+                "objectclass": [
+                  "groupOfNames",
+                  "top"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "CAND-13",
+      "topic": "ACI evaluation order / deny-wins",
+      "verdict": "match",
+      "oracle": [
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "uid=alice,ou=people,dc=example,dc=test"
+            }
+          ]
+        },
+        {
+          "code": 50
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 0
+        }
+      ],
+      "native": [
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "uid=alice,ou=people,dc=example,dc=test"
+            }
+          ]
+        },
+        {
+          "code": 50
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 0
+        }
+      ]
+    },
+    {
+      "id": "CAND-14",
+      "topic": "userPassword read on a person entry as runtime",
+      "verdict": "match",
+      "oracle": [
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "uid=alice,ou=people,dc=example,dc=test"
+            }
+          ]
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "dc=example,dc=test"
+            }
+          ]
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "cn=labldap-baseline,dc=example,dc=test"
+            }
+          ]
+        }
+      ],
+      "native": [
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "uid=alice,ou=people,dc=example,dc=test"
+            }
+          ]
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "dc=example,dc=test"
+            }
+          ]
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "cn=labldap-baseline,dc=example,dc=test"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "CAND-15",
+      "topic": "self/all/anyone bind-rule semantics",
+      "verdict": "delta",
+      "oracle": [
+        {
+          "code": 0
+        },
+        {
+          "code": 50
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "ou=probe-all,dc=example,dc=test",
+              "attrs": {
+                "ou": [
+                  "probe-all"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "cn=leaf,ou=probe-all,dc=example,dc=test",
+              "attrs": {
+                "description": [
+                  "all-leaf"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 48
+        },
+        {
+          "code": 48
+        },
+        {
+          "code": 0
+        }
+      ],
+      "native": [
+        {
+          "code": 0
+        },
+        {
+          "code": 50
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "ou=probe-all,dc=example,dc=test",
+              "attrs": {
+                "ou": [
+                  "probe-all"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "cn=leaf,ou=probe-all,dc=example,dc=test",
+              "attrs": {
+                "description": [
+                  "all-leaf"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "ou=probe-anyone,dc=example,dc=test",
+              "attrs": {
+                "ou": [
+                  "probe-anyone"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 0
+        }
+      ]
+    },
+    {
+      "id": "CAND-16",
+      "topic": "ACI entry-level add/delete targetattr scope",
+      "verdict": "match",
+      "oracle": [
+        {
+          "code": 0
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 32
+        },
+        {
+          "code": 0
+        }
+      ],
+      "native": [
+        {
+          "code": 0
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 32
+        },
+        {
+          "code": 0
+        }
+      ]
+    },
+    {
+      "id": "CAND-17",
+      "topic": "groupdn membership scope (nesting)",
+      "verdict": "delta",
+      "oracle": [
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "cn=leaf,ou=probe-groupdn,dc=example,dc=test",
+              "attrs": {
+                "description": [
+                  "groupdn-leaf"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "cn=leaf,ou=probe-groupdn,dc=example,dc=test",
+              "attrs": {
+                "description": [
+                  "groupdn-leaf"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "native": [
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "cn=leaf,ou=probe-groupdn,dc=example,dc=test",
+              "attrs": {
+                "description": [
+                  "groupdn-leaf"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 0
+        }
+      ]
+    },
+    {
+      "id": "CAND-18",
+      "topic": "paged-cookie tamper result code",
+      "verdict": "delta",
+      "oracle": [
+        {
+          "code": 0
+        },
+        {
+          "code": 0
+        }
+      ],
+      "native": [
+        {
+          "code": 53
+        },
+        {
+          "code": 53
+        }
+      ]
+    },
+    {
+      "id": "CAND-19",
+      "topic": "assertion control on non-Modify ops",
+      "verdict": "match",
+      "oracle": [
+        {
+          "code": 12
+        },
+        {
+          "code": 12
+        },
+        {
+          "code": 32
+        },
+        {
+          "code": 12
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "cn=labldap-baseline,dc=example,dc=test",
+              "attrs": {
+                "cn": [
+                  "labldap-baseline"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 32
+        }
+      ],
+      "native": [
+        {
+          "code": 12
+        },
+        {
+          "code": 12
+        },
+        {
+          "code": 32
+        },
+        {
+          "code": 12
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "cn=labldap-baseline,dc=example,dc=test",
+              "attrs": {
+                "cn": [
+                  "labldap-baseline"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 32
+        }
+      ]
+    },
+    {
+      "id": "CAND-20",
+      "topic": "WhoAmI authzid rendering",
+      "verdict": "delta",
+      "oracle": [
+        {
+          "code": 0,
+          "value": "dn: uid=erin,ou=people,dc=example,dc=test"
+        },
+        {
+          "code": 0,
+          "value": "dn: uid=erin,ou=people,dc=example,dc=test"
+        },
+        {
+          "code": 0,
+          "value": "\u003cempty\u003e"
+        }
+      ],
+      "native": [
+        {
+          "code": 0,
+          "value": "dn:uid=erin,ou=people,dc=example,dc=test"
+        },
+        {
+          "code": 0,
+          "value": "dn:uid=ERIN,ou=PEOPLE,dc=EXAMPLE,dc=TEST"
+        },
+        {
+          "code": 0,
+          "value": "\u003cempty\u003e"
+        }
+      ]
+    },
+    {
+      "id": "CAND-21",
+      "topic": "malformed-DN bind result code (D8)",
+      "verdict": "delta",
+      "oracle": [
+        {
+          "code": 34
+        },
+        {
+          "code": 49
+        }
+      ],
+      "native": [
+        {
+          "code": 49
+        },
+        {
+          "code": 49
+        }
+      ]
+    },
+    {
+      "id": "CAND-22",
+      "topic": "pre-bind root DSE read under anonymous-off",
+      "verdict": "delta",
+      "oracle": [
+        {
+          "code": 48
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "",
+              "attrs": {
+                "namingcontexts": [
+                  "dc=example,dc=test"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "native": [
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "",
+              "attrs": {
+                "namingcontexts": [
+                  "dc=example,dc=test"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "",
+              "attrs": {
+                "namingcontexts": [
+                  "dc=example,dc=test"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "CAND-23",
+      "topic": "compare against an absent attribute",
+      "verdict": "delta",
+      "oracle": [
+        {
+          "code": 16
+        },
+        {
+          "code": 6
+        }
+      ],
+      "native": [
+        {
+          "code": 5
+        },
+        {
+          "code": 6
+        }
+      ]
+    },
+    {
+      "id": "CAND-24",
+      "topic": "memberOf auxiliary object class add/retract",
+      "verdict": "delta",
+      "oracle": [
+        {
+          "code": 0
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "uid=ocprobe,ou=people,dc=example,dc=test",
+              "attrs": {
+                "objectclass": [
+                  "inetOrgPerson",
+                  "organizationalPerson",
+                  "person",
+                  "top"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "uid=ocprobe,ou=people,dc=example,dc=test",
+              "attrs": {
+                "memberof": [
+                  "cn=ocgrp,ou=groups,dc=example,dc=test"
+                ],
+                "objectclass": [
+                  "inetOrgPerson",
+                  "nsmemberof",
+                  "organizationalPerson",
+                  "person",
+                  "top"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "uid=ocprobe,ou=people,dc=example,dc=test",
+              "attrs": {
+                "objectclass": [
+                  "inetOrgPerson",
+                  "nsmemberof",
+                  "organizationalPerson",
+                  "person",
+                  "top"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 0
+        }
+      ],
+      "native": [
+        {
+          "code": 0
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "uid=ocprobe,ou=people,dc=example,dc=test",
+              "attrs": {
+                "objectclass": [
+                  "inetOrgPerson",
+                  "organizationalPerson",
+                  "person",
+                  "top"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "uid=ocprobe,ou=people,dc=example,dc=test",
+              "attrs": {
+                "memberof": [
+                  "cn=ocgrp,ou=groups,dc=example,dc=test"
+                ],
+                "objectclass": [
+                  "inetOrgPerson",
+                  "nsmemberof",
+                  "organizationalPerson",
+                  "person",
+                  "top"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "uid=ocprobe,ou=people,dc=example,dc=test",
+              "attrs": {
+                "objectclass": [
+                  "inetOrgPerson",
+                  "organizationalPerson",
+                  "person",
+                  "top"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 0
+        }
+      ]
+    },
+    {
+      "id": "CAND-25",
+      "topic": "DSE publication: v2 advertisement + assertion OID",
+      "verdict": "delta",
+      "oracle": [
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "",
+              "attrs": {
+                "supportedldapversion": [
+                  "2",
+                  "3"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 0,
+          "value": "assertion-not-advertised"
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "",
+              "attrs": {
+                "supportedextension": [
+                  "1.3.6.1.4.1.1466.20037",
+                  "1.3.6.1.4.1.4203.1.11.1",
+                  "1.3.6.1.4.1.4203.1.11.3",
+                  "2.16.840.1.113730.3.5.12",
+                  "2.16.840.1.113730.3.5.3",
+                  "2.16.840.1.113730.3.5.4",
+                  "2.16.840.1.113730.3.5.5",
+                  "2.16.840.1.113730.3.5.6",
+                  "2.16.840.1.113730.3.5.7",
+                  "2.16.840.1.113730.3.5.8",
+                  "2.16.840.1.113730.3.5.9",
+                  "2.16.840.1.113730.3.6.5",
+                  "2.16.840.1.113730.3.6.6",
+                  "2.16.840.1.113730.3.6.7",
+                  "2.16.840.1.113730.3.6.8"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "native": [
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "",
+              "attrs": {
+                "supportedldapversion": [
+                  "3"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 0,
+          "value": "assertion-advertised"
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "",
+              "attrs": {
+                "supportedextension": [
+                  "1.3.6.1.4.1.1466.20037",
+                  "1.3.6.1.4.1.4203.1.11.3"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "CAND-26",
+      "topic": "critical assertion on Modify (pass and fail)",
+      "verdict": "delta",
+      "oracle": [
+        {
+          "code": 0
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "uid=dave,ou=people,dc=example,dc=test",
+              "attrs": {
+                "description": [
+                  "assert-v3"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 12
+        },
+        {
+          "code": 12
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "uid=dave,ou=people,dc=example,dc=test",
+              "attrs": {
+                "description": [
+                  "assert-v3"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 0
+        }
+      ],
+      "native": [
+        {
+          "code": 0
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 122
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "uid=dave,ou=people,dc=example,dc=test",
+              "attrs": {
+                "description": [
+                  "assert-v2"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 122
+        },
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "uid=dave,ou=people,dc=example,dc=test",
+              "attrs": {
+                "description": [
+                  "assert-v5"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "code": 0
+        }
+      ]
+    },
+    {
+      "id": "CAND-27",
+      "topic": "DM password reset vs history policy",
+      "verdict": "delta",
+      "oracle": [
+        {
+          "code": 0
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 0
+        }
+      ],
+      "native": [
+        {
+          "code": 0
+        },
+        {
+          "code": 53
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 0
+        }
+      ]
+    },
+    {
+      "id": "CAND-28",
+      "topic": "subschema publishes pwdAccountLockedTime",
+      "verdict": "delta",
+      "oracle": [
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "at:nsaccountlock"
+            }
+          ]
+        }
+      ],
+      "native": [
+        {
+          "code": 0,
+          "entries": [
+            {
+              "dn": "at:nsaccountlock"
+            },
+            {
+              "dn": "at:pwdaccountlockedtime"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
