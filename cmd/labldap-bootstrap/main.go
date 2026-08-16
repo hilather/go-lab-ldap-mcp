@@ -10,10 +10,11 @@ import (
 
 const usage = `labldap-bootstrap — LabLDAP one-shot directory bootstrap
 
-Validates configuration, waits for 389 Directory Server, and (in later
-tasks) creates the backend, applies engine settings, seeds the managed
-suffix, creates the restricted runtime account, verifies allow/deny, and
-writes the baseline marker.
+Validates configuration, waits for the selected directory engine — the
+pinned 389 Directory Server (default) or the native labldapd engine — and
+creates the backend, applies engine settings, seeds the managed suffix,
+creates the restricted runtime account, verifies allow/deny, and writes
+the baseline marker.
 
 This command is the only LabLDAP process that may receive Directory Manager
 credentials, and only through a secret file — never a command-line value.

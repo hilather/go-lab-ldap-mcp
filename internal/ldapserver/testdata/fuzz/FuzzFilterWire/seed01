@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("\xa3\r\x04\x05x-bin\x04\x04\x00\xff()")

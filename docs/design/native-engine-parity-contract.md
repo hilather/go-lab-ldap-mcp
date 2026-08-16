@@ -188,6 +188,16 @@ A user created through REST or MCP is visible to `ldapsearch` against the direct
 | D5 | Backend name | `userroot` via `dsconf backend` | Suffix exists; backend name need not be `userroot` | Do not assert backend CN on native. |
 | D6 | Root DSE extra attrs | 389-specific operational attrs | Honest advertisement; omit unknown 389 extras | Capabilities test uses allowlisted fields. |
 | D7 | Assertion absence path | If 389 ever omits RFC 4528, control uses TOCTOU+lock | Native **must** advertise and honor RFC 4528 | Native-only assertion atomicity test. |
+| D8 | Bind with malformed DN | `invalidDNSyntax(34)` | `invalidCredentials(49)` | `TestDifferential389Oracle/bind-malformed-dn`; see parity-delta-log.md. |
+| D9 | Anonymous bind while disabled | `inappropriateAuthentication(48)` | `unwillingToPerform(53)` | `TestDifferential389Oracle/anon-bind-disabled`; CAND-1 adjudicated 2026-08-15. |
+| D10 | LDAPv2 bind attempt | `invalidCredentials(49)` | `protocolError(2)` | `TestDifferential389Oracle/bind-version-2`. |
+| D11 | ModifyDN with out-of-suffix `newSuperior` | `affectsMultipleDSAs(71)` | `unwillingToPerform(53)` | `TestDifferential389Oracle/modifydn-cross-suffix`; CAND-4 adjudicated 2026-08-15. |
+| D12 | Paged-results cookie tamper | Accepts tampered cookie (`success`); no integrity protection | HMAC-signed cookie fails closed, `unwillingToPerform(53)` | `TestDifferential389Oracle/paged-tampered-cookie`; CAND-5/CAND-18 adjudicated 2026-08-15. |
+| D13 | WhoAmI bound authzId rendering | `dn: <case-folded dn>` | `dn:<as-bound dn>` | `TestDifferential389Oracle/whoami-bound`; CAND-20 bound case. |
+| D14 | WhoAmI anonymous with anonymous access off | `inappropriateAuthentication(48)` | `success` + empty authzId | `TestDifferential389Oracle/whoami-anonymous`; CAND-20 anonymous case. |
+
+The adjudication record (observed values, rationale, controlling tests)
+is `docs/design/parity-delta-log.md` (T-150).
 
 ## 4. Excluded (not in M9)
 
@@ -210,7 +220,7 @@ A user created through REST or MCP is visible to `ldapsearch` against the direct
 4. Do not compare: `vendorVersion`, password hashes, `createTimestamp` clock values beyond “present and RFC3339-ish”, backend CNs.
 5. Failures attach redacted engine logs. Secret scan of the parity run must pass.
 6. `make test-parity` runs both engines. `make test-integration` remains 389-only until T-148 parametrizes it.
-7. A living **delta ledger** (section 3 of this file, plus `docs/design/parity-delta-log.md` once T-150 creates it) records observed-but-accepted differences with the test name that proves them.
+7. A living **delta ledger** (section 3 of this file, plus the adjudication record `docs/design/parity-delta-log.md` created by T-150) records observed-but-accepted differences with the test name that proves them.
 
 ## 6. Implementation notes for agents
 
@@ -228,24 +238,25 @@ A user created through REST or MCP is visible to `ldapsearch` against the direct
 | --- | --- |
 | 2026-08-15 | Initial contract (`labldap.parity.v1`) accepted with ADR-0008 / ADR-0009. |
 | 2026-08-15 | Wave 1 (T-125–T-128) recorded Delta **candidates** below; none are promoted to section 3 until adjudicated against the 389 oracle in T-147/T-150. |
+| 2026-08-15 | T-150 differential harness (`internal/ldapserver/differential_test.go`) adjudicated CAND-1, CAND-3, CAND-4, CAND-5, CAND-18, CAND-20 against the pinned 389 oracle: CAND-3 resolved as Contract; the rest promoted to section 3 as D8–D14 (with newly observed D10). Record: `docs/design/parity-delta-log.md`. |
 
 ### Delta candidates observed in Wave 1 (pending adjudication, T-147/T-150)
 
 | Ref | Topic | Native behavior (as implemented) | 389 expectation | Provenance |
 | --- | --- | --- | --- | --- |
-| CAND-1 | Anonymous-bind-disabled result code | `unwillingToPerform(53)` | RFC 4511 hints `inappropriateAuthentication(48)`; 389 observed returning 53 | T-126 `op_bind.go` |
+| ~~CAND-1~~ → D9 | Anonymous-bind-disabled result code | `unwillingToPerform(53)` | Oracle 2026-08-15: 389 returns `inappropriateAuthentication(48)` (contrary to the earlier note); accepted as D9 | T-126 `op_bind.go` |
 | CAND-2 | `approxMatch` filter | Folds to equality until T-131 matching rules | 389 applies real approx rules | T-127 `filter_eval.go` |
-| CAND-3 | Modify delete-of-missing / replace-of-missing attribute | Strict RFC 4511 (`noSuchAttribute`) | Oracle may tolerate some cases; confirm in T-147 | T-128 `op_write.go` |
-| CAND-4 | Cross/out-of-suffix ModifyDN | `unwillingToPerform(53)` | 389 answers `affectsMultipleDSAs(71)` | T-128 `op_write.go` |
-| CAND-5 | Paged-results cookie integrity | Plain offset, no integrity protection until T-140 | 389 cookie is opaque/validated | T-127 `op_search.go` |
+| ~~CAND-3~~ → Contract | Modify delete-of-missing / replace-of-missing attribute | Strict RFC 4511 (`noSuchAttribute`) | Oracle 2026-08-15: 389 agrees (`noSuchAttribute`); resolved as Contract, harness step untagged | T-128 `op_write.go` |
+| ~~CAND-4~~ → D11 | Cross/out-of-suffix ModifyDN | `unwillingToPerform(53)` | Oracle 2026-08-15 confirmed `affectsMultipleDSAs(71)`; accepted as D11 | T-128 `op_write.go` |
+| ~~CAND-5~~ → D12 | Paged-results cookie integrity | HMAC-signed since T-140, fails closed | Oracle 2026-08-15: 389 has no cookie integrity (tamper → success); accepted as D12 | T-127 `op_search.go`, T-140 `ctrl_paged.go` |
 
 When adjudicated, each moves into section 3 (accepted Delta) with the test name that proves the difference, or is fixed to match the oracle (Contract).
 
 | CAND-6 | ModifyDN rename into own subtree | bbolt store allows it; index-based Subtree walks can detach the subtree (no store sentinel exists) — needs a dispatch guard | 389 rejects (LDAP-illegal) | T-129 `store.go`; guard belongs in ModifyDN dispatch (T-143/T-144 hardening) |
 | CAND-17 | groupdn membership scope | direct `member`/`uniqueMember` only, no nesting; group objectClass not required | confirm vs 389 | T-139 `aci_eval.go` |
-| CAND-18 | Paged-cookie tamper result code | `unwillingToPerform(53)`; cookie is HMAC-SHA256 (offset + base DN + scope + filter), per-server random secret | 389's exact bad-cookie code unverified | T-140 `ctrl_paged.go`; adjudicate in T-147 |
+| ~~CAND-18~~ → D12 | Paged-cookie tamper result code | `unwillingToPerform(53)`; cookie is HMAC-SHA256 (offset + base DN + scope + filter), per-server random secret | Oracle 2026-08-15: 389 accepts a tampered cookie (`success`); accepted as D12 | T-140 `ctrl_paged.go` |
 | CAND-19 | Assertion control scope | Modify-only; critical assertion on non-Modify → `unavailableCriticalExtension`; `assertionFailed(122)` on mismatch | 389 assertion-on-Add / non-critical behavior unverified | T-141 `ctrl_assert.go`; adjudicate in T-147 |
-| CAND-20 | WhoAmI authzid rendering | `dn:<dn>` with case-preserving `DN.String()`; present-but-empty value for anonymous | 389 may normalize case or omit value for anonymous | T-142 `ext_whoami.go`; adjudicate in T-147 |
+| ~~CAND-20~~ → D13/D14 | WhoAmI authzid rendering | `dn:<dn>` with case-preserving `DN.String()`; present-but-empty value for anonymous | Oracle 2026-08-15: 389 renders `dn: <case-folded dn>` (D13) and, with anonymous access off, refuses the op with `inappropriateAuthentication(48)` (D14) | T-142 `ext_whoami.go` |
 
 **Resolved:** ~~CAND-7~~ (supportedExtension advertised StartTLS/WhoAmI pre-handler) — both handlers now exist (T-133 StartTLS, T-142 WhoAmI); the Root DSE advertisement is truthful. CAND-7 is removed from the candidate set.
 | CAND-8 | MAY-attribute allow-listing not enforced on writes | Only MUST enforced; 389 accepts marker attrs (destinationIndicator/owner on device) | Matches 389-observed | T-132 `schema_registry.go`; confirm vs oracle in T-147 |
