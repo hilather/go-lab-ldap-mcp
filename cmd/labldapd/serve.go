@@ -249,7 +249,10 @@ func startDaemon(ctx context.Context, f serveFlags, log *slog.Logger) (*daemon, 
 	}
 
 	if err := store.CheckDataDir(f.dataDir); err != nil {
-		return nil, dataDirMismatchErr(err)
+		if errors.Is(err, store.ErrEngineDataMismatch) {
+			return nil, dataDirMismatchErr(err)
+		}
+		return nil, err
 	}
 	if err := os.MkdirAll(f.dataDir, 0o700); err != nil {
 		return nil, fmt.Errorf("labldapd: create data directory: %w", err)

@@ -98,18 +98,29 @@ Stop: `make compose-down`. Operator hard reset: `make compose-reset`
 make compose-up-persistent
 ```
 
-Uses a named volume for `/data`. After first boot the helper runs the
-**documented** TLS import:
+Uses a named volume for `/data`. Native persistent labs mount the lab CA
+certificate as files (`secrets/tls/ca.crt`); there is no `dsctl` step.
+Restart keeps runtime entries. Soft reset (`POST /api/v1/reset` with
+`lab:reset`, scenario name, and expected revision) restores the compiled
+baseline without removing the volume.
+
+## Deploy (389 rollback)
+
+```text
+make compose-up-389ds
+make compose-up-389ds-persistent
+```
+
+Requires `spec.directory.engine: 389ds`. Ephemeral 389 publishes the
+instance CA to `secrets/tls/instance-ca.crt`. Persistent 389 is the only
+path that runs the documented TLS import after first boot:
 
 ```text
 dsctl localhost tls import-ca …
 dsctl localhost tls import-server-key-cert …
 ```
 
-That is the only directory-engine CLI path operators need. Do not hand-edit
-`cn=config`. Restart keeps runtime entries. Soft reset
-(`POST /api/v1/reset` with `lab:reset`, scenario name, and expected
-revision) restores the compiled baseline without removing the volume.
+Do not hand-edit `cn=config`. Do not run `dsctl` against native `labldapd`.
 
 ## Secrets and TLS
 

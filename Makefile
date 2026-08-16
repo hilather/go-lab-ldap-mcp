@@ -301,8 +301,7 @@ image-native:
 		.
 	@docker run --rm labldapd:dev version >/dev/null
 	@docker run --rm labldapd:dev >/dev/null
-	@printf '%s\n' 'image-native: labldapd:dev version=$(VERSION)'
-	@printf '%s\n' 'image-native: serve smoke (health listener) lands with T-143; run make compose-up-native once T-143/T-144/T-146 merge'
+	@printf '%s\n' 'image-native: labldapd:dev version=$(VERSION); make compose-up is the native stack'
 
 image-bootstrap:
 	docker build \

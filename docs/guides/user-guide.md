@@ -169,8 +169,9 @@ StartTLS is on.
 
 Trust the lab CA:
 
-- ephemeral: `secrets/tls/instance-ca.crt`
-- persistent: `secrets/tls/ca.crt` after import
+- native (default compose-up, ephemeral or persistent): `secrets/tls/ca.crt`
+- 389 ephemeral (`compose-up-389ds`): `secrets/tls/instance-ca.crt`
+- 389 persistent: `secrets/tls/ca.crt` after `setuptls import`
 
 A wrong CA or SAN fails closed. That is required behavior, not a bug.
 
@@ -259,8 +260,9 @@ up the new files.
 - Do not mount `/var/run/docker.sock`.
 - Do not treat ephemeral tmpfs as a wipe.
 - Do not expect Active Directory semantics.
-- Do not hand-run `dsconf` / `ldapadd` against the engine except the
-  documented TLS import path on persistent labs.
+- Do not hand-run `dsconf` / `ldapadd` against the engine. The only
+  documented `dsctl` path is TLS import on **389 persistent** labs
+  (`compose-up-389ds-persistent`). Native `labldapd` has no `dsctl`.
 - Do not log tokens, passwords, or session ids.
 
 When something is on fire: [Troubleshooting](../operations/troubleshooting.md).

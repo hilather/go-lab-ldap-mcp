@@ -150,6 +150,26 @@ func TestCheckDataDirSlapdLayout(t *testing.T) {
 	}
 }
 
+func TestCheckDataDirUnreadableBolt(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	path := filepath.Join(dir, StoreFileName)
+	if err := os.WriteFile(path, []byte("xxxxxxxxxxxxxxxxxxxxxxxxxxxx"), 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(path, 0o600) })
+	err := CheckDataDir(dir)
+	if err == nil {
+		t.Fatal("unreadable bolt file must fail")
+	}
+	if errors.Is(err, ErrEngineDataMismatch) {
+		t.Fatalf("permission/IO error must not be engine_data_mismatch: %v", err)
+	}
+	if strings.Contains(err.Error(), "xxxxxxxx") {
+		t.Fatalf("error leaked file contents: %v", err)
+	}
+}
+
 func TestCheckDataDirEmptyAndBoltOK(t *testing.T) {
 	t.Parallel()
 	if err := CheckDataDir(filepath.Join(t.TempDir(), "missing")); err != nil {

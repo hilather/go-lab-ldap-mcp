@@ -107,6 +107,9 @@ func TestComposeNativeOverlay(t *testing.T) {
 	if !strings.Contains(eph, "uid=65532") || !strings.Contains(eph, "gid=65532") {
 		t.Fatal("native ephemeral tmpfs must set uid/gid 65532 (labldapd)")
 	}
+	if !strings.Contains(eph, "size=2147483648") {
+		t.Fatal("native ephemeral alias must stay 2GiB (RQ-5)")
+	}
 	if !strings.Contains(eph, "host swap") && !strings.Contains(eph, "Host swap") {
 		t.Fatal("native ephemeral overlay must document the host-swap caveat")
 	}

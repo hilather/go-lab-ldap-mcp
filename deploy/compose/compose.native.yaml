@@ -1,12 +1,11 @@
 # Alias (one release): native is now the default compose.yaml.
-# Prefer `make compose-up`. Kept so existing `-f compose.native.yaml`
-# invocations still parse. 389 rollback: compose.389ds.yaml.
+# Prefer `make compose-up` (compose.yaml + compose.ephemeral.yaml).
+# 389 rollback: compose.389ds.yaml + make compose-up-389ds.
 #
 # Historical T-145 overlay. Replaces a 389 `directory` service with
-# labldapd if someone still stacks this file. Always stack a storage
-# overlay on top:
-#   docker compose -f compose.yaml -f compose.native.yaml -f compose.native-ephemeral.yaml
-#   docker compose -f compose.yaml -f compose.native.yaml -f compose.native-persistent.yaml
+# labldapd if someone still stacks this file. If you stack it, use the
+# default 2GiB ephemeral overlay, not a smaller volume:
+#   docker compose -f compose.yaml -f compose.native.yaml -f compose.ephemeral.yaml
 #
 # Requires Compose v2.24.4+ (`!reset` / `!override` tags; one step above the
 # OD-020 v2.24 floor, native profile only). Host publishes stay loopback
@@ -17,11 +16,6 @@
 # Directory Manager. Native mode has no 389 CLI tooling, no LDAPI socket,
 # and no shared /data mount. TLS is the lab CA directory certificate
 # mounted as files — there is no cert-import or instance-CA publish step.
-#
-# Runtime dependency: a live bring-up needs T-143 (labldapd serve), T-144
-# (native bootstrap reconcilers), and T-146 (control engine wiring) merged.
-# Until then this file is correct-by-construction and validated with
-# `docker compose ... config`, not reported as a passing bring-up.
 volumes:
   # DM password and the directory TLS key/cert, copied to 0400/65532 by the
   # native-secret-prep one-shot (host secret files are 0600 and unreadable

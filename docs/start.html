@@ -63,7 +63,7 @@ curl -sk https://127.0.0.1:8443/health/ready</code></pre>
         <p>Ready waits for a working runtime bind and a matching directory revision. If it never comes, check <code>docker compose logs bootstrap</code>.</p>
 
         <h2 id="ui">Open the UI</h2>
-        <p>Browse to <strong>https://127.0.0.1:8443/</strong>. The cert is a lab cert — continue past the warning, or trust <code>secrets/tls/instance-ca.crt</code>.</p>
+        <p>Browse to <strong>https://127.0.0.1:8443/</strong>. The cert is a lab cert — continue past the warning, or trust <code>secrets/tls/ca.crt</code> (native default). 389 rollback trusts <code>secrets/tls/instance-ca.crt</code> on ephemeral.</p>
         <p>Sign in with the contents of <code>secrets/token-admin</code>. The example scenario seeds user <code>alice</code> in group <code>staff</code> under <code>dc=example,dc=test</code>. That seed is YAML — <a href="scenario.html">Scenario YAML</a>.</p>
 
         <h2 id="api">Call the API</h2>

@@ -60,10 +60,7 @@ func CheckDataDir(dir string) error {
 	if st.IsDir() {
 		return fmt.Errorf("%w: %s is a directory", ErrEngineDataMismatch, StoreFileName)
 	}
-	if !isBoltFile(boltPath) {
-		return fmt.Errorf("%w: %s is not a bbolt database", ErrEngineDataMismatch, StoreFileName)
-	}
-	return nil
+	return inspectBoltFile(boltPath)
 }
 
 func looksLike389Tree(dir string) bool {
@@ -98,15 +95,24 @@ func fileExists(path string) bool {
 	return err == nil && !st.IsDir()
 }
 
-func isBoltFile(path string) bool {
+// inspectBoltFile reports ErrEngineDataMismatch when path exists and is
+// not a bbolt database. Open/read failures (permission, I/O) are returned
+// as-is so callers do not tell operators to compose-reset.
+func inspectBoltFile(path string) error {
 	f, err := os.Open(path)
 	if err != nil {
-		return false
+		return fmt.Errorf("store: open database: %w", err)
 	}
 	defer func() { _ = f.Close() }()
 	var hdr [bboltPageHeaderSize + 4]byte
 	if _, err := io.ReadFull(f, hdr[:]); err != nil {
-		return false
+		if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+			return fmt.Errorf("%w: %s is not a bbolt database", ErrEngineDataMismatch, StoreFileName)
+		}
+		return fmt.Errorf("store: read database: %w", err)
 	}
-	return binary.LittleEndian.Uint32(hdr[bboltPageHeaderSize:]) == bboltMagic
+	if binary.LittleEndian.Uint32(hdr[bboltPageHeaderSize:]) != bboltMagic {
+		return fmt.Errorf("%w: %s is not a bbolt database", ErrEngineDataMismatch, StoreFileName)
+	}
+	return nil
 }

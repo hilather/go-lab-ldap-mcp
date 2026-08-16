@@ -141,10 +141,13 @@ go run ./tools/setuptls generate --dir secrets/tls --host management
 
 - Private CA key stays on the **host** (`secrets/tls/ca.key`). It is not
   mounted into containers.
-- Ephemeral: trust `secrets/tls/instance-ca.crt`. tmpfs `/data` cannot take
-  `dsctl tls import-*`.
-- Persistent: `setuptls import` then 389 DS picks up the lab CA / server
-  cert after first boot.
+- Native (default `compose-up` / `compose-up-persistent`): trust
+  `secrets/tls/ca.crt`. Directory certs are lab-CA files; there is no
+  instance-CA publish or `dsctl tls import-*`.
+- 389 ephemeral (`compose-up-389ds`): trust `secrets/tls/instance-ca.crt`.
+  tmpfs `/data` cannot take `dsctl tls import-*`.
+- 389 persistent (`compose-up-389ds-persistent`): `setuptls import` then
+  389 DS picks up the lab CA / server cert after first boot.
 
 Wrong CA or SAN: connections fail closed.
 
@@ -157,11 +160,14 @@ Under [`deploy/compose/`](../../deploy/compose/):
 
 | File | Role |
 | --- | --- |
-| `compose.yaml` | base: directory, bootstrap, secret-prep, control |
-| `compose.ephemeral.yaml` | tmpfs `/data` |
-| `compose.persistent.yaml` | named volume + TLS import |
-| `scenario.yaml` | compiled baseline for ephemeral |
+| `compose.yaml` | base: native `labldapd`, bootstrap, secret-prep, control |
+| `compose.ephemeral.yaml` | 2GiB tmpfs `/data` (uid 65532) |
+| `compose.persistent.yaml` | named volume |
+| `compose.389ds.yaml` | 389 oracle/rollback overlay |
+| `compose.389ds-ephemeral.yaml` | 389 2GiB tmpfs `/data` (uid 389) |
+| `scenario.yaml` | compiled baseline for ephemeral (omitted engine → native) |
 | `scenario.persistent.yaml` | baseline for persistent |
+| `scenario.389ds.yaml` | 389 rollback scenario (`engine: 389ds`) |
 
 Published ports are **loopback only**:
 

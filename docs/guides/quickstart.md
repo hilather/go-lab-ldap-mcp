@@ -58,8 +58,9 @@ If ready never comes, see [Troubleshooting](../operations/troubleshooting.md).
 Browse to **https://127.0.0.1:8443/**.
 
 The management certificate is a lab cert. Your browser will warn. Continue
-anyway, or trust `secrets/tls/instance-ca.crt` (ephemeral) /
-`secrets/tls/ca.crt` (persistent).
+anyway, or trust `secrets/tls/ca.crt` (native default). 389 rollback
+trusts `secrets/tls/instance-ca.crt` (ephemeral) or `secrets/tls/ca.crt`
+after import (persistent).
 
 Sign in with the token in `secrets/token-admin`:
 

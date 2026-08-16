@@ -72,7 +72,7 @@ make image</code></pre>
         <h2 id="secrets">Secrets and TLS</h2>
         <p>Generated on first compose-up, mode 0600, gitignored. Rotate with <code>go run ./tools/setupsecrets --dir secrets --force</code>, then recreate the stack so control sees the new files.</p>
         <p>Directory Manager lives in <code>secrets/dm.pw</code> and is mounted only into bootstrap. Never pass it on a command line.</p>
-        <p>The private CA key stays on the host. Ephemeral labs trust <code>secrets/tls/instance-ca.crt</code>. Persistent labs import the lab CA into 389 DS after first boot. Wrong CA or SAN fails closed. Keep :8443 on loopback.</p>
+        <p>The private CA key stays on the host. Native labs (default compose-up) trust <code>secrets/tls/ca.crt</code>. 389 ephemeral rollback trusts <code>secrets/tls/instance-ca.crt</code>. 389 persistent rollback imports the lab CA into 389 DS after first boot. Wrong CA or SAN fails closed. Keep :8443 on loopback.</p>
 
         <h2 id="reset">Reset</h2>
         <ul>

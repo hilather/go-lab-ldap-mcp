@@ -175,8 +175,10 @@ LabLDAP is a laboratory. It is not a production identity system.
 10. Switching engines on an existing volume is a hard reset (`compose-reset`), not a live migration. `labldapd` refuses a 389 nsslapd `/data` tree.
 
 Management TLS in the shipped compose stack is a **lab certificate**. Trust
-`secrets/tls/instance-ca.crt` (ephemeral) or `secrets/tls/ca.crt` (persistent).
-Bind the management listener to loopback, which compose already does.
+`secrets/tls/ca.crt` on the default native stack. 389 rollback trusts
+`secrets/tls/instance-ca.crt` (ephemeral) or `secrets/tls/ca.crt`
+(persistent, after import). Bind the management listener to loopback,
+which compose already does.
 
 ## Documentation
 

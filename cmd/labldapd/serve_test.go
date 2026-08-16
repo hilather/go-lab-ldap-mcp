@@ -241,6 +241,34 @@ func TestServeRejectsNonBoltStoreFile(t *testing.T) {
 	}
 }
 
+func TestServeUnreadableBoltIsNotMismatch(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	data := filepath.Join(dir, "data")
+	if err := os.MkdirAll(data, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	bolt := filepath.Join(data, storeFileName)
+	if err := os.WriteFile(bolt, []byte("xxxxxxxxxxxxxxxxxxxxxxxxxxxx"), 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(bolt, 0o600) })
+	f, logs := testDaemonFixture(t)
+	f.dataDir = data
+	_, err := startDaemon(context.Background(), f, testLogger(logs))
+	if err == nil {
+		t.Fatal("expected unreadable bolt to fail")
+	}
+	var ae *apperr.Error
+	if errors.As(err, &ae) {
+		for _, fld := range ae.Fields() {
+			if fld.Code == "engine_data_mismatch" {
+				t.Fatalf("permission/IO error mapped to engine_data_mismatch: %#v", ae.Fields())
+			}
+		}
+	}
+}
+
 func TestServeRejectsNonNativeEngine(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
