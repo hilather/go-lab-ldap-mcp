@@ -1491,28 +1491,30 @@ Acceptance:
 - [x] Compare true/false result codes match RFC 4511.
 - [x] Schema enforcement may be stubbed until T-132.
 
-## [ ] T-129 bbolt entry store (dn2id / id2entry)
+## [x] T-129 bbolt entry store (dn2id / id2entry)
 
 Priority: P0 | Size: L | Depends on: T-122 | Wave 2 | Cloud fit: high
 
 Deliverables: `internal/ldapserver/store` bbolt implementation; pin module version; file mode 0600; crash-safe commit; open/close.
 
 Acceptance:
-- [ ] Restart reopens the same file and reads prior entries.
-- [ ] Concurrent read during write does not corrupt (transaction test).
-- [ ] Empty path / permission errors are stable and secret-free.
-- [ ] In-memory fake remains available for protocol tests.
+- [x] Restart reopens the same file and reads prior entries.
+- [x] Concurrent read during write does not corrupt (transaction test).
+- [x] Empty path / permission errors are stable and secret-free.
+- [x] In-memory fake remains available for protocol tests.
 
-## [ ] T-130 Equality indices and transactional snapshots
+## [x] T-130 Equality indices and transactional snapshots
 
 Priority: P0 | Size: L | Depends on: T-129 | Wave 2 | Cloud fit: high
 
-Deliverables: equality indices for `uid`, `cn`, `member`, `objectClass`; snapshot reads for Search; single-commit mutate.
+Deliverables: equality indices for `uid`, `cn`, `member`, `uniqueMember`, `objectClass`; snapshot reads for Search; single-commit mutate.
 
 Acceptance:
-- [ ] Indexed equality search does not scan all entries in a 1k-entry fixture (assert via counter or bounded time).
-- [ ] RFC 4528-ready: a transaction can read-then-write atomically (used by T-141).
-- [ ] Index updates on add/modify/delete stay consistent after simulated crash (re-open).
+- [x] Indexed equality search does not scan all entries in a 1k-entry fixture (assert via counter or bounded time).
+- [x] RFC 4528-ready: a transaction can read-then-write atomically (used by T-141).
+- [x] Index updates on add/modify/delete stay consistent after simulated crash (re-open).
+
+Follow-up: `op_search.go` should type-assert `ReadTx` to `EqualCandidateResolver` when a filter has an indexed equality predicate (fold into T-140 or a T-127 refinement); index normalization must stay no finer than the `RuleMatcher`.
 
 ## [x] T-131 Matching rules and DN canonicalization
 
@@ -1527,17 +1529,17 @@ Acceptance:
 
 Follow-up: `op_write.go` Compare/modify-dedup still uses fold-only `foldCase`/`valueEqual`; route through `Matcher` for DN-structural compare (fold into T-134 or T-139).
 
-## [ ] T-132 Schema registry, MUST/MAY, subschema, Root DSE
+## [x] T-132 Schema registry, MUST/MAY, subschema, Root DSE
 
 Priority: P0 | Size: L | Depends on: T-122 | Wave 2 | Cloud fit: high
 
 Deliverables: RFC 4512 subset for Contract object classes (C5); add/modify schema checks; Root DSE; subschema search; `nsmemberof` and `device` present.
 
 Acceptance:
-- [ ] Add user without `sn` fails `objectClassViolation`.
-- [ ] Root DSE advertises namingContexts, supportedControl, supportedExtension, vendorName (Delta D1 values, not 389 strings).
-- [ ] Subschema includes `inetOrgPerson`, `groupOfNames`, `nsAccountLock` attribute type, `nsmemberof`.
-- [ ] `requiredOK` capability inspect can consume this Root DSE.
+- [x] Add user without `sn` fails `objectClassViolation`.
+- [x] Root DSE advertises namingContexts, supportedControl, supportedExtension, vendorName (Delta D1 values, not 389 strings).
+- [x] Subschema includes `inetOrgPerson`, `groupOfNames`, `nsAccountLock` attribute type, `nsmemberof`.
+- [x] `requiredOK` capability inspect can consume this Root DSE.
 
 ## [ ] T-133 TLS, StartTLS, and bind-transport policy
 

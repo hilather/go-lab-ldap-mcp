@@ -14,9 +14,10 @@ import (
 // before existence where possible, so a denied caller gets
 // insufficientAccessRights without learning whether the target exists.
 //
-// Schema enforcement is stubbed behind the Schema interface until T-132:
-// when the registry knows object classes at all, every objectClass value
-// on an Add must resolve; an empty registry permits everything.
+// Schema enforcement (T-132, schema_registry.go): when the registry knows
+// object classes at all, Add and Modify must leave the entry with
+// resolvable objectClass values and every MUST attribute (inherited
+// through SUP chains) present; an empty registry permits everything.
 
 // inSuffix reports whether dn is the suffix or a descendant. Writes outside
 // the managed suffix fail noSuchObject, matching 389's "no such suffix"
@@ -51,19 +52,10 @@ func parentDN(dn config.DN) (config.DN, bool) {
 	return config.DN{}, false
 }
 
-// schemaCheckAdd applies the T-132-ready schema gate: a registry with no
-// object classes (the FakeSchema default) permits everything; otherwise
-// every objectClass value must resolve.
-func (s *Server) schemaCheckAdd(e *Entry) bool {
-	if len(s.opts.Schema.ObjectClasses()) == 0 {
-		return true
-	}
-	for _, v := range e.Values("objectClass") {
-		if _, ok := s.opts.Schema.ObjectClass(string(v)); !ok {
-			return false
-		}
-	}
-	return true
+// schemaCheckEntry applies the T-132 schema gate (checkEntrySchema in
+// schema_registry.go) to the final attribute set of an Add or Modify.
+func (s *Server) schemaCheckEntry(e *Entry) error {
+	return checkEntrySchema(s.opts.Schema, e)
 }
 
 // handleAdd creates one leaf entry.
@@ -98,8 +90,8 @@ func (s *Server) handleAdd(ctx context.Context, c *conn, m *Message, req *AddReq
 				return err // ErrNoSuchObject when the parent is absent
 			}
 		}
-		if !s.schemaCheckAdd(entry) {
-			return errSchemaViolation
+		if err := s.schemaCheckEntry(entry); err != nil {
+			return err
 		}
 		if err := tx.Add(ctx, entry); err != nil {
 			return err
@@ -113,7 +105,8 @@ func (s *Server) handleAdd(ctx context.Context, c *conn, m *Message, req *AddReq
 }
 
 // errSchemaViolation maps to objectClassViolation; errInvalidDN to
-// invalidDNSyntax.
+// invalidDNSyntax. schemaViolation (schema_registry.go) wraps
+// errSchemaViolation with the client-facing reason.
 var (
 	errSchemaViolation = errors.New("ldapserver: schema violation")
 	errInvalidDN       = errors.New("ldapserver: invalid DN")
@@ -123,7 +116,12 @@ var (
 func mapWriteError(err error) Result {
 	switch {
 	case errors.Is(err, errSchemaViolation):
-		return Result{Code: ResultObjectClassViolation, DiagnosticMessage: "unknown object class"}
+		msg := "schema violation"
+		var sv *schemaViolation
+		if errors.As(err, &sv) {
+			msg = sv.reason
+		}
+		return Result{Code: ResultObjectClassViolation, DiagnosticMessage: msg}
 	case errors.Is(err, errInvalidDN):
 		return Result{Code: ResultInvalidDNSyntax, DiagnosticMessage: "invalid DN"}
 	case errors.Is(err, errNoSuchAttribute):
@@ -184,6 +182,12 @@ func (s *Server) handleModify(ctx context.Context, c *conn, m *Message, req *Mod
 			if err := s.applyChange(after, ch); err != nil {
 				return err
 			}
+		}
+		// T-132: the resulting entry must still satisfy schema — deleting
+		// a MUST attribute or the last objectClass fails
+		// objectClassViolation and rolls the transaction back.
+		if err := s.schemaCheckEntry(after); err != nil {
+			return err
 		}
 		if err := tx.Replace(ctx, after); err != nil {
 			return err
