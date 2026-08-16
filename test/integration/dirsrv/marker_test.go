@@ -60,7 +60,8 @@ func TestShippedMarkerLastAndCapabilities(t *testing.T) {
 		t.Fatal("capabilities leaked secret")
 	}
 
-	marker := ldapSearch(t, inst, "cn=labldap-baseline,dc=example,dc=test",
+	d := inst.Dial(t)
+	marker := ldapSearch(t, d, "cn=labldap-baseline,dc=example,dc=test",
 		"dn", "objectClass", "cn", "serialNumber", "owner", "description", "destinationIndicator")
 	if !strings.Contains(marker, "cn=labldap-baseline,dc=example,dc=test") {
 		t.Fatalf("missing marker:\n%s", marker)

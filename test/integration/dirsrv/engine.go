@@ -19,8 +19,10 @@ import (
 //	        LDAP-as-Directory-Manager bootstrap data plane the 389 run uses
 //	        (ADR-0009 decision 12). `make test-integration-native` runs it.
 //
-// Skip ledger — the only tests skipped under engine=native, each naming the
-// parity-contract Delta/Excluded ID that covers it:
+// Skip ledger — skip389Only is valid only for tests that truly need dsconf,
+// on-disk image lifecycle, backend CN, or 389 tooling (D2/D4/D5/E7).
+// Contract tests must use startRuntimeEnv / startEngine (engineDial) and
+// host-LDAP helpers — they must not call Start().
 //
 //	D2  admin plane: dsconf/cn=config read-back, plugin CN and nsslapd-*
 //	    assertions, in-container ldap* probes of the admin tree. labldapd

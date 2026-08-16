@@ -105,7 +105,7 @@ func TestMCPUserVisibleViaRESTAndLDAP(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &u); err != nil {
 		t.Fatal(err)
 	}
-	if err := userBind(t, env.inst, u.DN, mcpITPass); err != nil {
+	if err := userBind(t, env.dial, u.DN, mcpITPass); err != nil {
 		t.Fatalf("direct LDAP bind: %v", err)
 	}
 

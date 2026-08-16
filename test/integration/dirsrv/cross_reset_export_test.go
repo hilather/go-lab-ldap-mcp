@@ -111,7 +111,7 @@ func TestCrossInterfaceResetAndExport(t *testing.T) {
 		t.Fatalf("rest create %d %s", cr.Code, cr.Body.String())
 	}
 
-	addExtraPerson(t, env.inst, "uid=runtime-extra,ou=people,dc=example,dc=test")
+	addExtraPerson(t, env.dial, "uid=runtime-extra,ou=people,dc=example,dc=test")
 
 	var beforeExport bytes.Buffer
 	if err := svc.Export.Write(t.Context(), admin, &beforeExport, app.ExportRequest{}); err != nil {
@@ -212,11 +212,11 @@ func assertBaselineRestored(t *testing.T, env *runtimeEnv, svc *app.Services, p 
 	if _, err := svc.Users.Get(t.Context(), p, "rest-carol"); err == nil {
 		t.Fatal("rest-carol remained")
 	}
-	extra := ldapSearchAllowMissing(t, env.inst, "uid=runtime-extra,ou=people,dc=example,dc=test")
+	extra := ldapSearchAllowMissing(t, env.dial, "uid=runtime-extra,ou=people,dc=example,dc=test")
 	if strings.Contains(extra, "uid=runtime-extra,ou=people,dc=example,dc=test") {
 		t.Fatalf("ldap extra remained:\n%s", extra)
 	}
-	if err := userBind(t, env.inst, "uid=alice,ou=people,dc=example,dc=test", crossSeedPass); err != nil {
+	if err := userBind(t, env.dial, "uid=alice,ou=people,dc=example,dc=test", crossSeedPass); err != nil {
 		t.Fatalf("alice bind: %v", err)
 	}
 	after, err := env.rt.ReadMarker(t.Context())
@@ -271,7 +271,7 @@ func TestResetInProgressBlocksRESTAndExport(t *testing.T) {
 	if err != nil || strings.TrimSpace(before.AppliedRevision) == "" {
 		t.Fatalf("marker %+v %v", before, err)
 	}
-	addExtraPerson(t, env.inst, "uid=runtime-extra,ou=people,dc=example,dc=test")
+	addExtraPerson(t, env.dial, "uid=runtime-extra,ou=people,dc=example,dc=test")
 	sec := config.ResolvedSecret{Path: "alice.pw", Value: observability.Secret(crossSeedPass)}
 	block := make(chan struct{}, 1)
 	unblock := make(chan struct{})

@@ -43,7 +43,7 @@ func TestApplicationServicesOnEngine(t *testing.T) {
 	}
 	assertNoPassword(t, u, appUserPass, appTokenCanary)
 
-	runtimeReplace(t, env.inst, u.DN, "description", "direct-ldap")
+	runtimeReplace(t, env.dial, u.DN, "description", "direct-ldap")
 	fresh, err := svc.Users.Get(ctx, p, "svc-alice")
 	if err != nil {
 		t.Fatal(err)

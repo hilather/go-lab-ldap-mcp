@@ -53,36 +53,24 @@ func TestShippedApplyPwpolicyUnsupported(t *testing.T) {
 }
 
 func TestShippedPwpolicyEngineBehavior(t *testing.T) {
-	inst := Start(t)
-	_, guest := stagePolicyApply(t, inst, policyYAML(12, 2, "24h", "0s", true, 2, "60s"))
-	if out, err := execApply(t, inst, guest, nil); err != nil {
-		t.Fatalf("apply: %v\n%s", err, out)
-	}
-	got := pwpolicyGet(t, inst, guest.PW)
-	if !strings.Contains(got, `"passwordmaxage"`) || !strings.Contains(got, `"86400"`) {
-		t.Fatalf("max-age not applied:\n%s", got)
-	}
-	if !strings.Contains(got, `"passwordminlength"`) || !strings.Contains(got, `"12"`) {
-		t.Fatalf("min-length not applied:\n%s", got)
-	}
-
-	addProbeUser(t, inst, "LongEnoughPass1")
-	allowSelfPassword(t, inst)
+	d := startEngine(t, policyYAML(12, 2, "24h", "0s", true, 2, "60s"))
+	addProbeUser(t, d, "LongEnoughPass1")
+	const probeDN = "uid=pwprobe,ou=people,dc=example,dc=test"
 	// Short password must be rejected (min length).
-	if out, err := userPasswd(t, inst, "uid=pwprobe,dc=example,dc=test", "LongEnoughPass1", "short"); err == nil {
+	if out, err := userPasswd(t, d, probeDN, "LongEnoughPass1", "short"); err == nil {
 		t.Fatalf("short password accepted:\n%s", out)
 	}
 	// History: rotate then reuse.
-	if out, err := userPasswd(t, inst, "uid=pwprobe,dc=example,dc=test", "LongEnoughPass1", "LongEnoughPass2"); err != nil {
+	if out, err := userPasswd(t, d, probeDN, "LongEnoughPass1", "LongEnoughPass2"); err != nil {
 		t.Fatalf("first rotate: %v\n%s", err, out)
 	}
-	if out, err := userPasswd(t, inst, "uid=pwprobe,dc=example,dc=test", "LongEnoughPass2", "LongEnoughPass1"); err == nil {
+	if out, err := userPasswd(t, d, probeDN, "LongEnoughPass2", "LongEnoughPass1"); err == nil {
 		t.Fatalf("history allowed reuse:\n%s", out)
 	}
 	// Lockout: two failed binds then good password is refused.
-	_ = userBind(t, inst, "uid=pwprobe,dc=example,dc=test", "wrong-password-aaa")
-	_ = userBind(t, inst, "uid=pwprobe,dc=example,dc=test", "wrong-password-bbb")
-	if err := userBind(t, inst, "uid=pwprobe,dc=example,dc=test", "LongEnoughPass2"); err == nil {
+	_ = userBind(t, d, probeDN, "wrong-password-aaa")
+	_ = userBind(t, d, probeDN, "wrong-password-bbb")
+	if err := userBind(t, d, probeDN, "LongEnoughPass2"); err == nil {
 		t.Fatal("lockout did not reject a subsequent bind")
 	}
 }
@@ -174,64 +162,4 @@ func pwpolicyGet(t *testing.T, inst *Instance, pwfile string) string {
 		t.Fatalf("pwpolicy get: %v\n%s", err, out)
 	}
 	return string(out)
-}
-
-func addProbeUser(t *testing.T, inst *Instance, password string) {
-	t.Helper()
-	ldif := `dn: uid=pwprobe,dc=example,dc=test
-objectClass: top
-objectClass: person
-objectClass: organizationalPerson
-objectClass: inetOrgPerson
-cn: probe
-sn: probe
-uid: pwprobe
-userPassword: ` + password + `
-`
-	cmd := exec.Command("docker", "exec", "-i", inst.Name,
-		"ldapadd", "-x", "-H", "ldaps://127.0.0.1:3636", "-o", "tls_reqcert=never",
-		"-D", "cn=Directory Manager", "-w", inst.Password().Reveal())
-	cmd.Stdin = strings.NewReader(ldif)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("ldapadd: %v\n%s", err, out)
-	}
-}
-
-func allowSelfPassword(t *testing.T, inst *Instance) {
-	t.Helper()
-	ldif := `dn: dc=example,dc=test
-changetype: modify
-add: aci
-aci: (targetattr="userPassword")(version 3.0; acl "self-pwd"; allow (write) userdn="ldap:///self";)
-`
-	cmd := exec.Command("docker", "exec", "-i", inst.Name,
-		"ldapmodify", "-x", "-H", "ldaps://127.0.0.1:3636", "-o", "tls_reqcert=never",
-		"-D", "cn=Directory Manager", "-w", inst.Password().Reveal())
-	cmd.Stdin = strings.NewReader(ldif)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("aci: %v\n%s", err, out)
-	}
-}
-
-func userPasswd(t *testing.T, inst *Instance, dn, old, neu string) (string, error) {
-	t.Helper()
-	cmd := exec.Command("docker", "exec", inst.Name,
-		"ldappasswd", "-x", "-H", "ldaps://127.0.0.1:3636", "-o", "tls_reqcert=never",
-		"-D", dn, "-w", old, "-s", neu)
-	out, err := cmd.CombinedOutput()
-	return string(out), err
-}
-
-func userBind(t *testing.T, inst *Instance, dn, password string) error {
-	t.Helper()
-	cmd := exec.Command("docker", "exec", inst.Name,
-		"ldapsearch", "-x", "-H", "ldaps://127.0.0.1:3636", "-o", "tls_reqcert=never",
-		"-D", dn, "-w", password, "-s", "base", "-b", dn, "dn")
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Logf("bind %s: %v\n%s", dn, err, out)
-	}
-	return err
 }

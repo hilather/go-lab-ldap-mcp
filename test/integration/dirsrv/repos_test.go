@@ -6,8 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"os/exec"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -23,27 +21,22 @@ const repoUserPass = "repo-user-pass-12"
 const repoBindCanary = "repo-bind-canary-99"
 
 type runtimeEnv struct {
-	inst *Instance
+	dial engineDial
+	inst *Instance // non-nil only on 389; D2/D4/D5 tests only
 	rt   *ds389.Runtime
 	pool *ldapclient.Pool
 }
 
 func startRuntimeEnv(t *testing.T) *runtimeEnv {
 	t.Helper()
-	inst := Start(t)
-	_, guest := stageApply(t, inst, "dc=example,dc=test")
-	if out, err := execApply(t, inst, guest, nil); err != nil {
-		t.Fatalf("apply: %v\n%s", err, out)
-	}
-	ca := filepath.Join(t.TempDir(), "ca.crt")
-	inst.WriteCA(t, ca)
+	d := startEngine(t, runtimeYAML())
 	cfg := ldapclient.Config{
-		Address:      inst.LDAPSAddr,
+		Address:      d.ldapsAddr,
 		Transport:    directory.TransportLDAPS,
-		CAFile:       ca,
-		ServerName:   inst.Hostname(t),
-		BindDN:       "uid=rt,ou=people,dc=example,dc=test",
-		BindPassword: observability.Secret("runtime-secret"),
+		CAFile:       d.caFile,
+		ServerName:   d.serverName,
+		BindDN:       runtimeBindDN,
+		BindPassword: observability.Secret(runtimeBindPass),
 		DialTimeout:  8 * time.Second,
 		PoolSize:     4,
 	}
@@ -56,17 +49,17 @@ func startRuntimeEnv(t *testing.T) *runtimeEnv {
 		t.Fatalf("runtime pool bind: %v", err)
 	}
 	rt, err := ds389.NewRuntime(pool, ds389.RuntimeConfig{
-		Suffix:    "dc=example,dc=test",
-		PeopleDN:  "ou=people,dc=example,dc=test",
-		GroupsDN:  "ou=groups,dc=example,dc=test",
-		RuntimeDN: "uid=rt,ou=people,dc=example,dc=test",
+		Suffix:    runtimeSuffix,
+		PeopleDN:  runtimePeopleDN,
+		GroupsDN:  runtimeGroupsDN,
+		RuntimeDN: runtimeBindDN,
 		Client:    cfg,
 		SchemaTTL: time.Minute,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	return &runtimeEnv{inst: inst, rt: rt, pool: pool}
+	return &runtimeEnv{dial: d, rt: rt, pool: pool}
 }
 
 func TestRuntimeRepositories(t *testing.T) {
@@ -152,7 +145,7 @@ func testRuntimeUsers(t *testing.T, env *runtimeEnv) {
 	if disabled.Enabled {
 		t.Fatal("expected disabled")
 	}
-	if err := userBind(t, env.inst, disabled.DN, repoUserPass); err == nil {
+	if err := userBind(t, env.dial, disabled.DN, repoUserPass); err == nil {
 		t.Fatal("disabled user must not bind")
 	}
 	enabled, err := users.SetEnabled(t.Context(), "alice", true, disabled.Revision)
@@ -162,7 +155,7 @@ func testRuntimeUsers(t *testing.T, env *runtimeEnv) {
 	if !enabled.Enabled {
 		t.Fatal("expected enabled")
 	}
-	if err := userBind(t, env.inst, enabled.DN, repoUserPass); err != nil {
+	if err := userBind(t, env.dial, enabled.DN, repoUserPass); err != nil {
 		t.Fatalf("enabled bind: %v", err)
 	}
 
@@ -170,7 +163,7 @@ func testRuntimeUsers(t *testing.T, env *runtimeEnv) {
 	if err := users.SetPassword(t.Context(), "alice", observability.Secret(nextPW), enabled.Revision); err != nil {
 		t.Fatalf("set password: %v", err)
 	}
-	if err := userBind(t, env.inst, enabled.DN, nextPW); err != nil {
+	if err := userBind(t, env.dial, enabled.DN, nextPW); err != nil {
 		t.Fatalf("bind after password: %v", err)
 	}
 	afterPW, err := users.Get(t.Context(), "alice")
@@ -725,7 +718,10 @@ func testRuntimeAssertionControl(t *testing.T, env *runtimeEnv) {
 	// passes; assertion on the pre-write CSN must fail when advertised.
 	env.rt.SetAfterSearch(func(_ context.Context, dn string) {
 		if strings.Contains(dn, "assert-a") {
-			runtimeReplace(t, env.inst, dn, "userPassword", repoUserPass+"x")
+			// Native assertion keys on modifyTimestamp (1s resolution).
+			// Wait so the injected password write is a distinct stamp.
+			time.Sleep(time.Second)
+			runtimeReplace(t, env.dial, dn, "userPassword", repoUserPass+"x")
 		}
 	})
 	t.Cleanup(func() { env.rt.SetAfterSearch(nil) })
@@ -742,19 +738,6 @@ func testRuntimeAssertionControl(t *testing.T, env *runtimeEnv) {
 	}
 	if fieldCode(err) != directory.FieldConflict {
 		t.Fatalf("assertion fail: %v", err)
-	}
-}
-
-func runtimeReplace(t *testing.T, inst *Instance, dn, attr, value string) {
-	t.Helper()
-	ldif := "dn: " + dn + "\nchangetype: modify\nreplace: " + attr + "\n" + attr + ": " + value + "\n"
-	cmd := exec.Command("docker", "exec", "-i", inst.Name,
-		"ldapmodify", "-x", "-H", "ldaps://127.0.0.1:3636", "-o", "tls_reqcert=never",
-		"-D", "uid=rt,ou=people,dc=example,dc=test", "-w", "runtime-secret")
-	cmd.Stdin = strings.NewReader(ldif)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("direct ldap replace %s: %v\n%s", attr, err, redactLogs(string(out), value, "runtime-secret"))
 	}
 }
 

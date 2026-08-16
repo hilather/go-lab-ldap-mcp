@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	ldap "github.com/go-ldap/ldap/v3"
 	"github.com/hilather/go-lab-ldap-mcp/internal/apperr"
 	"github.com/hilather/go-lab-ldap-mcp/internal/bootstrap"
 	"github.com/hilather/go-lab-ldap-mcp/internal/config"
@@ -18,6 +19,7 @@ import (
 
 func TestShippedApplyACIReadback(t *testing.T) {
 	inst := Start(t)
+	d := inst.Dial(t)
 	_, guest := stageApply(t, inst, "dc=example,dc=test")
 	out, err := execApply(t, inst, guest, nil)
 	if err != nil {
@@ -26,21 +28,21 @@ func TestShippedApplyACIReadback(t *testing.T) {
 	if !strings.Contains(out, `"phase": "aci"`) && !strings.Contains(out, `"phase":"aci"`) {
 		t.Fatalf("missing aci phase:\n%s", out)
 	}
-	suf := ldapSearch(t, inst, "dc=example,dc=test", "aci")
+	suf := ldapSearch(t, d, "dc=example,dc=test", "aci")
 	if !strings.Contains(suf, `acl "labldap:runtime-suffix-read"`) {
 		t.Fatalf("missing runtime-suffix-read:\n%s", suf)
 	}
 	if !strings.Contains(suf, `acl "Enable anyone domain read"`) {
 		t.Fatalf("unmanaged domain-read ACI was removed:\n%s", suf)
 	}
-	people := ldapSearch(t, inst, "ou=people,dc=example,dc=test", "aci")
+	people := ldapSearch(t, d, "ou=people,dc=example,dc=test", "aci")
 	if !strings.Contains(people, `acl "labldap:runtime-people-write"`) || !strings.Contains(people, `acl "labldap:runtime-password"`) {
 		t.Fatalf("missing people ACIs:\n%s", people)
 	}
 	if !strings.Contains(compactACI(people), `targetattr!="aci"`) {
 		t.Fatalf("people-write must deny aci:\n%s", people)
 	}
-	groups := ldapSearch(t, inst, "ou=groups,dc=example,dc=test", "aci")
+	groups := ldapSearch(t, d, "ou=groups,dc=example,dc=test", "aci")
 	if !strings.Contains(groups, `acl "labldap:runtime-groups-write"`) {
 		t.Fatalf("missing groups ACI:\n%s", groups)
 	}
@@ -51,7 +53,7 @@ func TestShippedApplyACIReadback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("re-apply: %v\n%s", err, out2)
 	}
-	if strings.Count(ldapSearch(t, inst, "dc=example,dc=test", "aci"), `acl "labldap:runtime-suffix-read"`) != 1 {
+	if strings.Count(ldapSearch(t, d, "dc=example,dc=test", "aci"), `acl "labldap:runtime-suffix-read"`) != 1 {
 		t.Fatal("duplicate named ACI after re-apply")
 	}
 }
@@ -119,41 +121,47 @@ spec:
 
 func TestShippedACIRuntimeCannotEscapeSuffix(t *testing.T) {
 	inst := Start(t)
+	d := inst.Dial(t)
 	_, guest := stageApply(t, inst, "dc=example,dc=test")
 	if out, err := execApply(t, inst, guest, nil); err != nil {
 		t.Fatalf("apply: %v\n%s", err, out)
 	}
-	if err := runtimeBind(t, inst, "uid=rt,ou=people,dc=example,dc=test", "runtime-secret"); err != nil {
+	if err := runtimeBind(t, d, "uid=rt,ou=people,dc=example,dc=test", "runtime-secret"); err != nil {
 		t.Fatalf("runtime bind: %v", err)
 	}
-	cmd := exec.Command("docker", "exec", inst.Name,
-		"ldapsearch", "-x", "-H", "ldaps://127.0.0.1:3636", "-o", "tls_reqcert=never",
-		"-D", "uid=rt,ou=people,dc=example,dc=test", "-w", "runtime-secret",
-		"-b", "cn=config", "-s", "base", "dn")
-	out, err := cmd.CombinedOutput()
-	if strings.Contains(string(out), "dn: cn=config") {
+	conn, err := d.bind(runtimeBindDN, runtimeBindPass)
+	if err != nil {
+		t.Fatalf("runtime bind: %v", err)
+	}
+	req := ldap.NewSearchRequest("cn=config", ldap.ScopeBaseObject, ldap.NeverDerefAliases, 0, 0, false, "(objectClass=*)", []string{"dn"}, nil)
+	res, serr := conn.Search(req)
+	out := ""
+	if serr != nil {
+		out = serr.Error()
+	} else if res != nil {
+		out = formatSearchLDIF(res.Entries, []string{"dn"})
+	}
+	if strings.Contains(out, "dn: cn=config") {
 		t.Fatalf("runtime read cn=config:\n%s", out)
 	}
-	if err == nil && strings.Contains(string(out), "nsslapd-") {
+	if serr == nil && strings.Contains(out, "nsslapd-") {
 		t.Fatalf("runtime read cn=config attributes:\n%s", out)
 	}
-	mod := exec.Command("docker", "exec", "-i", inst.Name,
-		"ldapmodify", "-x", "-H", "ldaps://127.0.0.1:3636", "-o", "tls_reqcert=never",
-		"-D", "uid=rt,ou=people,dc=example,dc=test", "-w", "runtime-secret")
-	mod.Stdin = strings.NewReader("dn: cn=config\nchangetype: modify\nreplace: nsslapd-port\nnsslapd-port: 3389\n")
-	mout, merr := mod.CombinedOutput()
-	if merr == nil {
-		t.Fatalf("runtime wrote cn=config:\n%s", mout)
+	mod := ldap.NewModifyRequest("cn=config", nil)
+	mod.Replace("nsslapd-port", []string{"3389"})
+	if merr := conn.Modify(mod); merr == nil {
+		t.Fatal("runtime wrote cn=config")
 	}
-	still := ldapSearch(t, inst, "uid=rt,ou=people,dc=example,dc=test", "dn")
+	_ = conn.Close()
+	still := ldapSearch(t, d, "uid=rt,ou=people,dc=example,dc=test", "dn")
 	if !strings.Contains(still, "uid=rt,ou=people,dc=example,dc=test") {
 		t.Fatalf("runtime entry gone:\n%s", still)
 	}
-	before := ldapSearch(t, inst, "dc=example,dc=test", "aci")
+	before := ldapSearch(t, d, "dc=example,dc=test", "aci")
 	if out, err := execValidate(t, inst, guest); err != nil {
 		t.Fatalf("validate: %v\n%s", err, out)
 	}
-	after := ldapSearch(t, inst, "dc=example,dc=test", "aci")
+	after := ldapSearch(t, d, "dc=example,dc=test", "aci")
 	if before != after {
 		t.Fatalf("validate mutated ACIs\nbefore=%s\nafter=%s", before, after)
 	}

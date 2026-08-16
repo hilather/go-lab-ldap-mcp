@@ -70,34 +70,25 @@ func TestShippedPluginsMissing(t *testing.T) {
 }
 
 func TestShippedPluginsEngineBehavior(t *testing.T) {
-	inst := Start(t)
-	_, guest := stageApply(t, inst, "dc=example,dc=test")
-	if out, err := execApply(t, inst, guest, nil); err != nil {
-		t.Fatalf("apply: %v\n%s", err, out)
-	}
-	addPluginProbe(t, inst)
-	mo := ldapSearch(t, inst, "uid=alice,dc=example,dc=test", "memberOf")
+	d := startEngine(t, treeYAML())
+	addPluginProbe(t, d)
+	mo := ldapSearch(t, d, "uid=alice,dc=example,dc=test", "memberOf")
 	if !strings.Contains(mo, "cn=staff,dc=example,dc=test") {
 		t.Fatalf("memberOf not updated:\n%s", mo)
 	}
-	if out, err := exec.Command("docker", "exec", inst.Name,
-		"ldapdelete", "-x", "-H", "ldaps://127.0.0.1:3636", "-o", "tls_reqcert=never",
-		"-D", "cn=Directory Manager", "-w", inst.Password().Reveal(),
-		"uid=alice,dc=example,dc=test").CombinedOutput(); err != nil {
-		t.Fatalf("delete alice: %v\n%s", err, out)
-	}
-	grp := ldapSearch(t, inst, "cn=staff,dc=example,dc=test", "member")
+	ldapDelete(t, d, "uid=alice,dc=example,dc=test")
+	grp := ldapSearch(t, d, "cn=staff,dc=example,dc=test", "member")
 	if strings.Contains(grp, "uid=alice") {
 		t.Fatalf("RI left alice in group:\n%s", grp)
 	}
-	if err := userBind(t, inst, "uid=bob,dc=example,dc=test", "BobPass1234"); err != nil {
+	if err := userBind(t, d, "uid=bob,dc=example,dc=test", "BobPass1234"); err != nil {
 		t.Fatalf("bob should bind before lock: %v", err)
 	}
-	lockAccount(t, inst, "uid=bob,dc=example,dc=test")
-	if err := userBind(t, inst, "uid=bob,dc=example,dc=test", "BobPass1234"); err == nil {
+	lockAccount(t, d, "uid=bob,dc=example,dc=test")
+	if err := userBind(t, d, "uid=bob,dc=example,dc=test", "BobPass1234"); err == nil {
 		t.Fatal("disabled account still bound")
 	}
-	still := ldapSearch(t, inst, "uid=bob,dc=example,dc=test", "dn", "nsAccountLock")
+	still := ldapSearch(t, d, "uid=bob,dc=example,dc=test", "dn", "nsAccountLock")
 	if !strings.Contains(still, "uid=bob,dc=example,dc=test") {
 		t.Fatalf("disabled entry was deleted:\n%s", still)
 	}
@@ -139,71 +130,6 @@ func schemaQuery(t *testing.T, inst *Instance, pwfile, name string) string {
 		"localhost", "schema", "attributetypes", "query", name).CombinedOutput()
 	if err != nil {
 		t.Fatalf("schema query %s: %v\n%s", name, err, out)
-	}
-	return string(out)
-}
-
-func addPluginProbe(t *testing.T, inst *Instance) {
-	t.Helper()
-	ldif := `dn: uid=alice,dc=example,dc=test
-objectClass: top
-objectClass: person
-objectClass: organizationalPerson
-objectClass: inetOrgPerson
-cn: alice
-sn: alice
-uid: alice
-userPassword: AlicePass12
-
-dn: uid=bob,dc=example,dc=test
-objectClass: top
-objectClass: person
-objectClass: organizationalPerson
-objectClass: inetOrgPerson
-cn: bob
-sn: bob
-uid: bob
-userPassword: BobPass1234
-
-dn: cn=staff,dc=example,dc=test
-objectClass: top
-objectClass: groupOfNames
-cn: staff
-member: uid=alice,dc=example,dc=test
-`
-	cmd := exec.Command("docker", "exec", "-i", inst.Name,
-		"ldapadd", "-x", "-H", "ldaps://127.0.0.1:3636", "-o", "tls_reqcert=never",
-		"-D", "cn=Directory Manager", "-w", inst.Password().Reveal())
-	cmd.Stdin = strings.NewReader(ldif)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("ldapadd: %v\n%s", err, out)
-	}
-}
-
-func lockAccount(t *testing.T, inst *Instance, dn string) {
-	t.Helper()
-	ldif := "dn: " + dn + "\nchangetype: modify\nreplace: nsAccountLock\nnsAccountLock: true\n"
-	cmd := exec.Command("docker", "exec", "-i", inst.Name,
-		"ldapmodify", "-x", "-H", "ldaps://127.0.0.1:3636", "-o", "tls_reqcert=never",
-		"-D", "cn=Directory Manager", "-w", inst.Password().Reveal())
-	cmd.Stdin = strings.NewReader(ldif)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("lock %s: %v\n%s", dn, err, out)
-	}
-}
-
-func ldapSearch(t *testing.T, inst *Instance, dn string, attrs ...string) string {
-	t.Helper()
-	args := []string{"exec", inst.Name,
-		"ldapsearch", "-x", "-LLL", "-H", "ldaps://127.0.0.1:3636", "-o", "tls_reqcert=never",
-		"-D", "cn=Directory Manager", "-w", inst.Password().Reveal(),
-		"-b", dn, "-s", "base"}
-	args = append(args, attrs...)
-	out, err := exec.Command("docker", args...).CombinedOutput()
-	if err != nil {
-		t.Fatalf("ldapsearch %s: %v\n%s", dn, err, out)
 	}
 	return string(out)
 }

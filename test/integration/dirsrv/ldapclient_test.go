@@ -16,23 +16,40 @@ import (
 	"github.com/hilather/go-lab-ldap-mcp/internal/directory/ldapclient"
 )
 
-func TestLDAPClientTLSTrustAndBind(t *testing.T) {
+func startLDAPClientTLS(t *testing.T) (engineDial, *TLSMaterial) {
+	t.Helper()
+	if itEngine(t) == EngineNative {
+		n := startNative(t, runtimeYAML())
+		return nativeDial(n), n.mat
+	}
 	mat := generateTLS(t, "localhost")
 	inst := Start(t)
 	inst.ImportTLS(t, mat)
-	ca := filepath.Join(mat.Dir, "ca", "ca.crt")
+	return engineDial{
+		engine:     Engine389DS,
+		ldapAddr:   inst.LDAPAddr,
+		ldapsAddr:  inst.LDAPSAddr,
+		caFile:     filepath.Join(mat.Dir, "ca", "ca.crt"),
+		serverName: "localhost",
+		dmPassword: inst.Password().Reveal(),
+	}, mat
+}
+
+func TestLDAPClientTLSTrustAndBind(t *testing.T) {
+	d, mat := startLDAPClientTLS(t)
+	ca := d.caFile
 	wrong := filepath.Join(t.TempDir(), "wrong.pem")
 	if err := os.WriteFile(wrong, mat.WrongCAPEM, 0o600); err != nil {
 		t.Fatal(err)
 	}
 
 	ok := ldapclient.Config{
-		Address:      inst.LDAPSAddr,
+		Address:      d.ldapsAddr,
 		Transport:    directory.TransportLDAPS,
 		CAFile:       ca,
-		ServerName:   "localhost",
+		ServerName:   d.serverName,
 		BindDN:       "cn=Directory Manager",
-		BindPassword: inst.Password(),
+		BindPassword: d.secret(),
 		DialTimeout:  8 * time.Second,
 	}
 	c, err := ldapclient.Connect(t.Context(), ok)
@@ -62,16 +79,14 @@ func TestLDAPClientTLSTrustAndBind(t *testing.T) {
 }
 
 func TestLDAPClientStartTLSBind(t *testing.T) {
-	mat := generateTLS(t, "localhost")
-	inst := Start(t)
-	inst.ImportTLS(t, mat)
+	d, _ := startLDAPClientTLS(t)
 	c, err := dialReady(t, ldapclient.Config{
-		Address:      inst.LDAPAddr,
+		Address:      d.ldapAddr,
 		Transport:    directory.TransportStartTLS,
-		CAFile:       filepath.Join(mat.Dir, "ca", "ca.crt"),
-		ServerName:   "localhost",
+		CAFile:       d.caFile,
+		ServerName:   d.serverName,
 		BindDN:       "cn=Directory Manager",
-		BindPassword: inst.Password(),
+		BindPassword: d.secret(),
 		DialTimeout:  8 * time.Second,
 	})
 	if err != nil {

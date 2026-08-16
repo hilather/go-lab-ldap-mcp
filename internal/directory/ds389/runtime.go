@@ -529,12 +529,10 @@ func newModify(ctx context.Context, r *Runtime, c *ldapclient.Conn, dn string, l
 	return ldap.NewModifyRequest(dn, controls)
 }
 
-func newDelete(ctx context.Context, r *Runtime, c *ldapclient.Conn, dn string, live *ldap.Entry) *ldap.DelRequest {
-	var controls []ldap.Control
-	if ctl := r.assertionControl(ctx, c, live); ctl != nil {
-		controls = append(controls, ctl)
-	}
-	return ldap.NewDelRequest(dn, controls)
+func newDelete(_ context.Context, _ *Runtime, _ *ldapclient.Conn, dn string, _ *ldap.Entry) *ldap.DelRequest {
+	// Native honors RFC 4528 only on Modify. A critical assertion on
+	// Delete is unavailableCriticalExtension; checkRev is the delete gate.
+	return ldap.NewDelRequest(dn, nil)
 }
 
 func filterEntryAttrs(e *ldap.Entry, allow map[string]struct{}) []directory.AttrKV {

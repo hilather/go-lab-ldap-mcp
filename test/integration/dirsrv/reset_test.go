@@ -16,7 +16,7 @@ import (
 func TestRuntimeInventoryAndProtectedDelete(t *testing.T) {
 	env := startRuntimeEnv(t)
 	env.rt.SetInventoryPageSize(1)
-	addExtraPerson(t, env.inst, "uid=runtime-extra,ou=people,dc=example,dc=test")
+	addExtraPerson(t, env.dial, "uid=runtime-extra,ou=people,dc=example,dc=test")
 
 	inv, err := env.rt.Inventory(t.Context())
 	if err != nil {
@@ -56,7 +56,7 @@ func TestRuntimeInventoryAndProtectedDelete(t *testing.T) {
 		containsDN(inv2.Extra, "uid=runtime-extra,ou=people,dc=example,dc=test") {
 		t.Fatalf("extra remained: %+v", inv2)
 	}
-	rt := ldapSearch(t, env.inst, "uid=rt,ou=people,dc=example,dc=test", "dn")
+	rt := ldapSearch(t, env.dial, "uid=rt,ou=people,dc=example,dc=test", "dn")
 	if !strings.Contains(rt, "uid=rt,ou=people,dc=example,dc=test") {
 		t.Fatal("runtime missing after inventory delete")
 	}
@@ -68,7 +68,7 @@ func TestAppResetReappliesSeedAndLeavesMarker(t *testing.T) {
 	if err != nil || strings.TrimSpace(before.AppliedRevision) == "" {
 		t.Fatalf("marker %+v %v", before, err)
 	}
-	addExtraPerson(t, env.inst, "uid=runtime-extra,ou=people,dc=example,dc=test")
+	addExtraPerson(t, env.dial, "uid=runtime-extra,ou=people,dc=example,dc=test")
 	alicePW := "seed-alice-pass-12"
 	sec := config.ResolvedSecret{Path: "alice.pw", Value: observability.Secret(alicePW)}
 	gate := reset.NewGate()
@@ -106,18 +106,18 @@ func TestAppResetReappliesSeedAndLeavesMarker(t *testing.T) {
 	if _, err := svc.Reset.Start(t.Context(), p, app.ResetRequest{Name: "lab", ExpectedRevision: before.AppliedRevision}); err != nil {
 		t.Fatal(err)
 	}
-	extra := ldapSearchAllowMissing(t, env.inst, "uid=runtime-extra,ou=people,dc=example,dc=test")
+	extra := ldapSearchAllowMissing(t, env.dial, "uid=runtime-extra,ou=people,dc=example,dc=test")
 	if strings.Contains(extra, "uid=runtime-extra,ou=people,dc=example,dc=test") {
 		t.Fatalf("extra remained:\n%s", extra)
 	}
-	if err := userBind(t, env.inst, "uid=alice,ou=people,dc=example,dc=test", alicePW); err != nil {
+	if err := userBind(t, env.dial, "uid=alice,ou=people,dc=example,dc=test", alicePW); err != nil {
 		t.Fatalf("alice bind after reset: %v", err)
 	}
 	after, err := env.rt.ReadMarker(t.Context())
 	if err != nil || after.AppliedRevision != before.AppliedRevision {
 		t.Fatalf("marker changed before=%q after=%q err=%v", before.AppliedRevision, after.AppliedRevision, err)
 	}
-	rt := ldapSearch(t, env.inst, "uid=rt,ou=people,dc=example,dc=test", "dn")
+	rt := ldapSearch(t, env.dial, "uid=rt,ou=people,dc=example,dc=test", "dn")
 	if !strings.Contains(rt, "uid=rt,ou=people,dc=example,dc=test") {
 		t.Fatal("runtime missing after reset")
 	}

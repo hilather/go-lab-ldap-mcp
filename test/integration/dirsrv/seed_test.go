@@ -32,7 +32,8 @@ func TestShippedApplySeedBindAndMembership(t *testing.T) {
 	assertRemainingAfterSeed(t, out1)
 	assertNoCanary(t, inst, out1, seedCanary)
 
-	alice := ldapSearch(t, inst, "uid=alice,ou=people,dc=example,dc=test", "dn", "uid", "cn", "sn", "objectClass", "memberOf")
+	d := inst.Dial(t)
+	alice := ldapSearch(t, d, "uid=alice,ou=people,dc=example,dc=test", "dn", "uid", "cn", "sn", "objectClass", "memberOf")
 	if !strings.Contains(alice, "uid=alice,ou=people,dc=example,dc=test") {
 		t.Fatalf("missing alice:\n%s", alice)
 	}
@@ -42,11 +43,11 @@ func TestShippedApplySeedBindAndMembership(t *testing.T) {
 	if strings.Contains(alice, "sn: runtime") {
 		t.Fatalf("runtime sn leaked onto seed user:\n%s", alice)
 	}
-	if err := userBind(t, inst, "uid=alice,ou=people,dc=example,dc=test", seedCanary); err != nil {
+	if err := userBind(t, d, "uid=alice,ou=people,dc=example,dc=test", seedCanary); err != nil {
 		t.Fatalf("alice bind: %v", err)
 	}
 
-	staff := ldapSearch(t, inst, "cn=staff,ou=groups,dc=example,dc=test", "dn", "cn", "member", "objectClass")
+	staff := ldapSearch(t, d, "cn=staff,ou=groups,dc=example,dc=test", "dn", "cn", "member", "objectClass")
 	if !strings.Contains(staff, "cn=staff,ou=groups,dc=example,dc=test") {
 		t.Fatalf("missing staff:\n%s", staff)
 	}
@@ -59,36 +60,36 @@ func TestShippedApplySeedBindAndMembership(t *testing.T) {
 		t.Fatalf("re-apply: %v\n%s", err, redactLogs(out2, seedCanary, inst.password))
 	}
 	assertNoCanary(t, inst, out2, seedCanary)
-	if strings.Count(ldapSearchChildren(t, inst, "ou=people,dc=example,dc=test"), "uid=alice,") != 1 {
+	if strings.Count(ldapSearchChildren(t, d, "ou=people,dc=example,dc=test"), "uid=alice,") != 1 {
 		t.Fatal("duplicate alice after re-apply")
 	}
-	if err := userBind(t, inst, "uid=alice,ou=people,dc=example,dc=test", seedCanary); err != nil {
+	if err := userBind(t, d, "uid=alice,ou=people,dc=example,dc=test", seedCanary); err != nil {
 		t.Fatalf("alice bind after re-apply: %v", err)
 	}
 
-	before := ldapSearch(t, inst, "uid=alice,ou=people,dc=example,dc=test", "modifyTimestamp", "sn")
+	before := ldapSearch(t, d, "uid=alice,ou=people,dc=example,dc=test", "modifyTimestamp", "sn")
 	vout, err := execValidate(t, inst, guest)
 	if err != nil {
 		t.Fatalf("validate matching: %v\n%s", err, redactLogs(vout, seedCanary, inst.password))
 	}
-	after := ldapSearch(t, inst, "uid=alice,ou=people,dc=example,dc=test", "modifyTimestamp", "sn")
+	after := ldapSearch(t, d, "uid=alice,ou=people,dc=example,dc=test", "modifyTimestamp", "sn")
 	if before != after {
 		t.Fatalf("validate mutated alice\nbefore=%s\nafter=%s", before, after)
 	}
 
-	addExtraPerson(t, inst, "uid=extra,ou=people,dc=example,dc=test")
-	addUserDescription(t, inst, "uid=alice,ou=people,dc=example,dc=test", "runtime-note")
+	addExtraPerson(t, d, "uid=extra,ou=people,dc=example,dc=test")
+	addUserDescription(t, d, "uid=alice,ou=people,dc=example,dc=test", "runtime-note")
 	out3, err := execApply(t, inst, guest, nil)
 	if err != nil {
 		t.Fatalf("merge re-apply: %v\n%s", err, redactLogs(out3, seedCanary, inst.password))
 	}
-	if !strings.Contains(ldapSearch(t, inst, "uid=extra,ou=people,dc=example,dc=test", "dn"), "uid=extra,ou=people,dc=example,dc=test") {
+	if !strings.Contains(ldapSearch(t, d, "uid=extra,ou=people,dc=example,dc=test", "dn"), "uid=extra,ou=people,dc=example,dc=test") {
 		t.Fatal("merge removed extra user")
 	}
-	if !strings.Contains(ldapSearch(t, inst, "uid=alice,ou=people,dc=example,dc=test", "description"), "runtime-note") {
+	if !strings.Contains(ldapSearch(t, d, "uid=alice,ou=people,dc=example,dc=test", "description"), "runtime-note") {
 		t.Fatal("merge clobbered unmanaged description")
 	}
-	if err := userBind(t, inst, "uid=alice,ou=people,dc=example,dc=test", seedCanary); err != nil {
+	if err := userBind(t, d, "uid=alice,ou=people,dc=example,dc=test", seedCanary); err != nil {
 		t.Fatalf("alice bind after merge: %v", err)
 	}
 
@@ -99,7 +100,7 @@ func TestShippedApplySeedBindAndMembership(t *testing.T) {
 	if !strings.Contains(dvout, "phase.drift") || !strings.Contains(dvout, "drift") {
 		t.Fatalf("want phase.drift / drift:\n%s", redactLogs(dvout, seedCanary, inst.password))
 	}
-	if strings.Contains(ldapSearch(t, inst, "uid=extra,ou=people,dc=example,dc=test", "dn"), "uid=extra") == false {
+	if strings.Contains(ldapSearch(t, d, "uid=extra,ou=people,dc=example,dc=test", "dn"), "uid=extra") == false {
 		t.Fatal("validate removed extra")
 	}
 
@@ -114,14 +115,14 @@ func TestShippedApplySeedBindAndMembership(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reset apply: %v\n%s", err, redactLogs(out4, seedCanary, inst.password))
 	}
-	extra := ldapSearchAllowMissing(t, inst, "uid=extra,ou=people,dc=example,dc=test")
+	extra := ldapSearchAllowMissing(t, d, "uid=extra,ou=people,dc=example,dc=test")
 	if strings.Contains(extra, "uid=extra,ou=people,dc=example,dc=test") {
 		t.Fatalf("reset left extra user:\n%s", extra)
 	}
-	if err := userBind(t, inst, "uid=alice,ou=people,dc=example,dc=test", seedCanary); err != nil {
+	if err := userBind(t, d, "uid=alice,ou=people,dc=example,dc=test", seedCanary); err != nil {
 		t.Fatalf("alice bind after reset: %v", err)
 	}
-	rt := ldapSearch(t, inst, "uid=rt,ou=people,dc=example,dc=test", "dn")
+	rt := ldapSearch(t, d, "uid=rt,ou=people,dc=example,dc=test", "dn")
 	if !strings.Contains(rt, "uid=rt,ou=people,dc=example,dc=test") {
 		t.Fatalf("reset deleted runtime:\n%s", rt)
 	}
@@ -129,25 +130,18 @@ func TestShippedApplySeedBindAndMembership(t *testing.T) {
 }
 
 func TestShippedSeedPasswordFailureCompensates(t *testing.T) {
-	inst := Start(t)
-	_, guest := stageApply(t, inst, "dc=example,dc=test")
-	if out, err := execApply(t, inst, guest, nil); err != nil {
-		t.Fatalf("tree apply: %v\n%s", err, out)
-	}
-	dir := t.TempDir()
-	ca := filepath.Join(dir, "ca.crt")
-	inst.WriteCA(t, ca)
+	d := startEngine(t, runtimeYAML())
 	pw := config.ResolvedSecret{Value: observability.Secret(seedCanary)}
 	req := bootstrap.SeedRequest{
 		TreeRequest: bootstrap.TreeRequest{
-			Suffix:     "dc=example,dc=test",
-			PeopleDN:   "ou=people,dc=example,dc=test",
-			GroupsDN:   "ou=groups,dc=example,dc=test",
-			RuntimeDN:  "uid=rt,ou=people,dc=example,dc=test",
-			DMPassword: inst.Password(),
-			LDAPURL:    "ldaps://" + inst.LDAPSAddr,
-			CAFile:     ca,
-			Host:       inst.Hostname(t),
+			Suffix:     runtimeSuffix,
+			PeopleDN:   runtimePeopleDN,
+			GroupsDN:   runtimeGroupsDN,
+			RuntimeDN:  runtimeBindDN,
+			DMPassword: d.secret(),
+			LDAPURL:    "ldaps://" + d.ldapsAddr,
+			CAFile:     d.caFile,
+			Host:       d.serverName,
 			Write:      true,
 		},
 		StartupMode: v1alpha1.StartupMerge,
@@ -175,35 +169,28 @@ func TestShippedSeedPasswordFailureCompensates(t *testing.T) {
 	if strings.Contains(err.Error(), seedCanary) {
 		t.Fatal("error leaked password")
 	}
-	got := ldapSearchAllowMissing(t, inst, "uid=alice,ou=people,dc=example,dc=test")
+	got := ldapSearchAllowMissing(t, d, "uid=alice,ou=people,dc=example,dc=test")
 	if strings.Contains(got, "uid=alice,ou=people,dc=example,dc=test") {
 		t.Fatalf("incomplete user left after compensation:\n%s", got)
 	}
-	if err := userBind(t, inst, "uid=alice,ou=people,dc=example,dc=test", seedCanary); err == nil {
+	if err := userBind(t, d, "uid=alice,ou=people,dc=example,dc=test", seedCanary); err == nil {
 		t.Fatal("incomplete user bound after password_set")
 	}
 }
 
 func TestReconcileSeedPasswordSetOnEngine(t *testing.T) {
-	inst := Start(t)
-	_, guest := stageApply(t, inst, "dc=example,dc=test")
-	if out, err := execApply(t, inst, guest, nil); err != nil {
-		t.Fatalf("tree apply: %v\n%s", err, out)
-	}
-	dir := t.TempDir()
-	ca := filepath.Join(dir, "ca.crt")
-	inst.WriteCA(t, ca)
+	d := startEngine(t, runtimeYAML())
 	pw := config.ResolvedSecret{Value: observability.Secret(seedCanary)}
 	req := bootstrap.SeedRequest{
 		TreeRequest: bootstrap.TreeRequest{
-			Suffix:     "dc=example,dc=test",
-			PeopleDN:   "ou=people,dc=example,dc=test",
-			GroupsDN:   "ou=groups,dc=example,dc=test",
-			RuntimeDN:  "uid=rt,ou=people,dc=example,dc=test",
-			DMPassword: inst.Password(),
-			LDAPURL:    "ldaps://" + inst.LDAPSAddr,
-			CAFile:     ca,
-			Host:       inst.Hostname(t),
+			Suffix:     runtimeSuffix,
+			PeopleDN:   runtimePeopleDN,
+			GroupsDN:   runtimeGroupsDN,
+			RuntimeDN:  runtimeBindDN,
+			DMPassword: d.secret(),
+			LDAPURL:    "ldaps://" + d.ldapsAddr,
+			CAFile:     d.caFile,
+			Host:       d.serverName,
 			Write:      true,
 		},
 		StartupMode: v1alpha1.StartupMerge,
@@ -223,7 +210,7 @@ func TestReconcileSeedPasswordSetOnEngine(t *testing.T) {
 	if len(res.Created) == 0 {
 		t.Fatalf("expected created: %+v", res)
 	}
-	if err := userBind(t, inst, "uid=alice,ou=people,dc=example,dc=test", seedCanary); err != nil {
+	if err := userBind(t, d, "uid=alice,ou=people,dc=example,dc=test", seedCanary); err != nil {
 		t.Fatalf("engine seed bind: %v", err)
 	}
 	res2, err := ds389.Engine{}.ReconcileSeed(t.Context(), req)
@@ -310,56 +297,6 @@ func stageSeedApply(t *testing.T, inst *Instance, yaml, alicePW string) (string,
 		CA:     "/etc/dirsrv/slapd-localhost/ca.crt",
 		Bin:    guestRoot + "/labldap-bootstrap",
 	}
-}
-
-func addUserDescription(t *testing.T, inst *Instance, dn, value string) {
-	t.Helper()
-	ldif := "dn: " + dn + `
-changetype: modify
-add: description
-description: ` + value + `
-`
-	cmd := exec.Command("docker", "exec", "-i", inst.Name,
-		"ldapmodify", "-x", "-H", "ldaps://127.0.0.1:3636", "-o", "tls_reqcert=never",
-		"-D", "cn=Directory Manager", "-w", inst.Password().Reveal())
-	cmd.Stdin = strings.NewReader(ldif)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("ldapmodify description: %v\n%s", err, out)
-	}
-}
-
-func addExtraPerson(t *testing.T, inst *Instance, dn string) {
-	t.Helper()
-	ldif := "dn: " + dn + `
-objectClass: top
-objectClass: person
-objectClass: organizationalPerson
-objectClass: inetOrgPerson
-cn: extra
-sn: extra
-uid: extra
-`
-	cmd := exec.Command("docker", "exec", "-i", inst.Name,
-		"ldapadd", "-x", "-H", "ldaps://127.0.0.1:3636", "-o", "tls_reqcert=never",
-		"-D", "cn=Directory Manager", "-w", inst.Password().Reveal())
-	cmd.Stdin = strings.NewReader(ldif)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("ldapadd extra: %v\n%s", err, out)
-	}
-}
-
-func ldapSearchAllowMissing(t *testing.T, inst *Instance, dn string) string {
-	t.Helper()
-	out, err := exec.Command("docker", "exec", inst.Name,
-		"ldapsearch", "-x", "-LLL", "-H", "ldaps://127.0.0.1:3636", "-o", "tls_reqcert=never",
-		"-D", "cn=Directory Manager", "-w", inst.Password().Reveal(),
-		"-b", dn, "-s", "base", "dn").CombinedOutput()
-	if err != nil {
-		return string(out)
-	}
-	return string(out)
 }
 
 func assertSeedPhase(t *testing.T, out string) {

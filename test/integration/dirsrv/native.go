@@ -244,7 +244,19 @@ func (n *nativeInstance) seed(t *testing.T, compiled *config.Compiled) {
 	if err != nil {
 		t.Fatalf("native seed apply: %v", err)
 	}
-	if len(res.Created) == 0 {
+	if len(nrm.Users)+len(nrm.Groups) > 0 && len(res.Created) == 0 {
 		t.Fatalf("native seed created nothing: %+v", res)
+	}
+	if compiled.Data.Marker != "" {
+		if err := eng.WriteMarker(t.Context(), bootstrap.MarkerRequest{
+			TreeRequest:      treq,
+			DN:               compiled.Data.Marker,
+			AppliedRevision:  compiled.Revisions.Directory,
+			ExpectedRevision: compiled.Revisions.Directory,
+			ApplyVersion:     "labldap-bootstrap/it",
+			AppliedAt:        time.Now().UTC().Format(time.RFC3339),
+		}); err != nil {
+			t.Fatalf("native marker write: %v", err)
+		}
 	}
 }

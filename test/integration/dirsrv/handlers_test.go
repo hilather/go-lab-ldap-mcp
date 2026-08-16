@@ -97,7 +97,7 @@ func TestRESTHandlersOnEngine(t *testing.T) {
 	if pr.Body.Len() != 0 || strings.Contains(pr.Body.String(), handlerUserPassNew) {
 		t.Fatalf("password response leaked: %q", pr.Body.String())
 	}
-	if err := userBind(t, env.inst, created.DN, handlerUserPassNew); err != nil {
+	if err := userBind(t, env.dial, created.DN, handlerUserPassNew); err != nil {
 		t.Fatalf("bind with new password: %v", err)
 	}
 

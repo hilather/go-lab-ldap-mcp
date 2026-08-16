@@ -4,7 +4,6 @@ package dirsrv
 
 import (
 	"errors"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -17,6 +16,7 @@ import (
 
 func TestShippedApplyTreeReadbackAndIdempotent(t *testing.T) {
 	inst := Start(t)
+	d := inst.Dial(t)
 	_, guest := stageApply(t, inst, "dc=example,dc=test")
 	out1, err := execApply(t, inst, guest, nil)
 	if err != nil {
@@ -31,7 +31,7 @@ func TestShippedApplyTreeReadbackAndIdempotent(t *testing.T) {
 		"ou=groups,dc=example,dc=test",
 		"uid=rt,ou=people,dc=example,dc=test",
 	} {
-		got := ldapSearch(t, inst, dn, "dn", "objectClass")
+		got := ldapSearch(t, d, dn, "dn", "objectClass")
 		if !strings.Contains(got, dn) {
 			t.Fatalf("missing %s:\n%s", dn, got)
 		}
@@ -40,11 +40,11 @@ func TestShippedApplyTreeReadbackAndIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("re-apply: %v\n%s", err, out2)
 	}
-	people := ldapSearchChildren(t, inst, "dc=example,dc=test")
+	people := ldapSearchChildren(t, d, "dc=example,dc=test")
 	if strings.Count(people, "ou=people") != 1 || strings.Count(people, "ou=groups") != 1 {
 		t.Fatalf("duplicate parents:\n%s", people)
 	}
-	rts := ldapSearchChildren(t, inst, "ou=people,dc=example,dc=test")
+	rts := ldapSearchChildren(t, d, "ou=people,dc=example,dc=test")
 	if strings.Count(rts, "uid=rt,") != 1 {
 		t.Fatalf("duplicate runtime:\n%s", rts)
 	}
@@ -52,26 +52,27 @@ func TestShippedApplyTreeReadbackAndIdempotent(t *testing.T) {
 
 func TestShippedTreeRuntimeBindAndNoGroup(t *testing.T) {
 	inst := Start(t)
+	d := inst.Dial(t)
 	_, guest := stageApply(t, inst, "dc=example,dc=test")
 	if out, err := execApply(t, inst, guest, nil); err != nil {
 		t.Fatalf("apply: %v\n%s", err, out)
 	}
-	if err := runtimeBind(t, inst, "uid=rt,ou=people,dc=example,dc=test", "runtime-secret"); err != nil {
+	if err := runtimeBind(t, d, "uid=rt,ou=people,dc=example,dc=test", "runtime-secret"); err != nil {
 		t.Fatalf("runtime LDAPS bind: %v", err)
 	}
-	mo := ldapSearch(t, inst, "uid=rt,ou=people,dc=example,dc=test", "memberOf")
+	mo := ldapSearch(t, d, "uid=rt,ou=people,dc=example,dc=test", "memberOf")
 	if strings.Contains(strings.ToLower(mo), "memberof:") {
 		t.Fatalf("runtime has memberOf:\n%s", mo)
 	}
-	hits := ldapSearchFilter(t, inst, "ou=groups,dc=example,dc=test", "(member=uid=rt,ou=people,dc=example,dc=test)")
+	hits := ldapSearchFilter(t, d, "ou=groups,dc=example,dc=test", "(member=uid=rt,ou=people,dc=example,dc=test)")
 	if strings.Contains(hits, "dn:") {
 		t.Fatalf("runtime listed in a group:\n%s", hits)
 	}
-	before := ldapSearch(t, inst, "ou=people,dc=example,dc=test", "dn")
+	before := ldapSearch(t, d, "ou=people,dc=example,dc=test", "dn")
 	if out, err := execValidate(t, inst, guest); err != nil {
 		t.Fatalf("validate: %v\n%s", err, out)
 	}
-	after := ldapSearch(t, inst, "ou=people,dc=example,dc=test", "dn")
+	after := ldapSearch(t, d, "ou=people,dc=example,dc=test", "dn")
 	if before != after {
 		t.Fatalf("validate mutated tree\nbefore=%s\nafter=%s", before, after)
 	}
@@ -137,40 +138,4 @@ func treeField(err error, code string) bool {
 		}
 	}
 	return false
-}
-
-func runtimeBind(t *testing.T, inst *Instance, dn, password string) error {
-	t.Helper()
-	cmd := exec.Command("docker", "exec", inst.Name,
-		"ldapsearch", "-x", "-H", "ldaps://127.0.0.1:3636", "-o", "tls_reqcert=never",
-		"-D", dn, "-w", password, "-s", "base", "-b", dn, "dn")
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Logf("runtime bind: %v\n%s", err, out)
-	}
-	return err
-}
-
-func ldapSearchChildren(t *testing.T, inst *Instance, base string) string {
-	t.Helper()
-	out, err := exec.Command("docker", "exec", inst.Name,
-		"ldapsearch", "-x", "-LLL", "-H", "ldaps://127.0.0.1:3636", "-o", "tls_reqcert=never",
-		"-D", "cn=Directory Manager", "-w", inst.Password().Reveal(),
-		"-b", base, "-s", "one", "dn").CombinedOutput()
-	if err != nil {
-		t.Fatalf("search children %s: %v\n%s", base, err, out)
-	}
-	return string(out)
-}
-
-func ldapSearchFilter(t *testing.T, inst *Instance, base, filter string) string {
-	t.Helper()
-	out, err := exec.Command("docker", "exec", inst.Name,
-		"ldapsearch", "-x", "-LLL", "-H", "ldaps://127.0.0.1:3636", "-o", "tls_reqcert=never",
-		"-D", "cn=Directory Manager", "-w", inst.Password().Reveal(),
-		"-b", base, filter, "dn").CombinedOutput()
-	if err != nil {
-		t.Fatalf("search %s %s: %v\n%s", base, filter, err, out)
-	}
-	return string(out)
 }

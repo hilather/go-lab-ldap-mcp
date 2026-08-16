@@ -30,7 +30,8 @@ func TestShippedApplyVerifyRuntimeAndApp(t *testing.T) {
 		t.Fatal("runtime password leaked")
 	}
 
-	people := ldapSearch(t, inst, "ou=people,dc=example,dc=test", "aci")
+	d := inst.Dial(t)
+	people := ldapSearch(t, d, "ou=people,dc=example,dc=test", "aci")
 	if !strings.Contains(compactACI(people), `targetattr!="aci"`) {
 		t.Fatalf("people-write must deny aci:\n%s", people)
 	}
@@ -41,7 +42,7 @@ func TestShippedApplyVerifyRuntimeAndApp(t *testing.T) {
 		"uid=labldap-probe-lockout,ou=people,dc=example,dc=test",
 		"uid=labldap-probe-disable,ou=people,dc=example,dc=test",
 	} {
-		got := ldapSearchAllowMissing(t, inst, dn)
+		got := ldapSearchAllowMissing(t, d, dn)
 		if strings.Contains(got, dn) {
 			t.Fatalf("probe left behind %s:\n%s", dn, got)
 		}
@@ -75,12 +76,12 @@ func TestShippedApplyVerifyRuntimeAndApp(t *testing.T) {
 		t.Fatalf("expected skipped_lockout: %+v", appCounts)
 	}
 
-	before := ldapSearch(t, inst, "uid=alice,ou=people,dc=example,dc=test", "modifyTimestamp", "sn")
+	before := ldapSearch(t, d, "uid=alice,ou=people,dc=example,dc=test", "modifyTimestamp", "sn")
 	vout, err := execValidate(t, inst, guest)
 	if err != nil {
 		t.Fatalf("validate: %v\n%s", err, redactLogs(vout, verifyCanary, inst.password))
 	}
-	after := ldapSearch(t, inst, "uid=alice,ou=people,dc=example,dc=test", "modifyTimestamp", "sn")
+	after := ldapSearch(t, d, "uid=alice,ou=people,dc=example,dc=test", "modifyTimestamp", "sn")
 	if before != after {
 		t.Fatalf("validate mutated alice\nbefore=%s\nafter=%s", before, after)
 	}
@@ -184,11 +185,12 @@ func TestShippedVerifyAppLockoutIsolated(t *testing.T) {
 			t.Fatalf("lockout should run: %+v", p.Counts)
 		}
 	}
-	got := ldapSearchAllowMissing(t, inst, "uid=labldap-probe-lockout,ou=people,dc=example,dc=test")
+	d := inst.Dial(t)
+	got := ldapSearchAllowMissing(t, d, "uid=labldap-probe-lockout,ou=people,dc=example,dc=test")
 	if strings.Contains(got, "uid=labldap-probe-lockout") {
 		t.Fatalf("lockout probe left behind:\n%s", got)
 	}
-	if err := userBind(t, inst, "uid=alice,ou=people,dc=example,dc=test", verifyCanary); err != nil {
+	if err := userBind(t, d, "uid=alice,ou=people,dc=example,dc=test", verifyCanary); err != nil {
 		t.Fatalf("alice locked by isolated lockout: %v", err)
 	}
 }

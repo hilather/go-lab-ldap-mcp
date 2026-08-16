@@ -26,6 +26,7 @@ type Instance struct {
 	LDAPAddr  string
 	LDAPSAddr string
 	password  string
+	hostDial  *engineDial
 }
 
 func requireDocker(t *testing.T) {
@@ -40,9 +41,9 @@ func requireDocker(t *testing.T) {
 
 func Start(t *testing.T) *Instance {
 	t.Helper()
-	// T-148: under LABLDAP_IT_ENGINE=native the pinned 389 container harness
-	// does not apply; tests that have not been parametrized skip here. The
-	// documented skip ledger (Delta/Excluded IDs) is at the top of engine.go.
+	// 389 container harness only. Contract tests must use startRuntimeEnv /
+	// startEngine (engineDial) so they run on native. skip389Only is valid
+	// here because Start itself is D2/D4/D5/E7 (docker/dsconf/image).
 	skip389Only(t, "D2/D4/D5/E7", "test drives the pinned 389 DS container (docker/dsconf/in-container ldap* tooling)")
 	requireDocker(t)
 	ref, err := ImageRef()
@@ -131,6 +132,7 @@ func (i *Instance) ImportTLS(t *testing.T, mat *TLSMaterial) {
 	}
 	i.LDAPAddr = net.JoinHostPort("127.0.0.1", ldapPort)
 	i.LDAPSAddr = net.JoinHostPort("127.0.0.1", ldapsPort)
+	i.hostDial = nil
 	waitReady(t, i)
 }
 

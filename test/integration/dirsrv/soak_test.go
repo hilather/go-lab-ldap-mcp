@@ -8,11 +8,11 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	ldap "github.com/go-ldap/ldap/v3"
 	"github.com/hilather/go-lab-ldap-mcp/internal/config"
 	"github.com/hilather/go-lab-ldap-mcp/internal/directory"
 	"github.com/hilather/go-lab-ldap-mcp/internal/directory/ldapclient"
@@ -157,18 +157,19 @@ func TestDatasetSmallCompiles(t *testing.T) {
 
 func addPeople(t *testing.T, inst *Instance, n int) {
 	t.Helper()
-	var b strings.Builder
+	d := inst.Dial(t)
+	conn := d.dmMust(t)
+	defer conn.Close()
 	for i := 1; i <= n; i++ {
 		uid := fmt.Sprintf("u%03d", i)
-		fmt.Fprintf(&b, "dn: uid=%s,ou=people,dc=example,dc=test\nobjectClass: inetOrgPerson\nuid: %s\ncn: %s\nsn: soak\n\n", uid, uid, uid)
-	}
-	cmd := exec.Command("docker", "exec", "-i", inst.Name,
-		"ldapadd", "-x", "-c", "-H", "ldaps://127.0.0.1:3636", "-o", "tls_reqcert=never",
-		"-D", "cn=Directory Manager", "-w", inst.Password().Reveal())
-	cmd.Stdin = strings.NewReader(b.String())
-	out, err := cmd.CombinedOutput()
-	if err != nil && !strings.Contains(string(out), "Already exists") {
-		t.Fatalf("ldapadd people: %v\n%s", err, out)
+		req := ldap.NewAddRequest("uid="+uid+",ou=people,dc=example,dc=test", nil)
+		req.Attribute("objectClass", []string{"inetOrgPerson"})
+		req.Attribute("uid", []string{uid})
+		req.Attribute("cn", []string{uid})
+		req.Attribute("sn", []string{"soak"})
+		if err := conn.Add(req); err != nil && !ldap.IsErrorWithCode(err, ldap.LDAPResultEntryAlreadyExists) {
+			t.Fatalf("ldapadd people: %v", err)
+		}
 	}
 }
 
