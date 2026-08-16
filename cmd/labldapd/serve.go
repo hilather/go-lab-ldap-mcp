@@ -435,6 +435,7 @@ func passwordPolicy(p config.NormalizedPolicy) *ldapserver.PasswordPolicy {
 //	                       shutdownTimeout overrides from spec.limits
 //	Codec/Store/Schema  <- BER codec, bbolt store, StandardSchema
 //	ACITexts            <- compiled.Data.ACIs (runtime ACIs + operator ACLs)
+//	NestedGroups        <- compiled.Normalized.NestedGroups (D22 groupdn walk)
 //	Plugins             <- memberof, referint (account-disable is built into
 //	                       the bind path); New appends the pwpolicy plugin
 //	DirectoryManager    <- cn=Directory Manager + constant-time file secret
@@ -472,6 +473,7 @@ func serverOptions(c *config.Compiled, f serveFlags, tlsCfg *tls.Config, dm ldap
 		Store:              st,
 		Schema:             schema,
 		ACITexts:           aciTexts,
+		NestedGroups:       c.Normalized.NestedGroups,
 		Plugins:            plugins,
 		DirectoryManager:   dm,
 		Logger:             log,

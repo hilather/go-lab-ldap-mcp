@@ -369,6 +369,9 @@ func TestServerOptionsMapping(t *testing.T) {
 	if len(opts.ACITexts) == 0 {
 		t.Error("ACITexts empty; runtime ACIs must reach the server")
 	}
+	if opts.NestedGroups != compiled.Normalized.NestedGroups {
+		t.Errorf("NestedGroups = %v, want %v", opts.NestedGroups, compiled.Normalized.NestedGroups)
+	}
 	if opts.Store == nil || opts.Schema == nil || opts.Codec == nil {
 		t.Error("store/schema/codec not wired")
 	}

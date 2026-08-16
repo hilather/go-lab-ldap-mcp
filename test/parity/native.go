@@ -112,6 +112,7 @@ func newNativeOptions(fx *fixture, ldapAddr, ldapsAddr string, tlsCfg *tls.Confi
 		Store:              st,
 		Schema:             schema,
 		ACITexts:           fx.aciTexts(),
+		NestedGroups:       c.Normalized.NestedGroups,
 		Plugins:            plugins,
 		DirectoryManager: ldapserver.Identity{
 			DN: dmDN,

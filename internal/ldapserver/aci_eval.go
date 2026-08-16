@@ -38,12 +38,18 @@ import (
 // Evaluation runs per search candidate, so groupdn resolution is bounded:
 // each distinct groupdn is read through tx at most once per Allowed call
 // (lazy per-call cache), in the same store snapshot as the operation being
-// authorized.
+// authorized. Nested groupdn walks (D22) reuse walkGroupFrontier and run
+// only when nestedGroups is true; allowRawACI stays direct-only when the
+// flag is off.
 
 // aciEngine is the concrete ACIEngine over a fixed parsed ACI set.
 type aciEngine struct {
 	acis   []*ParsedACI
 	logger *slog.Logger
+	// nested mirrors spec.directory.nestedGroups (D22). When false,
+	// groupdn matches only direct member/uniqueMember (owner rule:
+	// flag-gated). When true, walkGroupFrontier follows nested groups.
+	nested bool
 }
 
 var _ ACIEngine = (*aciEngine)(nil)
@@ -52,12 +58,17 @@ var _ ACIEngine = (*aciEngine)(nil)
 // and returns the evaluating engine. Any parse failure rejects the whole
 // set: a partial access policy is never enforced (fail-closed). An empty
 // set is valid and denies everything except BypassACI subjects. A nil
-// logger discards debug output.
+// logger discards debug output. groupdn nesting is off (direct members
+// only); New wires Options.NestedGroups through newACIEngine.
 func NewACIEngine(texts []string, logger *slog.Logger) (ACIEngine, error) {
+	return newACIEngine(texts, logger, false)
+}
+
+func newACIEngine(texts []string, logger *slog.Logger, nested bool) (*aciEngine, error) {
 	if logger == nil {
 		logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 	}
-	eng := &aciEngine{logger: logger}
+	eng := &aciEngine{logger: logger, nested: nested}
 	for _, text := range texts {
 		p, err := ParseACITextA(text)
 		if err != nil {
@@ -158,8 +169,11 @@ func aciAuthenticatedA(s Subject) bool {
 
 // groupMemberA reports whether userDN is a member/uniqueMember of the
 // group entry at aci.Subject.DN, reading the group through tx (the same
-// snapshot as the authorized operation). Verdicts are cached per Allowed
-// call. A missing group or one listing no parseable membership never
+// snapshot as the authorized operation). When eng.nested is true, nested
+// group DNs found as members are walked (D22); otherwise only direct
+// members match (allowRawACI stays direct-only with nestedGroups off).
+// Verdicts are cached per Allowed call. A missing group, a walk that
+// exceeds groupNestMaxDepth, or one listing no parseable membership never
 // matches; a store error other than ErrNoSuchObject is returned so the
 // caller denies with a logged reason.
 func (eng *aciEngine) groupMemberA(ctx context.Context, tx ReadTx, aci *ParsedACI, userDN config.DN, groups *map[string]bool) (bool, error) {
@@ -178,16 +192,70 @@ func (eng *aciEngine) groupMemberA(ctx context.Context, tx ReadTx, aci *ParsedAC
 	case err != nil:
 		return false, fmt.Errorf("ldapserver: aci groupdn lookup: %w", err)
 	default:
-		want := userDN.FoldedKey()
-		for _, m := range memberDNs(entry) {
-			if m.FoldedKey() == want {
-				member = true
-				break
-			}
+		found, exceeded, err := groupContainsUser(ctx, tx, entry, userDN, eng.nested)
+		if err != nil {
+			return false, fmt.Errorf("ldapserver: aci groupdn lookup: %w", err)
+		}
+		if exceeded {
+			eng.logDeny(ctx, "groupdn nested walk exceeded max depth", aci, ACICheck{})
+		} else {
+			member = found
 		}
 	}
 	(*groups)[key] = member
 	return member, nil
+}
+
+// groupContainsUser reports whether userDN appears as member or
+// uniqueMember of group, walking nested group members when nested is
+// true. Cycles are skipped via walkGroupFrontier's seen set. A walk that
+// would exceed groupNestMaxDepth returns exceeded so the caller denies.
+// A missing nested group is a skipped edge; other store errors surface.
+func groupContainsUser(ctx context.Context, tx ReadTx, group *Entry, userDN config.DN, nested bool) (found, exceeded bool, err error) {
+	start, err := config.ParseDN(group.DN)
+	if err != nil {
+		return false, false, nil
+	}
+	loaded := map[string]*Entry{start.FoldedKey(): group}
+	want := userDN.FoldedKey()
+	exceeded, err = walkGroupFrontier(start.FoldedKey(), nested, groupNestMaxDepth,
+		func(key string) ([]string, error) {
+			e := loaded[key]
+			if e == nil {
+				return nil, nil
+			}
+			var next []string
+			for _, m := range memberDNs(e) {
+				mk := m.FoldedKey()
+				next = append(next, mk)
+				if !nested {
+					continue
+				}
+				if _, have := loaded[mk]; have {
+					continue
+				}
+				child, err := tx.Entry(ctx, m)
+				if errors.Is(err, ErrNoSuchObject) {
+					continue
+				}
+				if err != nil {
+					return nil, err
+				}
+				if isGroupEntry(child) {
+					loaded[mk] = child
+				}
+			}
+			return next, nil
+		},
+		func(key string) bool {
+			if key == want {
+				found = true
+				return true
+			}
+			return false
+		},
+	)
+	return found, exceeded, err
 }
 
 // logDeny records a deny decision at debug level. The ACI id is

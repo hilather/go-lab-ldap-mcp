@@ -150,6 +150,7 @@ func startNative(t *testing.T, yaml string) *nativeInstance {
 		Store:              st,
 		Schema:             schema,
 		ACITexts:           aciTexts,
+		NestedGroups:       n.NestedGroups,
 		Plugins:            plugins,
 		DirectoryManager: ldapserver.Identity{
 			DN: "cn=Directory Manager",

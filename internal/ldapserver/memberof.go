@@ -16,7 +16,9 @@ import (
 // uniqueMember); this plugin maintains the derived, operational memberOf
 // attribute on member entries inside the same store commit as the write
 // that changed membership, and auto-adds the nsmemberof object class to
-// entries that gain memberOf (ADR-0009 decision 20).
+// entries that gain memberOf (ADR-0009 decision 20). Leftover nsmemberof
+// after the last membership is retracted is retained to match 389 (D26);
+// the class MAY memberOf, so an empty leftover stays schema-legal.
 //
 // Nested-group propagation follows the constructor flag, which cmd/labldapd
 // threads from spec.directory.nestedGroups: with nesting off, a group listed
@@ -136,7 +138,8 @@ func (p *MemberOfPlugin) AfterWrite(ctx context.Context, tx UpdateTx, ev WriteEv
 // native equivalent of the 389 memberOf fixup task, used by bootstrap and
 // soft reset after data was applied through paths that bypass the write
 // plugins (C7). It is suffix-scoped and converges entries exactly: stale
-// memberOf values and nsmemberof classes are removed, missing ones added.
+// memberOf values are removed and missing ones added. Leftover nsmemberof
+// after the computed set becomes empty is retained (D26).
 func (p *MemberOfPlugin) Fixup(ctx context.Context, store Store) error {
 	return store.Update(ctx, func(tx UpdateTx) error {
 		idx, err := p.indexGroups(ctx, tx)
@@ -210,33 +213,37 @@ func (p *MemberOfPlugin) recompute(ctx context.Context, tx UpdateTx, idx *groupI
 		return fmt.Errorf("ldapserver: memberof: load member: %w", err)
 	}
 
-	// Reverse reachability: walk from the member up through groups that
-	// list it. With nesting, listing a reached group extends the walk;
-	// without, only the member's direct groups count. The seen set bounds
-	// the walk, so membership cycles terminate.
+	// Reverse reachability via the shared group-graph walker: from the
+	// member up through groups that list it. With nesting, listing a
+	// reached group extends the walk; without, only the member's direct
+	// groups count. The walker's seen set bounds cycles.
 	expected := map[string]string{} // folded group key → canonical group DN
-	seen := map[string]struct{}{member.FoldedKey(): {}}
-	frontier := []string{member.FoldedKey()}
-	for len(frontier) > 0 {
-		key := frontier[0]
-		frontier = frontier[1:]
-		for _, g := range idx.byMember[key] {
+	if _, err := walkGroupFrontier(member.FoldedKey(), p.nested, 0,
+		func(key string) ([]string, error) {
+			var next []string
+			for _, g := range idx.byMember[key] {
+				gd, err := config.ParseDN(g.DN)
+				if err != nil {
+					continue
+				}
+				next = append(next, gd.FoldedKey())
+			}
+			return next, nil
+		},
+		func(key string) bool {
+			g := idx.groups[key]
+			if g == nil {
+				return false
+			}
 			gd, err := config.ParseDN(g.DN)
 			if err != nil {
-				continue
+				return false
 			}
-			gk := gd.FoldedKey()
-			if _, dup := expected[gk]; dup {
-				continue
-			}
-			expected[gk] = gd.String()
-			if p.nested {
-				if _, done := seen[gk]; !done {
-					seen[gk] = struct{}{}
-					frontier = append(frontier, gk)
-				}
-			}
-		}
+			expected[key] = gd.String()
+			return false
+		},
+	); err != nil {
+		return err
 	}
 
 	current := map[string]struct{}{}
@@ -245,8 +252,12 @@ func (p *MemberOfPlugin) recompute(ctx context.Context, tx UpdateTx, idx *groupI
 			current[d.FoldedKey()] = struct{}{}
 		}
 	}
-	if sameDNSet(current, expected) && hasObjectClass(e, "nsmemberof") == (len(expected) > 0) {
-		return nil // already converged: no write, no modifyTimestamp churn
+	// D26: retain leftover nsmemberof when the computed set is empty.
+	// Still add the class on grant. Skip the write when memberOf already
+	// matches and no class needs to be added (avoids modifyTimestamp churn).
+	needClass := len(expected) > 0 && !hasObjectClass(e, "nsmemberof")
+	if sameDNSet(current, expected) && !needClass {
+		return nil
 	}
 	keys := make([]string, 0, len(expected))
 	for k := range expected {
@@ -260,8 +271,6 @@ func (p *MemberOfPlugin) recompute(ctx context.Context, tx UpdateTx, idx *groupI
 	setAttr(e, "memberOf", values...)
 	if len(values) > 0 {
 		ensureObjectClass(e, "nsmemberof")
-	} else {
-		removeObjectClass(e, "nsmemberof")
 	}
 	if err := tx.Replace(ctx, e); err != nil {
 		return fmt.Errorf("ldapserver: memberof: update member: %w", err)
@@ -352,17 +361,64 @@ func ensureObjectClass(e *Entry, name string) {
 	e.Attributes[idx].Values = append(e.Attributes[idx].Values, []byte(name))
 }
 
-// removeObjectClass drops the named object class if present.
-func removeObjectClass(e *Entry, name string) {
-	idx := attrIndex(e, "objectClass")
-	if idx < 0 {
-		return
+// groupNestMaxDepth bounds ACI groupdn nesting (D22). MemberOf uses 0
+// (unlimited, seen-set only): its walk is a suffix-scoped recompute, not
+// an authorization check. Exceeding the ACI cap denies; the walk never
+// continues unbounded.
+const groupNestMaxDepth = 8
+
+// walkGroupFrontier is the shared group-graph BFS used by MemberOf
+// (reverse: who contains this member) and ACI groupdn (forward: does this
+// group contain the user). start is the folded seed key. neighbors returns
+// adjacent folded keys. visit is called once per newly seen neighbor (not
+// start); returning true stops the walk.
+//
+// When nested is false, only start's immediate neighbors are visited.
+// When nested is true, the walk continues through those neighbors. Cycles
+// are skipped via a seen set of folded keys.
+//
+// maxDepth <= 0 means unlimited. Otherwise a hop that would exceed
+// maxDepth stops the walk and returns exceeded=true (caller denies).
+func walkGroupFrontier(
+	start string,
+	nested bool,
+	maxDepth int,
+	neighbors func(key string) ([]string, error),
+	visit func(key string) (stop bool),
+) (exceeded bool, err error) {
+	seen := map[string]struct{}{start: {}}
+	type item struct {
+		key   string
+		depth int
 	}
-	kept := e.Attributes[idx].Values[:0]
-	for _, v := range e.Attributes[idx].Values {
-		if !strings.EqualFold(string(v), name) {
-			kept = append(kept, v)
+	queue := []item{{key: start, depth: 0}}
+	for len(queue) > 0 {
+		cur := queue[0]
+		queue = queue[1:]
+		adj, err := neighbors(cur.key)
+		if err != nil {
+			return false, err
+		}
+		for _, n := range adj {
+			if _, dup := seen[n]; dup {
+				continue
+			}
+			if visit(n) {
+				return false, nil
+			}
+			seen[n] = struct{}{}
+			if !nested {
+				continue
+			}
+			nextDepth := cur.depth + 1
+			if maxDepth > 0 && nextDepth > maxDepth {
+				// Keep visiting siblings at this depth; deny only if
+				// the walk ends without a match.
+				exceeded = true
+				continue
+			}
+			queue = append(queue, item{key: n, depth: nextDepth})
 		}
 	}
-	e.Attributes[idx].Values = kept
+	return exceeded, nil
 }

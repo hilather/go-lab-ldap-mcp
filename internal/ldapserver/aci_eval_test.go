@@ -53,9 +53,14 @@ func runtimeACITexts(t *testing.T) []string {
 
 func newRuntimeEngine(t *testing.T, extra ...string) ACIEngine {
 	t.Helper()
-	eng, err := NewACIEngine(append(runtimeACITexts(t), extra...), testLogger())
+	return newRuntimeEngineNested(t, false, extra...)
+}
+
+func newRuntimeEngineNested(t *testing.T, nested bool, extra ...string) ACIEngine {
+	t.Helper()
+	eng, err := newACIEngine(append(runtimeACITexts(t), extra...), testLogger(), nested)
 	if err != nil {
-		t.Fatalf("NewACIEngine: %v", err)
+		t.Fatalf("newACIEngine: %v", err)
 	}
 	return eng
 }
@@ -719,6 +724,195 @@ func TestACIEngineGroupCachePerCall(t *testing.T) {
 	}
 	if aciCheck(t, eng, store, aciSubject(t, aciEvalAlice), aciEvalSuffix, "cn", PermRead) {
 		t.Fatal("membership change between calls must take effect (no stale cache)")
+	}
+}
+
+// Nested groupdn (D22): with nestedGroups on, a member of an inner group
+// matches groupdn of the outer group; with the flag off, only direct
+// members match (owner rule: flag-gated, including allowRawACI).
+func TestACIEngineNestedGroupDN(t *testing.T) {
+	t.Parallel()
+	store := seedACITree(t)
+	const (
+		inner = "cn=inner,ou=groups,dc=example,dc=test"
+		outer = "cn=outer,ou=groups,dc=example,dc=test"
+	)
+	ctx := context.Background()
+	if err := store.Update(ctx, func(tx UpdateTx) error {
+		if err := tx.Add(ctx, NewEntry(inner,
+			StringAttribute("objectClass", "top", "groupOfNames"),
+			StringAttribute("cn", "inner"),
+			StringAttribute("member", aciEvalAlice))); err != nil {
+			return err
+		}
+		return tx.Add(ctx, NewEntry(outer,
+			StringAttribute("objectClass", "top", "groupOfNames"),
+			StringAttribute("cn", "outer"),
+			StringAttribute("member", inner)))
+	}); err != nil {
+		t.Fatalf("seed nested groups: %v", err)
+	}
+	grant := `(target="ldap:///dc=example,dc=test")(targetattr="*")` +
+		`(version 3.0; acl "labldap:outer-read"; allow (read,search,compare) groupdn="ldap:///` + outer + `";)`
+
+	nested := newRuntimeEngineNested(t, true, grant)
+	if !aciCheck(t, nested, store, aciSubject(t, aciEvalAlice), aciEvalSuffix, "cn", PermRead) {
+		t.Error("nestedGroups on: nested member alice must match outer groupdn")
+	}
+	if aciCheck(t, nested, store, aciSubject(t, aciEvalBob), aciEvalSuffix, "cn", PermRead) {
+		t.Error("nestedGroups on: non-member bob must be denied")
+	}
+
+	flat := newRuntimeEngineNested(t, false, grant)
+	if aciCheck(t, flat, store, aciSubject(t, aciEvalAlice), aciEvalSuffix, "cn", PermRead) {
+		t.Error("nestedGroups off: nested member alice must not match outer groupdn")
+	}
+	// Direct member of the ACI group still matches with nesting off.
+	if err := store.Update(ctx, func(tx UpdateTx) error {
+		g, err := tx.Entry(ctx, mustDNA(t, outer))
+		if err != nil {
+			return err
+		}
+		setAttr(g, "member", []byte(inner), []byte(aciEvalBob))
+		return tx.Replace(ctx, g)
+	}); err != nil {
+		t.Fatalf("add direct member: %v", err)
+	}
+	if !aciCheck(t, flat, store, aciSubject(t, aciEvalBob), aciEvalSuffix, "cn", PermRead) {
+		t.Error("nestedGroups off: direct member bob must still match")
+	}
+}
+
+// A membership cycle must terminate (seen set) and still grant a nested
+// member when nestedGroups is on.
+func TestACIEngineNestedGroupDNCycle(t *testing.T) {
+	t.Parallel()
+	store := seedACITree(t)
+	const (
+		inner = "cn=cycle-inner,ou=groups,dc=example,dc=test"
+		outer = "cn=cycle-outer,ou=groups,dc=example,dc=test"
+	)
+	ctx := context.Background()
+	if err := store.Update(ctx, func(tx UpdateTx) error {
+		if err := tx.Add(ctx, NewEntry(inner,
+			StringAttribute("objectClass", "top", "groupOfNames"),
+			StringAttribute("cn", "cycle-inner"),
+			StringAttribute("member", outer, aciEvalAlice))); err != nil {
+			return err
+		}
+		return tx.Add(ctx, NewEntry(outer,
+			StringAttribute("objectClass", "top", "groupOfNames"),
+			StringAttribute("cn", "cycle-outer"),
+			StringAttribute("member", inner)))
+	}); err != nil {
+		t.Fatalf("seed cycle: %v", err)
+	}
+	grant := `(target="ldap:///dc=example,dc=test")(targetattr="*")` +
+		`(version 3.0; acl "labldap:cycle-read"; allow (read) groupdn="ldap:///` + outer + `";)`
+	eng := newRuntimeEngineNested(t, true, grant)
+	if !aciCheck(t, eng, store, aciSubject(t, aciEvalAlice), aciEvalSuffix, "cn", PermRead) {
+		t.Error("cycle must not hide a nested member")
+	}
+	if aciCheck(t, eng, store, aciSubject(t, aciEvalBob), aciEvalSuffix, "cn", PermRead) {
+		t.Error("cycle must not grant a non-member")
+	}
+}
+
+// Exceeding groupNestMaxDepth denies rather than walking unbounded.
+func TestACIEngineNestedGroupDNMaxDepth(t *testing.T) {
+	t.Parallel()
+	store := seedACITree(t)
+	ctx := context.Background()
+	// Chain g0 → g1 → … → g{max+1} → alice. The hop onto g{max+1} is
+	// depth=max+1, which exceeds the cap, so alice must be denied.
+	prev := aciEvalAlice
+	var top string
+	if err := store.Update(ctx, func(tx UpdateTx) error {
+		for i := groupNestMaxDepth + 1; i >= 0; i-- {
+			dn := fmt.Sprintf("cn=depth-%d,ou=groups,dc=example,dc=test", i)
+			if err := tx.Add(ctx, NewEntry(dn,
+				StringAttribute("objectClass", "top", "groupOfNames"),
+				StringAttribute("cn", fmt.Sprintf("depth-%d", i)),
+				StringAttribute("member", prev))); err != nil {
+				return err
+			}
+			prev = dn
+			top = dn
+		}
+		return nil
+	}); err != nil {
+		t.Fatalf("seed depth chain: %v", err)
+	}
+	grant := `(target="ldap:///dc=example,dc=test")(targetattr="*")` +
+		`(version 3.0; acl "labldap:depth-read"; allow (read) groupdn="ldap:///` + top + `";)`
+	eng := newRuntimeEngineNested(t, true, grant)
+	if aciCheck(t, eng, store, aciSubject(t, aciEvalAlice), aciEvalSuffix, "cn", PermRead) {
+		t.Error("nested walk past groupNestMaxDepth must deny")
+	}
+
+	// A chain that fits inside the cap (g0 → … → g{max} → alice) grants.
+	shallowTop := "cn=shallow-0,ou=groups,dc=example,dc=test"
+	if err := store.Update(ctx, func(tx UpdateTx) error {
+		prev := aciEvalAlice
+		for i := groupNestMaxDepth; i >= 0; i-- {
+			dn := fmt.Sprintf("cn=shallow-%d,ou=groups,dc=example,dc=test", i)
+			if err := tx.Add(ctx, NewEntry(dn,
+				StringAttribute("objectClass", "top", "groupOfNames"),
+				StringAttribute("cn", fmt.Sprintf("shallow-%d", i)),
+				StringAttribute("member", prev))); err != nil {
+				return err
+			}
+			prev = dn
+		}
+		return nil
+	}); err != nil {
+		t.Fatalf("seed shallow chain: %v", err)
+	}
+	shallowGrant := `(target="ldap:///dc=example,dc=test")(targetattr="*")` +
+		`(version 3.0; acl "labldap:shallow-read"; allow (read) groupdn="ldap:///` + shallowTop + `";)`
+	shallow := newRuntimeEngineNested(t, true, shallowGrant)
+	if !aciCheck(t, shallow, store, aciSubject(t, aciEvalAlice), aciEvalSuffix, "cn", PermRead) {
+		t.Error("nested walk at groupNestMaxDepth must still grant")
+	}
+
+	// g0 → … → g{max} lists both a too-deep child and alice. Visiting
+	// the too-deep child first must not deny before alice is seen.
+	sibTop := "cn=sib-0,ou=groups,dc=example,dc=test"
+	if err := store.Update(ctx, func(tx UpdateTx) error {
+		deep := "cn=sib-deep,ou=groups,dc=example,dc=test"
+		if err := tx.Add(ctx, NewEntry(deep,
+			StringAttribute("objectClass", "top", "groupOfNames"),
+			StringAttribute("cn", "sib-deep"),
+			StringAttribute("member", aciEvalBob))); err != nil {
+			return err
+		}
+		leaf := fmt.Sprintf("cn=sib-%d,ou=groups,dc=example,dc=test", groupNestMaxDepth)
+		if err := tx.Add(ctx, NewEntry(leaf,
+			StringAttribute("objectClass", "top", "groupOfNames"),
+			StringAttribute("cn", fmt.Sprintf("sib-%d", groupNestMaxDepth)),
+			StringAttribute("member", deep, aciEvalAlice))); err != nil {
+			return err
+		}
+		prev := leaf
+		for i := groupNestMaxDepth - 1; i >= 0; i-- {
+			dn := fmt.Sprintf("cn=sib-%d,ou=groups,dc=example,dc=test", i)
+			if err := tx.Add(ctx, NewEntry(dn,
+				StringAttribute("objectClass", "top", "groupOfNames"),
+				StringAttribute("cn", fmt.Sprintf("sib-%d", i)),
+				StringAttribute("member", prev))); err != nil {
+				return err
+			}
+			prev = dn
+		}
+		return nil
+	}); err != nil {
+		t.Fatalf("seed sibling chain: %v", err)
+	}
+	sibGrant := `(target="ldap:///dc=example,dc=test")(targetattr="*")` +
+		`(version 3.0; acl "labldap:sib-read"; allow (read) groupdn="ldap:///` + sibTop + `";)`
+	sib := newRuntimeEngineNested(t, true, sibGrant)
+	if !aciCheck(t, sib, store, aciSubject(t, aciEvalAlice), aciEvalSuffix, "cn", PermRead) {
+		t.Error("sibling of a too-deep nest at max depth must still grant")
 	}
 }
 

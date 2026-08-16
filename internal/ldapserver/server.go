@@ -161,7 +161,12 @@ type Options struct {
 	// is consulted only when ACI is nil; a parse failure is a configuration
 	// error because a partial access policy must never be served.
 	ACITexts []string
-	Plugins  []Plugin
+	// NestedGroups mirrors compiled spec.directory.nestedGroups. When true,
+	// groupdn evaluation walks nested member/uniqueMember groups (D22).
+	// Default off: direct members only (owner rule: flag-gated). MemberOf
+	// nesting is a separate constructor flag on NewMemberOfPlugin.
+	NestedGroups bool
+	Plugins      []Plugin
 	// Metrics receives bounded-cardinality observations (op name + result
 	// code, connection open/close). Nil disables metrics. DNs and attribute
 	// values never cross this seam.
@@ -220,7 +225,7 @@ func New(opts Options) (*Server, error) {
 		if len(opts.ACITexts) == 0 {
 			return nil, fieldErr("aci", "required", "an ACI engine is required")
 		}
-		eng, err := NewACIEngine(opts.ACITexts, opts.Logger)
+		eng, err := newACIEngine(opts.ACITexts, opts.Logger, opts.NestedGroups)
 		if err != nil {
 			return nil, fieldErr("aciTexts", "invalid_aci", "ACI text failed to parse: "+err.Error())
 		}

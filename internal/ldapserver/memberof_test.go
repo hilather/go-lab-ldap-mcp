@@ -98,9 +98,9 @@ func TestMemberOfAddGroupSameCommit(t *testing.T) {
 	}
 }
 
-// TestMemberOfModifyAddRemoveMember: member add grants memberOf, member
-// delete drops it, and the nsmemberof class is removed when the last
-// membership goes away.
+// TestMemberOfModifyAddRemoveMember: member add grants memberOf and
+// nsmemberof; member delete drops memberOf, but leftover nsmemberof is
+// retained after the last membership (D26 / 389).
 func TestMemberOfModifyAddRemoveMember(t *testing.T) {
 	t.Parallel()
 	_, addr := serveTestServerFrom(t, memberOfOptions(t, false, nil), nil)
@@ -117,6 +117,9 @@ func TestMemberOfModifyAddRemoveMember(t *testing.T) {
 	if got := searchAttrValues(t, cl, bob, "memberOf"); !slices.Equal(got, []string{group}) {
 		t.Fatalf("memberOf after add = %v", got)
 	}
+	if ocs := searchAttrValues(t, cl, bob, "objectClass"); !slices.Contains(ocs, "nsmemberof") {
+		t.Fatalf("nsmemberof missing after grant: %v", ocs)
+	}
 
 	res = roundTrip(t, cl, &ModifyRequest{DN: group, Changes: []ModifyChange{
 		{Op: ModifyDelete, Attr: StringAttribute("member", bob)},
@@ -127,8 +130,8 @@ func TestMemberOfModifyAddRemoveMember(t *testing.T) {
 	if got := searchAttrValues(t, cl, bob, "memberOf"); len(got) != 0 {
 		t.Fatalf("memberOf after remove = %v, want gone", got)
 	}
-	if ocs := searchAttrValues(t, cl, bob, "objectClass"); slices.Contains(ocs, "nsmemberof") {
-		t.Fatalf("nsmemberof survived last memberOf removal: %v", ocs)
+	if ocs := searchAttrValues(t, cl, bob, "objectClass"); !slices.Contains(ocs, "nsmemberof") {
+		t.Fatalf("nsmemberof must remain after last memberOf removal: %v", ocs)
 	}
 }
 
@@ -353,8 +356,9 @@ func TestMemberOfSkipsDanglingAndForeign(t *testing.T) {
 }
 
 // TestMemberOfFixup: the bootstrap/reset sweep converges the whole suffix —
-// granting missing memberOf and stripping stale values plus the nsmemberof
-// class from entries no group references.
+// granting missing memberOf and nsmemberof, stripping stale memberOf
+// values. Leftover nsmemberof on an entry whose computed set is empty is
+// retained (D26).
 func TestMemberOfFixup(t *testing.T) {
 	t.Parallel()
 	mo, err := NewMemberOfPlugin("dc=example,dc=test", false)
@@ -399,8 +403,8 @@ func TestMemberOfFixup(t *testing.T) {
 	if got := bob.Values("memberOf"); len(got) != 0 {
 		t.Fatalf("bob stale memberOf survived fixup: %q", got)
 	}
-	if hasObjectClass(bob, "nsmemberof") {
-		t.Fatal("bob kept nsmemberof with empty memberOf")
+	if !hasObjectClass(bob, "nsmemberof") {
+		t.Fatal("bob leftover nsmemberof must survive fixup with empty memberOf")
 	}
 	// The suffix root is untouched (not a member of anything).
 	root, err := fetchEntry(t, opts, "dc=example,dc=test")
