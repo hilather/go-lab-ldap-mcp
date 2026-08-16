@@ -136,9 +136,16 @@ type Options struct {
 	// write path. Nil preserves the T-126 constant-time plaintext compare
 	// with no policy state. The engine plugin is appended last so it
 	// observes other plugins' in-transaction changes.
-	PasswordPolicy   *PasswordPolicy
-	Limits           Limits
-	Codec            Codec
+	PasswordPolicy *PasswordPolicy
+	Limits         Limits
+	// Clock supplies the current time for server-maintained operational
+	// attributes (createTimestamp, modifyTimestamp, T-137). Nil uses
+	// time.Now; tests inject a fake clock.
+	Clock func() time.Time
+	// NewUUID supplies entryUUID values on Add (T-137). Nil generates a
+	// random RFC 4122 version 4 UUID.
+	NewUUID func() string
+	Codec   Codec
 	Store   Store
 	Schema  Schema
 	ACI     ACIEngine

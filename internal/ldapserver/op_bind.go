@@ -30,6 +30,12 @@ import (
 //     password is never stored raw). Any other DN resolves against the
 //     store and compares userPassword in constant time. Unknown user and
 //     wrong password both fail invalidCredentials (49) — 389-observed.
+//  6. Account state (T-137): a resolved entry carrying nsAccountLock: true
+//     fails unwillingToPerform (53) before any password comparison,
+//     matching 389's account-inactivation order (ADR-0009 decision 18,
+//     parity contract C3). The entry stays searchable; only binds fail.
+//     This gate is deliberately separate from the T-134 password-policy
+//     verifier so the two compose at the seam below.
 //
 // A successful DM bind sets Subject.BypassACI (ADR-0009 decision 13); every
 // bind attempt first resets the connection to the anonymous identity
@@ -98,6 +104,14 @@ func (s *Server) authenticate(ctx context.Context, c *conn, req *BindRequest) (R
 	entry, err := s.lookupEntry(ctx, dn)
 	if err != nil {
 		return Result{Code: ResultInvalidCredentials, DiagnosticMessage: "invalid credentials"}, false
+	}
+	// nsAccountLock gate (T-137, op_attrs.go): checked before password
+	// verification so a locked account fails 53 regardless of password
+	// correctness — 389-observed. Delta candidate: unknown-user stays 49
+	// while locked-known-user is 53, so the codes distinguish "locked"
+	// from "no such user" (389 behaves the same way).
+	if accountLocked(entry) {
+		return Result{Code: ResultUnwillingToPerform, DiagnosticMessage: "account inactivated"}, false
 	}
 	// T-134 password-policy seam: scheme-aware hash verification
 	// (PBKDF2-SHA256 / SSHA512), maximum-age, and failure lockout live in

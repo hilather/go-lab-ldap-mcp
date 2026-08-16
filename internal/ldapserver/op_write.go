@@ -90,9 +90,16 @@ func (s *Server) handleAdd(ctx context.Context, c *conn, m *Message, req *AddReq
 				return err // ErrNoSuchObject when the parent is absent
 			}
 		}
+		// T-137: server-owned operational attributes are rejected on the
+		// client request, then stamped after the schema gate so the check
+		// sees the entry as the client sent it.
+		if err := s.checkClientAttrs(req.Attributes); err != nil {
+			return err
+		}
 		if err := s.schemaCheckEntry(entry); err != nil {
 			return err
 		}
+		s.applyAddOpAttrs(entry, subj)
 		if err := tx.Add(ctx, entry); err != nil {
 			return err
 		}
@@ -128,6 +135,16 @@ func mapWriteError(err error) Result {
 		return Result{Code: ResultNoSuchAttribute, DiagnosticMessage: "no such attribute or value"}
 	case errors.Is(err, errAttributeOrValueExists):
 		return Result{Code: ResultAttributeOrValueExists, DiagnosticMessage: "attribute value already exists"}
+	case errors.Is(err, errOperationalAttr):
+		// Server-owned operational attribute on a client Add/Modify (RFC
+		// 4512 NO-USER-MODIFICATION). 389's exact code is a Delta
+		// candidate for the T-147 oracle.
+		msg := "operational attribute is not client-modifiable"
+		var oe *operationalAttrError
+		if errors.As(err, &oe) {
+			msg = "operational attribute " + oe.attr + " is not client-modifiable"
+		}
+		return Result{Code: ResultConstraintViolation, DiagnosticMessage: msg}
 	case errors.Is(err, errPlugin):
 		// A plugin aborts the whole commit (C7); the client sees an
 		// unwillingToPerform, matching 389's plugin-failure surface.
@@ -179,6 +196,13 @@ func (s *Server) handleModify(ctx context.Context, c *conn, m *Message, req *Mod
 			if !s.allowed(ctx, tx, subj, dn, ch.Attr.Name, PermWrite) {
 				return errDenied
 			}
+			// T-137: operational attributes are server-owned (RFC 4512
+			// NO-USER-MODIFICATION); internal writes — the write plugins
+			// and the T-134 lockout stamp — go through the store directly
+			// and never cross this gate.
+			if !s.clientModifiable(ch.Attr.Name) {
+				return &operationalAttrError{attr: ch.Attr.Name}
+			}
 			if err := s.applyChange(after, ch); err != nil {
 				return err
 			}
@@ -189,6 +213,7 @@ func (s *Server) handleModify(ctx context.Context, c *conn, m *Message, req *Mod
 		if err := s.schemaCheckEntry(after); err != nil {
 			return err
 		}
+		s.applyModifyOpAttrs(after, subj)
 		if err := tx.Replace(ctx, after); err != nil {
 			return err
 		}
@@ -451,6 +476,8 @@ func (s *Server) handleModifyDN(ctx context.Context, c *conn, m *Message, req *M
 				}
 			}
 		}
+		// A rename is a modification of the entry (T-137).
+		s.applyModifyOpAttrs(after, subj)
 		if err := tx.Replace(ctx, after); err != nil {
 			return err
 		}
