@@ -227,3 +227,16 @@ A user created through REST or MCP is visible to `ldapsearch` against the direct
 | Date | Change |
 | --- | --- |
 | 2026-08-15 | Initial contract (`labldap.parity.v1`) accepted with ADR-0008 / ADR-0009. |
+| 2026-08-15 | Wave 1 (T-125–T-128) recorded Delta **candidates** below; none are promoted to section 3 until adjudicated against the 389 oracle in T-147/T-150. |
+
+### Delta candidates observed in Wave 1 (pending adjudication, T-147/T-150)
+
+| Ref | Topic | Native behavior (as implemented) | 389 expectation | Provenance |
+| --- | --- | --- | --- | --- |
+| CAND-1 | Anonymous-bind-disabled result code | `unwillingToPerform(53)` | RFC 4511 hints `inappropriateAuthentication(48)`; 389 observed returning 53 | T-126 `op_bind.go` |
+| CAND-2 | `approxMatch` filter | Folds to equality until T-131 matching rules | 389 applies real approx rules | T-127 `filter_eval.go` |
+| CAND-3 | Modify delete-of-missing / replace-of-missing attribute | Strict RFC 4511 (`noSuchAttribute`) | Oracle may tolerate some cases; confirm in T-147 | T-128 `op_write.go` |
+| CAND-4 | Cross/out-of-suffix ModifyDN | `unwillingToPerform(53)` | 389 answers `affectsMultipleDSAs(71)` | T-128 `op_write.go` |
+| CAND-5 | Paged-results cookie integrity | Plain offset, no integrity protection until T-140 | 389 cookie is opaque/validated | T-127 `op_search.go` |
+
+When adjudicated, each moves into section 3 (accepted Delta) with the test name that proves the difference, or is fixed to match the oracle (Contract).

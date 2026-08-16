@@ -1431,65 +1431,65 @@ Acceptance:
 - [x] Engine selection is mixed into the compiled plan; document whether it changes directory revision (prefer yes — different engine is a different lab).
 - [x] Existing fixtures without the field still compile.
 
-## [ ] T-124 BER codec, LDAPMessage framing, and fuzz
+## [x] T-124 BER codec, LDAPMessage framing, and fuzz
 
 Priority: P0 | Size: L | Depends on: T-122 | Wave 1 | Cloud fit: high (best-of-2 candidate)
 
 Deliverables: `internal/ldapserver` codec wrapping `github.com/go-asn1-ber/asn1-ber`; encode/decode LDAPMessage; max PDU size; golden RFC 4511 PDUs; go-fuzz corpus.
 
 Acceptance:
-- [ ] Round-trip BindRequest, SearchRequest, SearchResultEntry, LDAPResult, UnbindRequest, AbandonRequest.
-- [ ] Oversized PDU is rejected before allocation growth beyond the limit.
-- [ ] Fuzz target is wired; seed corpus committed without secrets.
-- [ ] No TCP listener in this task.
+- [x] Round-trip BindRequest, SearchRequest, SearchResultEntry, LDAPResult, UnbindRequest, AbandonRequest.
+- [x] Oversized PDU is rejected before allocation growth beyond the limit.
+- [x] Fuzz target is wired; seed corpus committed without secrets.
+- [x] No TCP listener in this task.
 
-## [ ] T-125 Listener, connection lifecycle, dispatch, and pre-auth limits
+## [x] T-125 Listener, connection lifecycle, dispatch, and pre-auth limits
 
 Priority: P0 | Size: L | Depends on: T-124 | Wave 1 | Cloud fit: high
 
 Deliverables: loopback listener; per-connection read/write/idle deadlines; max outstanding ops; graceful shutdown; request dispatch to handlers; metrics hooks without DNs.
 
 Acceptance:
-- [ ] In-process test dials loopback, sends a Bind, receives a result (handler may be a stub).
-- [ ] Context cancel closes blocked connections within tested bounds.
-- [ ] Default bind address is loopback when unspecified.
-- [ ] Logging redaction test: no raw PDU dump of passwords.
+- [x] In-process test dials loopback, sends a Bind, receives a result (handler may be a stub).
+- [x] Context cancel closes blocked connections within tested bounds.
+- [x] Default bind address is loopback when unspecified.
+- [x] Logging redaction test: no raw PDU dump of passwords.
 
-## [ ] T-126 Simple Bind, Unbind, and Abandon
+## [x] T-126 Simple Bind, Unbind, and Abandon
 
 Priority: P0 | Size: M | Depends on: T-125 | Wave 1 | Cloud fit: high
 
 Deliverables: simple bind against Store (fake is enough); anonymous bind gated; Unbind closes; Abandon cancels in-flight search on that conn.
 
 Acceptance:
-- [ ] Valid simple bind succeeds; wrong password → `invalidCredentials`.
-- [ ] Anonymous bind fails when disabled.
-- [ ] Abandon of a blocked search unblocks the worker in tests.
-- [ ] DM identity bypass flag is present on the bind result for later ACI (T-139).
+- [x] Valid simple bind succeeds; wrong password → `invalidCredentials`.
+- [x] Anonymous bind fails when disabled.
+- [x] Abandon of a blocked search unblocks the worker in tests.
+- [x] DM identity bypass flag is present on the bind result for later ACI (T-139).
 
-## [ ] T-127 Search operation and RFC 4515 filter parse
+## [x] T-127 Search operation and RFC 4515 filter parse
 
 Priority: P0 | Size: L | Depends on: T-125, T-126 | Wave 1 | Cloud fit: high
 
 Deliverables: SearchRequest handling against Store; filter parser; base/one/sub scopes; size/time limits; attribute selection.
 
 Acceptance:
-- [ ] Malformed filters fail with a protocol/filter error, not a panic.
-- [ ] Base search of a missing DN → `noSuchObject`.
-- [ ] Size limit is enforced in the server, not only the client.
-- [ ] Matching-rule evaluation may be stubbed (equality on exact bytes) until T-131; document the stub.
+- [x] Malformed filters fail with a protocol/filter error, not a panic.
+- [x] Base search of a missing DN → `noSuchObject`.
+- [x] Size limit is enforced in the server, not only the client.
+- [x] Matching-rule evaluation may be stubbed (equality on exact bytes) until T-131; document the stub.
 
-## [ ] T-128 Add, Modify, Delete, Compare, ModifyDN
+## [x] T-128 Add, Modify, Delete, Compare, ModifyDN
 
 Priority: P0 | Size: L | Depends on: T-127 | Wave 1 | Cloud fit: high
 
 Deliverables: write ops against Store transactions; Compare; ModifyDN (rename within suffix).
 
 Acceptance:
-- [ ] Add duplicate DN → `entryAlreadyExists`; delete missing → `noSuchObject`.
-- [ ] Modify of missing attribute follows RFC 4511 (or 389-observed; record if Delta).
-- [ ] Compare true/false result codes match RFC 4511.
-- [ ] Schema enforcement may be stubbed until T-132.
+- [x] Add duplicate DN → `entryAlreadyExists`; delete missing → `noSuchObject`.
+- [x] Modify of missing attribute follows RFC 4511 (or 389-observed; record if Delta).
+- [x] Compare true/false result codes match RFC 4511.
+- [x] Schema enforcement may be stubbed until T-132.
 
 ## [ ] T-129 bbolt entry store (dn2id / id2entry)
 
