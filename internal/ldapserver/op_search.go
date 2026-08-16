@@ -3,12 +3,9 @@ package ldapserver
 import (
 	"context"
 	"errors"
-	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
-	ber "github.com/go-asn1-ber/asn1-ber"
 	"github.com/hilather/go-lab-ldap-mcp/internal/config"
 	"github.com/hilather/go-lab-ldap-mcp/internal/observability"
 )
@@ -16,13 +13,6 @@ import (
 // errSearchLimit stops candidate iteration once the size or time limit has
 // been recorded on the search outcome.
 var errSearchLimit = errors.New("ldapserver: search limit reached")
-
-// pageRequest is the decoded Simple Paged Results control (RFC 2696,
-// OIDSimplePagedResults).
-type pageRequest struct {
-	size   int
-	offset int
-}
 
 // handleSearch runs one RFC 4511 search against a store snapshot (T-127).
 //
@@ -64,7 +54,7 @@ func (s *Server) runSearch(ctx context.Context, c *conn, m *Message, req *Search
 	if isSubschemaDN(base) {
 		return s.searchSubschema(ctx, c, m, req)
 	}
-	page, res, err := parsePagedControl(m.Controls)
+	page, res, err := s.parsePagedControl(m.Controls, base, req)
 	if err != nil {
 		sendDone(res, nil)
 		return res.Code
@@ -145,7 +135,7 @@ func (s *Server) runSearch(ctx context.Context, c *conn, m *Message, req *Search
 		return fail(ResultOperationsError, "internal error")
 	}
 
-	pageControls, paged := applyPaging(matched, page, sizeLimit)
+	pageControls, paged := s.applyPaging(matched, page, sizeLimit)
 	entries := matched
 	if paged.out != nil {
 		entries = paged.out
@@ -190,11 +180,12 @@ const VendorName = "LabLDAP"
 
 // rootDSE builds the RFC 4512 section 5.1 Root DSE (parity contract C10).
 // Only capabilities the engine honors are advertised: supportedControl
-// lists Simple Paged Results (T-127); the RFC 4528 assertion control stays
-// unadvertised until T-141 honors it (C9: never advertise-and-no-op).
-// supportedExtension lists the recognized extension OIDs whose handlers
-// land in T-133 (StartTLS) and T-142 (WhoAmI) — dispatch answers them with
-// unwillingToPerform until then. Delta D6: unknown 389 extras are omitted.
+// lists Simple Paged Results (T-127, cookie integrity since T-140); the
+// RFC 4528 assertion control stays unadvertised until T-141 honors it (C9:
+// never advertise-and-no-op). supportedExtension lists the recognized
+// extension OIDs whose handlers land in T-133 (StartTLS) and T-142
+// (WhoAmI) — dispatch answers them with unwillingToPerform until then.
+// Delta D6: unknown 389 extras are omitted.
 func (s *Server) rootDSE() *Entry {
 	return &Entry{
 		DN: "",
@@ -282,85 +273,4 @@ func selectDSEAttrs(e *Entry, sel attrSelection) *Entry {
 		}
 	}
 	return out
-}
-
-// pagedResult is the sliced page plus the next cookie.
-type pagedResult struct {
-	out        []*Entry
-	nextCookie []byte
-	size       int
-}
-
-// applyPaging slices the full result set for a paged search. An offset past
-// the end yields an empty page with an empty cookie (RFC 2696; the
-// index-out-of-range behavior pinned for T-127). Cookie integrity arrives
-// with T-140; the cookie is the plain next offset until then.
-func applyPaging(matched []*Entry, page *pageRequest, sizeLimit int) ([]Control, pagedResult) {
-	if page == nil {
-		return nil, pagedResult{}
-	}
-	size := page.size
-	if size <= 0 || size > sizeLimit {
-		size = sizeLimit
-	}
-	start := page.offset
-	if start > len(matched) {
-		start = len(matched)
-	}
-	end := start + size
-	if end > len(matched) {
-		end = len(matched)
-	}
-	var cookie []byte
-	if end < len(matched) {
-		cookie = []byte(strconv.Itoa(end))
-	}
-	return []Control{{OID: OIDSimplePagedResults, Value: encodePagedCookie(size, cookie)}},
-		pagedResult{out: matched[start:end], nextCookie: cookie, size: size}
-}
-
-// parsePagedControl decodes the RFC 2696 control value. A malformed value
-// or cookie fails with protocolError / unwillingToPerform; an absent
-// control yields a nil page request.
-func parsePagedControl(controls []Control) (*pageRequest, Result, error) {
-	var raw []byte
-	found := false
-	for _, ctrl := range controls {
-		if ctrl.OID == OIDSimplePagedResults {
-			raw, found = ctrl.Value, true
-		}
-	}
-	if !found {
-		return nil, Result{}, nil
-	}
-	pkt := ber.DecodePacket(raw)
-	if pkt == nil || pkt.ClassType != ber.ClassUniversal || pkt.TagType != ber.TypeConstructed || len(pkt.Children) != 2 {
-		return nil, Result{Code: ResultProtocolError, DiagnosticMessage: "malformed paged results control"}, fmt.Errorf("ldapserver: paged results control decode")
-	}
-	size, err := packetInt(pkt.Children[0])
-	if err != nil || size < 0 || size > maxInt32 {
-		return nil, Result{Code: ResultProtocolError, DiagnosticMessage: "malformed paged results size"}, fmt.Errorf("ldapserver: paged results size decode")
-	}
-	offset := 0
-	if c := pkt.Children[1].Data.Bytes(); len(c) > 0 {
-		// RFC 2696 leaves a malformed cookie to the server; T-140 adds
-		// real cookie integrity, until then an unparsable cookie fails.
-		n, err := strconv.Atoi(string(c))
-		if err != nil || n < 0 {
-			return nil, Result{Code: ResultUnwillingToPerform, DiagnosticMessage: "invalid paged results cookie"}, fmt.Errorf("ldapserver: paged results cookie decode")
-		}
-		offset = n
-	}
-	return &pageRequest{size: int(size), offset: offset}, Result{}, nil
-}
-
-// encodePagedCookie builds the RFC 2696 response control value: the server
-// size estimate (0: unknown) and the opaque cookie.
-func encodePagedCookie(size int, cookie []byte) []byte {
-	pkt := ber.NewSequence("pagedResultsControl")
-	pkt.AppendChild(ber.NewInteger(ber.ClassUniversal, ber.TypePrimitive, ber.TagInteger, int64(size), "size"))
-	c := ber.Encode(ber.ClassUniversal, ber.TypePrimitive, ber.TagOctetString, nil, "cookie")
-	c.Data.Write(cookie)
-	pkt.AppendChild(c)
-	return pkt.Bytes()
 }

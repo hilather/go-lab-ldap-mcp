@@ -2,11 +2,11 @@ package ldapserver
 
 import (
 	"context"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	ber "github.com/go-asn1-ber/asn1-ber"
 	"github.com/hilather/go-lab-ldap-mcp/internal/config"
 )
 
@@ -386,22 +386,20 @@ func TestSearchACIDeniedAttributeDropped(t *testing.T) {
 	}
 }
 
-// decodePagedCookie pulls the cookie out of a paged-results response
-// control for the next request.
+// decodePagedCookie pulls the raw cookie out of a paged-results response
+// control so the next request can echo it. The cookie is opaque signed
+// state (T-140); tests treat it as bytes, never as an offset.
 func decodePagedCookie(t *testing.T, controls []Control) []byte {
 	t.Helper()
 	for _, ctrl := range controls {
 		if ctrl.OID != OIDSimplePagedResults {
 			continue
 		}
-		pr, res, err := parsePagedControl([]Control{ctrl})
-		if err != nil {
-			t.Fatalf("response control parse: %v (%v)", err, res)
+		pkt := ber.DecodePacket(ctrl.Value)
+		if pkt == nil || len(pkt.Children) != 2 {
+			t.Fatalf("response control decode: %x", ctrl.Value)
 		}
-		if pr.offset == 0 {
-			return nil
-		}
-		return []byte(strconv.Itoa(pr.offset))
+		return pkt.Children[1].Data.Bytes()
 	}
 	return nil
 }
@@ -435,29 +433,18 @@ func TestSearchPagedResults(t *testing.T) {
 			break
 		}
 	}
-	// 6 entries, page size 2: 3 full pages then a final empty-page request
-	// with the exhausted cookie returns the terminating empty cookie.
+	// 6 entries, page size 2: exactly 3 pages, then the last page's empty
+	// cookie terminates the walk.
 	if total != 6 {
 		t.Fatalf("paged total = %d, want 6", total)
 	}
-
-	// Index out of range: an offset beyond the result set returns an empty
-	// page and an empty cookie, not an error (T-127 acceptance).
-	ctrl := Control{OID: OIDSimplePagedResults, Value: encodePagedCookie(2, []byte("999"))}
-	entries, done, respControls := searchFull(t, cl, &SearchRequest{
-		BaseDN: "dc=example,dc=test", Scope: ScopeWholeSubtree,
-		Filter: &FilterPresent{Attr: "objectClass"},
-	}, ctrl)
-	if done.Result.Code != ResultSuccess || len(entries) != 0 {
-		t.Fatalf("out-of-range page: %v, %d entries", done.Result, len(entries))
-	}
-	if c := decodePagedCookie(t, respControls); len(c) != 0 {
-		t.Fatalf("out-of-range cookie = %q, want empty", c)
+	if pages != 3 {
+		t.Fatalf("paged pages = %d, want 3", pages)
 	}
 
-	// A malformed cookie fails cleanly (cookie integrity lands in T-140).
-	ctrl = Control{OID: OIDSimplePagedResults, Value: encodePagedCookie(2, []byte("garbage"))}
-	_, done, _ = searchFull(t, cl, &SearchRequest{
+	// A malformed cookie fails cleanly (integrity cases: ctrl_paged_test).
+	ctrl := Control{OID: OIDSimplePagedResults, Value: encodePagedCookie(2, []byte("garbage"))}
+	_, done, _ := searchFull(t, cl, &SearchRequest{
 		BaseDN: "dc=example,dc=test", Scope: ScopeWholeSubtree,
 		Filter: &FilterPresent{Attr: "objectClass"},
 	}, ctrl)

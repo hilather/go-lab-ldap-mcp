@@ -2,6 +2,7 @@ package ldapserver
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -179,6 +180,12 @@ type Server struct {
 	// through the passwordGate seam; nil without Options.PasswordPolicy.
 	passwords *passwordEngine
 
+	// pageKey is the HMAC key signing Simple Paged Results cookies
+	// (T-140, ctrl_paged.go): 32 random bytes generated in New, held only
+	// in memory, never persisted, configured, or logged. Cookies are
+	// therefore valid only against the server instance that issued them.
+	pageKey []byte
+
 	// ldapAddr and ldapsAddr hold the bound net.Addr once Serve has
 	// opened the listeners (atomic.Value of net.Addr).
 	ldapAddr  atomic.Value
@@ -222,7 +229,11 @@ func New(opts Options) (*Server, error) {
 	if err != nil {
 		return nil, fieldErr("suffix", "invalid_dn", "suffix is not a valid DN")
 	}
-	s := &Server{opts: opts, suffix: suffix, conns: map[*conn]struct{}{}}
+	pageKey := make([]byte, 32)
+	if _, err := rand.Read(pageKey); err != nil {
+		return nil, fmt.Errorf("ldapserver: paged results cookie key: %w", err)
+	}
+	s := &Server{opts: opts, suffix: suffix, pageKey: pageKey, conns: map[*conn]struct{}{}}
 	if opts.DirectoryManager.DN != "" {
 		dm, err := config.ParseDN(opts.DirectoryManager.DN)
 		if err != nil {
