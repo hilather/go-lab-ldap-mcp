@@ -37,7 +37,7 @@ func TestRESTHandlersOnEngine(t *testing.T) {
 		GroupsDN: "ou=groups,dc=example,dc=test",
 	})
 	reg, err := auth.NewRegistry([]auth.Token{
-		{ID: "admin", Scopes: []string{auth.ScopeDirectoryRead, auth.ScopeDirectoryWrite, auth.ScopeDirectoryPassword}, Secret: observability.Secret(handlerAdminToken)},
+		{ID: "admin", Scopes: []string{auth.ScopeDirectoryRead, auth.ScopeDirectoryWrite, auth.ScopeDirectoryPassword, auth.ScopeSchemaRead}, Secret: observability.Secret(handlerAdminToken)},
 		{ID: "writer", Scopes: []string{auth.ScopeDirectoryWrite}, Secret: observability.Secret(handlerWriteToken)},
 	})
 	if err != nil {
@@ -48,6 +48,8 @@ func TestRESTHandlersOnEngine(t *testing.T) {
 		Sessions: auth.NewStore(auth.DefaultSessionConfig()),
 		Users:    svc.Users,
 		Groups:   svc.Groups,
+		Query:    svc.Query,
+		System:   svc.Query,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -141,5 +143,100 @@ func TestRESTHandlersOnEngine(t *testing.T) {
 	}
 	if len(sum.Added) != 0 || len(sum.Unchanged) != 1 {
 		t.Fatalf("idempotent add counts %+v", sum)
+	}
+
+	get := httptest.NewRequest(http.MethodGet, "/api/v1/users/h-alice", nil)
+	get.Header.Set("Authorization", "Bearer "+handlerAdminToken)
+	gr := httptest.NewRecorder()
+	h.ServeHTTP(gr, get)
+	if gr.Code != http.StatusOK {
+		t.Fatalf("get user %d %s", gr.Code, gr.Body.String())
+	}
+	var live struct {
+		Revision string `json:"revision"`
+	}
+	if err := json.Unmarshal(gr.Body.Bytes(), &live); err != nil {
+		t.Fatal(err)
+	}
+
+	short := httptest.NewRequest(http.MethodPost, "/api/v1/users/h-alice/password", strings.NewReader(`{"password":"short","revision":"`+live.Revision+`"}`))
+	short.Header.Set("Authorization", "Bearer "+handlerAdminToken)
+	short.Header.Set("Content-Type", "application/json")
+	sr := httptest.NewRecorder()
+	h.ServeHTTP(sr, short)
+	if sr.Code != http.StatusBadRequest || !strings.Contains(sr.Body.String(), `"code":"constraint"`) {
+		t.Fatalf("short password %d %s", sr.Code, sr.Body.String())
+	}
+
+	stale := httptest.NewRequest(http.MethodPatch, "/api/v1/users/h-alice", strings.NewReader(`{"attributes":{"description":"stale"}}`))
+	stale.Header.Set("Authorization", "Bearer "+handlerAdminToken)
+	stale.Header.Set("Content-Type", "application/json")
+	stale.Header.Set("If-Match", `"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"`)
+	str := httptest.NewRecorder()
+	h.ServeHTTP(str, stale)
+	if str.Code != http.StatusPreconditionFailed || !strings.Contains(str.Body.String(), `"code":"conflict"`) {
+		t.Fatalf("stale If-Match %d %s", str.Code, str.Body.String())
+	}
+
+	approx := httptest.NewRequest(http.MethodPost, "/api/v1/search", strings.NewReader(`{"base":"ou=people,dc=example,dc=test","scope":"sub","filter":"(cn~=Alic Anderson)"}`))
+	approx.Header.Set("Authorization", "Bearer "+handlerAdminToken)
+	approx.Header.Set("Content-Type", "application/json")
+	apr := httptest.NewRecorder()
+	h.ServeHTTP(apr, approx)
+	if apr.Code != http.StatusBadRequest || !strings.Contains(apr.Body.String(), `"code":"unsupported_filter"`) {
+		t.Fatalf("approx filter %d %s", apr.Code, apr.Body.String())
+	}
+
+	unknown := httptest.NewRequest(http.MethodPost, "/api/v1/auth-tests", strings.NewReader(`{"identity":"no-such-handler-user","password":"`+handlerUserPassNew+`"}`))
+	unknown.Header.Set("Authorization", "Bearer "+handlerAdminToken)
+	unknown.Header.Set("Content-Type", "application/json")
+	ur := httptest.NewRecorder()
+	h.ServeHTTP(ur, unknown)
+	wrong := httptest.NewRequest(http.MethodPost, "/api/v1/auth-tests", strings.NewReader(`{"identity":"h-alice","password":"wrong-handler-pass-99"}`))
+	wrong.Header.Set("Authorization", "Bearer "+handlerAdminToken)
+	wrong.Header.Set("Content-Type", "application/json")
+	wr := httptest.NewRecorder()
+	h.ServeHTTP(wr, wrong)
+	if ur.Code != http.StatusOK || wr.Code != http.StatusOK ||
+		!strings.Contains(ur.Body.String(), `"outcome":"invalid_credentials"`) ||
+		!strings.Contains(wr.Body.String(), `"outcome":"invalid_credentials"`) {
+		t.Fatalf("bind-test unknown/wrong %d %s / %d %s", ur.Code, ur.Body.String(), wr.Code, wr.Body.String())
+	}
+
+	caps := httptest.NewRequest(http.MethodGet, "/api/v1/capabilities", nil)
+	caps.Header.Set("Authorization", "Bearer "+handlerAdminToken)
+	cr2 := httptest.NewRecorder()
+	h.ServeHTTP(cr2, caps)
+	if cr2.Code != http.StatusOK {
+		t.Fatalf("capabilities %d %s", cr2.Code, cr2.Body.String())
+	}
+	var capBody directory.Capabilities
+	if err := json.Unmarshal(cr2.Body.Bytes(), &capBody); err != nil {
+		t.Fatal(err)
+	}
+	switch itEngine(t) {
+	case EngineNative:
+		if !strings.Contains(capBody.EngineVendor, "LabLDAP") || strings.Contains(capBody.EngineVendor, "389") {
+			t.Fatalf("D1 native vendor = %q", capBody.EngineVendor)
+		}
+	default:
+		if capBody.EngineVendor == "" || strings.EqualFold(capBody.EngineVendor, "LabLDAP") {
+			t.Fatalf("D1 389 vendor = %q", capBody.EngineVendor)
+		}
+	}
+
+	attr := httptest.NewRequest(http.MethodGet, "/api/v1/schema/attributes/pwdAccountLockedTime", nil)
+	attr.Header.Set("Authorization", "Bearer "+handlerAdminToken)
+	atr := httptest.NewRecorder()
+	h.ServeHTTP(atr, attr)
+	switch itEngine(t) {
+	case EngineNative:
+		if atr.Code != http.StatusOK {
+			t.Fatalf("D30 native pwdAccountLockedTime %d %s", atr.Code, atr.Body.String())
+		}
+	default:
+		if atr.Code != http.StatusNotFound {
+			t.Fatalf("D30 389 pwdAccountLockedTime %d %s", atr.Code, atr.Body.String())
+		}
 	}
 }

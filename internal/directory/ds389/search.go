@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	ber "github.com/go-asn1-ber/asn1-ber"
 	"github.com/go-ldap/ldap/v3"
 
 	"github.com/hilather/go-lab-ldap-mcp/internal/apperr"
@@ -79,6 +80,9 @@ func (r *Runtime) buildSearch(q directory.SearchQuery) (*ldap.SearchRequest, str
 	if _, err := config.ParseFilterLimits(q.Filter, r.cfg.MaxFilterDepth, r.cfg.MaxFilterLength); err != nil {
 		return nil, "", nil, false, err
 	}
+	if err := rejectApproxFilter(q.Filter); err != nil {
+		return nil, "", nil, false, err
+	}
 	// children is emulated as subtree minus the base, so suffix+children+
 	// match-all is the same dump as suffix+sub and is rejected with it.
 	if config.IsOverBroad(q.Filter) && parsed.Equal(suffix) &&
@@ -105,6 +109,32 @@ func (r *Runtime) buildSearch(q directory.SearchQuery) (*ldap.SearchRequest, str
 		Attributes:   attrs,
 	}
 	return req, queryKey, cookie, dropBase, nil
+}
+
+func rejectApproxFilter(filter string) error {
+	if config.ContainsApproxMatch(filter) {
+		return cfgErr("filter", "unsupported_filter", "approxMatch filters are not supported")
+	}
+	pkt, err := ldap.CompileFilter(filter)
+	if err == nil && filterPacketHasApprox(pkt) {
+		return cfgErr("filter", "unsupported_filter", "approxMatch filters are not supported")
+	}
+	return nil
+}
+
+func filterPacketHasApprox(p *ber.Packet) bool {
+	if p == nil {
+		return false
+	}
+	if p.Tag == ldap.FilterApproxMatch {
+		return true
+	}
+	for _, c := range p.Children {
+		if filterPacketHasApprox(c) {
+			return true
+		}
+	}
+	return false
 }
 
 func ldapScope(scope string) (int, bool, error) {

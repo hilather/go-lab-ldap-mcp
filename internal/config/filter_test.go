@@ -48,6 +48,28 @@ func TestParseFilterLimitsAndOverBroad(t *testing.T) {
 	}
 }
 
+func TestParseFilterRejectsApproxMatch(t *testing.T) {
+	t.Parallel()
+	for _, f := range []string{
+		"(cn~=Alic Anderson)",
+		"(sn~=Andersen)",
+		"(&(objectClass=inetOrgPerson)(cn~=Alic Anderson))",
+	} {
+		if !ContainsApproxMatch(f) {
+			t.Fatalf("ContainsApproxMatch(%q) = false", f)
+		}
+		if _, err := ParseFilter(f, 16, 4096); err == nil || !hasFieldCode(err, "filter", "unsupported_filter") {
+			t.Fatalf("ParseFilter approx %q: %v", f, err)
+		}
+		if _, err := ParseFilterLimits(f, 16, 4096); err == nil || !hasFieldCode(err, "filter", "unsupported_filter") {
+			t.Fatalf("ParseFilterLimits approx %q: %v", f, err)
+		}
+	}
+	if ContainsApproxMatch("(cn=alice)") || ContainsApproxMatch("(cn>=x)") || ContainsApproxMatch("") {
+		t.Fatal("equality/ordering must not look like approxMatch")
+	}
+}
+
 func hasFieldCode(err error, path, code string) bool {
 	var e *apperr.Error
 	if !errors.As(err, &e) {

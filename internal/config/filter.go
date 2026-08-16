@@ -23,8 +23,9 @@ func ParseFilter(s string, maxDepth, maxLen int) (Filter, error) {
 	return f, nil
 }
 
-// ParseFilterLimits validates syntax, depth, length, NUL, and balance.
-// It does not apply the suffix+sub match-all over-broad conjunction (T-050).
+// ParseFilterLimits validates syntax, depth, length, NUL, balance, and
+// rejects approxMatch (`~=`). It does not apply the suffix+sub match-all
+// over-broad conjunction (T-050).
 func ParseFilterLimits(s string, maxDepth, maxLen int) (Filter, error) {
 	if s == "" {
 		return Filter{}, fieldErr("filter", "empty", "filter is empty")
@@ -54,7 +55,17 @@ func ParseFilterLimits(s string, maxDepth, maxLen int) (Filter, error) {
 	if depth != 0 {
 		return Filter{}, fieldErr("filter", "unbalanced", "filter parentheses are unbalanced")
 	}
+	// Control plane rejects approxMatch (KD-14). Direct LDAP ~= stays D15.
+	if ContainsApproxMatch(s) {
+		return Filter{}, fieldErr("filter", "unsupported_filter", "approxMatch filters are not supported")
+	}
 	return Filter{Raw: s}, nil
+}
+
+// ContainsApproxMatch reports an RFC 4515 approxMatch operator (`~=`).
+// Do not import ldapserver types here; a raw operator check is the contract.
+func ContainsApproxMatch(s string) bool {
+	return strings.Contains(s, "~=")
 }
 
 // IsOverBroad reports a match-all filter. T-050 rejects this only with suffix+sub.

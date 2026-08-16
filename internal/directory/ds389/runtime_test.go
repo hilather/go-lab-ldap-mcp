@@ -185,6 +185,10 @@ func TestSearchConstraints(t *testing.T) {
 	if err == nil || !hasField(err, "filter", "too_long") {
 		t.Fatalf("too long: %v", err)
 	}
+	_, _, _, _, err = rt.buildSearch(directory.SearchQuery{Filter: "(cn~=Alic Anderson)"})
+	if err == nil || !hasField(err, "filter", "unsupported_filter") {
+		t.Fatalf("approxMatch: %v", err)
+	}
 	_, _, _, _, err = rt.buildSearch(directory.SearchQuery{Filter: "(uid=a)", Attributes: []string{"userPassword", "cn"}})
 	if err != nil {
 		t.Fatal(err)
@@ -194,6 +198,25 @@ func TestSearchConstraints(t *testing.T) {
 	})
 	if err == nil || !hasField(err, "filter", "over_broad") {
 		t.Fatalf("suffix+children match-all: %v", err)
+	}
+}
+
+func TestAccountLockStampedUnionsMarkers(t *testing.T) {
+	t.Parallel()
+	if accountLockStamped(nil) {
+		t.Fatal("nil entry")
+	}
+	none := ldap.NewEntry("uid=a,dc=x", map[string][]string{"uid": {"a"}})
+	if accountLockStamped(none) {
+		t.Fatal("no lock stamp")
+	}
+	pwd := ldap.NewEntry("uid=a,dc=x", map[string][]string{"pwdAccountLockedTime": {"20260101000000Z"}})
+	if !accountLockStamped(pwd) {
+		t.Fatal("pwdAccountLockedTime")
+	}
+	unlock := ldap.NewEntry("uid=a,dc=x", map[string][]string{"accountUnlockTime": {"20260101000000Z"}})
+	if !accountLockStamped(unlock) {
+		t.Fatal("accountUnlockTime")
 	}
 }
 

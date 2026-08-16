@@ -4,6 +4,8 @@ import (
 	"context"
 	"strings"
 
+	"github.com/go-ldap/ldap/v3"
+
 	"github.com/hilather/go-lab-ldap-mcp/internal/config"
 	"github.com/hilather/go-lab-ldap-mcp/internal/directory"
 	"github.com/hilather/go-lab-ldap-mcp/internal/directory/ldapclient"
@@ -65,7 +67,7 @@ func (r *Runtime) lookupBindIdentity(ctx context.Context, identity string) (dn s
 		}
 	}
 	err = r.pool.Do(ctx, func(c *ldapclient.Conn) error {
-		ent, e := searchBaseConn(ctx, c, target, []string{"uid", "nsAccountLock", "pwdAccountLockedTime"}, size, seconds)
+		ent, e := searchBaseConn(ctx, c, target, []string{"uid", "nsAccountLock", "pwdAccountLockedTime", "accountUnlockTime"}, size, seconds)
 		if e != nil {
 			if fieldOf(e) == directory.FieldNotFound {
 				return nil
@@ -75,7 +77,7 @@ func (r *Runtime) lookupBindIdentity(ctx context.Context, identity string) (dn s
 		found = true
 		dn = ent.DN
 		disabled = accountLocked(ent)
-		locked = len(ent.GetAttributeValues("pwdAccountLockedTime")) > 0
+		locked = accountLockStamped(ent)
 		return nil
 	})
 	return dn, found, disabled, locked, err
@@ -93,6 +95,16 @@ func (r *Runtime) dialBindTest(ctx context.Context, transport directory.Transpor
 		return r.cfg.Connect(ctx, cfg)
 	}
 	return ldapclient.Connect(ctx, cfg)
+}
+
+// accountLockStamped unions engine lock markers (D19 / RQ-2): native
+// stamps pwdAccountLockedTime; 389 stamps accountUnlockTime.
+func accountLockStamped(e *ldap.Entry) bool {
+	if e == nil {
+		return false
+	}
+	return len(e.GetEqualFoldAttributeValues("pwdAccountLockedTime")) > 0 ||
+		len(e.GetEqualFoldAttributeValues("accountUnlockTime")) > 0
 }
 
 func accountInactivated(err error) bool {

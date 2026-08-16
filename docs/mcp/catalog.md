@@ -17,7 +17,7 @@ register only when the matching `register*` flag is true (OD-016).
 
 | Name | Contract | Task | Scope | Default | Notes |
 | --- | --- | --- | --- | --- | --- |
-| `ldap_search_entries` | binding | T-088 | `directory:read` | on | Input/output match `POST /api/v1/search` |
+| `ldap_search_entries` | binding | T-088 | `directory:read` | on | Input/output match `POST /api/v1/search`. `approxMatch` (`~=`) is rejected as `filter` / `unsupported_filter` (HTTP 400); direct LDAP `~=` remains D15. |
 | `ldap_get_capabilities` | proposed | T-088 | `directory:read` | on | `GET /api/v1/capabilities` |
 | `ldap_get_baseline` | proposed | T-088 | `directory:read` | on | `GET /api/v1/baseline` |
 | `ldap_get_entry` | proposed | T-088 | `directory:read` | on | Base-scope read; passwords stripped |
