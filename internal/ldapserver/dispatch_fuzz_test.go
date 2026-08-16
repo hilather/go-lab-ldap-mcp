@@ -97,6 +97,9 @@ func fuzzDispatchServer(f *testing.F) (*Server, func()) {
 	opts.Codec = NewBERCodec(BERCodecOptions{})
 	opts.Schema = schema
 	opts.AllowCleartextBind = true
+	// Keep the fuzzer on the handler surface; anonymous-off refusal is
+	// unit-tested, not the fuzz contract.
+	opts.AllowAnonymousBind = true
 	opts.DirectoryManager = dmIdentity(diffDMFixturePassword)
 	opts.ACI = &FakeACI{Decide: func(ctx context.Context, tx ReadTx, check ACICheck) (bool, error) {
 		return check.Subject.BypassACI, nil

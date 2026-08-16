@@ -657,15 +657,17 @@ func TestACIEngineRuntimeMatrixWire(t *testing.T) {
 		t.Fatalf("runtime add outside suffix = %v, want noSuchObject", res)
 	}
 
-	// An anonymous connection sees nothing under the runtime-pinned set:
-	// denied searches look like empty results, never like existence.
+	// An anonymous connection is refused when anonymous bind is off
+	// (KD-6 / D21): 389 returns inappropriateAuthentication (48) rather
+	// than an empty search result. Denied-search-looks-empty remains the
+	// ACI rule for an authenticated subject that fails search.
 	anon := dialTestClient(t, addr)
 	entries, done = search(t, anon, &SearchRequest{
 		BaseDN: aciEvalSuffix, Scope: ScopeWholeSubtree,
 		Filter: &FilterPresent{Attr: "objectClass"},
 	})
-	if done.Result.Code != ResultSuccess || len(entries) != 0 {
-		t.Fatalf("anonymous subtree = %v with %d entries, want success with none", done.Result, len(entries))
+	if done.Result.Code != ResultInappropriateAuthentication || len(entries) != 0 {
+		t.Fatalf("anonymous subtree = %v with %d entries, want inappropriateAuthentication with none", done.Result, len(entries))
 	}
 }
 

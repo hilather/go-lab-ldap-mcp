@@ -19,6 +19,7 @@ func pagedOptions(t *testing.T) Options {
 	opts := testOptions()
 	opts.Codec = NewBERCodec(BERCodecOptions{})
 	opts.Schema = searchSchema()
+	opts.AllowAnonymousBind = true
 	opts.ACI = &FakeACI{Decide: func(ctx context.Context, tx ReadTx, check ACICheck) (bool, error) {
 		return true, nil
 	}}

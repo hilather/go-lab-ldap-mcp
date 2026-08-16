@@ -96,6 +96,9 @@ func TestWhoAmIRequestValueRejected(t *testing.T) {
 	t.Parallel()
 	_, addr := serveTestServerFrom(t, bindOptions(t), nil)
 	cl := dialTestClient(t, addr)
+	if res := bindResult(t, cl, "uid=alice,ou=people,dc=example,dc=test", "alice-fixture-password"); res.Code != ResultSuccess {
+		t.Fatalf("bind = %v", res)
+	}
 
 	resp := whoami(t, cl, &ExtendedRequest{Name: OIDWhoAmI, Value: []byte("x")})
 	if resp.Result.Code != ResultProtocolError {
@@ -109,9 +112,24 @@ func TestWhoAmIUnknownExtendedOp(t *testing.T) {
 	t.Parallel()
 	_, addr := serveTestServerFrom(t, bindOptions(t), nil)
 	cl := dialTestClient(t, addr)
+	if res := bindResult(t, cl, "uid=alice,ou=people,dc=example,dc=test", "alice-fixture-password"); res.Code != ResultSuccess {
+		t.Fatalf("bind = %v", res)
+	}
 
 	resp := whoami(t, cl, &ExtendedRequest{Name: "1.3.6.1.4.1.99999.1"})
 	if resp.Result.Code != ResultProtocolError {
 		t.Fatalf("unknown extended op = %v, want protocolError", resp.Result)
+	}
+}
+
+// TestWhoAmIAnonymousOffRefused: with anonymous access off, pre-bind
+// WhoAmI is refused (D14 collapsed onto KD-6 / D21).
+func TestWhoAmIAnonymousOffRefused(t *testing.T) {
+	t.Parallel()
+	_, addr := serveTestServerFrom(t, bindOptions(t), nil)
+	cl := dialTestClient(t, addr)
+	resp := whoami(t, cl, &ExtendedRequest{Name: OIDWhoAmI})
+	if resp.Result.Code != ResultInappropriateAuthentication {
+		t.Fatalf("whoami anonymous-off = %v, want inappropriateAuthentication", resp.Result)
 	}
 }

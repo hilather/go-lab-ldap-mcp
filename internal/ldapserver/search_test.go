@@ -33,6 +33,9 @@ func searchOptions(t *testing.T, mutate func(*Options)) Options {
 	opts := testOptions()
 	opts.Codec = NewBERCodec(BERCodecOptions{})
 	opts.Schema = searchSchema()
+	// Operation tests drive the wire without a bind. Production default
+	// remains off (KD-6); anonymous-off refusal is covered separately.
+	opts.AllowAnonymousBind = true
 	opts.ACI = &FakeACI{Decide: func(ctx context.Context, tx ReadTx, check ACICheck) (bool, error) {
 		return true, nil
 	}}

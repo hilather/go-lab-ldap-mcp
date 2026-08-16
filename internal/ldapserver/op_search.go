@@ -203,11 +203,14 @@ func (s *Server) rootDSE() *Entry {
 }
 
 // searchRootDSE answers a base-object search on the empty DN with the Root
-// DSE (T-132, parity contract C10). Like 389, the DSE is readable without
-// a bind and is not subject to ACI: capability inspection runs pre-bind.
-// One-level and subtree searches on "" miss the DSE (RFC 4511 section
-// 4.5.1: it belongs to no naming context); 389 answers those with
-// noSuchObject, matched here (Delta candidate for the T-147 oracle).
+// DSE (T-132, parity contract C10). The DSE is not subject to ACI.
+// When AllowAnonymousBind is off, dispatch refuses the search before this
+// handler runs (KD-6 / D24): pinned 389 returns
+// inappropriateAuthentication (48) for pre-bind Root DSE. Production
+// capability inspect uses the bound runtime pool (fetchRootDSE). When
+// the flag is on, the DSE remains readable without a bind. One-level
+// and subtree searches on "" miss the DSE (RFC 4511 section 4.5.1); 389
+// answers those with noSuchObject.
 func (s *Server) searchRootDSE(ctx context.Context, c *conn, m *Message, req *SearchRequest) ResultCode {
 	if req.Scope != ScopeBaseObject {
 		return s.answerSynthetic(ctx, c, m, req, nil, "root DSE requires a base-object search")
@@ -218,8 +221,10 @@ func (s *Server) searchRootDSE(ctx context.Context, c *conn, m *Message, req *Se
 // searchSubschema answers searches addressed at the subschema subentry
 // (cn=subschema, plus the 389-shaped cn=schema alias the control plane's
 // capability inspect reads). Base and subtree return the subentry when the
-// filter matches; one-level has no subordinates. Like 389, the subschema
-// is world-readable.
+// filter matches; one-level has no subordinates. The subschema is not
+// subject to ACI. When AllowAnonymousBind is off, dispatch refuses
+// unauthenticated searches here the same way as Root DSE (KD-6 / D24).
+// When the flag is on, the subschema remains world-readable.
 func (s *Server) searchSubschema(ctx context.Context, c *conn, m *Message, req *SearchRequest) ResultCode {
 	entry := subschemaEntry(s.opts.Schema, req.BaseDN)
 	if req.Scope == ScopeSingleLevel || req.Scope == ScopeChildren {

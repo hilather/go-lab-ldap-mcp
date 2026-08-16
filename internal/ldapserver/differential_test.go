@@ -324,10 +324,10 @@ func diffSequence() []diffStep {
 			cl := s.bindDM()
 			return simpleOpOutcome(t, cl, &ExtendedRequest{Name: OIDWhoAmI})
 		}},
-		// CAND-20 anonymous case (D14): with anonymous access disabled, 389
-		// refuses the WhoAmI op itself (48); native succeeds with an empty
-		// authzId.
-		{name: "whoami-anonymous", delta: "D14", run: func(t *testing.T, s *diffSession) diffOutcome {
+		// CAND-20 anonymous case: D14 collapsed under KD-6. With anonymous
+		// access off, both engines refuse WhoAmI with
+		// inappropriateAuthentication (48).
+		{name: "whoami-anonymous", run: func(t *testing.T, s *diffSession) diffOutcome {
 			cl := s.dial()
 			return simpleOpOutcome(t, cl, &ExtendedRequest{Name: OIDWhoAmI})
 		}},
@@ -542,10 +542,8 @@ func TestDifferentialNativeSequence(t *testing.T) {
 		"bind-user-ok":        {code: ResultSuccess},
 		"bind-malformed-dn":   {code: ResultInvalidCredentials}, // D8
 		"whoami-bound":        {code: ResultSuccess, ext: strPtr("dn:cn=Directory Manager")},
-		// Anonymous WhoAmI: native emits a present, zero-length responseValue
-		// (RFC 4532), which decodes indistinguishably from absent; the
-		// CAND-20 adjudication step tags any 389-visible rendering.
-		"whoami-anonymous":           {code: ResultSuccess},
+		// D14 collapsed: anonymous-off WhoAmI is refused (48), matching 389.
+		"whoami-anonymous":           {code: ResultInappropriateAuthentication},
 		"search-base-missing":        {code: ResultNoSuchObject},
 		"search-sub-equality":        {code: ResultSuccess, dns: []string{"uid=alice,ou=people,dc=example,dc=test"}},
 		"search-sub-equality-folded": {code: ResultSuccess, dns: []string{"uid=alice,ou=people,dc=example,dc=test"}},

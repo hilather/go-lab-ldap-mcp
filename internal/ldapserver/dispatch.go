@@ -20,6 +20,11 @@ var errDenied = errors.New("ldapserver: access denied")
 // an abandoned operation gets no response PDU (RFC 4511 section 4.11).
 func (s *Server) dispatchOp(ctx context.Context, c *conn, m *Message) {
 	name := opName(m.Op)
+	if res, ok := s.refuseUnauthenticated(c); !ok {
+		c.sendResult(m.ID, responseFor(m.Op, res))
+		s.metrics().ObserveOperation(name, res.Code)
+		return
+	}
 	if res, ok := s.checkControls(m); !ok {
 		c.sendResult(m.ID, responseFor(m.Op, res))
 		s.metrics().ObserveOperation(name, res.Code)
@@ -50,6 +55,28 @@ func (s *Server) dispatchOp(ctx context.Context, c *conn, m *Message) {
 		}))
 	}
 	s.metrics().ObserveOperation(name, code)
+}
+
+// refuseUnauthenticated implements KD-6 / D21 / D24: when
+// AllowAnonymousBind is off, unauthenticated directory operations are
+// refused with inappropriateAuthentication (48), matching pinned 389.
+// That includes Search of the suffix, Root DSE, and subschema; Compare;
+// writes; and extended ops other than StartTLS (StartTLS is handled in
+// the read loop and never reaches dispatch). WhoAmI on a pre-bind
+// connection collapses to the same 48 (D14). Production capability
+// inspect uses the bound runtime pool, so bound Root DSE search is
+// unaffected.
+func (s *Server) refuseUnauthenticated(c *conn) (Result, bool) {
+	if s.opts.AllowAnonymousBind {
+		return Result{}, true
+	}
+	if aciAuthenticatedA(c.subject()) {
+		return Result{}, true
+	}
+	return Result{
+		Code:              ResultInappropriateAuthentication,
+		DiagnosticMessage: "anonymous access disabled",
+	}, false
 }
 
 // checkControls enforces the critical-control contract (parity contract

@@ -166,8 +166,11 @@ func TestRootDSEScopeFilterAndSelection(t *testing.T) {
 }
 
 // TestRootDSEIgnoresACI: the DSE and subschema stay readable when the ACI
-// engine denies everything (389-observed; capability inspect runs
-// pre-bind).
+// engine denies everything. They are not subject to ACI. When
+// AllowAnonymousBind is off, dispatch refuses the op before ACI (D24);
+// this fixture enables anonymous (via schemaWireOptions) so the
+// ACI-independence of the synthetic entries is visible. Production
+// capability inspect uses the bound runtime pool.
 func TestRootDSEIgnoresACI(t *testing.T) {
 	t.Parallel()
 	_, addr := serveTestServerFrom(t, schemaWireOptions(t, func(o *Options) {
@@ -408,6 +411,7 @@ func TestSubschemaOutsideStore(t *testing.T) {
 	opts := testOptions()
 	opts.Codec = NewBERCodec(BERCodecOptions{})
 	opts.Schema = std
+	opts.AllowAnonymousBind = true
 	opts.ACI = &FakeACI{Decide: func(ctx context.Context, tx ReadTx, check ACICheck) (bool, error) {
 		return true, nil
 	}}

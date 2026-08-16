@@ -19,6 +19,12 @@ import (
 // The handler reads only the connection's Subject and touches no
 // credentials; the authzId echoes the identity the client already proved
 // by binding, so no ACI check applies.
+//
+// When AllowAnonymousBind is off, dispatch refuses unauthenticated WhoAmI
+// with inappropriateAuthentication (48) before this handler runs,
+// matching pinned 389 (D14 collapsed by KD-6). When the flag is on, the
+// anonymous identity still answers success with a present, empty
+// responseValue.
 func (s *Server) handleWhoAmI(ctx context.Context, c *conn, m *Message, req *ExtendedRequest) ResultCode {
 	respond := func(res Result, value []byte) ResultCode {
 		if ctx.Err() == nil {

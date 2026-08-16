@@ -125,7 +125,11 @@ type Options struct {
 	TLSConfig *tls.Config
 	// AllowStartTLS permits the StartTLS extended op on the LDAP listener.
 	AllowStartTLS bool
-	// AllowAnonymousBind permits anonymous binds. Default off (C3).
+	// AllowAnonymousBind permits anonymous binds. Default off (C3). When
+	// off, unauthenticated directory operations (search including Root DSE
+	// and subschema, compare, writes, and extended ops other than StartTLS)
+	// are also refused with inappropriateAuthentication (48), matching
+	// pinned 389 (KD-6 / D21 / D24).
 	AllowAnonymousBind bool
 	// AllowCleartextBind permits simple bind without TLS. Default off; only
 	// explicit insecure lab mode turns it on (C3).
