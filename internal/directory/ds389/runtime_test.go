@@ -447,6 +447,29 @@ func TestAssertionFilterUsesOperationalAttrs(t *testing.T) {
 	}
 }
 
+func TestNewDeleteOmitsAssertionControl(t *testing.T) {
+	t.Parallel()
+	rt := testRuntime(t)
+	on := true
+	rt.cfg.Assertion = &on
+	live := &ldap.Entry{
+		DN: "uid=x,ou=people,dc=example,dc=test",
+		Attributes: []*ldap.EntryAttribute{
+			{Name: "entryCSN", Values: []string{"20240101000000.000000Z#000000#000#000000"}},
+		},
+	}
+	if rt.assertionControl(t.Context(), nil, live) == nil {
+		t.Fatal("fixture: enabled assertion missing on modify path")
+	}
+	req := newDelete(t.Context(), rt, nil, live.DN, live)
+	if req.DN != live.DN {
+		t.Fatalf("delete dn %q", req.DN)
+	}
+	if len(req.Controls) != 0 {
+		t.Fatalf("delete controls = %#v, want none (no critical RFC 4528)", req.Controls)
+	}
+}
+
 func TestConfigFieldCodes(t *testing.T) {
 	t.Parallel()
 	err := cfgErr("filter", "over_broad", "search too broad")

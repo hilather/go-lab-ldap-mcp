@@ -73,6 +73,8 @@ type RuntimeConfig struct {
 	// AfterSearch runs after a mutation's live read/checkRev and after the
 	// assertion control is built, immediately before the write. Tests inject
 	// a concurrent directory change into the search-to-modify window.
+	// Delete does not attach RFC 4528 (see newDelete); AfterSearch on
+	// delete only observes the checkRev-only residual race.
 	AfterSearch func(ctx context.Context, dn string)
 
 	// Client is the unbound-capable LDAP config for disposable bind-test.
@@ -441,6 +443,8 @@ func (r *Runtime) noteAssertion(dse directory.RootDSE) {
 
 // assertionEnabledOn uses a cached Root DSE or probes on the held connection.
 // It must not call pool.Do (nested acquire deadlocks ldapPoolSize 1).
+// When false (or unprobed), Modify has a residual search-to-write TOCTOU.
+// Delete is always checkRev-only: newDelete never attaches RFC 4528.
 func (r *Runtime) assertionEnabledOn(ctx context.Context, c *ldapclient.Conn) bool {
 	if r.cfg.Assertion != nil {
 		return *r.cfg.Assertion
@@ -530,8 +534,11 @@ func newModify(ctx context.Context, r *Runtime, c *ldapclient.Conn, dn string, l
 }
 
 func newDelete(_ context.Context, _ *Runtime, _ *ldapclient.Conn, dn string, _ *ldap.Entry) *ldap.DelRequest {
-	// Native honors RFC 4528 only on Modify. A critical assertion on
-	// Delete is unavailableCriticalExtension; checkRev is the delete gate.
+	// Both engines: no RFC 4528 on Delete. Native honors assertion only
+	// on Modify (critical control → unavailableCriticalExtension). 389
+	// therefore also loses the atomic search-to-delete gate. checkRev
+	// still compares the pre-delete snapshot; the AfterSearch window is
+	// a residual TOCTOU (same class as "assertion absent" on Modify).
 	return ldap.NewDelRequest(dn, nil)
 }
 

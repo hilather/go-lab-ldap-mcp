@@ -380,17 +380,6 @@ func addProbeUser(t *testing.T, d engineDial, password string) {
 	}
 }
 
-func allowSelfPassword(t *testing.T, d engineDial) {
-	t.Helper()
-	conn := d.dmMust(t)
-	defer conn.Close()
-	mod := ldap.NewModifyRequest(runtimeSuffix, nil)
-	mod.Add("aci", []string{`(target="ldap:///dc=example,dc=test")(targetattr="userPassword")(version 3.0; acl "self-pwd"; allow (write) userdn="ldap:///self";)`})
-	if err := conn.Modify(mod); err != nil {
-		t.Fatalf("aci: %v", err)
-	}
-}
-
 func userPasswd(t *testing.T, d engineDial, dn, old, neu string) (string, error) {
 	t.Helper()
 	// Confirm the current secret still binds, then replace as the runtime

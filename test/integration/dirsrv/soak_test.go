@@ -28,8 +28,19 @@ func TestSoakSmallProfile(t *testing.T) {
 	mat := generateTLS(t, "localhost")
 	inst.ImportTLS(t, mat)
 	ca := filepath.Join(mat.Dir, "ca", "ca.crt")
+	// ImportTLS replaces the server cert with the generated localhost
+	// material. Do not use inst.Dial() here: that trusts WriteCA's
+	// first-boot instance CA and Hostname(), not the imported test CA.
+	d := engineDial{
+		engine:     Engine389DS,
+		ldapAddr:   inst.LDAPAddr,
+		ldapsAddr:  inst.LDAPSAddr,
+		caFile:     ca,
+		serverName: "localhost",
+		dmPassword: inst.Password().Reveal(),
+	}
 	const extra = 19
-	addPeople(t, inst, extra)
+	addPeople(t, d, extra)
 
 	start := time.Now()
 	who, dns, err := goindep.SearchWhoami(goindep.Config{
@@ -155,9 +166,8 @@ func TestDatasetSmallCompiles(t *testing.T) {
 	}
 }
 
-func addPeople(t *testing.T, inst *Instance, n int) {
+func addPeople(t *testing.T, d engineDial, n int) {
 	t.Helper()
-	d := inst.Dial(t)
 	conn := d.dmMust(t)
 	defer conn.Close()
 	for i := 1; i <= n; i++ {
