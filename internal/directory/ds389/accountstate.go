@@ -178,7 +178,10 @@ func isUndefinedAttribute(err error) bool {
 		return false
 	}
 	msg := strings.ToLower(err.Error())
-	return strings.Contains(msg, "undefined attribute") || strings.Contains(msg, "nosuchattribute") || strings.Contains(msg, "object class violation")
+	return strings.Contains(msg, "undefined attribute") ||
+		strings.Contains(msg, "nosuchattribute") ||
+		strings.Contains(msg, "no such attribute") ||
+		strings.Contains(msg, "object class violation")
 }
 
 func applyAccountChanges(ctx context.Context, c *ldapclient.Conn, dn string, mod *ldap.ModifyRequest) error {

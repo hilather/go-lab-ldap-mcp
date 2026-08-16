@@ -1,7 +1,8 @@
 # LabLDAP continuous integration (T-004, T-007 wiring).
 #
-# Required PR gate: static, unit, frontend, security, integration.
-# image-bootstrap and make image are required. SBOM/provenance is the sbom job.
+# Required PR gate: static, unit, frontend, security, integration (389),
+# integration-native. image-bootstrap and make image are required.
+# SBOM/provenance is the sbom job.
 #
 # Caches are only the Go module/build cache and the pnpm store.
 # Do not add cache paths that include /secrets, .env, or credential files.
@@ -31,15 +32,15 @@ env:
   COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
 
 jobs:
-  # Docs-only pushes were never finishing: each new docs commit
-  # cancelled a 25-minute integration job. Skip Docker-heavy jobs
-  # when the compare range is only site/docs/markdown.
+  # Docs-only pushes skip Docker-heavy jobs. Native integration is a
+  # second, cheaper gate: only when native LDAP paths change.
   changes:
     name: changes
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
       heavy: ${{ steps.filter.outputs.heavy }}
+      native: ${{ steps.filter.outputs.native }}
     steps:
       - id: filter
         env:
@@ -55,28 +56,37 @@ jobs:
           fi
           if [ -z "${base}" ] || [ "${base}" = "0000000000000000000000000000000000000000" ]; then
             echo "heavy=true" >> "${GITHUB_OUTPUT}"
-            echo "no prior SHA; run integration and image"
+            echo "native=true" >> "${GITHUB_OUTPUT}"
+            echo "no prior SHA; run integration, native integration, and image"
             exit 0
           fi
           if ! files=$(gh api "repos/${GITHUB_REPOSITORY}/compare/${base}...${head}" --jq '.files[].filename'); then
             echo "heavy=true" >> "${GITHUB_OUTPUT}"
-            echo "compare failed; run integration and image"
+            echo "native=true" >> "${GITHUB_OUTPUT}"
+            echo "compare failed; run integration, native integration, and image"
             exit 0
           fi
           printf '%s\n' "${files}"
           list=$(mktemp)
           printf '%s\n' "${files}" > "${list}"
           heavy=false
+          native=false
           while IFS= read -r f; do
             [ -z "${f}" ] && continue
             case "${f}" in
               docs/*|*.md|.github/workflows/pages.yml) ;;
               *) heavy=true ;;
             esac
+            case "${f}" in
+              internal/ldapserver/*|cmd/labldapd/*|internal/directory/native/*|test/integration/dirsrv/*|test/parity/*|deploy/compose/compose.native*|deploy/docker/labldapd*|deploy/docker/*native*)
+                native=true
+                ;;
+            esac
           done < "${list}"
           rm -f "${list}"
           echo "heavy=${heavy}" >> "${GITHUB_OUTPUT}"
-          echo "heavy=${heavy}"
+          echo "native=${native}" >> "${GITHUB_OUTPUT}"
+          echo "heavy=${heavy} native=${native}"
 
   static:
     name: static
@@ -258,7 +268,7 @@ jobs:
           command -v ldapwhoami
           python3 --version
 
-      - name: Integration tests
+      - name: Integration tests (389 DS)
         run: |
           set -euo pipefail
           make test-integration 2>&1 | tee integration.log
@@ -271,6 +281,48 @@ jobs:
         with:
           name: integration-log
           path: integration.log
+          if-no-files-found: warn
+          retention-days: 30
+          include-hidden-files: false
+
+  integration-native:
+    name: integration-native
+    needs: [changes]
+    if: needs.changes.outputs.native == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+          cache-dependency-path: go.mod
+
+      - name: Install host LDAP tools
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ldap-utils
+          command -v ldapsearch
+          command -v ldapwhoami
+
+      - name: Integration tests (native engine)
+        run: |
+          set -euo pipefail
+          make test-integration-native 2>&1 | tee integration-native.log
+
+      - name: Upload native integration log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-native-log
+          path: integration-native.log
           if-no-files-found: warn
           retention-days: 30
           include-hidden-files: false

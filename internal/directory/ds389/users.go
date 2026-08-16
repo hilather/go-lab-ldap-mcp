@@ -281,7 +281,7 @@ func (r *Runtime) SetPassword(ctx context.Context, id directory.UserID, password
 	}
 	size, seconds := r.searchLimits()
 	err = r.pool.Do(ctx, func(c *ldapclient.Conn) error {
-		live, e := searchBaseConn(ctx, c, dn, accountStateReadAttrs(), size, seconds)
+		live, e := searchBaseConn(ctx, c, dn, runtimeUserReadAttrs(), size, seconds)
 		if e != nil {
 			return e
 		}
@@ -300,18 +300,14 @@ func (r *Runtime) SetPassword(ctx context.Context, id directory.UserID, password
 		if mustChange {
 			stamps.Replace(attrPwdReset, []string{pwdResetTrue})
 			stamps.Replace(attrPasswordExpirationTime, []string{passwordExpiredGeneralized})
-		} else {
-			if hasAttr(live, attrPwdReset) {
-				stamps.Delete(attrPwdReset, nil)
-			}
-			if hasAttr(live, attrPasswordExpirationTime) {
-				stamps.Delete(attrPasswordExpirationTime, nil)
-			}
+			return applyAccountChanges(ctx, c, dn, stamps)
 		}
-		if len(stamps.Changes) == 0 {
-			return nil
-		}
-		return applyAccountChanges(ctx, c, dn, stamps)
+		// Best-effort: native hash-on-write already dropped these; 389
+		// may keep them. Missing/undefined attributes are not a failed set.
+		stamps.Delete(attrPwdReset, nil)
+		stamps.Delete(attrPasswordExpirationTime, nil)
+		_ = applyAccountChanges(ctx, c, dn, stamps)
+		return nil
 	})
 	return redactSecrets(err, password)
 }

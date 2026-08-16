@@ -1,6 +1,6 @@
 # Tests
 
-- `integration/` — real 389 DS container tests (`//go:build integration`; `make test-integration`), including bootstrap-image smoke, Compose topology, and T-113 TLS helper LDAPS/StartTLS
+- `integration/` — engine tests (`//go:build integration`). `make test-integration` is 389 DS (Docker). `make test-integration-native` is the same suite against in-process `labldapd`. Contract cases must pass on both; 389-only skips are the Delta/Excluded ledger in `dirsrv/engine.go`. Includes REST→LDAP workflow battery (`TestRESTAccountWorkflowLDAPTools`), bootstrap-image smoke, Compose topology, and T-113 TLS helper LDAPS/StartTLS.
 - `enginesuite/` — T-043 observed/proposed inventory (does not require `docs/03`)
 - `composecontract/` — T-110/T-111 Compose file contract (no Docker)
 - `imagecontract/` — T-108 / T-109 Dockerfile pin and hardening contract (no Docker)

@@ -25,6 +25,7 @@ Before implementing a task, read:
 - Do not provide Directory Manager credentials to the long-running control service.
 - Do not make the REST handlers call MCP handlers or the MCP handlers call REST handlers.
 - Both transports must call the same application service interfaces.
+- New public REST operations and MCP tools that an operator or agent uses to inspect or change directory, account, password, membership, reset, or export state must be usable from the embedded web UI in the same change. The UI calls the generated OpenAPI client and `internal/app` only through REST. Do not ship REST/MCP-only operator workflows and leave the console unable to trigger them.
 - Do not log tokens, passwords, bind credentials, session IDs, complete authorization headers, or secret-file content.
 - Do not commit plaintext secrets or generated test credentials.
 - Do not concatenate untrusted strings into LDAP filters, DNs, ACIs, shell commands, or URLs.
@@ -33,6 +34,7 @@ Before implementing a task, read:
 - Do not let the runtime service account write outside the configured managed suffix.
 - Do not expose hard engine reset through REST or MCP.
 - Do not use a floating container tag in release Compose files.
+- New directory-visible behavior in the native engine (`internal/ldapserver` / `labldapd`) must have a parametrized integration test that runs against **both** 389 DS and native (`LABLDAP_IT_ENGINE`, `make test-integration` and `make test-integration-native`) and asserts the same client-visible result. Skip 389 only when the behavior is explicitly native-only infrastructure (no 389 counterpart) and name the Delta/Excluded ID. Do not treat native unit tests as a substitute for the 389 oracle path. CI runs the native integration job only when those native LDAP paths change.
 
 ## Repository source-of-truth hierarchy
 
@@ -158,6 +160,7 @@ If a task cannot be completed without violating an architecture rule, stop that 
 
 - Enable TypeScript strict mode.
 - Use generated OpenAPI types and a single API client layer.
+- When adding or changing a public REST/MCP operator workflow, add or extend the matching console page so a browser user can perform the same action (same scopes, revision/`If-Match`, password-field clearing, and error announcement).
 - Use TanStack Query for server state and avoid duplicating it in global client state.
 - Do not store bearer tokens in `localStorage`, `sessionStorage`, IndexedDB, URL parameters, or browser logs.
 - Meet keyboard navigation, focus, labeling, contrast, and error-announcement requirements.
@@ -200,10 +203,11 @@ Every behavior change requires the lowest applicable test level:
 - Pure parsing or mapping: unit test.
 - LDAP operation or 389 DS configuration: integration test with a real 389 DS container.
 - Native engine protocol or store behavior: in-process unit/integration test against `internal/ldapserver` (no Docker required until compose-native).
+- Native behavior that 389 also implements: the same `test/integration/dirsrv` case on both engines (`LABLDAP_IT_ENGINE=389ds` default and `=native`). Prefer REST/MCP to toggle state and host LDAP tools (`ldapwhoami`, `ldapsearch`) to observe it. `skip389Only` only for documented Delta/Excluded IDs in `engine.go`.
 - Dual-engine Contract behavior: `test/parity` with 389 as oracle (see `docs/design/native-engine-parity-contract.md`).
 - REST contract: OpenAPI contract and handler test.
 - MCP tool: SDK-level protocol test and application-service test.
-- Browser workflow: Playwright end-to-end test.
+- Browser workflow: Playwright end-to-end test of the UI path for every new operator REST/MCP action (not a screenshot-only check).
 - Authorization change: positive and negative scope tests.
 - Reset or export: deterministic baseline comparison test.
 - Security-sensitive parser: fuzz test or property test where practical.
@@ -219,10 +223,11 @@ A task is done only when:
 - New configuration fields have defaults, validation, schema, examples, and compatibility notes.
 - New API operations appear in OpenAPI and generated clients.
 - New MCP operations have input schema, output schema, scopes, annotations, and tests.
+- New operator REST/MCP actions are reachable and completable in the embedded UI, with Playwright coverage. Do not mark the task complete if the console cannot perform the same workflow.
 - Sensitive data is covered by logging-redaction tests.
 - Errors are stable and actionable.
 - The implementation works in both ephemeral and persistent Compose modes when applicable.
-- Contract-tier native-engine behavior has a 389 oracle case in `test/parity` unless the task is explicitly native-only infrastructure.
+- Contract-tier native-engine behavior has a 389 oracle case in `test/parity` and a dual-engine integration case unless the task is explicitly native-only infrastructure.
 - `make verify` passes.
 - No new high or critical vulnerability is introduced by dependency scanning.
 

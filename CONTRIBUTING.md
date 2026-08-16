@@ -38,6 +38,7 @@ Other targets you will actually run:
 
 ```text
 make test-integration    # real 389 DS, needs Docker
+make test-integration-native  # same suite against in-process labldapd
 make test-e2e
 make image && make image-bootstrap
 make compose-up
@@ -66,6 +67,13 @@ same change.
   compatibility note.
 - New REST operations belong in OpenAPI and the generated clients.
 - New MCP tools need input/output schema, scopes, annotations, and tests.
+- New operator REST/MCP actions must also be usable in the embedded UI in
+  the same change (generated client, same scopes). Playwright must cover
+  that UI path. Agents: see `AGENTS.md`.
+- New native LDAP behavior that 389 also has must ship a dual-engine
+  integration test (`make test-integration` and
+  `make test-integration-native`). Skip 389 only with a named
+  Delta/Excluded ID.
 
 Breaking config → new `apiVersion`. Breaking REST → new URL version.
 Breaking MCP → new tool name, or a documented transition.

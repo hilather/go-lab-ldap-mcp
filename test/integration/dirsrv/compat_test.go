@@ -32,8 +32,13 @@ type compatEnv struct {
 // (native.go) with the identical scenario compiled and applied over LDAP.
 func startCompatEngine(t *testing.T) compatEnv {
 	t.Helper()
+	return startCompatEngineFromYAML(t, seedYAML("merge"))
+}
+
+func startCompatEngineFromYAML(t *testing.T, yaml string) compatEnv {
+	t.Helper()
 	if itEngine(t) == EngineNative {
-		n := startNative(t, seedYAML("merge"))
+		n := startNative(t, yaml)
 		return compatEnv{
 			engine:     EngineNative,
 			ldapAddr:   n.LDAPAddr,
@@ -44,7 +49,7 @@ func startCompatEngine(t *testing.T) compatEnv {
 		}
 	}
 	inst := Start(t)
-	_, guest := stageSeedApply(t, inst, seedYAML("merge"), seedCanary)
+	_, guest := stageSeedApply(t, inst, yaml, seedCanary)
 	out, err := execApply(t, inst, guest, nil)
 	if err != nil {
 		t.Fatalf("apply: %v\n%s", err, redactLogs(out, seedCanary, inst.password))
@@ -59,6 +64,35 @@ func startCompatEngine(t *testing.T) compatEnv {
 		serverName: "localhost",
 		dmPassword: inst.Password().Reveal(),
 	}
+}
+
+func workflowYAML() string {
+	return `apiVersion: labldap.dev/v1alpha1
+kind: LabScenario
+metadata: { name: workflow }
+spec:
+  directory: { suffix: "dc=example,dc=test" }
+  lifecycle: { startupMode: merge }
+  transport: { ldaps: { enabled: true, port: 3636 } }
+  runtimeAccount: { id: rt, passwordFile: secrets/runtime-ldap }
+  users:
+    - id: alice
+      uid: alice
+      passwordFile: secrets/user-alice
+      enabled: true
+      attributes: { sn: Seed }
+  groups:
+    - id: staff
+      members:
+        - user: alice
+  passwordPolicy:
+    minLength: 12
+    historyCount: 0
+    maxAge: 0s
+    warningAge: 0s
+    lockout: { enabled: true, maxFailures: 5, lockoutDuration: 60s }
+    storageScheme: PBKDF2-SHA256
+`
 }
 
 func TestCompatibilityLDAPClients(t *testing.T) {

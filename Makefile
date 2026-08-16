@@ -53,6 +53,7 @@ help:
 		'  test-unit          Go tests + frontend build/scaffold tests' \
 		'  test-integration   real 389 DS harness (pinned digest; needs Docker)' \
 		'  test-integration-native  T-148 native engine variant (in-process labldapd; no Docker)' \
+		'  test-integration-workflow  REST account-state battery + ldapwhoami/ldapsearch (389 then native)' \
 		'  test-fuzz-short    T-149: every fuzz target, CI-short fuzztime' \
 		'  test-native-soak   T-150: goroutine/FD churn + bbolt growth gates' \
 		'  test-diff          T-149 differential: native always; 389 oracle when Docker+image' \
@@ -108,6 +109,11 @@ test-integration:
 # (skip ledger: test/integration/dirsrv/engine.go).
 test-integration-native:
 	LABLDAP_IT_ENGINE=native $(GO) test -tags=integration ./test/integration/... -count=1 -timeout 30m
+
+# REST account-workflow battery + host ldapwhoami/ldapsearch, both engines.
+test-integration-workflow:
+	$(GO) test -tags=integration ./test/integration/dirsrv -run TestRESTAccountWorkflowLDAPTools -count=1 -timeout 30m
+	LABLDAP_IT_ENGINE=native $(GO) test -tags=integration ./test/integration/dirsrv -run TestRESTAccountWorkflowLDAPTools -count=1 -timeout 10m
 
 # T-149: every fuzz target in CI-compatible short mode. One -fuzz run per
 # target (go test runs a single fuzz target per invocation); the regexps

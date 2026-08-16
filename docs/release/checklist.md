@@ -8,7 +8,7 @@ Do not invent a LICENSE. Do not push images (OD-004).
 4. `make compose-up` then `GET /health` and `GET /health/ready` succeed.
 5. `make compose-down` then `make compose-up-persistent`; restart keeps a
    runtime entry; soft reset restores baseline.
-6. `make test-integration` (real 389 DS).
+6. `make test-integration` (real 389 DS) and `make test-integration-native`.
 7. `make test-e2e` (mock by default; set `LABLDAP_E2E_BASE_URL` for live UI).
 8. `make scan` has no unapproved criticals.
 9. `dist/sbom/source.cdx.json` names the pinned dirsrv digest.

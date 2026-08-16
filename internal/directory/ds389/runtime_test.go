@@ -220,6 +220,9 @@ func TestBindOutcomeDoesNotEnumerate(t *testing.T) {
 	if bindOutcome(true, false, false, false, nil) != directory.BindOutcomeSuccess {
 		t.Fatal("success")
 	}
+	if bindOutcome(true, false, true, false, nil) != directory.BindOutcomeLocked {
+		t.Fatal("locked stamp wins over successful bind")
+	}
 	if bindOutcome(true, false, false, true, nil) != directory.BindOutcomeMustChange {
 		t.Fatal("must_change on successful bind")
 	}

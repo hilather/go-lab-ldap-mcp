@@ -108,6 +108,15 @@ func accountInactivated(err error) bool {
 
 func bindOutcome(found, disabled, locked, mustChange bool, bindErr error) string {
 	if bindErr == nil {
+		// Stamps win over a successful simple bind. 389 may still allow
+		// LDAP bind when expire/lockout plugins are off; bind-test is the
+		// QA view of account state.
+		if disabled {
+			return directory.BindOutcomeDisabled
+		}
+		if locked {
+			return directory.BindOutcomeLocked
+		}
 		if mustChange {
 			return directory.BindOutcomeMustChange
 		}
