@@ -8,44 +8,50 @@ import (
 // matchFilter evaluates one filter tree against an entry. Evaluation never
 // panics and treats unknown nodes as non-matching (parity contract C6).
 //
-// Matching-rule stub (TASKS T-127 acceptance): until T-131 lands the real
-// matching-rule engine, equality folds case only when the schema registers
-// the attribute with a caseIgnore* / distinguishedName equality rule, and
-// otherwise compares exact octets. Ordering comparisons use the same
-// folding on the byte-lexicographic order. Approximate match folds to
-// equality — 389 evaluates approx as equality for attributes without an
-// approximate matching rule (observed); recorded as a parity Delta
-// candidate for the T-147 oracle.
+// Matching rules (T-131): equality, substring, and ordering assertions
+// resolve through the Matcher seam (matching.go), which applies the
+// attribute's RFC 4512/4517 rule — caseIgnoreMatch, caseIgnoreIA5Match,
+// distinguishedNameMatch as structural canonical-DN comparison, or exact
+// octets for attributes with no known rule. Approximate match folds to
+// equality: 389 evaluates approx as equality for attributes without an
+// approximate matching rule (observed); still folded, recorded as parity
+// Delta candidate CAND-2 for the T-147 oracle.
 func matchFilter(e *Entry, f Filter, s Schema) bool {
+	return matchFilterM(e, f, NewRuleMatcher(s))
+}
+
+// matchFilterM is the Matcher-driven filter evaluator; tests exercise it
+// directly against golden matching pairs.
+func matchFilterM(e *Entry, f Filter, m Matcher) bool {
 	switch flt := f.(type) {
 	case *FilterAnd:
 		for _, child := range flt.Children {
-			if !matchFilter(e, child, s) {
+			if !matchFilterM(e, child, m) {
 				return false
 			}
 		}
 		return true
 	case *FilterOr:
 		for _, child := range flt.Children {
-			if matchFilter(e, child, s) {
+			if matchFilterM(e, child, m) {
 				return true
 			}
 		}
 		return false
 	case *FilterNot:
-		return !matchFilter(e, flt.Child, s)
+		return !matchFilterM(e, flt.Child, m)
 	case *FilterEquality:
-		return matchEquality(e, flt.Attr, flt.Value, s)
+		return matchEquality(e, flt.Attr, flt.Value, m)
 	case *FilterSubstrings:
-		return matchSubstrings(e, flt, s)
+		return matchSubstrings(e, flt, m)
 	case *FilterPresent:
 		return len(e.Values(flt.Attr)) > 0
 	case *FilterGreaterOrEqual:
-		return matchOrdering(e, flt.Attr, flt.Value, s, 1)
+		return matchOrdering(e, flt.Attr, flt.Value, m, 1)
 	case *FilterLessOrEqual:
-		return matchOrdering(e, flt.Attr, flt.Value, s, -1)
+		return matchOrdering(e, flt.Attr, flt.Value, m, -1)
 	case *FilterApproxMatch:
-		return matchEquality(e, flt.Attr, flt.Value, s)
+		return matchEquality(e, flt.Attr, flt.Value, m)
 	default:
 		return false
 	}
@@ -53,6 +59,9 @@ func matchFilter(e *Entry, f Filter, s Schema) bool {
 
 // foldCase reports whether the attribute's registered equality rule folds
 // case. Unknown attributes fall back to exact octet comparison.
+//
+// T-128 write-path value matching (op_write.go) still uses this fold-only
+// helper; T-131 replaced the search/filter side with the Matcher seam.
 func foldCase(s Schema, attr string) bool {
 	at, ok := s.AttributeType(attr)
 	if !ok {
@@ -73,10 +82,11 @@ func valueEqual(fold bool, a, b []byte) bool {
 	return bytes.Equal(a, b)
 }
 
-func matchEquality(e *Entry, attr string, value []byte, s Schema) bool {
-	fold := foldCase(s, attr)
+// matchEquality evaluates the attribute's equality rule through the
+// Matcher; malformed assertions are Undefined (no match), never errors.
+func matchEquality(e *Entry, attr string, value []byte, m Matcher) bool {
 	for _, v := range e.Values(attr) {
-		if valueEqual(fold, v, value) {
+		if m.Equal(attr, v, value) {
 			return true
 		}
 	}
@@ -84,19 +94,10 @@ func matchEquality(e *Entry, attr string, value []byte, s Schema) bool {
 }
 
 // matchOrdering implements >= (dir 1) and <= (dir -1) over the attribute
-// values, folded per the equality rule.
-func matchOrdering(e *Entry, attr string, value []byte, s Schema, dir int) bool {
-	fold := foldCase(s, attr)
-	assertion := string(value)
-	if fold {
-		assertion = strings.ToLower(assertion)
-	}
+// values under the attribute's ordering rule.
+func matchOrdering(e *Entry, attr string, value []byte, m Matcher, dir int) bool {
 	for _, v := range e.Values(attr) {
-		candidate := string(v)
-		if fold {
-			candidate = strings.ToLower(candidate)
-		}
-		cmp := strings.Compare(candidate, assertion)
+		cmp := m.Compare(attr, v, value)
 		if dir > 0 && cmp >= 0 {
 			return true
 		}
@@ -107,43 +108,13 @@ func matchOrdering(e *Entry, attr string, value []byte, s Schema, dir int) bool 
 	return false
 }
 
-// matchSubstrings implements RFC 4511 section 4.5.1 substring evaluation:
-// optional initial prefix, ordered any-runs, optional final suffix.
-func matchSubstrings(e *Entry, f *FilterSubstrings, s Schema) bool {
-	fold := foldCase(s, f.Attr)
-	norm := func(b []byte) string {
-		if fold {
-			return strings.ToLower(string(b))
-		}
-		return string(b)
-	}
-	initial := norm(f.Initial)
-	final := norm(f.Final)
+// matchSubstrings evaluates an RFC 4511 substring assertion through the
+// Matcher's substring rule.
+func matchSubstrings(e *Entry, f *FilterSubstrings, m Matcher) bool {
 	for _, v := range e.Values(f.Attr) {
-		rest := norm(v)
-		if initial != "" {
-			if !strings.HasPrefix(rest, initial) {
-				continue
-			}
-			rest = rest[len(initial):]
+		if m.Substrings(f.Attr, v, f.Initial, f.Final, f.Any) {
+			return true
 		}
-		ok := true
-		for _, any := range f.Any {
-			needle := norm(any)
-			i := strings.Index(rest, needle)
-			if i < 0 {
-				ok = false
-				break
-			}
-			rest = rest[i+len(needle):]
-		}
-		if !ok {
-			continue
-		}
-		if final != "" && !strings.HasSuffix(rest, final) {
-			continue
-		}
-		return true
 	}
 	return false
 }
