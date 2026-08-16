@@ -198,8 +198,8 @@ A user created through REST or MCP is visible to `ldapsearch` against the direct
 | D13 | WhoAmI bound authzId rendering | `dn: <case-folded dn>` | `dn:<as-bound dn>` | `TestDifferential389Oracle/whoami-bound`; CAND-20 bound case. |
 | D14 | WhoAmI anonymous with anonymous access off | `inappropriateAuthentication(48)` | `inappropriateAuthentication(48)` — **collapsed** by KD-6 (PR-2B) | Was `TestDifferential389Oracle/whoami-anonymous`. Residual CAND-20 Delta is bound authzId rendering (D13). |
 | D15 | `approxMatch` filter (`~=`) | Real approx matching on **direct LDAP**; a near-miss can return the entry | Folds to equality on **direct LDAP** (near-miss returns nothing) | `test/parity` CAND-2. REST `POST /search` and MCP `ldap_search_entries` reject `~=` as `filter` / `unsupported_filter` (HTTP 400) on both engines. |
-| D16 | ModifyDN rename into own subtree | Rejects `unwillingToPerform(53)`; tree intact | Rejects `unwillingToPerform(53)`; tree intact (unit-tested; folded NewSuperior). Ledger `native` column is pre-fix — re-probe to flip Contract. | `test/parity` CAND-6. |
-| D17 | Schema MAY / unknown-attribute writes | Rejects marker extras and unknown attrs with `objectClassViolation(65)` | Rejects both with `objectClassViolation(65)` (unit-tested). Marker stays `description` JSON (OD-012). Ledger `native` column is pre-fix — re-probe to flip Contract. | `test/parity` CAND-8. |
+| D16 | ModifyDN rename into own subtree | Rejects `unwillingToPerform(53)`; tree intact | **Closed:** same reject, tree intact | `test/parity` CAND-6 verdict `match`. |
+| D17 | Schema MAY / unknown-attribute writes | Rejects marker extras and unknown attrs with `objectClassViolation(65)` | **Closed:** same `objectClassViolation(65)`. Marker stays `description` JSON (OD-012). `aci` is MAY on `top` (allowed on any entry, matching 389 / CAND-16). | `test/parity` CAND-8 verdict `match`. |
 | D18 | Password-policy-violation write code | `constraintViolation(19)` (min-length and history) | **Closed:** same `constraintViolation(19)` | `test/parity` CAND-9 verdict `match`. |
 | D19 | Lockout bind code + lock markers | 5th failure → `constraintViolation(19)`; stamps `accountUnlockTime` / `passwordRetryCount` | 5th failure → `invalidCredentials(49)`; stamps `pwdAccountLockedTime` | `test/parity` CAND-10. C4 is lockout *effect* + bind-test `locked`, not a single marker. |
 | D20 | Re-setting the current password | Rejected with `constraintViolation(19)` | **Closed:** same reject with `constraintViolation(19)` | `test/parity` CAND-11 verdict `match`. Both reject; codes agree. |
@@ -208,7 +208,7 @@ A user created through REST or MCP is visible to `ldapsearch` against the direct
 | D23 | Malformed-DN bind result code | `invalidDNSyntax(34)` | `invalidCredentials(49)` | `test/parity` CAND-21 (same divergence as D8). |
 | D24 | Pre-bind Root DSE, anonymous off | Refused `inappropriateAuthentication(48)` | Same 48 — **collapsed** by KD-6 (PR-2B) | `test/parity` CAND-22 now `match`. |
 | D25 | Compare against an absent attribute | `noSuchAttribute(16)` | `compareFalse(5)` | `test/parity` CAND-23. |
-| D26 | memberOf auxiliary OC after retract | **Keeps** leftover `nsmemberof` after last-member removal | **Retracts** today (post-retract `objectClass` has no `nsmemberof`) | `test/parity` CAND-24. Do not invert: 389 keeps; native retracts. |
+| D26 | memberOf auxiliary OC after retract | **Keeps** leftover `nsmemberof` after last-member removal | **Closed:** same leftover `nsmemberof` after retract | `test/parity` CAND-24 verdict `match`. |
 | D27 | `supportedLDAPVersion` advertisement | `2, 3` | `3` only | `test/parity` CAND-25. Contract is “v3 is served.” |
 | D28 | Critical RFC 4528 assertion on Modify | `unavailableCriticalExtension(12)`; OID not advertised | Advertised and honored (`success(0)` / `assertionFailed(122)`) | `test/parity` CAND-26. Observed form of D7. |
 | D29 | DM password reset vs history | DM bypasses history, `success(0)` | **Closed:** DM BypassACI skips history, `success(0)` | `test/parity` CAND-27 verdict `match`. |
@@ -262,6 +262,7 @@ is [`docs/design/parity-delta-log.md`](https://github.com/hilather/go-lab-ldap-m
 | 2026-08-16 | KD-6 / PR-2B: native refuses unauthenticated directory operations (suffix search, Root DSE, subschema, Compare, writes, WhoAmI) with `inappropriateAuthentication(48)` when `allowAnonymousBind` is off. D14, D21, and D24 collapse. CAND-15 and CAND-22 native columns updated to 48 (`match`). CAND-20 remains a Delta for bound authzId rendering (D13); native anonymous WhoAmI is now 48 (oracle column not rewritten). |
 | 2026-08-16 | Native D16/D17 now reject the same way as 389 (`unwillingToPerform(53)` / `objectClassViolation(65)`); unit-tested. Section 3 native *description* updated. Ledger `native` columns and verdict=Delta stay until an oracle re-probe. |
 | 2026-08-16 | Control-plane Contract cases (`test/parity/controlplane.go`) implement section 5 rule 2: `internal/app` + `ds389.Runtime` against each engine, no HTTP. LDAP contract cases and the delta ledger are unchanged. |
+| 2026-08-16 | Ledger CAND-6/8/24 native columns copied from the committed oracle shape (live native now matches). Verdicts flipped to `match`. D16/D17/D26 closed. `aci` is MAY on `top` so CAND-16 person-entry ACI add stays `match` at code 0 (not a new Delta). |
 
 ### Adjudicated Wave-1 candidates (no pending rows)
 
@@ -269,5 +270,5 @@ Wave-1 CAND rows are closed. Verdicts live in section 3 and in [parity-delta-log
 
 | Disposition | Refs |
 | --- | --- |
-| Promoted to Delta (section 3) | CAND-1 → D9; CAND-2 → D15; CAND-4 → D11; CAND-5/18 → D12; CAND-6 → D16; CAND-8 → D17; CAND-10 → D19; CAND-17 → D22; CAND-20 → D13; CAND-21 → D8/D23; CAND-23 → D25; CAND-24 → D26; CAND-25 → D27; CAND-26 → D28; CAND-28 → D30 |
-| Resolved as Contract (engines agree) | CAND-3, CAND-7, CAND-9 (D18 closed), CAND-11 (D20 closed), CAND-12, CAND-13, CAND-14, CAND-15 (D21 collapsed), CAND-16, CAND-19, CAND-22 (D24 collapsed), CAND-27 (D29 closed) |
+| Promoted to Delta (section 3) | CAND-1 → D9; CAND-2 → D15; CAND-4 → D11; CAND-5/18 → D12; CAND-10 → D19; CAND-17 → D22; CAND-20 → D13; CAND-21 → D8/D23; CAND-23 → D25; CAND-25 → D27; CAND-26 → D28; CAND-28 → D30 |
+| Resolved as Contract (engines agree) | CAND-3, CAND-6 (D16 closed), CAND-7, CAND-8 (D17 closed), CAND-9 (D18 closed), CAND-11 (D20 closed), CAND-12, CAND-13, CAND-14, CAND-15 (D21 collapsed), CAND-16, CAND-19, CAND-22 (D24 collapsed), CAND-24 (D26 closed), CAND-27 (D29 closed) |

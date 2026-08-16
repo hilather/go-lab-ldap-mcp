@@ -145,7 +145,10 @@ const (
 // RuleMatcher treats a declared rule as authoritative. aci and jpegPhoto
 // deliberately declare no equality rule, matching 389's publication.
 var standardObjectClasses = []ObjectClassDef{
-	{OID: "2.5.6.0", Name: "top", Kind: ObjectClassAbstract, Must: []string{"objectClass"}},
+	// aci is MAY on top: 389 allows it on any entry (person included).
+	// CAND-16 adds a person that carries aci; treating it as a class-
+	// specific MAY only on domain/ou/group would reject that write with 65.
+	{OID: "2.5.6.0", Name: "top", Kind: ObjectClassAbstract, Must: []string{"objectClass"}, May: []string{"aci"}},
 	{
 		OID: "0.9.2342.19200300.100.4.13", Name: "domain", Kind: ObjectClassStructural, Sup: []string{"top"},
 		Must: []string{"dc"},

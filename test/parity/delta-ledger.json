@@ -1730,7 +1730,7 @@
     {
       "id": "CAND-6",
       "topic": "rename into own subtree",
-      "verdict": "delta",
+      "verdict": "match",
       "oracle": [
         {
           "code": 53
@@ -1764,13 +1764,33 @@
       ],
       "native": [
         {
-          "code": 0
+          "code": 53
         },
         {
-          "code": 32
+          "code": 0,
+          "entries": [
+            {
+              "dn": "ou=movedemo,dc=example,dc=test",
+              "attrs": {
+                "ou": [
+                  "movedemo"
+                ]
+              }
+            }
+          ]
         },
         {
-          "code": 0
+          "code": 0,
+          "entries": [
+            {
+              "dn": "ou=movedemo,dc=example,dc=test",
+              "attrs": {
+                "ou": [
+                  "movedemo"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -1800,7 +1820,7 @@
     {
       "id": "CAND-8",
       "topic": "schema MAY/unknown-attribute enforcement",
-      "verdict": "delta",
+      "verdict": "match",
       "oracle": [
         {
           "code": 65
@@ -1823,45 +1843,22 @@
       ],
       "native": [
         {
-          "code": 0
+          "code": 65
         },
         {
-          "code": 0
+          "code": 65
         },
         {
-          "code": 0,
-          "entries": [
-            {
-              "dn": "cn=markerdemo,dc=example,dc=test",
-              "attrs": {
-                "destinationindicator": [
-                  "lab"
-                ],
-                "owner": [
-                  "cn=directory manager"
-                ]
-              }
-            }
-          ]
+          "code": 32
         },
         {
-          "code": 0,
-          "entries": [
-            {
-              "dn": "cn=unknownattr,dc=example,dc=test",
-              "attrs": {
-                "cn": [
-                  "unknownattr"
-                ]
-              }
-            }
-          ]
+          "code": 32
         },
         {
-          "code": 0
+          "code": 32
         },
         {
-          "code": 0
+          "code": 32
         }
       ]
     },
@@ -2616,7 +2613,7 @@
     {
       "id": "CAND-24",
       "topic": "memberOf auxiliary object class add/retract",
-      "verdict": "delta",
+      "verdict": "match",
       "oracle": [
         {
           "code": 0
@@ -2741,6 +2738,7 @@
               "attrs": {
                 "objectclass": [
                   "inetOrgPerson",
+                  "nsmemberof",
                   "organizationalPerson",
                   "person",
                   "top"

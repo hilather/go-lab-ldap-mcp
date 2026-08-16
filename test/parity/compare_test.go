@@ -55,6 +55,27 @@ func TestDualEngineParity(t *testing.T) {
 		}
 	}
 
+	// --- Delta candidates: record, don't fail. Run before control-plane
+	// so extra cp* people cannot change CAND search/page sets. ---
+	nativeCands := map[string][]opOutcome{}
+	oracleCands := map[string][]opOutcome{}
+	t.Run("candidates-native", func(t *testing.T) {
+		nativeCands = runCandidates(t, fx, native)
+	})
+	t.Run("candidates-oracle", func(t *testing.T) {
+		oracleCands = runCandidates(t, fx, oracle)
+	})
+	for _, p := range candProbes {
+		no, oo := nativeCands[p.id], oracleCands[p.id]
+		entry := ledgerCandEntry{
+			ID: p.id, Topic: p.topic,
+			Verdict: verdictFor(oo, no),
+			Oracle:  oo, Native: no,
+		}
+		fresh.Candidates = append(fresh.Candidates, entry)
+		t.Logf("candidate %s (%s): verdict=%s", p.id, p.topic, entry.Verdict)
+	}
+
 	// Control-plane Contract (section 5 rule 2): app + Runtime, no HTTP.
 	// Not written into the LDAP ledger — compare live, 389 is oracle.
 	nativeCP := map[string][]opOutcome{}
@@ -87,26 +108,6 @@ func TestDualEngineParity(t *testing.T) {
 			t.Errorf("CONTROL-PLANE %s oracle drifted from the expected sequence:\n%s",
 				key, diffOutcomes(key, want, oracleGot))
 		}
-	}
-
-	// --- Delta candidates: record, don't fail. ---
-	nativeCands := map[string][]opOutcome{}
-	oracleCands := map[string][]opOutcome{}
-	t.Run("candidates-native", func(t *testing.T) {
-		nativeCands = runCandidates(t, fx, native)
-	})
-	t.Run("candidates-oracle", func(t *testing.T) {
-		oracleCands = runCandidates(t, fx, oracle)
-	})
-	for _, p := range candProbes {
-		no, oo := nativeCands[p.id], oracleCands[p.id]
-		entry := ledgerCandEntry{
-			ID: p.id, Topic: p.topic,
-			Verdict: verdictFor(oo, no),
-			Oracle:  oo, Native: no,
-		}
-		fresh.Candidates = append(fresh.Candidates, entry)
-		t.Logf("candidate %s (%s): verdict=%s", p.id, p.topic, entry.Verdict)
 	}
 
 	// --- Deltas whose *difference* is asserted (contract section 3). ---

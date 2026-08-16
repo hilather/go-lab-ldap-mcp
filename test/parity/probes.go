@@ -141,11 +141,9 @@ func probeCAND5(c *caseCtx) []opOutcome {
 	return []opOutcome{second, replay}
 }
 
-// CAND-6: rename an entry into its own subtree. 389 rejects it as
-// LDAP-illegal (unwillingToPerform). Native now refuses the same way in
-// handleModifyDN and store.Rename (folded DN identity). The ledger
-// native column is still the pre-fix recording; re-probe to flip
-// Contract. The probe runs LAST against ou=movedemo.
+// CAND-6: rename an entry into its own subtree. Both engines reject it
+// as unwillingToPerform(53) and leave the tree intact (D16 closed).
+// The probe runs LAST against ou=movedemo.
 func probeCAND6(c *caseCtx) []opOutcome {
 	e := c.e
 	dm := e.dm(c.t)
@@ -168,12 +166,10 @@ func probeCAND7(c *caseCtx) []opOutcome {
 	return []opOutcome{w, stls}
 }
 
-// CAND-8: schema enforcement depth. 389 rejects marker extras
+// CAND-8: schema enforcement depth. Both engines reject marker extras
 // (destinationIndicator/owner on device) and unknown attributes with
-// objectClassViolation(65). Native now enforces MUST/MAY plus unknown
-// reject the same way (marker remains description JSON, OD-012). The
-// ledger native column is still the pre-fix recording; re-probe to
-// flip Contract.
+// objectClassViolation(65) (D17 closed). Marker remains description
+// JSON (OD-012).
 func probeCAND8(c *caseCtx) []opOutcome {
 	t, e := c.t, c.e
 	dm := e.dm(t)
@@ -364,9 +360,9 @@ func probeCAND15(c *caseCtx) []opOutcome {
 }
 
 // CAND-16: entry-level scope — targetattr must not gate Add/Delete of
-// whole entries (native ignores targetattr for entry ops); and the
-// runtime account adding an entry that itself carries an aci attribute
-// (389's per-attribute add check may deny what native allows).
+// whole entries. The runtime account adding a person that carries an
+// aci attribute must succeed on both engines (aci is MAY on top, matching
+// 389; this is not a schema-MAY probe — that is CAND-8).
 func probeCAND16(c *caseCtx) []opOutcome {
 	t, e := c.t, c.e
 	rt := mustDial(t, e, userSpec(runtimeDN, runtimePassword))
@@ -719,10 +715,9 @@ func probeCAND23(c *caseCtx) []opOutcome {
 
 // CAND-24: auxiliary object class lifecycle of the memberOf derivation.
 // 389's plugin is configured with --autoaddoc nsmemberof (mirroring the
-// production reconciler). On membership ADD both engines end up with
-// nsmemberof on the member entry (observed); on RETRACTION the engines
-// may differ (389 keeps the auto-added class, native drops it with the
-// memberOf value). Dedicated entries keep the probe state-neutral.
+// production reconciler). On membership ADD both engines add nsmemberof;
+// on RETRACTION both keep the leftover class (D26 closed). Dedicated
+// entries keep the probe state-neutral.
 func probeCAND24(c *caseCtx) []opOutcome {
 	e := c.e
 	dm := e.dm(c.t)

@@ -149,6 +149,18 @@ func TestCheckEntrySchema(t *testing.T) {
 			),
 		},
 		{
+			// 389 allows aci on any entry (CAND-16 person add). aci is
+			// MAY on top so MUST/MAY does not reject it on person.
+			name:   "person entry may carry aci",
+			schema: std,
+			entry: user(
+				StringAttribute("uid", "u"),
+				StringAttribute("cn", "User One"),
+				StringAttribute("sn", "One"),
+				StringAttribute("aci", `(targetattr="description")(version 3.0; acl "x"; allow (write) userdn="ldap:///self";)`),
+			),
+		},
+		{
 			name:   "missing sn fails (T-132 acceptance)",
 			schema: std,
 			entry: user(

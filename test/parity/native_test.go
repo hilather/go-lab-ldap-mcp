@@ -83,7 +83,7 @@ func TestNativeRunLogRedaction(t *testing.T) {
 		cpUserPass, cpUserPassNew, cpShortPass, "parity-cp-WRONG-00")
 	for _, s := range secrets {
 		if strings.Contains(logs, s) {
-			t.Errorf("native engine log contains a secret value (%q...)", s[:12])
+			t.Errorf("native engine log contains a secret value (%q...)", s[:min(12, len(s))])
 		}
 	}
 	if os.Getenv(ledgerUpdateEnv) != "" {

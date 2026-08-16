@@ -29,7 +29,7 @@ If that log disagrees with the JSON, the JSON wins.
 | `native_test.go` | always | Hermetic run: all cases/probes against native only, verified against the ledger's native columns; engine-log secret scan. |
 | `excluded_test.go` | always | Excluded-tier (E1–E8) inertness on the native surface. |
 | `ledger_test.go` | always | Structural validation of the committed ledger. |
-| `delta-ledger.json` | — | Machine observation SoT. Adjudicated golden ledger T-150 consumes. Delta verdicts CAND-2/6/8/10/15/17/21–26/28 are D15–D30 in the contract. CAND-9/11/27 match after the native password-policy write-path fix. |
+| `delta-ledger.json` | — | Machine observation SoT. Adjudicated golden ledger T-150 consumes. CAND-6/8/9/11/24/27 match after the native write-path and memberOf retain fixes. Remaining Delta verdicts are the identity-only / listing rows in contract section 3. |
 
 ## Running
 
@@ -76,8 +76,8 @@ behavior fails the run.
     attributes are CAND-10 / D19 (dedicated account so the Contract
     lockout cannot pollute it). Native may publish extra lock attrs.
   - Member-entry object classes are compared only on never-membered
-    entries (D26 / CAND-24: 389 **keeps** leftover `nsmemberof` after
-    last-member removal; native **retracts** it today).
+    entries in the LDAP contract list (D26 / CAND-24 now match: both
+    engines **keep** leftover `nsmemberof` after last-member removal).
 - `userPassword` and password history never enter an outcome, a log, or
   the ledger; 389-internal operational attributes (`entryid`,
   `parentid`, `entrydn`, `dsentrydn`) are dropped as non-comparable.
