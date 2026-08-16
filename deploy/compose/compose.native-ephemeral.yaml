@@ -1,0 +1,20 @@
+# Ephemeral native /data (T-145). Default make compose-up-native overlay.
+# Stack after compose.native.yaml:
+#   docker compose -f compose.yaml -f compose.native.yaml -f compose.native-ephemeral.yaml
+#
+# tmpfs-backed directory-data, same semantics as compose.ephemeral.yaml:
+# contents vanish when the volume is unmounted or removed and
+# `docker compose restart` remounts it empty. Sized 256Mi: the native engine
+# stores a single bbolt file and needs none of the 2GiB that 389 DS
+# first-boot requires. UID/GID 65532 match the labldapd runtime user
+# (the 389 overlay uses 389).
+#
+# Host swap can still persist tmpfs pages unless the host is configured
+# otherwise (non-negotiable 7). Do not treat ephemeral as forensic wipe.
+volumes:
+  directory-data:
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: size=268435456,uid=65532,gid=65532,mode=0750

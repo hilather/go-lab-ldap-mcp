@@ -1,0 +1,120 @@
+# Native engine overlay (T-145; ADR-0008, ADR-0009). Replaces the 389 DS
+# `directory` service with `labldapd` (labldapd:dev) and re-points bootstrap
+# at it. Always stack a storage overlay on top:
+#   docker compose -f compose.yaml -f compose.native.yaml -f compose.native-ephemeral.yaml
+#   docker compose -f compose.yaml -f compose.native.yaml -f compose.native-persistent.yaml
+#
+# Requires Compose v2.24.4+ (`!reset` / `!override` tags; one step above the
+# OD-020 v2.24 floor, native profile only). Host publishes stay loopback
+# 3389/3636/8443.
+#
+# labldapd self-applies the engine plan (suffix, TLS materials, password
+# policy, plugin hooks) at start; bootstrap keeps the LDAP data plane as
+# Directory Manager. Native mode has no 389 CLI tooling, no LDAPI socket,
+# and no shared /data mount. TLS is the lab CA directory certificate
+# mounted as files — there is no cert-import or instance-CA publish step.
+#
+# Runtime dependency: a live bring-up needs T-143 (labldapd serve), T-144
+# (native bootstrap reconcilers), and T-146 (control engine wiring) merged.
+# Until then this file is correct-by-construction and validated with
+# `docker compose ... config`, not reported as a passing bring-up.
+volumes:
+  # DM password and the directory TLS key/cert, copied to 0400/65532 by the
+  # native-secret-prep one-shot (host secret files are 0600 and unreadable
+  # by the non-root engine uid; mirrors the control secret-prep pattern).
+  directory-secrets:
+
+services:
+  native-secret-prep:
+    image: labldapd:dev
+    user: "0:0"
+    network_mode: none
+    volumes:
+      - ${LABLDAP_DM_PASSWORD_FILE:-../../secrets/dm.pw}:/in/dm.pw:ro
+      - ${LABLDAP_TLS_DIR:-../../secrets/tls}/directory.crt:/in/directory.crt:ro
+      - ${LABLDAP_TLS_DIR:-../../secrets/tls}/directory.key:/in/directory.key:ro
+      - directory-secrets:/out
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+        for f in dm.pw directory.crt directory.key; do
+          cp "/in/$$f" "/out/$$f"
+          chown 65532:65532 "/out/$$f"
+          chmod 0400 "/out/$$f"
+        done
+    restart: "no"
+
+  directory:
+    image: labldapd:dev
+    # The 389 env_file carries the Directory Manager password variable; it
+    # must never reach the native engine. labldapd takes no engine
+    # environment — DM arrives as a 0400 file in directory-secrets
+    # (ADR-0009 decision 13).
+    env_file: !reset []
+    user: "65532:65532"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:uid=65532,gid=65532,mode=1777,size=16m
+    depends_on:
+      native-secret-prep:
+        condition: service_completed_successfully
+    volumes: !override
+      - directory-data:/data
+      - directory-secrets:/run/secrets:ro
+      - ${LABLDAP_SCENARIO_FILE:-./scenario.native.yaml}:/config/scenario.yaml:ro
+    command:
+      - serve
+      - --config
+      - /config/scenario.yaml
+      - --data-dir
+      - /data
+      # In-container listeners bind all interfaces so Compose peers on the
+      # lab network reach them; host publishes stay 127.0.0.1 (base file).
+      - --listen
+      - 0.0.0.0:3389
+      - --ldaps-listen
+      - 0.0.0.0:3636
+      - --tls-cert-file
+      - /run/secrets/directory.crt
+      - --tls-key-file
+      - /run/secrets/directory.key
+      - --directory-manager-password-file
+      - /run/secrets/dm.pw
+      # Health listener stays loopback inside the container; never published.
+      - --health-listen
+      - 127.0.0.1:8389
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8389/health"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+
+  bootstrap:
+    # Native bootstrap is LDAP-only (ADR-0009 decision 12): no 389 CLI flags
+    # and no /data mount (native has no LDAPI socket to share). Reconcilers
+    # wait for the daemon and read the applied engine plan back over LDAP.
+    volumes: !override
+      - ${LABLDAP_SCENARIO_FILE:-./scenario.native.yaml}:/config/scenario.yaml:ro
+      - ${LABLDAP_SECRETS_DIR:-../../secrets}/runtime-ldap:/run/secrets/runtime-ldap:ro
+      - ${LABLDAP_SECRETS_DIR:-../../secrets}/token-admin:/run/secrets/token-admin:ro
+      - ${LABLDAP_SECRETS_DIR:-../../secrets}/user-alice:/run/secrets/user-alice:ro
+      - ${LABLDAP_DM_PASSWORD_FILE:-../../secrets/dm.pw}:/run/secrets/dm.pw:ro
+      - ${LABLDAP_TLS_CA:-../../secrets/tls/ca.crt}:/run/tls/ca.crt:ro
+    command:
+      - apply
+      - --config
+      - /config/scenario.yaml
+      - --directory-manager-password-file
+      - /run/secrets/dm.pw
+      - --ldap-url
+      - ldaps://directory:3636
+      - --directory-host
+      - directory
+      - --directory-ca-file
+      - /run/tls/ca.crt

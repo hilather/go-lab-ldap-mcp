@@ -1,0 +1,11 @@
+# Persistent native /data (T-145). Stack after compose.native.yaml:
+#   docker compose -f compose.yaml -f compose.native.yaml -f compose.native-persistent.yaml
+#
+# Ordinary restart keeps runtime entries (bbolt file survives in the named
+# volume, initialized with the image's /data ownership 65532:65532). Soft
+# reset (REST/MCP lab:reset) restores the compiled baseline and does not
+# remove the volume. Volume removal is a destructive operator action
+# (make compose-reset-native / docker compose down -v). It is not exposed
+# through REST or MCP.
+volumes:
+  directory-data:

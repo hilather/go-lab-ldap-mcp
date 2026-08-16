@@ -1,0 +1,53 @@
+# labldapd:dev (OD-004). Do not push.
+# Native LabLDAP directory engine (ADR-0008, ADR-0009, T-145).
+# Multi-stage: pinned golang builder links a static labldapd; pinned alpine
+# runtime is non-root and read-only-root compatible. Directory state is the
+# bbolt file at /data/labldapd.bolt on the mounted /data volume (tmpfs in
+# ephemeral Compose, named volume in persistent). Secrets are mounted files
+# only (compose native-secret-prep); nothing sensitive is baked into the image.
+
+# FROM-time ARGs must be declared before the first FROM (legacy builder).
+ARG GO_IMAGE=docker.io/library/golang:1.26.5@sha256:705e964a93a2fd2e75c7d59bb7d781b57e30f12293ffde5175c69229e18fb678
+# Default matches deploy/docker/labldapd.digest. Release files must stay digest-pinned.
+ARG ALPINE_IMAGE=docker.io/library/alpine:3.21@sha256:48b0309ca019d89d40f670aa1bc06e426dc0931948452e8491e3d65087abc07d
+
+FROM ${GO_IMAGE} AS build
+WORKDIR /src
+ENV CGO_ENABLED=0
+ENV GOTOOLCHAIN=go1.26.5
+ARG VERSION=dev
+ARG REVISION=unknown
+ARG BUILT_AT=unknown
+COPY go.mod go.sum ./
+RUN go mod download
+COPY cmd ./cmd
+COPY internal ./internal
+RUN go build -trimpath \
+	-ldflags="-s -w -X github.com/hilather/go-lab-ldap-mcp/internal/observability.version=${VERSION} -X github.com/hilather/go-lab-ldap-mcp/internal/observability.revision=${REVISION} -X github.com/hilather/go-lab-ldap-mcp/internal/observability.builtAt=${BUILT_AT}" \
+	-o /out/labldapd ./cmd/labldapd
+
+FROM ${ALPINE_IMAGE}
+ARG VERSION=dev
+ARG REVISION=unknown
+ARG BUILT_AT=unknown
+RUN apk add --no-cache ca-certificates wget \
+	&& adduser -D -H -u 65532 -g labldapd labldapd \
+	&& mkdir -p /data \
+	&& chown 65532:65532 /data \
+	&& rm -rf /var/cache/apk /root/.cache
+COPY --from=build /out/labldapd /usr/local/bin/labldapd
+USER 65532:65532
+# 3389 LDAP, 3636 LDAPS/StartTLS, 8389 health listener (loopback; not published).
+EXPOSE 3389 3636 8389
+# Writable at runtime: the mounted /data volume and the Compose /tmp tmpfs.
+# The root filesystem stays read-only in Compose.
+LABEL org.opencontainers.image.title="labldapd" \
+	org.opencontainers.image.description="LabLDAP native directory engine (bbolt store). Directory Manager secret via file mount only. Do not push (OD-004)." \
+	org.opencontainers.image.version="${VERSION}" \
+	org.opencontainers.image.revision="${REVISION}" \
+	org.opencontainers.image.created="${BUILT_AT}" \
+	org.opencontainers.image.source="https://github.com/hilather/go-lab-ldap-mcp"
+HEALTHCHECK --interval=5s --timeout=3s --start-period=3s --retries=10 \
+	CMD wget -q -O - http://127.0.0.1:8389/health || exit 1
+ENTRYPOINT ["/usr/local/bin/labldapd"]
+CMD ["serve", "--help"]
