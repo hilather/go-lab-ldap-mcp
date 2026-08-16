@@ -16,7 +16,8 @@ engine, not the control plane: labldap and labldap-bootstrap stay LDAP
 clients of it, and Directory Manager credentials reach it only through a
 secret file — never a command-line value.
 
-Native mode is lab-scoped and is not ready until milestone M9 completes.
+Native mode is lab-scoped and ready as opt-in engine: native. Omitting the
+field still defaults to 389ds.
 
 Usage:
   labldapd [command]

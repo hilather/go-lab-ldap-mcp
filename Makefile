@@ -95,8 +95,10 @@ generate-drift: generate
 
 test: test-unit
 
+# Hermetic test/parity is included so CI unit catches Contract drift.
+# verify-native re-runs it as the native-lane gate (~26s).
 test-unit: frontend-install
-	$(GO) test $$(go list ./... | grep -v '/test/parity')
+	$(GO) test ./...
 	cd frontend && $(PNPM) test
 
 test-integration:
@@ -395,7 +397,7 @@ verify: format lint generate generate-drift test-unit test-security sbom checksu
 	$(MAKE) verify-native
 	$(MAKE) test-integration-native
 	@if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then \
-		$(MAKE) test-integration; \
+		$(MAKE) test-integration && \
 		$(GO) test -tags=integration ./test/parity/ -count=1 -timeout 30m; \
 	else \
 		printf '%s\n' 'verify: docker unavailable; skipped 389 integration + dual-engine parity legs'; \

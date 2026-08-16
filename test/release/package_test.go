@@ -183,11 +183,24 @@ func TestMakefileVerifyIsReleaseGate(t *testing.T) {
 	if strings.Contains(mk, "WARNING test/parity") {
 		t.Fatal("make verify must hard-gate test/parity, not WARNING-on-failure")
 	}
+	if !strings.Contains(mk, "verify-native: test-fuzz-short test-native-soak test-diff test-parity") {
+		t.Fatal("verify-native must include test-parity")
+	}
 	if !strings.Contains(mk, "$(MAKE) test-integration-native") {
 		t.Fatal("make verify must hard-gate test-integration-native")
 	}
-	if !strings.Contains(mk, "go test -tags=integration ./test/parity/") {
-		t.Fatal("make verify must hard-gate dual-engine test/parity when Docker is present")
+	if !strings.Contains(mk, "$(MAKE) test-integration &&") {
+		t.Fatal("docker-gated 389 IT must be &&-chained so its failure fails verify")
+	}
+	var recipeDual bool
+	for _, line := range strings.Split(mk, "\n") {
+		if strings.HasPrefix(line, "\t") && strings.Contains(line, "$(GO) test -tags=integration ./test/parity/") {
+			recipeDual = true
+			break
+		}
+	}
+	if !recipeDual {
+		t.Fatal("make verify must run dual-engine test/parity on a recipe line")
 	}
 }
 

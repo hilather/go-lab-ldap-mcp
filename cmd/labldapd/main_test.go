@@ -16,10 +16,13 @@ func TestHelp(t *testing.T) {
 			t.Fatalf("%s exit %d stderr=%s", arg, code, stderr.String())
 		}
 		out := stdout.String()
-		for _, want := range []string{"labldapd", "serve", "version", "ADR-0009"} {
+		for _, want := range []string{"labldapd", "serve", "version", "ADR-0009", "engine: native"} {
 			if !strings.Contains(out, want) {
 				t.Fatalf("%s help missing %q:\n%s", arg, want, out)
 			}
+		}
+		if strings.Contains(out, "not ready until milestone M9") {
+			t.Fatalf("%s help still says native is unready:\n%s", arg, out)
 		}
 	}
 }
