@@ -106,8 +106,61 @@ func TestOpenErrorsAreSecretFree(t *testing.T) {
 	if err == nil {
 		t.Fatal("Open of a non-database file must fail")
 	}
+	if !errors.Is(err, ErrEngineDataMismatch) {
+		t.Fatalf("Open non-bbolt = %v, want ErrEngineDataMismatch", err)
+	}
 	if strings.Contains(err.Error(), secret) || strings.Contains(err.Error(), "xxxx") {
 		t.Fatalf("error leaks file contents: %v", err)
+	}
+}
+
+func TestCheckDataDir389Tree(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "config"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "config", "container.inf"), []byte("[General]\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	err := CheckDataDir(dir)
+	if !errors.Is(err, ErrEngineDataMismatch) {
+		t.Fatalf("CheckDataDir 389 tree = %v", err)
+	}
+	if strings.Contains(err.Error(), "[General]") {
+		t.Fatalf("error leaked marker file content: %v", err)
+	}
+	_, err = Open(filepath.Join(dir, StoreFileName))
+	if !errors.Is(err, ErrEngineDataMismatch) {
+		t.Fatalf("Open beside 389 tree = %v", err)
+	}
+	if _, statErr := os.Stat(filepath.Join(dir, StoreFileName)); !os.IsNotExist(statErr) {
+		t.Fatal("Open must not create labldapd.bolt beside a 389 tree")
+	}
+}
+
+func TestCheckDataDirSlapdLayout(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	if err := os.Mkdir(filepath.Join(dir, "slapd-localhost"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := CheckDataDir(dir); !errors.Is(err, ErrEngineDataMismatch) {
+		t.Fatalf("CheckDataDir slapd-* = %v", err)
+	}
+}
+
+func TestCheckDataDirEmptyAndBoltOK(t *testing.T) {
+	t.Parallel()
+	if err := CheckDataDir(filepath.Join(t.TempDir(), "missing")); err != nil {
+		t.Fatalf("missing dir should be ok: %v", err)
+	}
+	s, path := openTemp(t)
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := CheckDataDir(filepath.Dir(path)); err != nil {
+		t.Fatalf("native bolt dir: %v", err)
 	}
 }
 

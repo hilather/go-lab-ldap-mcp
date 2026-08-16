@@ -1,7 +1,7 @@
 # Quick start
 
-Stand up a disposable 389 DS lab, sign in to the UI, and make one change
-you can see over REST, LDAP, and MCP.
+Stand up a disposable native `labldapd` lab, sign in to the UI, and make
+one change you can see over REST, LDAP, and MCP.
 
 ## What you need
 
@@ -23,12 +23,14 @@ make compose-up
 
 This will:
 
-1. Build `labldap-bootstrap:dev` and `labldap-control:dev`
+1. Build `labldapd:dev`, `labldap-bootstrap:dev`, and `labldap-control:dev`
 2. Generate gitignored secrets under `secrets/`
 3. Generate a lab CA and certificates
-4. Start 389 DS (tmpfs-backed `/data` — ephemeral)
+4. Start `labldapd` (tmpfs-backed `/data` — ephemeral)
 5. Run bootstrap against Directory Manager, then exit
 6. Start the control plane
+
+389 oracle/rollback: `make compose-up-389ds`.
 
 First run is image-build heavy. Later runs reuse the local images.
 

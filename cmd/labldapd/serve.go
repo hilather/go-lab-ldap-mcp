@@ -34,7 +34,7 @@ const (
 	defaultHealthListen = "127.0.0.1:8389"
 	// storeFileName is the bbolt database file inside the data directory
 	// (deploy/docker/labldapd-image-contract.md).
-	storeFileName = "labldapd.bolt"
+	storeFileName = store.StoreFileName
 	// directoryManagerDN is the native root identity (ADR-0009 decision 13,
 	// default value). Bootstrap binds it as defaultBindDN; no scenario
 	// field renames it yet (tracked for T-146 documentation).
@@ -248,11 +248,17 @@ func startDaemon(ctx context.Context, f serveFlags, log *slog.Logger) (*daemon, 
 		return nil, err
 	}
 
+	if err := store.CheckDataDir(f.dataDir); err != nil {
+		return nil, dataDirMismatchErr(err)
+	}
 	if err := os.MkdirAll(f.dataDir, 0o700); err != nil {
 		return nil, fmt.Errorf("labldapd: create data directory: %w", err)
 	}
 	st, err := store.Open(filepath.Join(f.dataDir, storeFileName))
 	if err != nil {
+		if errors.Is(err, store.ErrEngineDataMismatch) {
+			return nil, dataDirMismatchErr(err)
+		}
 		return nil, err
 	}
 	ok := false
@@ -483,6 +489,20 @@ func serverOptions(c *config.Compiled, f serveFlags, tlsCfg *tls.Config, dm ldap
 func configFieldErr(path, code, msg string) error {
 	return apperr.New(apperr.CodeConfiguration, "labldapd: invalid serve configuration").
 		WithField(apperr.Field{Path: path, Code: code, Message: msg})
+}
+
+// dataDirMismatchErr is the fail-closed diagnostic when --data-dir looks
+// like a 389 nsslapd tree or labldapd.bolt is not bbolt (KD-12). The
+// message is secret-free and names the operator recovery path.
+func dataDirMismatchErr(err error) error {
+	return apperr.New(apperr.CodeConfiguration, "labldapd: data directory is not a native engine store").
+		WithField(apperr.Field{
+			Path: "dataDir",
+			Code: "engine_data_mismatch",
+			Message: "this directory looks like a 389 Directory Server data tree " +
+				"(or labldapd.bolt is not a bbolt file); run compose-reset or set " +
+				"spec.directory.engine: 389ds — on-disk formats are not migrated",
+		}).Wrap(err)
 }
 
 // waitBound blocks until every configured listener reports its bound

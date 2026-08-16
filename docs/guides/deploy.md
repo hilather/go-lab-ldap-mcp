@@ -17,7 +17,7 @@ file — [Scenario YAML](scenario.md).
 | OS | Linux `amd64` (advertised). `arm64` is not advertised. |
 | Docker Engine | 24+ |
 | Compose | v2.24+ |
-| Disk | enough for two local images plus 389 DS data |
+| Disk | enough for local images plus engine `/data` |
 | Ports on loopback | `8443` (management), `3389` (LDAP), `3636` (LDAPS) |
 
 Optional for from-source work: Go 1.26 (toolchain `go1.26.5`), Node 22.12+,
@@ -33,17 +33,19 @@ pnpm. Pins live in [docs/toolchain.md](../toolchain.md).
   metrics        │        MCP  │         │
                  └─────────────┘         │ runtime account
                                          ▼
-  ldapsearch     :3389 / :3636      389 Directory Server
+  ldapsearch     :3389 / :3636      labldapd (default)
                                          ▲
                          one-shot        │ Directory Manager
                       labldap-bootstrap ─┘  (secret file, then gone)
 ```
 
+`make compose-up-389ds` swaps `directory` for pinned 389 DS.
+
 Three compose roles:
 
 | Service | Image | Lifetime | Privilege |
 | --- | --- | --- | --- |
-| `directory` | pinned `quay.io/389ds/dirsrv` | long-running | owns `/data` |
+| `directory` | `labldapd:dev` (default) or pinned `quay.io/389ds/dirsrv` | long-running | owns `/data` |
 | `bootstrap` | `labldap-bootstrap:dev` | one-shot | DM via `--directory-manager-password-file` |
 | `control` | `labldap-control:dev` | long-running | restricted account, no DM, no Docker socket |
 | `secret-prep` | `labldap-control:dev` | one-shot | copies secret files into a 0400 volume for uid 65532 |
@@ -64,9 +66,9 @@ not a forensic wipe.
 make compose-up-persistent
 ```
 
-Named volume. Runtime entries survive restart. After first boot the helper
-imports the lab CA and server cert into 389 DS and restarts the directory
-for NSS reload.
+Named volume. Runtime entries survive restart. Native persistent labs
+mount the lab CA certificate as files. The 389 persistent rollback
+(`make compose-up-389ds-persistent`) still imports the lab CA into NSS.
 
 ```bash
 make compose-down
@@ -76,16 +78,18 @@ make compose-reset    # down -v, then compose-up
 `make compose-up` runs `tools/composepreflight`, generates secrets, and
 generates TLS if they are missing.
 
-Native `labldapd` is ready as opt-in `engine: native` (`make compose-up-native`
-/ `make compose-up-native-persistent`). The omitted-field default remains
-389 DS. Switching engines on an existing volume is a hard reset
-(`compose-reset`), not a live migration.
+Default compose is native `labldapd`. `make compose-up-native` is a
+one-release alias of `make compose-up`. Rollback to 389:
+`spec.directory.engine: 389ds` and `make compose-up-389ds`. Switching
+engines on an existing volume is a hard reset (`compose-reset`), not a
+live migration. `labldapd` refuses a 389 nsslapd `/data` tree.
 
 ## Images
 
 All local. Do not push.
 
 ```bash
+make image-native      # labldapd:dev
 make image-bootstrap   # labldap-bootstrap:dev
 make image             # labldap-control:dev
 ```
@@ -95,6 +99,7 @@ make image             # labldap-control:dev
 
 | Image | What it is |
 | --- | --- |
+| `labldapd:dev` | native directory engine (default compose-up) |
 | `labldap-bootstrap:dev` | static helper, pinned 389 DS digest, same VERSION as control |
 | `labldap-control:dev` | multi-stage frontend + Go, non-root, CA bundle, HEALTHCHECK `/health` |
 | `labldap-control:placeholder` | thin process only — **not** what compose-up runs |

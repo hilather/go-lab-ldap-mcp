@@ -23,11 +23,6 @@ func TestReleaseComposeTopology(t *testing.T) {
 		t.Fatal("compose must not mount the private CA key")
 	}
 
-	pin := strings.TrimSpace(string(read(t, filepath.Join(root, "deploy", "docker", "dirsrv.digest"))))
-	if !strings.Contains(pin, "@sha256:") {
-		t.Fatalf("dirsrv.digest is not a digest pin: %s", pin)
-	}
-
 	var doc struct {
 		Services map[string]map[string]any `yaml:"services"`
 		Volumes  map[string]any            `yaml:"volumes"`
@@ -49,16 +44,19 @@ func TestReleaseComposeTopology(t *testing.T) {
 	}
 
 	dir := doc.Services["directory"]
-	if img, _ := dir["image"].(string); img != pin {
-		t.Fatalf("directory image %q, want pinned %q", img, pin)
+	if img, _ := dir["image"].(string); img != "labldapd:dev" {
+		t.Fatalf("default directory image %q, want labldapd:dev", img)
 	}
-	if _, ok := dir["env_file"]; !ok {
-		t.Fatal("directory must use env_file (KD-R20)")
+	if _, ok := dir["env_file"]; ok {
+		t.Fatal("native directory must not use 389 env_file")
 	}
 	if env, _ := dir["environment"].(map[string]any); env != nil {
 		if _, ok := env["DS_DM_PASSWORD"]; ok {
 			t.Fatal("directory must not inline DS_DM_PASSWORD")
 		}
+	}
+	if dir["user"] != "65532:65532" {
+		t.Fatalf("native directory user = %v", dir["user"])
 	}
 	ports := flatten(dir["ports"])
 	if !containsExact(ports, "127.0.0.1:3389:3389") || !containsExact(ports, "127.0.0.1:3636:3636") {
@@ -133,6 +131,9 @@ func TestReleaseComposeTopology(t *testing.T) {
 	if _, ok := doc.Services["secret-prep"]; !ok {
 		t.Fatal("missing secret-prep service")
 	}
+	if _, ok := doc.Services["native-secret-prep"]; !ok {
+		t.Fatal("missing native-secret-prep service")
+	}
 	if _, ok := doc.Volumes["control-secrets"]; !ok {
 		t.Fatal("missing control-secrets volume")
 	}
@@ -145,14 +146,14 @@ func TestEphemeralTmpfsVolumeOptions(t *testing.T) {
 	if !strings.Contains(text, "type: tmpfs") {
 		t.Fatal("ephemeral overlay must use a tmpfs-backed volume")
 	}
-	if !strings.Contains(text, "uid=389") || !strings.Contains(text, "gid=389") {
-		t.Fatal("tmpfs must set uid/gid 389 (dirsrv)")
+	if !strings.Contains(text, "uid=65532") || !strings.Contains(text, "gid=65532") {
+		t.Fatal("default ephemeral tmpfs must set uid/gid 65532 (labldapd)")
 	}
 	if !strings.Contains(text, "mode=0750") {
 		t.Fatal("tmpfs must set mode=0750")
 	}
 	if !strings.Contains(text, "size=2147483648") {
-		t.Fatal("tmpfs must set a 2GiB size (512Mi is too small for 389 DS first-boot)")
+		t.Fatal("tmpfs must stay 2GiB (RQ-5; do not shrink the default ephemeral volume)")
 	}
 	if !strings.Contains(text, "host swap") && !strings.Contains(text, "Host swap") {
 		t.Fatal("ephemeral overlay must document the host-swap caveat")
@@ -205,13 +206,46 @@ func TestMakefileComposeResetIsReal(t *testing.T) {
 		t.Fatal("compose-up must use the secret and TLS helpers")
 	}
 	if !strings.Contains(text, "instance-ca.crt") {
-		t.Fatal("ephemeral compose-up must publish instance-ca.crt")
+		t.Fatal("389 compose-up-389ds must publish instance-ca.crt")
+	}
+	if !strings.Contains(text, "compose-up-389ds:") {
+		t.Fatal("Makefile must define compose-up-389ds for 389 rollback")
 	}
 	if !strings.Contains(text, "scenario.persistent.yaml") {
 		t.Fatal("persistent compose-up must use scenario.persistent.yaml")
 	}
 	if !strings.Contains(text, "--force-recreate secret-prep") {
 		t.Fatal("compose-up must force-recreate secret-prep so rotated secrets reach control")
+	}
+}
+
+func TestCompose389dsOverlay(t *testing.T) {
+	root := repoRoot(t)
+	pin := strings.TrimSpace(string(read(t, filepath.Join(root, "deploy", "docker", "dirsrv.digest"))))
+	if !strings.Contains(pin, "@sha256:") {
+		t.Fatalf("dirsrv.digest is not a digest pin: %s", pin)
+	}
+	raw := read(t, filepath.Join(root, "deploy", "compose", "compose.389ds.yaml"))
+	text := string(raw)
+	if !strings.Contains(text, pin) {
+		t.Fatal("389 overlay must pin the dirsrv digest")
+	}
+	if !strings.Contains(text, "env_file") {
+		t.Fatal("389 overlay must restore env_file")
+	}
+	if !strings.Contains(text, "--dsconf-instance") {
+		t.Fatal("389 overlay bootstrap must keep --dsconf-instance")
+	}
+	if strings.Contains(text, "docker.sock") || strings.Contains(text, "DS_DM_PASSWORD") {
+		t.Fatal("389 overlay must not mount the Docker socket or inline DS_DM_PASSWORD")
+	}
+	scenario := string(read(t, filepath.Join(root, "deploy", "compose", "scenario.389ds.yaml")))
+	if !strings.Contains(scenario, "engine: 389ds") {
+		t.Fatal("389 scenario must set engine: 389ds")
+	}
+	eph := string(read(t, filepath.Join(root, "deploy", "compose", "compose.389ds-ephemeral.yaml")))
+	if !strings.Contains(eph, "uid=389") || !strings.Contains(eph, "size=2147483648") {
+		t.Fatal("389 ephemeral overlay must keep 2GiB tmpfs uid=389")
 	}
 }
 

@@ -4,6 +4,7 @@ metadata:
   name: compose-lab
 spec:
   directory:
+    # omitted engine defaults to native (ADR-0008 amendment 2026-08-16).
     suffix: "dc=example,dc=test"
     peopleRDN: "ou=people"
     groupsRDN: "ou=groups"

@@ -25,3 +25,14 @@ Compiler contract string (mixed into revisions in T-021): `labldap.config.v1alph
   ready as opt-in `engine: native` (T-146 wiring, T-150 M9 exit). Omitting
   the field still defaults to `389ds`. See
   `docs/design/native-engine-parity-contract.md`.
+- **2026-08-16 (ADR-0008 amendment):** omitted `spec.directory.engine` now
+  defaults to `native`. Stay on `apiVersion: labldap.dev/v1alpha1`. This
+  one omitted-field reinterpretation does **not** take a new `apiVersion`
+  and does **not** bump `CompilerContract` (`labldap.config.v1alpha1.3`);
+  the directory revision already mixes `engine`, so omitted-engine labs
+  get a new directory hash (correct: a different engine is a different
+  lab). REST `/api/v1` and MCP tool names are unchanged. Explicit
+  `engine: 389ds` is first-class oracle/rollback. Operators who omitted
+  `engine` and still need 389 must add `engine: 389ds` before upgrading,
+  or accept a hard reset of `/data` (`compose-reset`). On-disk formats
+  are not migrated; `labldapd` refuses a 389 nsslapd data directory.

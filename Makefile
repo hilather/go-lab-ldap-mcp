@@ -17,11 +17,17 @@ LABLDAPD_BASE    := $(shell cat deploy/docker/labldapd.digest)
 COMPOSE_EPHEMERAL  := docker compose -f deploy/compose/compose.yaml -f deploy/compose/compose.ephemeral.yaml -p labldap
 COMPOSE_PERSISTENT := docker compose -f deploy/compose/compose.yaml -f deploy/compose/compose.persistent.yaml -p labldap
 COMPOSE            := $(COMPOSE_EPHEMERAL)
-COMPOSE_NATIVE_EPHEMERAL  := docker compose -f deploy/compose/compose.yaml -f deploy/compose/compose.native.yaml -f deploy/compose/compose.native-ephemeral.yaml -p labldap
-COMPOSE_NATIVE_PERSISTENT := docker compose -f deploy/compose/compose.yaml -f deploy/compose/compose.native.yaml -f deploy/compose/compose.native-persistent.yaml -p labldap
-COMPOSE_NATIVE            := $(COMPOSE_NATIVE_EPHEMERAL)
-COMPOSE_NATIVE_SCENARIO            := deploy/compose/scenario.native.yaml
-COMPOSE_NATIVE_PERSISTENT_SCENARIO := deploy/compose/scenario.native-persistent.yaml
+# compose-up-native is a one-release alias of the default native stack.
+COMPOSE_NATIVE_EPHEMERAL  := $(COMPOSE_EPHEMERAL)
+COMPOSE_NATIVE_PERSISTENT := $(COMPOSE_PERSISTENT)
+COMPOSE_NATIVE            := $(COMPOSE_EPHEMERAL)
+COMPOSE_NATIVE_SCENARIO            := deploy/compose/scenario.yaml
+COMPOSE_NATIVE_PERSISTENT_SCENARIO := deploy/compose/scenario.persistent.yaml
+COMPOSE_389DS_EPHEMERAL  := docker compose -f deploy/compose/compose.yaml -f deploy/compose/compose.389ds.yaml -f deploy/compose/compose.389ds-ephemeral.yaml -p labldap
+COMPOSE_389DS_PERSISTENT := docker compose -f deploy/compose/compose.yaml -f deploy/compose/compose.389ds.yaml -f deploy/compose/compose.persistent.yaml -p labldap
+COMPOSE_389DS            := $(COMPOSE_389DS_EPHEMERAL)
+COMPOSE_389DS_SCENARIO            := deploy/compose/scenario.389ds.yaml
+COMPOSE_389DS_PERSISTENT_SCENARIO := deploy/compose/scenario.389ds-persistent.yaml
 COMPOSE_ENV        := secrets/directory.env
 COMPOSE_DM         := secrets/dm.pw
 COMPOSE_TLS        := secrets/tls
@@ -37,6 +43,8 @@ IMAGE_BUILD_ARGS := --build-arg VERSION=$(VERSION) --build-arg REVISION=$(REVISI
 	compose-up-persistent compose-reset compose-secrets compose-preflight \
 	compose-up-native compose-up-native-persistent compose-down-native \
 	compose-reset-native \
+	compose-up-389ds compose-up-389ds-persistent compose-down-389ds \
+	compose-reset-389ds \
 	test-fuzz-short test-native-soak test-diff test-parity verify-native \
 	setup-tls image image-bootstrap image-multiarch image-native \
 	image-control-placeholder verify frontend-install frontend-build \
@@ -60,14 +68,16 @@ help:
 		'  verify-native      aggregate native lane (fuzz + soak + diff + parity)' \
 		'  test-e2e           Playwright UI suite (mock control plane; optional live URL)' \
 		'  test-security      secret scan, govulncheck, license denylist' \
-		'  compose-up         ephemeral tmpfs /data; publish instance CA; bootstrap → control' \
-		'  compose-up-persistent  named volume /data; dsctl tls import lab CA' \
+		'  compose-up         native labldapd; ephemeral 2GiB tmpfs /data; bootstrap → control' \
+		'  compose-up-persistent  native engine; named volume /data' \
 		'  compose-down       stop the Compose project' \
 		'  compose-reset      operator hard reset: down -v then compose-up (not REST/MCP)' \
-		'  compose-up-native  opt-in native labldapd engine: directory → bootstrap → control' \
-		'  compose-up-native-persistent  native engine with named-volume /data' \
-		'  compose-down-native   stop the native Compose stack' \
-		'  compose-reset-native  operator hard reset: down -v then compose-up-native (not REST/MCP)' \
+		'  compose-up-389ds   389 oracle/rollback; ephemeral tmpfs; publish instance CA' \
+		'  compose-up-389ds-persistent  389 oracle; named volume; dsctl tls import lab CA' \
+		'  compose-up-native  alias of compose-up (one release)' \
+		'  compose-up-native-persistent  alias of compose-up-persistent' \
+		'  compose-down-native   alias of compose-down' \
+		'  compose-reset-native  alias of compose-reset' \
 		'  image-native       build labldapd:dev (native engine; pinned bases)' \
 		'  image-bootstrap    build labldap-bootstrap:dev (pinned 389 DS)' \
 		'  image              build labldap-control:dev (hardened; matching version)' \
@@ -185,21 +195,35 @@ compose-secrets:
 setup-tls:
 	$(GO) run ./tools/setuptls generate --dir $(COMPOSE_TLS) --host directory
 
-compose-up: image image-bootstrap compose-preflight compose-secrets setup-tls
-	LABLDAP_TLS_CA=$(COMPOSE_TLS)/instance-ca.crt $(COMPOSE) up -d --wait --remove-orphans directory
-	$(GO) run ./tools/setuptls publish --out $(COMPOSE_TLS)/instance-ca.crt --project labldap \
-		-f deploy/compose/compose.yaml -f deploy/compose/compose.ephemeral.yaml
+# Default stack is native labldapd. labldapd self-applies the engine plan
+# and serves the lab CA certificate directly, so there is no setuptls
+# publish/import (dsctl) step. LABLDAP_TLS_CA is the lab CA itself.
+compose-up: image-native image image-bootstrap compose-preflight compose-secrets setup-tls
+	# Recreate native-secret-prep so rotated DM/TLS files reach directory-secrets.
+	LABLDAP_TLS_CA=$(COMPOSE_TLS)/ca.crt \
+		$(COMPOSE) up -d --no-deps --force-recreate native-secret-prep
+	LABLDAP_TLS_CA=$(COMPOSE_TLS)/ca.crt \
+		$(COMPOSE) wait native-secret-prep
+	LABLDAP_TLS_CA=$(COMPOSE_TLS)/ca.crt \
+		$(COMPOSE) up -d --wait --remove-orphans directory
 	# Recreate secret-prep so setupsecrets --force copies into control-secrets.
-	LABLDAP_TLS_CA=$(COMPOSE_TLS)/instance-ca.crt $(COMPOSE) up -d --no-deps --force-recreate secret-prep
-	LABLDAP_TLS_CA=$(COMPOSE_TLS)/instance-ca.crt $(COMPOSE) wait secret-prep
-	LABLDAP_TLS_CA=$(COMPOSE_TLS)/instance-ca.crt $(COMPOSE) up -d --wait --remove-orphans --force-recreate control
+	LABLDAP_TLS_CA=$(COMPOSE_TLS)/ca.crt \
+		$(COMPOSE) up -d --no-deps --force-recreate secret-prep
+	LABLDAP_TLS_CA=$(COMPOSE_TLS)/ca.crt \
+		$(COMPOSE) wait secret-prep
+	LABLDAP_TLS_CA=$(COMPOSE_TLS)/ca.crt \
+		$(COMPOSE) up -d --wait --remove-orphans --force-recreate control
 
-compose-up-persistent: image image-bootstrap compose-preflight compose-secrets setup-tls
+compose-up-persistent: image-native image image-bootstrap compose-preflight compose-secrets setup-tls
+	LABLDAP_SCENARIO_FILE=deploy/compose/scenario.persistent.yaml \
+	LABLDAP_TLS_CA=$(COMPOSE_TLS)/ca.crt \
+		$(COMPOSE_PERSISTENT) up -d --no-deps --force-recreate native-secret-prep
+	LABLDAP_SCENARIO_FILE=deploy/compose/scenario.persistent.yaml \
+	LABLDAP_TLS_CA=$(COMPOSE_TLS)/ca.crt \
+		$(COMPOSE_PERSISTENT) wait native-secret-prep
 	LABLDAP_SCENARIO_FILE=deploy/compose/scenario.persistent.yaml \
 	LABLDAP_TLS_CA=$(COMPOSE_TLS)/ca.crt \
 		$(COMPOSE_PERSISTENT) up -d --wait --remove-orphans directory
-	$(GO) run ./tools/setuptls import --dir $(COMPOSE_TLS) --project labldap \
-		-f deploy/compose/compose.yaml -f deploy/compose/compose.persistent.yaml
 	LABLDAP_SCENARIO_FILE=deploy/compose/scenario.persistent.yaml \
 	LABLDAP_TLS_CA=$(COMPOSE_TLS)/ca.crt \
 		$(COMPOSE_PERSISTENT) up -d --no-deps --force-recreate secret-prep
@@ -213,56 +237,59 @@ compose-up-persistent: image image-bootstrap compose-preflight compose-secrets s
 compose-down:
 	-$(COMPOSE) down --remove-orphans
 	-$(COMPOSE_PERSISTENT) down --remove-orphans
+	-$(COMPOSE_389DS_EPHEMERAL) down --remove-orphans
+	-$(COMPOSE_389DS_PERSISTENT) down --remove-orphans
 
 compose-reset:
 	-$(COMPOSE) down --remove-orphans -v
 	-$(COMPOSE_PERSISTENT) down --remove-orphans -v
+	-$(COMPOSE_389DS_EPHEMERAL) down --remove-orphans -v
+	-$(COMPOSE_389DS_PERSISTENT) down --remove-orphans -v
 	$(MAKE) compose-up
 
-# Native engine profile (T-145; ADR-0008/0009). labldapd self-applies the
-# engine plan and serves the lab CA certificate directly, so there is no
-# setuptls publish/import (dsctl) step. LABLDAP_TLS_CA is the lab CA itself.
-# Runtime bring-up requires T-143 (labldapd serve), T-144 (native bootstrap
-# reconcilers), and T-146 (control engine wiring); the targets are
-# correct-by-construction against the documented labldapd CLI until then.
-compose-up-native: image-native image image-bootstrap compose-preflight compose-secrets setup-tls
-	# Recreate native-secret-prep so rotated DM/TLS files reach directory-secrets.
-	LABLDAP_SCENARIO_FILE=$(COMPOSE_NATIVE_SCENARIO) LABLDAP_TLS_CA=$(COMPOSE_TLS)/ca.crt \
-		$(COMPOSE_NATIVE) up -d --no-deps --force-recreate native-secret-prep
-	LABLDAP_SCENARIO_FILE=$(COMPOSE_NATIVE_SCENARIO) LABLDAP_TLS_CA=$(COMPOSE_TLS)/ca.crt \
-		$(COMPOSE_NATIVE) wait native-secret-prep
-	LABLDAP_SCENARIO_FILE=$(COMPOSE_NATIVE_SCENARIO) LABLDAP_TLS_CA=$(COMPOSE_TLS)/ca.crt \
-		$(COMPOSE_NATIVE) up -d --wait --remove-orphans directory
-	# Recreate secret-prep so setupsecrets --force copies into control-secrets.
-	LABLDAP_SCENARIO_FILE=$(COMPOSE_NATIVE_SCENARIO) LABLDAP_TLS_CA=$(COMPOSE_TLS)/ca.crt \
-		$(COMPOSE_NATIVE) up -d --no-deps --force-recreate secret-prep
-	LABLDAP_SCENARIO_FILE=$(COMPOSE_NATIVE_SCENARIO) LABLDAP_TLS_CA=$(COMPOSE_TLS)/ca.crt \
-		$(COMPOSE_NATIVE) wait secret-prep
-	LABLDAP_SCENARIO_FILE=$(COMPOSE_NATIVE_SCENARIO) LABLDAP_TLS_CA=$(COMPOSE_TLS)/ca.crt \
-		$(COMPOSE_NATIVE) up -d --wait --remove-orphans --force-recreate control
+# One-release aliases: native is now the default compose-up.
+compose-up-native: compose-up
+compose-up-native-persistent: compose-up-persistent
+compose-down-native: compose-down
+compose-reset-native: compose-reset
 
-compose-up-native-persistent: image-native image image-bootstrap compose-preflight compose-secrets setup-tls
-	LABLDAP_SCENARIO_FILE=$(COMPOSE_NATIVE_PERSISTENT_SCENARIO) LABLDAP_TLS_CA=$(COMPOSE_TLS)/ca.crt \
-		$(COMPOSE_NATIVE_PERSISTENT) up -d --no-deps --force-recreate native-secret-prep
-	LABLDAP_SCENARIO_FILE=$(COMPOSE_NATIVE_PERSISTENT_SCENARIO) LABLDAP_TLS_CA=$(COMPOSE_TLS)/ca.crt \
-		$(COMPOSE_NATIVE_PERSISTENT) wait native-secret-prep
-	LABLDAP_SCENARIO_FILE=$(COMPOSE_NATIVE_PERSISTENT_SCENARIO) LABLDAP_TLS_CA=$(COMPOSE_TLS)/ca.crt \
-		$(COMPOSE_NATIVE_PERSISTENT) up -d --wait --remove-orphans directory
-	LABLDAP_SCENARIO_FILE=$(COMPOSE_NATIVE_PERSISTENT_SCENARIO) LABLDAP_TLS_CA=$(COMPOSE_TLS)/ca.crt \
-		$(COMPOSE_NATIVE_PERSISTENT) up -d --no-deps --force-recreate secret-prep
-	LABLDAP_SCENARIO_FILE=$(COMPOSE_NATIVE_PERSISTENT_SCENARIO) LABLDAP_TLS_CA=$(COMPOSE_TLS)/ca.crt \
-		$(COMPOSE_NATIVE_PERSISTENT) wait secret-prep
-	LABLDAP_SCENARIO_FILE=$(COMPOSE_NATIVE_PERSISTENT_SCENARIO) LABLDAP_TLS_CA=$(COMPOSE_TLS)/ca.crt \
-		$(COMPOSE_NATIVE_PERSISTENT) up -d --wait --remove-orphans --force-recreate control
+# 389 Directory Server oracle / rollback (explicit engine: 389ds).
+compose-up-389ds: image image-bootstrap compose-preflight compose-secrets setup-tls
+	LABLDAP_SCENARIO_FILE=$(COMPOSE_389DS_SCENARIO) LABLDAP_TLS_CA=$(COMPOSE_TLS)/instance-ca.crt \
+		$(COMPOSE_389DS) up -d --wait --remove-orphans directory
+	$(GO) run ./tools/setuptls publish --out $(COMPOSE_TLS)/instance-ca.crt --project labldap \
+		-f deploy/compose/compose.yaml -f deploy/compose/compose.389ds.yaml -f deploy/compose/compose.389ds-ephemeral.yaml
+	LABLDAP_SCENARIO_FILE=$(COMPOSE_389DS_SCENARIO) LABLDAP_TLS_CA=$(COMPOSE_TLS)/instance-ca.crt \
+		$(COMPOSE_389DS) up -d --no-deps --force-recreate secret-prep
+	LABLDAP_SCENARIO_FILE=$(COMPOSE_389DS_SCENARIO) LABLDAP_TLS_CA=$(COMPOSE_TLS)/instance-ca.crt \
+		$(COMPOSE_389DS) wait secret-prep
+	LABLDAP_SCENARIO_FILE=$(COMPOSE_389DS_SCENARIO) LABLDAP_TLS_CA=$(COMPOSE_TLS)/instance-ca.crt \
+		$(COMPOSE_389DS) up -d --wait --remove-orphans --force-recreate control
 
-compose-down-native:
-	-$(COMPOSE_NATIVE_EPHEMERAL) down --remove-orphans
-	-$(COMPOSE_NATIVE_PERSISTENT) down --remove-orphans
+compose-up-389ds-persistent: image image-bootstrap compose-preflight compose-secrets setup-tls
+	LABLDAP_SCENARIO_FILE=$(COMPOSE_389DS_PERSISTENT_SCENARIO) \
+	LABLDAP_TLS_CA=$(COMPOSE_TLS)/ca.crt \
+		$(COMPOSE_389DS_PERSISTENT) up -d --wait --remove-orphans directory
+	$(GO) run ./tools/setuptls import --dir $(COMPOSE_TLS) --project labldap \
+		-f deploy/compose/compose.yaml -f deploy/compose/compose.389ds.yaml -f deploy/compose/compose.persistent.yaml
+	LABLDAP_SCENARIO_FILE=$(COMPOSE_389DS_PERSISTENT_SCENARIO) \
+	LABLDAP_TLS_CA=$(COMPOSE_TLS)/ca.crt \
+		$(COMPOSE_389DS_PERSISTENT) up -d --no-deps --force-recreate secret-prep
+	LABLDAP_SCENARIO_FILE=$(COMPOSE_389DS_PERSISTENT_SCENARIO) \
+	LABLDAP_TLS_CA=$(COMPOSE_TLS)/ca.crt \
+		$(COMPOSE_389DS_PERSISTENT) wait secret-prep
+	LABLDAP_SCENARIO_FILE=$(COMPOSE_389DS_PERSISTENT_SCENARIO) \
+	LABLDAP_TLS_CA=$(COMPOSE_TLS)/ca.crt \
+		$(COMPOSE_389DS_PERSISTENT) up -d --wait --remove-orphans --force-recreate control
 
-compose-reset-native:
-	-$(COMPOSE_NATIVE_EPHEMERAL) down --remove-orphans -v
-	-$(COMPOSE_NATIVE_PERSISTENT) down --remove-orphans -v
-	$(MAKE) compose-up-native
+compose-down-389ds:
+	-$(COMPOSE_389DS_EPHEMERAL) down --remove-orphans
+	-$(COMPOSE_389DS_PERSISTENT) down --remove-orphans
+
+compose-reset-389ds:
+	-$(COMPOSE_389DS_EPHEMERAL) down --remove-orphans -v
+	-$(COMPOSE_389DS_PERSISTENT) down --remove-orphans -v
+	$(MAKE) compose-up-389ds
 
 image-native:
 	docker build \

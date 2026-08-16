@@ -4,9 +4,9 @@ metadata:
   name: example-lab
 spec:
   directory:
-    # engine selects the directory engine: 389ds (default when omitted) or
-    # native (opt-in labldapd; M9 / T-150). See ADR-0008/ADR-0009.
-    engine: 389ds
+    # engine selects the directory engine. Omitted defaults to native
+    # (labldapd). Set 389ds for the pinned 389 oracle/rollback.
+    # See ADR-0008 amendment 2026-08-16.
     suffix: "dc=example,dc=test"
     peopleRDN: "ou=people"
     groupsRDN: "ou=groups"

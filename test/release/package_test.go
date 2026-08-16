@@ -36,6 +36,14 @@ func TestExamplesValidateAndHaveNoRealSecrets(t *testing.T) {
 				"/run/secrets/token-admin":  "lab-fixture-admin-token",
 			},
 		},
+		{
+			path: filepath.Join(root, "deploy", "compose", "scenario.389ds.yaml"),
+			res: config.MapResolver{
+				"/run/secrets/runtime-ldap": "lab-fixture-runtime-password",
+				"/run/secrets/user-alice":   "lab-fixture-alice-password",
+				"/run/secrets/token-admin":  "lab-fixture-admin-token",
+			},
+		},
 	}
 	for _, ex := range examples {
 		src, err := os.ReadFile(ex.path)
@@ -153,6 +161,7 @@ func TestPersistentUpgradeHasNoPriorAPIVersion(t *testing.T) {
 	for _, rel := range []string{
 		"deploy/compose/scenario.yaml",
 		"deploy/compose/scenario.persistent.yaml",
+		"deploy/compose/scenario.389ds.yaml",
 		"config/examples/example-lab.yaml",
 	} {
 		text := read(t, filepath.Join(root, rel))

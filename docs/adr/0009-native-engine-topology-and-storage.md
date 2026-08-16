@@ -92,7 +92,7 @@ test/parity/                  # dual-engine comparison harness
 ### Neutral / follow-up
 
 - T-122 lands the interface skeletons on `main` before parallel implementation.
-- T-123 adds `spec.directory.engine` (`389ds` | `native`, default `389ds`) without a new `apiVersion`.
+- T-123 adds `spec.directory.engine` (`389ds` | `native`) without a new `apiVersion`. The omitted-field default became `native` in the ADR-0008 amendment of 2026-08-16.
 - T-143–T-146 ship `labldapd`, native reconcilers, image, and `make compose-up-native`.
 - Pin the bbolt module version at first import (T-129). Record the version in the parity contract’s implementation notes.
 

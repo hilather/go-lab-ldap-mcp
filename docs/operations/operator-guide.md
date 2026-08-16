@@ -20,17 +20,19 @@ Local images only. No distribution LICENSE file yet.
 | Direct LDAP | `ldap://127.0.0.1:3389` and `ldaps://127.0.0.1:3636` |
 | MCP | `POST /mcp` (bearer) and `labldap mcp-stdio`. Read tools on by default; mutations off until `register*`. Catalog: [docs/mcp/catalog.md](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/mcp/catalog.md). |
 
-389 Directory Server is the directory engine. The Go service does **not**
-implement the LDAP wire protocol.
+The omitted-field default engine is native `labldapd`. Pinned 389 Directory
+Server remains the oracle and rollback (`engine: 389ds`). The Go control
+plane does **not** implement the LDAP wire protocol.
 
 ## Limitations (read first)
 
 - **Not Active Directory.** There is no NTLM, Kerberos, GPOs, `sAMAccountName`
   uniqueness model, SID history, or AD-style schema. Clients that assume
-  Active Directory will not work. LabLDAP is generic LDAPv3 against 389 DS.
+  Active Directory will not work. LabLDAP is generic LDAPv3 against the
+  selected engine (`labldapd` by default, or 389 DS).
 - **Ephemeral tmpfs is not a forensic wipe.** Host swap can still persist
   tmpfs pages (non-negotiable 7).
-- **One suffix, one 389 DS instance, one control replica.** Not HA.
+- **One suffix, one engine instance, one control replica.** Not HA.
 - **Hard engine reset is not an API.** `make compose-reset` (volume removal)
   is operator-only. REST/MCP expose suffix-scoped soft reset only.
 - **Directory Manager never goes to control.** DM is bootstrap-only.
@@ -53,11 +55,13 @@ implement the LDAP wire protocol.
 
 | Path | Role |
 | --- | --- |
-| `deploy/compose/compose.yaml` | Base topology (pinned 389 DS digest) |
-| `deploy/compose/compose.ephemeral.yaml` | Default: tmpfs-backed `/data` |
+| `deploy/compose/compose.yaml` | Base topology (native `labldapd`) |
+| `deploy/compose/compose.ephemeral.yaml` | Default: 2GiB tmpfs-backed `/data` |
 | `deploy/compose/compose.persistent.yaml` | Named volume |
-| `deploy/compose/scenario.yaml` | Ephemeral lab scenario |
+| `deploy/compose/compose.389ds.yaml` | 389 oracle/rollback overlay |
+| `deploy/compose/scenario.yaml` | Ephemeral lab scenario (omitted engine → native) |
 | `deploy/compose/scenario.persistent.yaml` | Persistent lab scenario |
+| `deploy/compose/scenario.389ds.yaml` | 389 rollback scenario (`engine: 389ds`) |
 | `config/examples/example-lab.yaml` | Compiler example |
 | `config/schema/v1alpha1.json` | JSON Schema |
 | `api/openapi.yaml` | REST contract |
@@ -72,10 +76,10 @@ From a clean checkout:
 make compose-up
 ```
 
-That builds `labldap-control:dev` and `labldap-bootstrap:dev`, generates
-gitignored secrets and a lab CA, starts 389 DS, publishes the **instance
-CA** to `secrets/tls/instance-ca.crt`, runs bootstrap `apply`, then starts
-control.
+That builds `labldapd:dev`, `labldap-control:dev`, and
+`labldap-bootstrap:dev`, generates gitignored secrets and a lab CA, starts
+`labldapd`, runs bootstrap `apply`, then starts control. 389 rollback:
+`make compose-up-389ds` (that path publishes the instance CA).
 
 Host publishes (loopback only):
 

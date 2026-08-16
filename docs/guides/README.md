@@ -17,5 +17,5 @@ Related:
 - [MCP catalog](../mcp/catalog.md)
 - [Release notes](../release/notes.md)
 - Dual-engine ADRs: [0008](../adr/0008-dual-directory-engines.md), [0009](../adr/0009-native-engine-topology-and-storage.md)
-- [Native parity contract](../design/native-engine-parity-contract.md) (M9; opt-in `engine: native`)
+- [Native parity contract](../design/native-engine-parity-contract.md) (default engine is `native`; `389ds` is oracle/rollback)
 - Public site: https://hilather.github.io/go-lab-ldap-mcp/ (GitHub Pages from this `docs/` tree)

@@ -4,8 +4,8 @@ Start here: **[docs/guides/deploy.md](../docs/guides/deploy.md)**.
 Operator package: [docs/operations/operator-guide.md](../docs/operations/operator-guide.md).
 Release notes: [docs/release/notes.md](../docs/release/notes.md).
 
-Compose topology: directory (pinned 389 DS) → CA publish or lab TLS import
-→ bootstrap one-shot → hardened `labldap-control:dev`.
+Compose topology: directory (`labldapd` default, or pinned 389 via
+`compose.389ds.yaml`) → bootstrap one-shot → hardened `labldap-control:dev`.
 
 Release files pin images by digest, never a floating tag. Control never
 receives Directory Manager and never mounts the Docker socket.
@@ -14,6 +14,7 @@ receives Directory Manager and never mounts the Docker socket.
 
 | Image | Make target | Notes |
 | --- | --- | --- |
+| `labldapd:dev` | `make image-native` | Native directory engine. Default `compose-up`. Do not push (OD-004). |
 | `labldap-bootstrap:dev` | `make image-bootstrap` | Static `labldap-bootstrap` on the pinned 389 DS digest, same VERSION as control. Do not push (OD-004). |
 | `labldap-control:placeholder` | `make image-control-placeholder` | Thin T-042 process. Not used by `make compose-up`. |
 | `labldap-control:dev` | `make image` | Hardened multi-stage frontend+Go image. Non-root, CA bundle, HEALTHCHECK `/health`. |
@@ -28,24 +29,21 @@ is comparable.
 ## Compose
 
 ```text
-make compose-up              # ephemeral tmpfs-backed /data (default)
-make compose-up-persistent   # named volume
+make compose-up              # native labldapd; ephemeral 2GiB tmpfs /data
+make compose-up-persistent   # native; named volume
+make compose-up-389ds        # 389 oracle/rollback; publish instance CA
 make compose-down
 make compose-reset           # operator hard reset: down -v, then compose-up
 ```
 
-`make compose-up` (ephemeral) generates gitignored secrets and a lab CA,
-starts directory, publishes the **instance CA** to
-`secrets/tls/instance-ca.crt` (it does **not** overwrite `ca.crt`), then
-starts bootstrap and control. Ephemeral tmpfs `/data` remounts empty on
-container restart, so `dsctl tls import-*` is refused on that volume.
+`make compose-up` (ephemeral, native) generates gitignored secrets and a
+lab CA, starts `labldapd`, then bootstrap and control. Ephemeral tmpfs
+`/data` remounts empty on container restart. Size stays **2GiB** (RQ-5).
 
-`make compose-up-persistent` uses `scenario.persistent.yaml`
-(`storageMode: persistent`), imports the generated lab CA/server cert with
-`dsctl tls import-*` after first boot, restarts directory so NSS reloads,
-and points bootstrap/control at `secrets/tls/ca.crt`. That is the T-113
-generated-PKI path. `import` without `-f` defaults to the persistent overlay
-and fails if `/data` is tmpfs-backed.
+`make compose-up-389ds` restores pinned 389 DS and publishes the
+**instance CA** to `secrets/tls/instance-ca.crt`. Persistent 389
+(`compose-up-389ds-persistent`) still uses `dsctl tls import-*` after
+first boot.
 
 The directory service uses `secrets/directory.env`. Bootstrap uses
 `--directory-manager-password-file`. Control never receives Directory
@@ -68,9 +66,9 @@ baseline match.
 ### Ephemeral vs persistent
 
 Ephemeral (`compose.ephemeral.yaml`) uses a **tmpfs-backed Docker volume**
-for `/data` so bootstrap can still mount it read-only (LDAPI). UID 389,
-GID 389, mode 0750, size **2GiB** (the pinned 389 DS 2.4.6 first-boot
-fails on a 512Mi tmpfs). Runtime entries disappear after volume unmount
+for `/data`. UID 65532, GID 65532, mode 0750, size **2GiB** (RQ-5). The
+389 rollback overlay (`compose.389ds-ephemeral.yaml`) keeps UID 389 and
+the same 2GiB size. Runtime entries disappear after volume unmount
 or `compose-reset`. Ordinary container recreate that keeps the volume
 object may remount an empty tmpfs.
 

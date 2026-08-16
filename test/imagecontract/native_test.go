@@ -63,13 +63,18 @@ func TestLabldapdDockerfileHardening(t *testing.T) {
 
 func TestComposeNativeOverlay(t *testing.T) {
 	root := repoRoot(t)
-	text := read(t, filepath.Join(root, "deploy", "compose", "compose.native.yaml"))
-
-	if strings.Contains(text, "labldap-control:placeholder") {
-		t.Fatal("native overlay must not use the placeholder control image")
+	// Native is the default compose.yaml; compose.native.yaml remains a
+	// one-release alias overlay.
+	base := read(t, filepath.Join(root, "deploy", "compose", "compose.yaml"))
+	if strings.Contains(base, "labldap-control:placeholder") {
+		t.Fatal("default compose must not use the placeholder control image")
 	}
-	if !strings.Contains(text, "image: labldapd:dev") {
-		t.Fatal("native overlay must run labldapd:dev as the directory engine")
+	if !strings.Contains(base, "image: labldapd:dev") {
+		t.Fatal("default compose must run labldapd:dev as the directory engine")
+	}
+	text := read(t, filepath.Join(root, "deploy", "compose", "compose.native.yaml"))
+	if !strings.Contains(text, "alias") && !strings.Contains(text, "image: labldapd:dev") {
+		t.Fatal("compose.native.yaml must remain a documented alias or native overlay")
 	}
 	for _, banned := range []string{"docker.sock", "ca.key", "DS_DM_PASSWORD", "dsconf", "--dsconf-instance"} {
 		if strings.Contains(text, banned) {
@@ -141,8 +146,14 @@ func TestMakefileNativeTargetsAreReal(t *testing.T) {
 	if !strings.Contains(text, "Dockerfile.labldapd") || !strings.Contains(text, "labldapd:dev") {
 		t.Fatal("make image-native must build labldapd:dev from Dockerfile.labldapd")
 	}
-	if !strings.Contains(text, "compose.native.yaml") || !strings.Contains(text, "compose.native-ephemeral.yaml") {
-		t.Fatal("make compose-up-native must stack the native overlays")
+	if !strings.Contains(text, "compose-up-native:") {
+		t.Fatal("make compose-up-native must remain as a one-release alias")
+	}
+	if !strings.Contains(text, "compose-up-389ds:") {
+		t.Fatal("make compose-up-389ds must exist for 389 rollback")
+	}
+	if !strings.Contains(text, "compose.389ds.yaml") {
+		t.Fatal("389 rollback must stack compose.389ds.yaml")
 	}
 	if !strings.Contains(text, "labldapd.digest") {
 		t.Fatal("make image-native must pin the labldapd base from labldapd.digest")

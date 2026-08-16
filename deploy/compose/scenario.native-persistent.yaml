@@ -4,8 +4,8 @@ metadata:
   name: compose-lab
 spec:
   directory:
-    # engine: native selects labldapd (ADR-0008/0009). Opt-in; omitted
-    # engine still defaults to 389ds.
+    # engine: native is the omitted-field default. Kept explicit so this
+    # overlay scenario stays valid if stacked with older compose files.
     engine: native
     suffix: "dc=example,dc=test"
     peopleRDN: "ou=people"

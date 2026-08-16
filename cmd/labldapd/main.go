@@ -16,8 +16,8 @@ engine, not the control plane: labldap and labldap-bootstrap stay LDAP
 clients of it, and Directory Manager credentials reach it only through a
 secret file — never a command-line value.
 
-Native mode is lab-scoped and ready as opt-in engine: native. Omitting the
-field still defaults to 389ds.
+Native mode is lab-scoped and is the omitted-field default (engine: native;
+ADR-0008 amendment 2026-08-16). Set engine: 389ds for the pinned 389 oracle.
 
 Usage:
   labldapd [command]
@@ -53,9 +53,12 @@ Flags:
   --health-listen ADDR                     health listener (default 127.0.0.1:8389; empty disables)
 
 Listener hosts default to loopback when unspecified. The scenario must
-select engine: native; the daemon never reads user/runtime/token secret
-files (the data plane belongs to labldap-bootstrap). GET /health on the
-health listener answers 200 once the directory listeners are bound.
+select engine: native (the omitted-field default). The daemon fails closed
+if --data-dir looks like a 389 nsslapd tree or labldapd.bolt is not a
+bbolt file — run compose-reset or set engine: 389ds. It never reads
+user/runtime/token secret files (the data plane belongs to
+labldap-bootstrap). GET /health on the health listener answers 200 once
+the directory listeners are bound.
 
 Exit codes: 0 clean shutdown, 1 startup/runtime failure, 2 flag error.
 `

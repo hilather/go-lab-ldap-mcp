@@ -37,7 +37,7 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "engine": { "type": "string", "enum": ["389ds", "native"], "default": "389ds" },
+        "engine": { "type": "string", "enum": ["389ds", "native"], "default": "native" },
         "suffix": { "type": "string" },
         "peopleRDN": { "type": "string" },
         "groupsRDN": { "type": "string" },

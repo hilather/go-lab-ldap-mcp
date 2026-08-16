@@ -64,7 +64,38 @@ spec:
 }
 
 func TestWireEngineReconcilersDS389(t *testing.T) {
-	opt, err := bootstrap.ParseArgs("plan", []string{"--config", "../../config/examples/example-lab.yaml"})
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "secrets"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for name, val := range map[string]string{
+		"runtime-ldap": "lab-fixture-runtime-password",
+		"user-alice":   "lab-fixture-alice-password",
+	} {
+		if err := os.WriteFile(filepath.Join(dir, "secrets", name), []byte(val+"\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	path := filepath.Join(dir, "389ds-lab.yaml")
+	src := `
+apiVersion: labldap.dev/v1alpha1
+kind: LabScenario
+metadata: { name: ds389-lab }
+spec:
+  directory:
+    suffix: "dc=example,dc=test"
+    engine: 389ds
+  transport:
+    ldaps: { enabled: true, port: 3636 }
+  runtimeAccount: { id: rt, passwordFile: secrets/runtime-ldap }
+  users:
+    - id: alice
+      passwordFile: secrets/user-alice
+`
+	if err := os.WriteFile(path, []byte(src), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	opt, err := bootstrap.ParseArgs("plan", []string{"--config", path})
 	if err != nil {
 		t.Fatal(err)
 	}

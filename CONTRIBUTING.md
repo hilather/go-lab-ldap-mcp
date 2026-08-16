@@ -48,7 +48,8 @@ make test-fuzz-short     # T-149 nightly fuzz (also in verify-native)
 make test-e2e
 make image && make image-bootstrap
 make compose-up
-make compose-up-native   # opt-in native engine stack
+make compose-up          # native labldapd (default)
+make compose-up-389ds    # 389 oracle / rollback
 ```
 
 Security, secret, and license policy:

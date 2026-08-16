@@ -5,7 +5,7 @@
 <h1 align="center">LabLDAP</h1>
 
 <p align="center">
-  <strong>A disposable 389 Directory Server laboratory.</strong><br />
+  <strong>A disposable laboratory directory.</strong><br />
   Real LDAP on the wire. A Go control plane for REST, MCP, and a browser UI.<br />
   Directory Manager never touches the long-running service.
 </p>
@@ -28,11 +28,11 @@
 
 ![LabLDAP console](docs/assets/console.jpg)
 
-LabLDAP is a control plane around a directory engine. v0.1.0 ships **389 Directory
-Server** as the engine of record. [ADR-0008](docs/adr/0008-dual-directory-engines.md)
-adds a second, Go-native engine (`labldapd`) with [LabLDAP-surface parity](docs/design/native-engine-parity-contract.md).
-Native is ready as **opt-in** `engine: native` (M9). Omitting the field still
-defaults to `389ds`.
+LabLDAP is a control plane around a directory engine. The omitted-field
+default is the Go-native engine (`labldapd`). [ADR-0008](docs/adr/0008-dual-directory-engines.md)
+keeps pinned **389 Directory Server** as the behavioral oracle and first-class
+rollback (`engine: 389ds`, `make compose-up-389ds`). See
+[LabLDAP-surface parity](docs/design/native-engine-parity-contract.md).
 
 The Go process bootstraps a lab suffix, then exposes the same authorized
 operations over HTTPS, Model Context Protocol, and an embedded UI. Directory
@@ -53,7 +53,7 @@ LabLDAP splits the job the way an operator would:
 
 | Role | Process | Privilege |
 | --- | --- | --- |
-| **directory** | long-running 389 DS | owns `/data` |
+| **directory** | long-running `labldapd` (default) or 389 DS | owns `/data` |
 | **bootstrap** | one-shot `labldap-bootstrap` | Directory Manager, via a secret file, then exits |
 | **control** | long-running `labldap` | restricted service account. No DM secret. No Docker socket. |
 
@@ -71,8 +71,9 @@ cd go-lab-ldap-mcp
 make compose-up
 ```
 
-That builds the local images, mints lab secrets and a lab CA, starts 389 DS,
-runs bootstrap, and brings the control plane up.
+That builds the local images, mints lab secrets and a lab CA, starts
+`labldapd`, runs bootstrap, and brings the control plane up. Use
+`make compose-up-389ds` for the 389 oracle/rollback.
 
 | Surface | Where |
 | --- | --- |
@@ -169,9 +170,9 @@ LabLDAP is a laboratory. It is not a production identity system.
 5. Static bearer tokens are an explicit lab mode, not an accident.
 6. Ephemeral tmpfs is not a forensic wipe — host swap can still hold pages.
 7. Soft reset restores the compiled suffix. It does not delete the volume.
-8. First usable release: one managed suffix, one engine instance. Engine default is 389 DS.
+8. First usable release: one managed suffix, one engine instance. Omitted `spec.directory.engine` defaults to `native` (`labldapd`). Explicit `engine: 389ds` remains the oracle/rollback.
 9. Active Directory emulation is out of scope.
-10. Native Go engine (`labldapd`) is a dual-mode lab option under ADR-0008. It is ready as opt-in `engine: native` (`make compose-up-native`); it is not a silent replacement for 389 DS. The omitted-field default stays `389ds`.
+10. Switching engines on an existing volume is a hard reset (`compose-reset`), not a live migration. `labldapd` refuses a 389 nsslapd `/data` tree.
 
 Management TLS in the shipped compose stack is a **lab certificate**. Trust
 `secrets/tls/instance-ca.crt` (ephemeral) or `secrets/tls/ca.crt` (persistent).
@@ -209,11 +210,17 @@ not pushed to a public registry.
 
 ## Status
 
-**v0.1.0** — first usable release. One suffix, one 389 DS, REST + UI + MCP,
-ephemeral and persistent compose. Dual-engine native mode is accepted in
-[ADR-0008](docs/adr/0008-dual-directory-engines.md) and ready as opt-in
-`engine: native` (M9 in [`TASKS.md`](TASKS.md)). The omitted-engine default
-remains 389 DS.
+**v0.1.0** — first usable release. One suffix, REST + UI + MCP, ephemeral
+and persistent compose. Dual-engine mode is accepted in
+[ADR-0008](docs/adr/0008-dual-directory-engines.md). The omitted-engine
+default is `native` (`labldapd`); `engine: 389ds` is the oracle/rollback.
+
+### Upgrading an omitted-engine lab
+
+1. If you already set `engine: native` or `engine: 389ds`, this default change does not apply.
+2. If you omitted `engine` and run 389 today: add `engine: 389ds` **before** upgrading, or accept a new directory revision and a **hard reset** of `/data` (`make compose-reset`).
+3. Do not point native `labldapd` at an existing 389 `/data` volume — the daemon refuses to start (`engine_data_mismatch`). Use `engine: 389ds` or `compose-reset`.
+4. Tokens, TLS, ports, MCP flags, and password-policy YAML are unchanged. Anonymous bind and cleartext bind stay off.
 
 No project license file yet; treat it as source-available until one is added.
 

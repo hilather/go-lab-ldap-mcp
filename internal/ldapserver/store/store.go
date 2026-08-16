@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sync"
 
 	"github.com/hilather/go-lab-ldap-mcp/internal/config"
@@ -55,6 +56,11 @@ var _ ldapserver.Store = (*Store)(nil)
 func Open(path string) (*Store, error) {
 	if path == "" {
 		return nil, ErrEmptyPath
+	}
+	// Refuse to create labldapd.bolt beside a 389 nsslapd tree, and
+	// refuse an existing file that is not bbolt (KD-12 / D4).
+	if err := CheckDataDir(filepath.Dir(path)); err != nil {
+		return nil, err
 	}
 	db, err := bolt.Open(path, fileMode, nil)
 	if err != nil {

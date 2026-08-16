@@ -2,7 +2,7 @@
 
 Users, groups, ACLs, tokens, and lab policy are declared in a
 `labldap.dev/v1alpha1` **LabScenario** file. Bootstrap compiles that file
-and writes real 389 DS entries. The YAML is the lab definition — not an
+and writes real directory entries. The YAML is the lab definition — not an
 in-memory directory.
 
 Shipped examples:
@@ -18,12 +18,16 @@ Shipped examples:
 
 | Value | Meaning |
 | --- | --- |
-| `389ds` | Pinned 389 Directory Server container. **Default** when the field is omitted. |
-| `native` | In-repo Go engine (`labldapd`). **Ready as opt-in** (M9 / T-150). Set `engine: native` or use `make compose-up-native`. Omitting the field still defaults to `389ds`. See [`docs/design/native-engine-parity-contract.md`](../design/native-engine-parity-contract.md). |
+| `native` | In-repo Go engine (`labldapd`). **Default** when the field is omitted (ADR-0008 amendment 2026-08-16). `make compose-up` uses this engine. |
+| `389ds` | Pinned 389 Directory Server container. First-class oracle/rollback. Set `engine: 389ds` and use `make compose-up-389ds`. |
 
-The field is optional and backward-compatible; omitting it keeps the `389ds`
-behavior. Engine is part of the compiled plan (`labldap plan` output) and the
-directory revision, so switching engines is a re-bootstrap, not a live change.
+The field is optional. Omitting it now selects `native`. Operators who
+still need 389 must set `engine: 389ds` **before** upgrading an omitted-engine
+lab, or accept a hard reset of `/data`. Engine is part of the compiled plan
+(`labldap plan` output) and the directory revision, so switching engines is
+a re-bootstrap, not a live change. On-disk formats are not migrated;
+`labldapd` refuses a 389 nsslapd data directory. See
+[`docs/design/native-engine-parity-contract.md`](../design/native-engine-parity-contract.md).
 
 ## Declare users and groups
 

@@ -165,6 +165,82 @@ func TestServeRequiresConfigAndDMFile(t *testing.T) {
 	_ = ln.Close()
 }
 
+func TestServeRejects389DataDir(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	data := filepath.Join(dir, "data")
+	if err := os.MkdirAll(filepath.Join(data, "config", "slapd-localhost"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(data, "config", "container.inf"), []byte("[General]\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg := writeFile(t, dir, "lab.yaml", minimalScenario)
+	dm := writeFile(t, dir, "dm.secret", dmCanary)
+	ldapAddr := freeAddr(t)
+	var stdout, stderr bytes.Buffer
+	code := run([]string{
+		"serve", "--config", cfg,
+		"--data-dir", data,
+		"--listen", ldapAddr, "--ldaps-listen=", "--health-listen=",
+		"--directory-manager-password-file", dm,
+	}, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("exit %d, want 1; stderr=%s", code, stderr.String())
+	}
+	msg := stderr.String()
+	for _, want := range []string{"engine_data_mismatch", "compose-reset", "engine: 389ds"} {
+		if !strings.Contains(msg, want) {
+			t.Fatalf("stderr missing %q:\n%s", want, msg)
+		}
+	}
+	if strings.Contains(msg, "[General]") || strings.Contains(msg, dmCanary) {
+		t.Fatalf("diagnostic leaked file content or secret:\n%s", msg)
+	}
+	if _, err := os.Stat(filepath.Join(data, storeFileName)); !os.IsNotExist(err) {
+		t.Fatal("must not create labldapd.bolt beside a 389 tree")
+	}
+	ln, err := net.Listen("tcp", ldapAddr)
+	if err != nil {
+		t.Fatalf("LDAP address %s still bound after fail-closed startup: %v", ldapAddr, err)
+	}
+	_ = ln.Close()
+}
+
+func TestServeRejectsNonBoltStoreFile(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	data := filepath.Join(dir, "data")
+	if err := os.MkdirAll(data, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(data, storeFileName), []byte("not-a-bbolt-file"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	f, logs := testDaemonFixture(t)
+	f.dataDir = data
+	_, err := startDaemon(context.Background(), f, testLogger(logs))
+	if err == nil {
+		t.Fatal("expected non-bbolt store to fail closed")
+	}
+	var ae *apperr.Error
+	if !errors.As(err, &ae) {
+		t.Fatalf("err = %v (%T), want apperr", err, err)
+	}
+	found := false
+	for _, fld := range ae.Fields() {
+		if fld.Path == "dataDir" && fld.Code == "engine_data_mismatch" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("fields = %#v", ae.Fields())
+	}
+	if strings.Contains(err.Error(), "not-a-bbolt-file") || strings.Contains(logs.String(), dmCanary) {
+		t.Fatalf("leaked file content or secret: err=%v logs=%s", err, logs.String())
+	}
+}
+
 func TestServeRejectsNonNativeEngine(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()

@@ -1,0 +1,65 @@
+# 389 Directory Server overlay (oracle / rollback). Stack after compose.yaml:
+#   docker compose -f compose.yaml -f compose.389ds.yaml -f compose.389ds-ephemeral.yaml
+#   docker compose -f compose.yaml -f compose.389ds.yaml -f compose.persistent.yaml
+#
+# Restores the pinned 389 image, env_file DM injection, shared /data, and
+# bootstrap --dsconf-instance. Requires Compose v2.24.4+ (`!reset` /
+# `!override`). Host publishes stay loopback 3389/3636/8443.
+#
+# Scenario must set spec.directory.engine: 389ds (see scenario.389ds.yaml).
+# Switching onto an existing native /data is a hard reset (compose-reset).
+volumes:
+  directory-data:
+
+services:
+  directory:
+    image: quay.io/389ds/dirsrv@sha256:f2851654c5df545cd893d84bea8d08c28dc25f0930493fbfed1d8a6eacf657f7
+    user: !reset
+    read_only: !reset
+    cap_drop: !reset
+    security_opt: !reset
+    tmpfs: !reset
+    depends_on: !reset {}
+    env_file:
+      - path: ${LABLDAP_DIRECTORY_ENVFILE:-../../secrets/directory.env}
+        required: true
+    volumes: !override
+      - directory-data:/data
+    command: !reset []
+    healthcheck:
+      test: ["CMD", "/bin/sh", "-c", "test -f /data/config/container.inf && test -S /data/run/slapd-localhost.socket"]
+      interval: 2s
+      timeout: 5s
+      retries: 60
+      start_period: 10s
+
+  bootstrap:
+    volumes: !override
+      # Shared /data is read-only. Bootstrap must not write engine state.
+      - directory-data:/data:ro
+      - ${LABLDAP_SCENARIO_FILE:-./scenario.389ds.yaml}:/config/scenario.yaml:ro
+      - ${LABLDAP_SECRETS_DIR:-../../secrets}/runtime-ldap:/run/secrets/runtime-ldap:ro
+      - ${LABLDAP_SECRETS_DIR:-../../secrets}/token-admin:/run/secrets/token-admin:ro
+      - ${LABLDAP_SECRETS_DIR:-../../secrets}/user-alice:/run/secrets/user-alice:ro
+      - ${LABLDAP_DM_PASSWORD_FILE:-../../secrets/dm.pw}:/run/secrets/dm.pw:ro
+      - ${LABLDAP_TLS_CA:-../../secrets/tls/ca.crt}:/run/tls/ca.crt:ro
+    command:
+      - apply
+      - --config
+      - /config/scenario.yaml
+      - --directory-manager-password-file
+      - /run/secrets/dm.pw
+      - --ldap-url
+      - ldaps://directory:3636
+      - --directory-host
+      - directory
+      - --directory-ca-file
+      - /run/tls/ca.crt
+      - --dsconf-instance
+      - localhost
+
+  control:
+    volumes: !override
+      - ${LABLDAP_SCENARIO_FILE:-./scenario.389ds.yaml}:/config/scenario.yaml:ro
+      - control-secrets:/run/secrets:ro
+      - ${LABLDAP_TLS_CA:-../../secrets/tls/ca.crt}:/run/tls/ca.crt:ro

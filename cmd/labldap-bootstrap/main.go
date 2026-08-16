@@ -11,7 +11,8 @@ import (
 const usage = `labldap-bootstrap — LabLDAP one-shot directory bootstrap
 
 Validates configuration, waits for the selected directory engine — the
-pinned 389 Directory Server (default) or the native labldapd engine — and
+native labldapd engine (default) or pinned 389 Directory Server
+(engine: 389ds) — and
 creates the backend, applies engine settings, seeds the managed suffix,
 creates the restricted runtime account, verifies allow/deny, and writes
 the baseline marker.

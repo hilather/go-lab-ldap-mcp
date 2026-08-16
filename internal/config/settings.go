@@ -12,7 +12,7 @@ import (
 func applyDefaults(f *v1alpha1.File) {
 	d := &f.Spec.Directory
 	if d.Engine == "" {
-		d.Engine = v1alpha1.Engine389DS
+		d.Engine = v1alpha1.EngineNative
 	}
 	if d.PeopleRDN == "" {
 		d.PeopleRDN = "ou=people"

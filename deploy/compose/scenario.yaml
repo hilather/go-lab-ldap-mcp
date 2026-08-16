@@ -4,6 +4,8 @@ metadata:
   name: compose-lab
 spec:
   directory:
+    # omitted engine defaults to native (ADR-0008 amendment 2026-08-16).
+    # Set engine: 389ds and use make compose-up-389ds for the 389 oracle.
     suffix: "dc=example,dc=test"
     peopleRDN: "ou=people"
     groupsRDN: "ou=groups"

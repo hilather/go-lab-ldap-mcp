@@ -2,7 +2,7 @@
 
 ## 1. Architecture summary
 
-LabLDAP is a control plane around a directory engine. The architecture deliberately separates engine bootstrap privileges from runtime management privileges. v0.1.0 ships 389 Directory Server as the default engine. [ADR-0008](adr/0008-dual-directory-engines.md) adds a second engine (`native` / `labldapd`) with the same three lifecycle roles. Native is ready as opt-in `engine: native` (M9); omitting the field still selects `389ds`.
+LabLDAP is a control plane around a directory engine. The architecture deliberately separates engine bootstrap privileges from runtime management privileges. The omitted-field default is the native engine (`labldapd`). [ADR-0008](adr/0008-dual-directory-engines.md) keeps pinned 389 Directory Server as the behavioral oracle and first-class rollback (`engine: 389ds`). Both engines share the same three lifecycle roles.
 
 There are three lifecycle roles:
 
@@ -50,12 +50,12 @@ flowchart TB
         LDAPClient[LDAP client or application]
 
         subgraph Compose[LabLDAP Compose project]
-            Directory[389 Directory Server\nlong-running]
+            Directory[labldapd default\nor 389 DS rollback]
             Bootstrap[Bootstrap image\none-shot]
             Control[Go control plane\nREST + MCP + UI]
             Config[Scenario YAML\nread-only mount]
             Secrets[Secret files\nselective mounts]
-            State[389 DS /data\ntmpfs or named volume]
+            State[engine /data\ntmpfs or named volume]
         end
     end
 
@@ -81,7 +81,7 @@ flowchart TB
 | Seed user password files | No, except as stored hashes | Yes | Yes only when soft reset is enabled |
 | Management API token files | No | No | Yes |
 | Docker socket | No | No | No |
-| Write to 389 DS `/data` | Engine only | No direct filesystem write | No |
+| Write to engine `/data` | Engine only | No direct filesystem write | No |
 | LDAP write to managed suffix | Engine | Yes | Yes, restricted |
 | LDAP write to `cn=config` | Engine | Yes during bootstrap | No |
 

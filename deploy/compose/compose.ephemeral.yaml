@@ -1,15 +1,12 @@
-# Ephemeral /data (T-110). Default make compose-up overlay.
+# Ephemeral /data. Default make compose-up overlay (native labldapd).
 #
-# A tmpfs-backed Docker volume is used instead of a container-local tmpfs
-# so bootstrap can mount /data:ro (LDAPI socket + instance config).
+# A tmpfs-backed Docker volume is used so restart remounts empty.
 # Contents vanish when the volume is unmounted or removed.
 #
-# Size is 2GiB: the pinned 389 DS 2.4.6 first-boot fails on a 512Mi tmpfs
-# (ns-slapd never writes container.inf). UID/GID 389 match the dirsrv user.
+# Size stays 2GiB (RQ-5). UID/GID 65532 match the labldapd runtime user.
+# 389 rollback uses compose.389ds-ephemeral.yaml (uid 389, same 2GiB).
 #
-# docker compose restart remounts this volume empty. Lab CA import
-# (dsctl tls import-* + NSS reload) is refused on tmpfs /data.
-# Ephemeral compose-up publishes the instance CA to instance-ca.crt.
+# docker compose restart remounts this volume empty.
 #
 # Host swap can still persist tmpfs pages unless the host is configured
 # otherwise (non-negotiable 7). Do not treat ephemeral as forensic wipe.
@@ -19,4 +16,5 @@ volumes:
     driver_opts:
       type: tmpfs
       device: tmpfs
-      o: size=2147483648,uid=389,gid=389,mode=0750
+      o: size=2147483648,uid=65532,gid=65532,mode=0750
+

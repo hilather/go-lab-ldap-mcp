@@ -4,9 +4,9 @@ metadata:
   name: compose-lab
 spec:
   directory:
-    # engine: native is the omitted-field default. Kept explicit so this
-    # overlay scenario stays valid if stacked with older compose files.
-    engine: native
+    # engine: 389ds is the first-class oracle/rollback (ADR-0008).
+    # Omitted engine now defaults to native.
+    engine: 389ds
     suffix: "dc=example,dc=test"
     peopleRDN: "ou=people"
     groupsRDN: "ou=groups"

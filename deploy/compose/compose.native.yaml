@@ -1,6 +1,10 @@
-# Native engine overlay (T-145; ADR-0008, ADR-0009). Replaces the 389 DS
-# `directory` service with `labldapd` (labldapd:dev) and re-points bootstrap
-# at it. Always stack a storage overlay on top:
+# Alias (one release): native is now the default compose.yaml.
+# Prefer `make compose-up`. Kept so existing `-f compose.native.yaml`
+# invocations still parse. 389 rollback: compose.389ds.yaml.
+#
+# Historical T-145 overlay. Replaces a 389 `directory` service with
+# labldapd if someone still stacks this file. Always stack a storage
+# overlay on top:
 #   docker compose -f compose.yaml -f compose.native.yaml -f compose.native-ephemeral.yaml
 #   docker compose -f compose.yaml -f compose.native.yaml -f compose.native-persistent.yaml
 #

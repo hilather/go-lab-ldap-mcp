@@ -4,16 +4,16 @@ metadata:
   name: compose-lab
 spec:
   directory:
-    # engine: native is the omitted-field default. Kept explicit so this
-    # overlay scenario stays valid if stacked with older compose files.
-    engine: native
+    # engine: 389ds is the first-class oracle/rollback (ADR-0008).
+    engine: 389ds
     suffix: "dc=example,dc=test"
     peopleRDN: "ou=people"
     groupsRDN: "ou=groups"
     nestedGroups: false
     allowRawACI: false
   lifecycle:
-    storageMode: ephemeral
+    storageMode: persistent
+    # Named-volume Compose overlay (compose.persistent.yaml).
     startupMode: merge
     softReset: true
   transport:

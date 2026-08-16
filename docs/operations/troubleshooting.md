@@ -30,8 +30,9 @@ Fix the scenario or secrets, then `make compose-up` again. Do not pass
 ## LDAPS / StartTLS fails from the host
 
 - Ports are **3636** (LDAPS) and **3389** (LDAP / StartTLS).
-- Ephemeral: trust `secrets/tls/instance-ca.crt`.
-- Persistent: trust `secrets/tls/ca.crt` after `setuptls import`.
+- Native (default compose-up): trust `secrets/tls/ca.crt`.
+- 389 ephemeral (`compose-up-389ds`): trust `secrets/tls/instance-ca.crt`.
+- 389 persistent: trust `secrets/tls/ca.crt` after `setuptls import`.
 - A wrong CA or hostname fails closed. That is required, not a bug.
 
 ## Runtime entries vanished (ephemeral)
