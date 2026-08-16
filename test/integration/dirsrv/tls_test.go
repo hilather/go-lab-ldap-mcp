@@ -11,13 +11,24 @@ import (
 )
 
 func TestLDAPSTrustAndName(t *testing.T) {
-	mat := generateTLS(t, "localhost")
+	// T-148 parametrized (Contract C2: wrong CA and wrong server name fail
+	// closed on both engines). 389 imports the test CA via dsctl; the native
+	// fixture serves the same material directly (Delta D2: no admin plane).
+	var ldapsAddr string
+	var mat *TLSMaterial
+	if itEngine(t) == EngineNative {
+		n := startNative(t, seedYAML("merge"))
+		ldapsAddr = n.LDAPSAddr
+		mat = n.mat
+	} else {
+		mat = generateTLS(t, "localhost")
+		inst := Start(t)
+		inst.ImportTLS(t, mat)
+		ldapsAddr = inst.LDAPSAddr
+	}
 	if len(mat.CACertPEM) == 0 || len(mat.WrongCAPEM) == 0 {
 		t.Fatal("generateTLS returned empty PEMs")
 	}
-
-	inst := Start(t)
-	inst.ImportTLS(t, mat)
 
 	pool := x509.NewCertPool()
 	if !pool.AppendCertsFromPEM(mat.CACertPEM) {
@@ -33,7 +44,7 @@ func TestLDAPSTrustAndName(t *testing.T) {
 	var err error
 	deadline := time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) {
-		conn, err = tls.DialWithDialer(d, "tcp", inst.LDAPSAddr, cfg)
+		conn, err = tls.DialWithDialer(d, "tcp", ldapsAddr, cfg)
 		if err == nil {
 			break
 		}
@@ -58,7 +69,7 @@ func TestLDAPSTrustAndName(t *testing.T) {
 	if !wrong.AppendCertsFromPEM(mat.WrongCAPEM) {
 		t.Fatal("wrong ca")
 	}
-	_, err = tls.DialWithDialer(d, "tcp", inst.LDAPSAddr, &tls.Config{
+	_, err = tls.DialWithDialer(d, "tcp", ldapsAddr, &tls.Config{
 		RootCAs:    wrong,
 		ServerName: "localhost",
 		MinVersion: tls.VersionTLS12,
@@ -67,7 +78,7 @@ func TestLDAPSTrustAndName(t *testing.T) {
 		t.Fatal("wrong CA must fail closed")
 	}
 
-	_, err = tls.DialWithDialer(d, "tcp", inst.LDAPSAddr, &tls.Config{
+	_, err = tls.DialWithDialer(d, "tcp", ldapsAddr, &tls.Config{
 		RootCAs:    pool,
 		ServerName: "not-the-server.example",
 		MinVersion: tls.VersionTLS12,

@@ -224,6 +224,13 @@ func composeProject(t *testing.T, kind string) string {
 
 func requireCompose(t *testing.T) string {
 	t.Helper()
+	// T-148: the native engine run (LABLDAP_IT_ENGINE=native, see
+	// test/integration/dirsrv/engine.go) is the hermetic in-process fixture;
+	// these tests exercise the 389 Compose overlay only (parity contract
+	// D2/D4). The native overlay is `make compose-up-native` (T-145).
+	if os.Getenv("LABLDAP_IT_ENGINE") == "native" {
+		t.Skip("389 compose overlay only under LABLDAP_IT_ENGINE=native (parity contract D2/D4)")
+	}
 	if _, err := exec.LookPath("docker"); err != nil {
 		t.Skip("docker not on PATH")
 	}

@@ -33,7 +33,7 @@ IMAGE_LDFLAGS    := -s -w -X github.com/hilather/go-lab-ldap-mcp/internal/observ
 IMAGE_BUILD_ARGS := --build-arg VERSION=$(VERSION) --build-arg REVISION=$(REVISION) --build-arg BUILT_AT=$(BUILT_AT)
 
 .PHONY: help format lint generate generate-drift test test-unit \
-	test-integration test-e2e test-security compose-up compose-down \
+	test-integration test-integration-native test-e2e test-security compose-up compose-down \
 	compose-up-persistent compose-reset compose-secrets compose-preflight \
 	compose-up-native compose-up-native-persistent compose-down-native \
 	compose-reset-native \
@@ -51,6 +51,7 @@ help:
 		'  test               alias for test-unit' \
 		'  test-unit          Go tests + frontend build/scaffold tests' \
 		'  test-integration   real 389 DS harness (pinned digest; needs Docker)' \
+		'  test-integration-native  T-148 native engine variant (in-process labldapd; no Docker)' \
 		'  test-e2e           Playwright UI suite (mock control plane; optional live URL)' \
 		'  test-security      secret scan, govulncheck, license denylist' \
 		'  compose-up         ephemeral tmpfs /data; publish instance CA; bootstrap → control' \
@@ -94,6 +95,13 @@ test-unit: frontend-install
 
 test-integration:
 	$(GO) test -tags=integration ./test/integration/... -count=1 -timeout 30m
+
+# T-148: same integration suite against the native engine. The T-115 client
+# matrix runs against an in-process labldapd-equivalent fixture (no Docker
+# needed); 389-only tests skip with their parity-contract Delta/Excluded ID
+# (skip ledger: test/integration/dirsrv/engine.go).
+test-integration-native:
+	LABLDAP_IT_ENGINE=native $(GO) test -tags=integration ./test/integration/... -count=1 -timeout 30m
 
 test-e2e: frontend-build
 	cd test/e2e && $(PNPM) install --frozen-lockfile

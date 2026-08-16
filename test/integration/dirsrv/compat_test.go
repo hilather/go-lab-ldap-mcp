@@ -12,7 +12,37 @@ import (
 	"github.com/hilather/go-lab-ldap-mcp/test/compatibility/goindep"
 )
 
-func TestCompatibilityLDAPClients(t *testing.T) {
+// compatEnv is the engine endpoint the T-115 client matrix runs against
+// (T-148 parametrization; engine selected by LABLDAP_IT_ENGINE, see
+// engine.go). Client subtests consume only this surface, so the same
+// expectations apply to both engines wherever the parity contract is
+// Contract-tier; intentional differences carry a Delta ID inline.
+type compatEnv struct {
+	engine     string // Engine389DS or EngineNative
+	ldapAddr   string // host:port, cleartext listener (StartTLS only)
+	ldapsAddr  string // host:port, implicit TLS
+	caFile     string // test CA that signed the directory server cert
+	serverName string // TLS name clients verify ("localhost")
+	dmPassword string // Directory Manager password for this run
+}
+
+// startCompatEngine stages the selected engine for the matrix. The 389 path
+// is the shipped container flow (bootstrap binary exec'd inside the pinned
+// image, dsctl TLS import); the native path is the in-process fixture
+// (native.go) with the identical scenario compiled and applied over LDAP.
+func startCompatEngine(t *testing.T) compatEnv {
+	t.Helper()
+	if itEngine(t) == EngineNative {
+		n := startNative(t, seedYAML("merge"))
+		return compatEnv{
+			engine:     EngineNative,
+			ldapAddr:   n.LDAPAddr,
+			ldapsAddr:  n.LDAPSAddr,
+			caFile:     n.CAFile,
+			serverName: n.ServerName,
+			dmPassword: n.dmPassword,
+		}
+	}
 	inst := Start(t)
 	_, guest := stageSeedApply(t, inst, seedYAML("merge"), seedCanary)
 	out, err := execApply(t, inst, guest, nil)
@@ -21,33 +51,62 @@ func TestCompatibilityLDAPClients(t *testing.T) {
 	}
 	mat := generateTLS(t, "localhost")
 	inst.ImportTLS(t, mat)
-	ca := filepath.Join(mat.Dir, "ca", "ca.crt")
+	return compatEnv{
+		engine:     Engine389DS,
+		ldapAddr:   inst.LDAPAddr,
+		ldapsAddr:  inst.LDAPSAddr,
+		caFile:     filepath.Join(mat.Dir, "ca", "ca.crt"),
+		serverName: "localhost",
+		dmPassword: inst.Password().Reveal(),
+	}
+}
+
+func TestCompatibilityLDAPClients(t *testing.T) {
+	env := startCompatEngine(t)
+	ca := env.caFile
 
 	recordClientVersions(t)
 
+	// Parity contract Delta D1 (vendor identity): record the selected
+	// engine's Root DSE identity for the compatibility report and assert
+	// the engines differ — native must not fake 389 strings.
+	t.Run("engine_identity_D1", func(t *testing.T) {
+		requireHostTool(t, "ldapsearch")
+		out := hostLDAPSearch(t, env, "cn=Directory Manager", env.dmPassword,
+			"", "base", "(objectClass=*)", "vendorName", "vendorVersion")
+		t.Logf("compatibility report: engine=%s\n%s", env.engine, out)
+		switch env.engine {
+		case EngineNative:
+			if !strings.Contains(out, "vendorName: LabLDAP") {
+				t.Fatalf("native vendorName missing (D1):\n%s", out)
+			}
+			if strings.Contains(out, "389-Directory") {
+				t.Fatalf("native must not present 389 identity (D1):\n%s", out)
+			}
+		default:
+			if !strings.Contains(out, "389-Directory/") {
+				t.Fatalf("389 vendorVersion missing (oracle identity):\n%s", out)
+			}
+		}
+	})
+
 	t.Run("ldapsearch_ldaps", func(t *testing.T) {
 		requireHostTool(t, "ldapsearch")
-		pw := writePW(t, inst.Password().Reveal())
-		cmd := exec.Command("ldapsearch", "-x", "-LLL",
-			"-H", "ldaps://"+inst.LDAPSAddr,
-			"-o", "tls_reqcert=demand",
-			"-o", "tls_cacert="+ca,
-			"-D", "cn=Directory Manager", "-y", pw,
-			"-b", "dc=example,dc=test", "-s", "sub", "(uid=alice)", "uid", "memberOf")
-		got, err := cmd.CombinedOutput()
-		if err != nil {
-			t.Fatalf("%v\n%s", err, redactLogs(string(got), inst.password, seedCanary))
-		}
-		if !strings.Contains(string(got), "uid: alice") {
+		got := hostLDAPSearch(t, env, "cn=Directory Manager", env.dmPassword,
+			"dc=example,dc=test", "sub", "(uid=alice)", "uid", "memberOf")
+		if !strings.Contains(got, "uid: alice") {
 			t.Fatalf("missing alice:\n%s", got)
 		}
 	})
 
+	// Contract C1/C2: StartTLS then WhoAmI. The authzid rendering differs in
+	// case preservation (delta candidate CAND-20), so the assertion accepts
+	// any rendering carrying the uid.
 	t.Run("ldapwhoami_starttls", func(t *testing.T) {
 		requireHostTool(t, "ldapwhoami")
 		pw := writePW(t, seedCanary)
 		cmd := exec.Command("ldapwhoami", "-x", "-ZZ",
-			"-H", "ldap://"+inst.LDAPAddr,
+			"-H", "ldap://"+env.ldapAddr,
 			"-o", "tls_reqcert=demand",
 			"-o", "tls_cacert="+ca,
 			"-D", "uid=alice,ou=people,dc=example,dc=test", "-y", pw)
@@ -60,11 +119,12 @@ func TestCompatibilityLDAPClients(t *testing.T) {
 		}
 	})
 
+	// Contract C6/C9: Simple Paged Results over LDAPS.
 	t.Run("ldapsearch_paging", func(t *testing.T) {
 		requireHostTool(t, "ldapsearch")
-		pw := writePW(t, inst.Password().Reveal())
+		pw := writePW(t, env.dmPassword)
 		cmd := exec.Command("ldapsearch", "-x", "-LLL",
-			"-H", "ldaps://"+inst.LDAPSAddr,
+			"-H", "ldaps://"+env.ldapsAddr,
 			"-o", "tls_reqcert=demand",
 			"-o", "tls_cacert="+ca,
 			"-D", "cn=Directory Manager", "-y", pw,
@@ -72,32 +132,34 @@ func TestCompatibilityLDAPClients(t *testing.T) {
 			"-b", "dc=example,dc=test", "(objectClass=inetOrgPerson)", "uid")
 		got, err := cmd.CombinedOutput()
 		if err != nil {
-			t.Fatalf("%v\n%s", err, redactLogs(string(got), inst.password))
+			t.Fatalf("%v\n%s", err, redactLogs(string(got), env.dmPassword))
 		}
 		if !strings.Contains(string(got), "uid: alice") {
 			t.Fatalf("page missing alice:\n%s", got)
 		}
 	})
 
+	// Contract C11: password change is an attribute replace on userPassword
+	// (RFC 3062 is Excluded E3), then a fresh bind with the new secret.
 	t.Run("password_modify_and_rebind", func(t *testing.T) {
 		requireHostTool(t, "ldapmodify")
 		neu := seedCanary + "X"
-		pw := writePW(t, inst.Password().Reveal())
+		pw := writePW(t, env.dmPassword)
 		replacePassword := func(value string) {
 			t.Helper()
 			ldif := "dn: uid=alice,ou=people,dc=example,dc=test\nchangetype: modify\nreplace: userPassword\nuserPassword: " + value + "\n"
 			cmd := exec.Command("ldapmodify", "-x",
-				"-H", "ldaps://"+inst.LDAPSAddr,
+				"-H", "ldaps://"+env.ldapsAddr,
 				"-o", "tls_reqcert=demand",
 				"-o", "tls_cacert="+ca,
 				"-D", "cn=Directory Manager", "-y", pw)
 			cmd.Stdin = strings.NewReader(ldif)
 			if out, err := cmd.CombinedOutput(); err != nil {
-				t.Fatalf("ldapmodify: %v\n%s", err, redactLogs(string(out), inst.password, seedCanary, neu))
+				t.Fatalf("ldapmodify: %v\n%s", err, redactLogs(string(out), env.dmPassword, seedCanary, neu))
 			}
 		}
 		replacePassword(neu)
-		if err := userBind(t, inst, "uid=alice,ou=people,dc=example,dc=test", neu); err != nil {
+		if err := envBind(t, env, "uid=alice,ou=people,dc=example,dc=test", neu); err != nil {
 			t.Fatalf("rebind: %v", err)
 		}
 		replacePassword(seedCanary)
@@ -105,11 +167,11 @@ func TestCompatibilityLDAPClients(t *testing.T) {
 
 	t.Run("go_independent", func(t *testing.T) {
 		who, dns, err := goindep.SearchWhoami(goindep.Config{
-			URL:        "ldaps://" + inst.LDAPSAddr,
+			URL:        "ldaps://" + env.ldapsAddr,
 			CAFile:     ca,
-			ServerName: "localhost",
+			ServerName: env.serverName,
 			BindDN:     "cn=Directory Manager",
-			Password:   inst.Password().Reveal(),
+			Password:   env.dmPassword,
 			BaseDN:     "dc=example,dc=test",
 			Filter:     "(uid=alice)",
 			PageSize:   2,
@@ -127,12 +189,12 @@ func TestCompatibilityLDAPClients(t *testing.T) {
 			t.Fatalf("whoami=%q dns=%v", who, dns)
 		}
 		_, _, err = goindep.SearchWhoami(goindep.Config{
-			URL:        "ldap://" + inst.LDAPAddr,
+			URL:        "ldap://" + env.ldapAddr,
 			StartTLS:   true,
 			CAFile:     ca,
-			ServerName: "localhost",
+			ServerName: env.serverName,
 			BindDN:     "cn=Directory Manager",
-			Password:   inst.Password().Reveal(),
+			Password:   env.dmPassword,
 			BaseDN:     "dc=example,dc=test",
 			Filter:     "(uid=alice)",
 			PageSize:   2,
@@ -140,10 +202,12 @@ func TestCompatibilityLDAPClients(t *testing.T) {
 		if err != nil {
 			t.Fatalf("go starttls: %v", err)
 		}
+		// Contract C2: cleartext simple bind is refused when
+		// allowCleartextBind is false (both engines).
 		_, _, err = goindep.SearchWhoami(goindep.Config{
-			URL:      "ldap://" + inst.LDAPAddr,
+			URL:      "ldap://" + env.ldapAddr,
 			BindDN:   "cn=Directory Manager",
-			Password: inst.Password().Reveal(),
+			Password: env.dmPassword,
 			BaseDN:   "dc=example,dc=test",
 			Filter:   "(uid=alice)",
 		})
@@ -153,29 +217,32 @@ func TestCompatibilityLDAPClients(t *testing.T) {
 	})
 
 	t.Run("python_ldap3", func(t *testing.T) {
-		runPythonClient(t, inst, ca, false)
-		runPythonClient(t, inst, ca, true)
+		runPythonClient(t, env, ca, false)
+		runPythonClient(t, env, ca, true)
 	})
 
+	// Contract C8: alice has no grant on any engine-admin tree, and group
+	// membership is visible. Delta D2: native has no 389 cn=config DIT, so
+	// the native expectation is absence-or-denial; the 389 oracle denies.
 	t.Run("aci_alice_read_no_config", func(t *testing.T) {
-		cmd := exec.Command("docker", "exec", inst.Name,
-			"ldapsearch", "-x", "-H", "ldaps://127.0.0.1:3636", "-o", "tls_reqcert=never",
-			"-D", "uid=alice,ou=people,dc=example,dc=test", "-w", seedCanary,
-			"-b", "cn=config", "-s", "base", "dn")
-		out, err := cmd.CombinedOutput()
-		if err == nil && strings.Contains(string(out), "dn: cn=config") {
+		out := hostLDAPSearchAllowFail(t, env, "uid=alice,ou=people,dc=example,dc=test", seedCanary,
+			"cn=config", "base", "(objectClass=*)", "dn")
+		if strings.Contains(out, "dn: cn=config") {
 			t.Fatalf("alice must not read cn=config:\n%s", out)
 		}
-		staff := ldapSearch(t, inst, "cn=staff,ou=groups,dc=example,dc=test", "member")
+		staff := hostLDAPSearch(t, env, "cn=Directory Manager", env.dmPassword,
+			"cn=staff,ou=groups,dc=example,dc=test", "base", "(objectClass=*)", "member")
 		if !strings.Contains(staff, "uid=alice") {
 			t.Fatalf("membership missing:\n%s", staff)
 		}
 	})
 
+	// Contract C3: anonymous bind is off by default; even if a server let
+	// the search through, no runtime ACI grants anonymous anything.
 	t.Run("anonymous_denied", func(t *testing.T) {
 		requireHostTool(t, "ldapsearch")
 		cmd := exec.Command("ldapsearch", "-x", "-LLL",
-			"-H", "ldaps://"+inst.LDAPSAddr,
+			"-H", "ldaps://"+env.ldapsAddr,
 			"-o", "tls_reqcert=demand",
 			"-o", "tls_cacert="+ca,
 			"-b", "dc=example,dc=test", "(uid=alice)", "uid")
@@ -184,6 +251,56 @@ func TestCompatibilityLDAPClients(t *testing.T) {
 			t.Fatalf("anonymous search must not return alice:\n%s", got)
 		}
 	})
+}
+
+// hostLDAPSearch runs the host OpenLDAP ldapsearch against the selected
+// engine over LDAPS with strict certificate verification and fails on error.
+func hostLDAPSearch(t *testing.T, env compatEnv, bindDN, password, base, scope, filter string, attrs ...string) string {
+	t.Helper()
+	out, err := runHostLDAPSearch(t, env, bindDN, password, base, scope, filter, attrs...)
+	if err != nil {
+		t.Fatalf("ldapsearch %s: %v\n%s", base, err, redactLogs(out, env.dmPassword, seedCanary))
+	}
+	return out
+}
+
+// hostLDAPSearchAllowFail returns the search output even when the server
+// refuses the operation (access-denied assertions).
+func hostLDAPSearchAllowFail(t *testing.T, env compatEnv, bindDN, password, base, scope, filter string, attrs ...string) string {
+	t.Helper()
+	out, _ := runHostLDAPSearch(t, env, bindDN, password, base, scope, filter, attrs...)
+	return out
+}
+
+func runHostLDAPSearch(t *testing.T, env compatEnv, bindDN, password, base, scope, filter string, attrs ...string) (string, error) {
+	t.Helper()
+	requireHostTool(t, "ldapsearch")
+	pw := writePW(t, password)
+	args := []string{"-x", "-LLL",
+		"-H", "ldaps://" + env.ldapsAddr,
+		"-o", "tls_reqcert=demand",
+		"-o", "tls_cacert=" + env.caFile,
+		"-D", bindDN, "-y", pw,
+		"-b", base, "-s", scope, filter}
+	args = append(args, attrs...)
+	out, err := exec.Command("ldapsearch", args...).CombinedOutput()
+	return string(out), err
+}
+
+// envBind checks one bind through the independent Go client (go-ldap),
+// engine-agnostic by construction.
+func envBind(t *testing.T, env compatEnv, dn, password string) error {
+	t.Helper()
+	_, _, err := goindep.SearchWhoami(goindep.Config{
+		URL:        "ldaps://" + env.ldapsAddr,
+		CAFile:     env.caFile,
+		ServerName: env.serverName,
+		BindDN:     dn,
+		Password:   password,
+		BaseDN:     dn,
+		Filter:     "(objectClass=*)",
+	})
+	return err
 }
 
 func writePW(t *testing.T, value string) string {
@@ -223,7 +340,7 @@ func recordClientVersions(t *testing.T) {
 	}
 }
 
-func runPythonClient(t *testing.T, inst *Instance, ca string, startTLS bool) {
+func runPythonClient(t *testing.T, env compatEnv, ca string, startTLS bool) {
 	t.Helper()
 	requireHostTool(t, "python3")
 	root, err := moduleRoot()
@@ -246,7 +363,7 @@ func runPythonClient(t *testing.T, inst *Instance, ca string, startTLS bool) {
 		t.Skipf("pip install ldap3: %v\n%s", err, out)
 	}
 	pw := filepath.Join(t.TempDir(), "dm.pw")
-	if err := os.WriteFile(pw, []byte(inst.Password().Reveal()+"\n"), 0o600); err != nil {
+	if err := os.WriteFile(pw, []byte(env.dmPassword+"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	script := filepath.Join(root, "test", "compatibility", "clients", "python", "client.py")
@@ -258,14 +375,14 @@ func runPythonClient(t *testing.T, inst *Instance, ca string, startTLS bool) {
 		"--server-name", "localhost",
 	}
 	if startTLS {
-		args = append(args, "--url", "ldap://"+inst.LDAPAddr, "--starttls")
+		args = append(args, "--url", "ldap://"+env.ldapAddr, "--starttls")
 	} else {
-		args = append(args, "--url", "ldaps://"+inst.LDAPSAddr)
+		args = append(args, "--url", "ldaps://"+env.ldapsAddr)
 	}
 	cmd := exec.Command(py, args...)
 	got, err := cmd.CombinedOutput()
 	if err != nil {
-		t.Fatalf("python client: %v\n%s", err, redactLogs(string(got), inst.password))
+		t.Fatalf("python client: %v\n%s", err, redactLogs(string(got), env.dmPassword))
 	}
 	if !strings.Contains(string(got), "alice") {
 		t.Fatalf("python output: %s", got)

@@ -40,6 +40,10 @@ func requireDocker(t *testing.T) {
 
 func Start(t *testing.T) *Instance {
 	t.Helper()
+	// T-148: under LABLDAP_IT_ENGINE=native the pinned 389 container harness
+	// does not apply; tests that have not been parametrized skip here. The
+	// documented skip ledger (Delta/Excluded IDs) is at the top of engine.go.
+	skip389Only(t, "D2/D4/D5/E7", "test drives the pinned 389 DS container (docker/dsconf/in-container ldap* tooling)")
 	requireDocker(t)
 	ref, err := ImageRef()
 	if err != nil {
