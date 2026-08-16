@@ -1590,17 +1590,17 @@ Acceptance:
 - [x] Delete outside suffix does not rewrite foreign entries (no foreign entries in v1).
 - [x] Fixup is suffix-scoped.
 
-## [ ] T-137 nsAccountLock, operational attributes, marker schema
+## [x] T-137 nsAccountLock, operational attributes, marker schema
 
 Priority: P0 | Size: M | Depends on: T-126, T-132, T-134 | Wave 3 | Cloud fit: high
 
 Deliverables: `nsAccountLock: true` bind fail (LDAP 53 / 389-observed); `createTimestamp`, `modifyTimestamp`, `modifiersName`, `entryUUID` on add; `device` marker OC allowed.
 
 Acceptance:
-- [ ] Disabled user cannot bind; entry still exists.
-- [ ] Modify updates `modifyTimestamp`.
-- [ ] Marker add with `device` + `description` JSON succeeds.
-- [ ] Bind-test can read `pwdAccountLockedTime` and `nsAccountLock`.
+- [x] Disabled user cannot bind; entry still exists.
+- [x] Modify updates `modifyTimestamp`.
+- [x] Marker add with `device` + `description` JSON succeeds.
+- [x] Bind-test can read `pwdAccountLockedTime` and `nsAccountLock`.
 
 ## [ ] T-138 ACI parser for the compiler subset
 
