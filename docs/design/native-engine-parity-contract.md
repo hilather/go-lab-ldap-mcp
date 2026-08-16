@@ -248,3 +248,8 @@ When adjudicated, each moves into section 3 (accepted Delta) with the test name 
 | CAND-10 | Lockout / expired-password bind failure code | `invalidCredentials(49)` | confirm 389's exact bind-path code | T-134 `password.go`; adjudicate in T-147 |
 | CAND-11 | Re-setting the current password | Rejected as in-history (stricter) | 389 known to allow re-set in some paths | T-134 `password.go`; adjudicate in T-147 |
 | CAND-12 | Empty groupOfNames after RI member removal | handling per 389-observed (groupOfNames cannot be empty) | 389-observed fail-or-keep | T-136 `refint.go`; confirm vs oracle in T-147 |
+| CAND-13 | ACI evaluation order | Order-independent deny-wins | 389 never first-match/subtree-distance on the T-036 set | T-139 `aci_eval.go`; confirm vs oracle in T-147 |
+| CAND-14 | `userPassword` read under `ou=people` | `runtime-people-write` (targetattr!=aci) grants it; suffix/marker deny it via `runtime-suffix-read` | pin 389's answer on a person entry | T-139; T-036 probes suffix/marker only |
+| CAND-15 | self/all/anyone semantics | pre-bind = anonymous for `all`; `self` = bound DN vs target DN only | confirm vs 389 | T-139 `aci_eval.go` |
+| CAND-16 | ACI target scope + entry-level attr | "at or under target DN", fold-correct; entry add/delete ignore `targetattr` | 389 add checks may differ for entries carrying `aci` | T-139 `aci_eval.go` |
+| CAND-17 | groupdn membership scope | direct `member`/`uniqueMember` only, no nesting; group objectClass not required | confirm vs 389 | T-139 `aci_eval.go` |

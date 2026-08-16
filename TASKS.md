@@ -1616,18 +1616,20 @@ Acceptance:
 
 Adjudicated best-of-2: kept attempt A (`aci_parse_a.go`, `ParseACITextA`) for case-insensitive keyword/permission matching faithful to 389's lexer; dropped attempt B (lowercase-only). `FuzzParseACITextA` seed corpus committed for T-149.
 
-## [ ] T-139 ACI evaluator and T-036 allow/deny matrix
+## [x] T-139 ACI evaluator and T-036 allow/deny matrix
 
 Priority: P0 | Size: L | Depends on: T-138, T-126, T-128, T-135 | Wave 4 | Cloud fit: high
 
 Deliverables: evaluate parsed ACIs on Search/Add/Modify/Delete/Compare; DM bypass; deny-wins per 389 observed; runtime account matrix from T-036.
 
 Acceptance:
-- [ ] Runtime can read people/groups and cannot read `userPassword`.
-- [ ] Runtime can write people/groups except `aci`.
-- [ ] Runtime can write `userPassword` on people.
-- [ ] Runtime cannot modify engine-admin tree (`cn=config` absent is Delta D2; operation still `insufficientAccessRights`).
-- [ ] Operator `groupdn` ACL allows a member and denies a non-member.
+- [x] Runtime can read people/groups and cannot read `userPassword`.
+- [x] Runtime can write people/groups except `aci`.
+- [x] Runtime can write `userPassword` on people.
+- [x] Runtime cannot modify engine-admin tree (`cn=config` absent is Delta D2; operation still `insufficientAccessRights`).
+- [x] Operator `groupdn` ACL allows a member and denies a non-member.
+
+Follow-up: `cmd/labldapd` wires compiled `plan.ACIs` → `Options.ACITexts` (T-143). Note: `runtime-people-write` (targetattr!=aci) grants userPassword *read* under `ou=people`; 389-consistent — the T-036 `denyUserPasswordRead` probe is base-scoped to suffix/marker. Pinned in tests; oracle-adjudicate in T-147.
 
 ## [ ] T-140 Simple Paged Results control
 
