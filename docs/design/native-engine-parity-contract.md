@@ -240,3 +240,7 @@ A user created through REST or MCP is visible to `ldapsearch` against the direct
 | CAND-5 | Paged-results cookie integrity | Plain offset, no integrity protection until T-140 | 389 cookie is opaque/validated | T-127 `op_search.go` |
 
 When adjudicated, each moves into section 3 (accepted Delta) with the test name that proves the difference, or is fixed to match the oracle (Contract).
+
+| CAND-6 | ModifyDN rename into own subtree | bbolt store allows it; index-based Subtree walks can detach the subtree (no store sentinel exists) — needs a dispatch guard | 389 rejects (LDAP-illegal) | T-129 `store.go`; guard belongs in ModifyDN dispatch (T-143/T-144 hardening) |
+| CAND-7 | supportedExtension advertises StartTLS/WhoAmI pre-handler | Root DSE lists both OIDs; dispatch answers unwillingToPerform until T-133/T-142 land the handlers | 389 advertises only honored extensions | T-132 `op_search.go`; resolved when T-133/T-142 merge |
+| CAND-8 | MAY-attribute allow-listing not enforced on writes | Only MUST enforced; 389 accepts marker attrs (destinationIndicator/owner on device) | Matches 389-observed | T-132 `schema_registry.go`; confirm vs oracle in T-147 |
