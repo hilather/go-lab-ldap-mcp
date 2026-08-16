@@ -10,8 +10,8 @@ const (
 	StoragePersistent = "persistent"
 )
 
-// Directory engines (ADR-0008). EngineNative is accepted by the schema but
-// not wired into serve/bootstrap until milestone M9 (T-146).
+// Directory engines (ADR-0008). Both are wired into serve/bootstrap as of
+// T-146; RequireAvailableEngine stays fail-closed behind this enum.
 const (
 	Engine389DS  = "389ds"
 	EngineNative = "native"

@@ -116,48 +116,55 @@ spec:
 	return dir, path
 }
 
-func assertNativeGate(t *testing.T, code int, stderr string) {
+// assertNoGate checks the post-T-146 behavior: engine: native is wired, so
+// neither stdout nor stderr may carry the engine_not_available gate error,
+// and no fixture secret may leak.
+func assertNoGate(t *testing.T, stdout, stderr string) {
 	t.Helper()
-	if code != 1 {
-		t.Fatalf("exit %d, want 1; stderr=%s", code, stderr)
-	}
-	for _, want := range []string{"spec.directory.engine", "engine_not_available", "M9", "engine: 389ds"} {
-		if !strings.Contains(stderr, want) {
-			t.Fatalf("stderr missing %q:\n%s", want, stderr)
+	for _, s := range []string{stdout, stderr} {
+		if strings.Contains(s, "engine_not_available") {
+			t.Fatalf("native engine hit the availability gate:\n%s", s)
 		}
-	}
-	if strings.Contains(stderr, "lab-fixture") {
-		t.Fatalf("leaked secret: %s", stderr)
+		if strings.Contains(s, "lab-fixture") {
+			t.Fatalf("leaked secret: %s", s)
+		}
 	}
 }
 
-func TestPlanFailsClosedOnNativeEngine(t *testing.T) {
+func TestPlanSucceedsOnNativeEngine(t *testing.T) {
 	t.Setenv("LABLDAP_LOG_FORMAT", "json")
 	_, path := writeNativeScenario(t)
 	var stdout, stderr bytes.Buffer
 	code := run([]string{"plan", "--config", path}, &stdout, &stderr)
-	assertNativeGate(t, code, stderr.String())
-	// plan performs no network I/O: the compiled plan is still printed and
-	// the exit code stays non-zero for the unwired engine.
+	if code != 0 {
+		t.Fatalf("exit %d, want 0; stderr=%s", code, stderr.String())
+	}
 	if !strings.Contains(stdout.String(), `"engine": "native"`) {
 		t.Fatalf("plan stdout missing compiled engine:\n%s", stdout.String())
 	}
-	if strings.Contains(stdout.String(), "lab-fixture") {
-		t.Fatalf("plan leaked secret: %s", stdout.String())
-	}
+	assertNoGate(t, stdout.String(), stderr.String())
 }
 
-func TestApplyValidateFailClosedOnNativeEngine(t *testing.T) {
+// Apply/validate with engine: native now pass the availability gate and run
+// the wired native path; with no labldapd listening they fail in the wait
+// phase (a dial timeout), not at the engine gate.
+func TestApplyValidateRunNativePath(t *testing.T) {
 	t.Setenv("LABLDAP_LOG_FORMAT", "json")
 	dir, path := writeNativeScenario(t)
 	dmFile := filepath.Join(dir, "secrets", "dm")
 	for _, cmd := range []string{"apply", "validate"} {
 		var stdout, stderr bytes.Buffer
-		code := run([]string{cmd, "--config", path, "--directory-manager-password-file", dmFile}, &stdout, &stderr)
-		assertNativeGate(t, code, stderr.String())
-		// The gate fires before bootstrap.Run: no phase (wait/dial) ran.
-		if !strings.Contains(stdout.String(), `"phases": []`) {
-			t.Fatalf("%s ran phases despite the gate:\n%s", cmd, stdout.String())
+		code := run([]string{cmd, "--config", path, "--directory-manager-password-file", dmFile, "--deadline", "1s"}, &stdout, &stderr)
+		if code != 1 {
+			t.Fatalf("%s exit %d, want 1; stderr=%s", cmd, code, stderr.String())
+		}
+		assertNoGate(t, stdout.String(), stderr.String())
+		// load and wait ran: the failure is the wait dial, not the gate.
+		if !strings.Contains(stdout.String(), `"phase": "wait"`) {
+			t.Fatalf("%s did not reach the wait phase:\n%s", cmd, stdout.String())
+		}
+		if !strings.Contains(stderr.String(), "phase.wait") {
+			t.Fatalf("%s stderr missing wait failure:\n%s", cmd, stderr.String())
 		}
 	}
 }

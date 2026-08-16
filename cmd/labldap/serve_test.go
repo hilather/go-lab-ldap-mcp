@@ -174,33 +174,80 @@ spec:
 	return path
 }
 
-func assertNativeGateError(t *testing.T, stderr string) {
-	t.Helper()
-	for _, want := range []string{"spec.directory.engine", "engine_not_available", "M9", "engine: 389ds"} {
-		if !strings.Contains(stderr, want) {
-			t.Fatalf("stderr missing %q:\n%s", want, stderr)
-		}
+// TestCompileControlAllowsNativeEngine covers the T-146 gate for both
+// serving entry points (serve and mcp-stdio share compileControl):
+// engine: native is wired now, so the scenario compiles and passes
+// RequireAvailableEngine instead of failing closed. The runtime needs no
+// engine branch: it is ds389.Runtime over ldapclient pointed at the
+// configured LDAP URL in both modes.
+func TestCompileControlAllowsNativeEngine(t *testing.T) {
+	path := writeNativeScenario(t)
+	built, err := compileControl(context.Background(), path)
+	if err != nil {
+		t.Fatalf("compileControl(native): %v", err)
 	}
-	if strings.Contains(stderr, "lab-fixture") {
-		t.Fatalf("leaked secret: %s", stderr)
+	if built.Engine.Engine != "native" {
+		t.Fatalf("engine = %q", built.Engine.Engine)
+	}
+
+	// The serve composition root builds against a native scenario without a
+	// live daemon (lazy pool; readiness stays false until a dial succeeds).
+	opt, _, closer, err := serverOptionsFromCompiled(built, serveFlags{ldapURL: "ldaps://127.0.0.1:1", caFile: "/tmp/ca.pem"}, nil)
+	if err != nil {
+		t.Fatalf("serverOptionsFromCompiled(native): %v", err)
+	}
+	if closer != nil {
+		t.Cleanup(closer)
+	}
+	if opt.Ready == nil || opt.Ready() {
+		t.Fatal("readiness must stay false without a reachable engine")
 	}
 }
 
-func TestServeFailsClosedOnNativeEngine(t *testing.T) {
-	t.Setenv("LABLDAP_LOG_FORMAT", "text")
+// TestControlPlaneNeverLoadsDirectoryManagerSecret asserts the privilege
+// split (ADR-0008 decision 5) on the native path: the long-running control
+// has no DM credential surface at all — no flag, no scenario field — and
+// binds only the restricted runtime account.
+func TestControlPlaneNeverLoadsDirectoryManagerSecret(t *testing.T) {
 	t.Setenv("LABLDAP_LDAP_URL", "")
 	t.Setenv("LABLDAP_DIRECTORY_CA_FILE", "")
 	t.Setenv("LABLDAP_DIRECTORY_HOST", "")
-	path := writeNativeScenario(t)
-	var stdout, stderr bytes.Buffer
-	code := run([]string{"serve", "--config", path}, &stdout, &stderr)
-	if code != 1 {
-		t.Fatalf("exit %d, want 1; stderr=%s", code, stderr.String())
+	// Structural: neither serve nor mcp-stdio accepts a DM password flag.
+	for _, args := range [][]string{
+		{"serve", "--placeholder", "--directory-manager-password-file", "/tmp/dm"},
+		{"mcp-stdio", "--config", "x.yaml", "--directory-manager-password-file", "/tmp/dm"},
+	} {
+		var stdout, stderr bytes.Buffer
+		if code := run(args, &stdout, &stderr); code != 2 {
+			t.Fatalf("run(%v) exit %d, want 2 (unknown flag): %s", args, code, stderr.String())
+		}
 	}
-	assertNativeGateError(t, stderr.String())
+
+	path := writeNativeScenario(t)
+	built, err := compileControl(context.Background(), path)
+	if err != nil {
+		t.Fatalf("compileControl(native): %v", err)
+	}
+	cfg, err := ldapClientConfig(built, serveFlags{ldapURL: "ldaps://127.0.0.1:3636", caFile: "/tmp/ca.pem", dirHost: "directory"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.BindDN == "cn=Directory Manager" {
+		t.Fatal("control plane must never bind as Directory Manager")
+	}
+	if cfg.BindDN != built.Normalized.Runtime.DN {
+		t.Fatalf("BindDN = %q, want runtime account %q", cfg.BindDN, built.Normalized.Runtime.DN)
+	}
+	if got := cfg.BindPassword.Reveal(); got != "lab-fixture-runtime-password" {
+		t.Fatalf("BindPassword is not the runtime account secret")
+	}
 }
 
-func TestMCPStdioFailsClosedOnNativeEngine(t *testing.T) {
+// TestMCPStdioNativeEnginePassesGate: mcp-stdio no longer rejects
+// engine: native at the config layer; with no compiled token matching, it
+// fails later at credential lookup (exit 2), never with
+// engine_not_available, and stdout stays protocol-clean.
+func TestMCPStdioNativeEnginePassesGate(t *testing.T) {
 	t.Setenv("LABLDAP_LOG_FORMAT", "text")
 	t.Setenv("LABLDAP_LDAP_URL", "")
 	t.Setenv("LABLDAP_DIRECTORY_CA_FILE", "")
@@ -208,12 +255,23 @@ func TestMCPStdioFailsClosedOnNativeEngine(t *testing.T) {
 	t.Setenv("LABLDAP_MCP_TOKEN", "lab-fixture-admin-token")
 	path := writeNativeScenario(t)
 	var stdout, stderr bytes.Buffer
-	code := run([]string{"mcp-stdio", "--config", path}, &stdout, &stderr)
-	if code != 1 {
-		t.Fatalf("exit %d, want 1; stderr=%s", code, stderr.String())
+	// The CA file satisfies lazy pool validation (presence only; nothing
+	// dials). The run must pass the engine gate and fail later at token
+	// lookup — never with engine_not_available.
+	code := run([]string{"mcp-stdio", "--config", path, "--directory-ca-file", "/tmp/ca.pem"}, &stdout, &stderr)
+	if code != 2 {
+		t.Fatalf("exit %d, want 2 (invalid token against the compiled registry); stderr=%s", code, stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "invalid credentials") {
+		t.Fatalf("stderr = %q", stderr.String())
+	}
+	if strings.Contains(stderr.String(), "engine_not_available") {
+		t.Fatalf("native hit the availability gate: %s", stderr.String())
+	}
+	if strings.Contains(stderr.String(), "lab-fixture-") {
+		t.Fatalf("leaked secret: %s", stderr.String())
 	}
 	if stdout.Len() != 0 {
 		t.Fatalf("protocol/logs on stdout: %q", stdout.String())
 	}
-	assertNativeGateError(t, stderr.String())
 }

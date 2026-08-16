@@ -43,13 +43,16 @@ func buildEnginePlan(n *Normalized) EnginePlan {
 }
 
 // wiredEngines lists the directory engines this build of labldap and
-// labldap-bootstrap can actually run. T-123 ships the selection surface
-// only: 389ds is wired; native lands in milestone M9 (T-146 wires it).
-var wiredEngines = []string{v1alpha1.Engine389DS}
+// labldap-bootstrap can actually run. T-123 shipped the selection surface
+// with 389ds only; T-146 wired native (labldapd + the native read-back
+// bootstrap reconcilers in internal/directory/native, ADR-0009).
+var wiredEngines = []string{v1alpha1.Engine389DS, v1alpha1.EngineNative}
 
 // RequireAvailableEngine fails closed when the compiled engine is not wired
 // into this build. Call it after a successful Compile and before any
-// directory dial so engine: native never reaches the network half-configured.
+// directory dial so an unwired engine never reaches the network
+// half-configured. The schema enum already rejects unknown engines at
+// compile time; this is the defense-in-depth gate behind it.
 func RequireAvailableEngine(engine string) error {
 	if contains(wiredEngines, engine) {
 		return nil
@@ -58,9 +61,8 @@ func RequireAvailableEngine(engine string) error {
 		WithField(apperr.Field{
 			Path: "spec.directory.engine",
 			Code: "engine_not_available",
-			Message: "engine " + engine + " is accepted but not wired in this build; " +
-				"native mode arrives in milestone M9 (see docs/design/native-engine-parity-contract.md); " +
-				"use engine: " + v1alpha1.Engine389DS,
+			Message: "engine " + engine + " is not wired in this build; " +
+				"use engine: " + v1alpha1.Engine389DS + " or engine: " + v1alpha1.EngineNative,
 		})
 }
 

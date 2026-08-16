@@ -221,8 +221,12 @@ func compileControl(ctx context.Context, path string) (*config.Compiled, error) 
 	if err != nil {
 		return nil, err
 	}
-	// T-123: fail closed after a successful compile and before any directory
-	// dial. engine: native is not wired until milestone M9 (T-146).
+	// T-146: fail closed after a successful compile and before any directory
+	// dial only when the engine is not wired into this build. Both engines
+	// are wired: the runtime is ds389.Runtime over ldapclient pointed at the
+	// configured LDAP URL, which speaks plain LDAP to 389 DS or labldapd
+	// alike. The control plane never holds Directory Manager credentials in
+	// either mode (ADR-0009 decision 5).
 	if err := config.RequireAvailableEngine(built.Engine.Engine); err != nil {
 		return nil, err
 	}

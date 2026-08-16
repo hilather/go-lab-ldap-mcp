@@ -438,12 +438,17 @@ func TestEngineMixesIntoDirectoryRevision(t *testing.T) {
 }
 
 func TestRequireAvailableEngine(t *testing.T) {
-	if err := config.RequireAvailableEngine(v1alpha1.Engine389DS); err != nil {
-		t.Fatal(err)
+	// T-146: both engines are wired into serve/bootstrap.
+	for _, eng := range []string{v1alpha1.Engine389DS, v1alpha1.EngineNative} {
+		if err := config.RequireAvailableEngine(eng); err != nil {
+			t.Fatalf("RequireAvailableEngine(%q): %v", eng, err)
+		}
 	}
-	err := config.RequireAvailableEngine(v1alpha1.EngineNative)
+	// Unknown values still fail closed (defense in depth; the schema enum
+	// rejects them at compile time first).
+	err := config.RequireAvailableEngine("openldap")
 	if err == nil {
-		t.Fatal("native must fail closed until T-146")
+		t.Fatal("unknown engine must fail closed")
 	}
 	apperr.Assert(t, err).Code(apperr.CodeConfiguration).FieldPath("spec.directory.engine")
 	for _, f := range mustFields(t, err) {
@@ -453,7 +458,7 @@ func TestRequireAvailableEngine(t *testing.T) {
 		if f.Code != "engine_not_available" {
 			t.Fatalf("field code = %s", f.Code)
 		}
-		for _, want := range []string{"M9", "engine: 389ds"} {
+		for _, want := range []string{"engine: 389ds", "engine: native"} {
 			if !strings.Contains(f.Message, want) {
 				t.Fatalf("message %q missing %q", f.Message, want)
 			}
