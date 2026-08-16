@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Quick start — LabLDAP</title>
-  <meta name="description" content="Stand up a disposable 389 DS lab in one sitting." />
+  <meta name="description" content="Stand up a disposable native labldapd lab in one sitting." />
   <meta name="theme-color" content="#0b0c0e" />
   <link rel="icon" type="image/svg+xml" href="assets/mark.svg" />
   <link rel="stylesheet" href="site.css" />
@@ -40,7 +40,7 @@
       <article class="prose">
         <div class="eyebrow">Guide 01</div>
         <h1>Quick start</h1>
-        <p>Stand up a disposable 389 DS lab, sign in, and make one change you can see over REST, LDAP, and MCP.</p>
+        <p>Stand up a disposable native <code>labldapd</code> lab, sign in, and make one change you can see over REST, LDAP, and MCP.</p>
 
         <h2 id="need">What you need</h2>
         <ul>
@@ -54,8 +54,8 @@
         <pre><code>git clone https://github.com/hilather/go-lab-ldap-mcp.git
 cd go-lab-ldap-mcp
 make compose-up</code></pre>
-        <p>That builds local images, mints gitignored secrets, generates a lab CA, starts 389 DS on tmpfs, runs bootstrap, and brings the control plane up. First run is image-build heavy.</p>
-        <p>Persistent data: <code>make compose-up-persistent</code>.</p>
+        <p>That builds local images, mints gitignored secrets, generates a lab CA, starts <code>labldapd</code> on tmpfs, runs bootstrap, and brings the control plane up. First run is image-build heavy.</p>
+        <p>Persistent data: <code>make compose-up-persistent</code>. 389 rollback: <code>make compose-up-389ds</code>.</p>
 
         <h2 id="up">Confirm it is up</h2>
         <pre><code>curl -sk https://127.0.0.1:8443/health

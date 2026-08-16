@@ -3,11 +3,11 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>LabLDAP — a disposable 389 DS laboratory</title>
+  <title>LabLDAP — a disposable laboratory directory</title>
   <meta name="description" content="Real LDAP on the wire. A Go control plane for REST, MCP, and a browser UI. Directory Manager never touches the long-running service." />
   <meta name="theme-color" content="#0b0c0e" />
   <meta property="og:title" content="LabLDAP" />
-  <meta property="og:description" content="A disposable 389 Directory Server laboratory. REST, MCP, and a browser UI over a real directory." />
+  <meta property="og:description" content="A disposable laboratory directory. REST, MCP, and a browser UI over a real LDAP engine." />
   <meta property="og:image" content="assets/og.jpg" />
   <meta name="twitter:card" content="summary_large_image" />
   <link rel="icon" type="image/svg+xml" href="assets/mark.svg" />
@@ -40,9 +40,11 @@
           <div class="eyebrow">v0.1.0 · first usable release</div>
           <h1>A real directory.<br />A small control plane.</h1>
           <p class="lead">
-            LabLDAP stands up 389 Directory Server, applies a declarative
-            scenario, then hands you REST, MCP, and a browser UI that share
-            one authorization policy. Directory Manager is bootstrap-only.
+            LabLDAP stands up a real directory engine (<code>labldapd</code>
+            by default), applies a declarative scenario, then hands you REST,
+            MCP, and a browser UI that share one authorization policy.
+            Directory Manager is bootstrap-only. 389 DS is a first-class
+            rollback (<code>make compose-up-389ds</code>).
           </p>
           <div class="hero-actions">
             <a class="btn btn-primary" href="start.html">Quick start</a>
@@ -55,7 +57,7 @@
       </div>
       <div class="wrap">
         <div class="meta-row">
-          <div><span>Engine</span><strong>389-ds 2.4.6</strong></div>
+          <div><span>Engine</span><strong>labldapd</strong></div>
           <div><span>Control plane</span><strong>Go 1.26</strong></div>
           <div><span>Agent surface</span><strong>MCP 2026-07-28</strong></div>
           <div><span>Images</span><strong>Local only</strong></div>
@@ -77,7 +79,7 @@
         <div class="roles">
           <div class="role">
             <code>directory</code>
-            <strong>Long-running 389 DS</strong>
+            <strong>Long-running labldapd</strong>
             <p>Owns <code>/data</code>. Source of truth for users, groups, memberships, and passwords.</p>
           </div>
           <div class="role">
@@ -125,7 +127,7 @@
           <h2>Compose up. Sign in. Search.</h2>
           <p>Docker Engine 24+ and Compose v2.24+. First run builds local images. Later runs reuse them.</p>
           <ol class="list">
-            <li><strong>make compose-up</strong> — secrets, lab CA, 389 DS, bootstrap, control.</li>
+            <li><strong>make compose-up</strong> — secrets, lab CA, labldapd, bootstrap, control.</li>
             <li><strong>https://127.0.0.1:8443/</strong> — trust the lab cert, paste <code>secrets/token-admin</code>.</li>
             <li><strong>ldap://127.0.0.1:3389</strong> — bind as a directory user, not as Directory Manager.</li>
           </ol>
@@ -173,7 +175,7 @@ curl -sk -H "Authorization: Bearer $TOKEN" \
           <h2>Laboratory on purpose.</h2>
           <p>This is not a production identity system. The constraints are the product.</p>
           <ul class="list">
-            <li><strong>LDAP bind hits 389 DS, not Go.</strong> <code>ldap://127.0.0.1:3389</code> is a real directory. The Go process is HTTPS only.</li>
+            <li><strong>LDAP bind hits the directory engine, not Go.</strong> <code>ldap://127.0.0.1:3389</code> is a real directory (<code>labldapd</code> by default). The Go process is HTTPS only.</li>
             <li><strong>No Docker socket</strong> in the control plane.</li>
             <li><strong>Directory Manager is bootstrap-only.</strong></li>
             <li><strong>Static tokens are an explicit lab mode.</strong></li>

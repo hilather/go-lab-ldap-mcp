@@ -51,7 +51,7 @@
         </ul>
 
         <h2 id="yaml">Scenario YAML</h2>
-        <p>Users and groups are declared in the LabScenario file. Bootstrap writes them into 389 DS. Passwords are file references. Groups cannot be empty. Soft reset restores that file.</p>
+        <p>Users and groups are declared in the LabScenario file. Bootstrap writes them into the selected directory engine (<code>labldapd</code> by default). Passwords are file references. Groups cannot be empty. Soft reset restores that file.</p>
         <pre><code>spec:
   users:
     - id: alice

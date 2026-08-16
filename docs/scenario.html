@@ -38,7 +38,7 @@
       <article class="prose">
         <div class="eyebrow">Guide 04</div>
         <h1>Scenario YAML</h1>
-        <p>Users, groups, ACLs, tokens, and lab policy are declared in a <code>labldap.dev/v1alpha1</code> LabScenario file. Bootstrap compiles that file and writes real 389 DS entries. The YAML is the lab definition — not an in-memory directory.</p>
+        <p>Users, groups, ACLs, tokens, and lab policy are declared in a <code>labldap.dev/v1alpha1</code> LabScenario file. Bootstrap compiles that file and writes real directory entries. The YAML is the lab definition — not an in-memory directory. Omitted <code>engine</code> defaults to <code>native</code> (<code>labldapd</code>); set <code>engine: 389ds</code> for the 389 oracle.</p>
 
         <h2 id="declare">Users and groups</h2>
         <pre><code>apiVersion: labldap.dev/v1alpha1
@@ -73,7 +73,7 @@ spec:
           </thead>
           <tbody>
             <tr><td><code>users[].id</code> / <code>uid</code></td><td><code>uid=<id>,ou=people,<suffix></code></td></tr>
-            <tr><td><code>passwordFile</code></td><td><code>userPassword</code> (hashed by 389 DS)</td></tr>
+            <tr><td><code>passwordFile</code></td><td><code>userPassword</code> (hashed by the directory engine)</td></tr>
             <tr><td><code>enabled: false</code></td><td><code>nsAccountLock</code></td></tr>
             <tr><td><code>attributes</code></td><td>extra string attrs (<code>givenName</code>, <code>sn</code>, <code>mail</code>)</td></tr>
             <tr><td><code>groups[].id</code></td><td><code>cn=<id>,ou=groups,<suffix></code> (<code>groupOfNames</code>)</td></tr>
@@ -100,7 +100,7 @@ spec:
       attributes:
         allow: ["*"]
         deny: [userPassword]</code></pre>
-        <p>That compiles to 389 ACIs. Seed user <code>alice</code> can search the suffix, bind as herself, and cannot read <code>userPassword</code>.</p>
+        <p>That compiles to directory ACIs. Seed user <code>alice</code> can search the suffix, bind as herself, and cannot read <code>userPassword</code>.</p>
 
         <h2 id="apply">Apply</h2>
         <p>Edit <code>deploy/compose/scenario.yaml</code> (or set <code>LABLDAP_SCENARIO_FILE</code>), then <code>make compose-up</code>. Bind as a seeded user, not Directory Manager:</p>
@@ -117,7 +117,7 @@ spec:
           </thead>
           <tbody>
             <tr><td>Scenario YAML</td><td>Compiled at bootstrap. Soft reset target.</td></tr>
-            <tr><td>UI / REST / MCP</td><td>Live mutations on 389 DS until reset or volume wipe.</td></tr>
+            <tr><td>UI / REST / MCP</td><td>Live mutations on the directory engine until reset or volume wipe.</td></tr>
             <tr><td><code>make compose-reset</code></td><td>Destroy the volume, apply the YAML again.</td></tr>
           </tbody>
         </table>

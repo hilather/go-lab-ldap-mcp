@@ -51,23 +51,25 @@
         <h2 id="topo">Topology</h2>
         <p>Three roles, plus a one-shot secret copier.</p>
         <ul>
-          <li><code>directory</code> — pinned 389 DS, owns <code>/data</code></li>
+          <li><code>directory</code> — <code>labldapd:dev</code> by default, owns <code>/data</code>. 389 rollback: <code>make compose-up-389ds</code></li>
           <li><code>bootstrap</code> — <code>labldap-bootstrap:dev</code>, Directory Manager via a password file, then exits</li>
           <li><code>control</code> — <code>labldap-control:dev</code>, non-root, no DM, no Docker socket</li>
           <li><code>secret-prep</code> — copies secrets into a 0400 volume for uid 65532</li>
         </ul>
 
         <h2 id="cmd">One command</h2>
-        <pre><code>make compose-up              # ephemeral tmpfs /data
-make compose-up-persistent   # named volume + TLS import
+        <pre><code>make compose-up              # native labldapd; ephemeral tmpfs /data
+make compose-up-persistent   # native; named volume
+make compose-up-389ds        # 389 oracle / rollback
 make compose-down
 make compose-reset           # down -v, then up</code></pre>
         <p>Ephemeral is not a forensic wipe. Host swap can still hold pages. Persistent runtime entries survive restart. Soft reset restores the compiled baseline without deleting the volume.</p>
 
         <h2 id="images">Images</h2>
-        <pre><code>make image-bootstrap
+        <pre><code>make image-native
+make image-bootstrap
 make image</code></pre>
-        <p>Local tags only: <code>labldap-bootstrap:dev</code> and <code>labldap-control:dev</code>. Compose files pin digests, never floating tags. <code>make image</code> checks that both images report the same version and smokes <code>/health</code>.</p>
+        <p>Local tags only: <code>labldapd:dev</code>, <code>labldap-bootstrap:dev</code>, and <code>labldap-control:dev</code>. Compose files pin digests, never floating tags. <code>make image</code> checks that control and bootstrap report the same version and smokes <code>/health</code>.</p>
 
         <h2 id="secrets">Secrets and TLS</h2>
         <p>Generated on first compose-up, mode 0600, gitignored. Rotate with <code>go run ./tools/setupsecrets --dir secrets --force</code>, then recreate the stack so control sees the new files.</p>
