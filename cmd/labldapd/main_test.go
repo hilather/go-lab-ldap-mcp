@@ -35,16 +35,18 @@ func TestVersion(t *testing.T) {
 	}
 }
 
-func TestServeNotImplemented(t *testing.T) {
+func TestServeUnreadableConfig(t *testing.T) {
 	t.Parallel()
 	var stdout, stderr bytes.Buffer
-	code := run([]string{"serve", "--config", "lab.yaml", "--data-dir", "/tmp/data"}, &stdout, &stderr)
+	code := run([]string{
+		"serve", "--config", "no/such/lab.yaml",
+		"--directory-manager-password-file", "also-missing",
+	}, &stdout, &stderr)
 	if code != 1 {
 		t.Fatalf("serve exit %d, want 1", code)
 	}
-	msg := stderr.String()
-	if !strings.Contains(msg, "not implemented") || !strings.Contains(msg, "T-143") {
-		t.Fatalf("serve message = %q", msg)
+	if !strings.Contains(stderr.String(), "labldapd serve:") {
+		t.Fatalf("serve message = %q", stderr.String())
 	}
 }
 

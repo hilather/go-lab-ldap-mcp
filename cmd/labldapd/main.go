@@ -24,7 +24,7 @@ Usage:
 Commands:
   help       Show this help (also -h, --help)
   version    Print component and version fields
-  serve      Start the directory listeners (lands in T-143)
+  serve      Start the directory listeners (T-143)
 
 Structured logs go to stderr. Set LABLDAP_LOG_FORMAT=json for JSON logs.
 
@@ -33,24 +33,30 @@ docs/design/native-engine-parity-contract.md.
 `
 
 const serveUsage = `Usage:
-  labldapd serve [--config FILE] [flags]
+  labldapd serve --config FILE --directory-manager-password-file PATH [flags]
 
-serve starts the native directory engine: it applies the compiled engine
-plan at start (suffix, TLS materials, password policy, plugin hooks), opens
-the bbolt store in the data directory, and binds the directory listeners.
+serve starts the native directory engine: it compiles the scenario, applies
+the engine plan at start (suffix, TLS materials, password policy, plugin
+hooks, runtime ACIs), publishes the applied plan at cn=config for bootstrap
+read-back, opens the bbolt store in the data directory, and binds the
+directory listeners. SIGTERM/SIGINT shut down gracefully.
 
 Flags:
-  --config PATH                            scenario YAML (engine plan source)
+  --config PATH                            scenario YAML (engine plan source; required)
   --data-dir PATH                          bbolt data directory (default /data)
-  --listen ADDR                            LDAP listener (default 127.0.0.1:3389)
-  --ldaps-listen ADDR                      LDAPS listener (default 127.0.0.1:3636)
-  --tls-cert-file PATH                     TLS certificate PEM
-  --tls-key-file PATH                      TLS private key PEM
-  --directory-manager-password-file PATH   Directory Manager secret file
-  --health-listen ADDR                     health listener (loopback default)
+  --listen ADDR                            LDAP listener (default 127.0.0.1:3389; empty disables)
+  --ldaps-listen ADDR                      LDAPS listener (default 127.0.0.1:3636; empty disables)
+  --tls-cert-file PATH                     TLS certificate PEM (required with LDAPS/StartTLS)
+  --tls-key-file PATH                      TLS private key PEM (required with LDAPS/StartTLS)
+  --directory-manager-password-file PATH   Directory Manager secret file (required)
+  --health-listen ADDR                     health listener (default 127.0.0.1:8389; empty disables)
 
-Listener hosts default to loopback when unspecified. Server startup itself
-is not implemented yet; it lands in T-143.
+Listener hosts default to loopback when unspecified. The scenario must
+select engine: native; the daemon never reads user/runtime/token secret
+files (the data plane belongs to labldap-bootstrap). GET /health on the
+health listener answers 200 once the directory listeners are bound.
+
+Exit codes: 0 clean shutdown, 1 startup/runtime failure, 2 flag error.
 `
 
 func main() {
