@@ -129,12 +129,20 @@ type Options struct {
 	// AllowCleartextBind permits simple bind without TLS. Default off; only
 	// explicit insecure lab mode turns it on (C3).
 	AllowCleartextBind bool
-	Limits             Limits
-	Codec              Codec
-	Store              Store
-	Schema             Schema
-	ACI                ACIEngine
-	Plugins            []Plugin
+	// PasswordPolicy enables the T-134 policy engine: scheme-aware hash
+	// verification on binds, bind-failure lockout with
+	// pwdAccountLockedTime, and — as an automatically registered Plugin —
+	// hash-on-write, minimum length, history, and pwdChangedTime on the
+	// write path. Nil preserves the T-126 constant-time plaintext compare
+	// with no policy state. The engine plugin is appended last so it
+	// observes other plugins' in-transaction changes.
+	PasswordPolicy   *PasswordPolicy
+	Limits           Limits
+	Codec            Codec
+	Store   Store
+	Schema  Schema
+	ACI     ACIEngine
+	Plugins []Plugin
 	// Metrics receives bounded-cardinality observations (op name + result
 	// code, connection open/close). Nil disables metrics. DNs and attribute
 	// values never cross this seam.
@@ -152,6 +160,10 @@ type Server struct {
 	suffix config.DN
 	dmDN   config.DN
 	hasDM  bool
+
+	// passwords is the T-134 policy engine, consulted by the bind path
+	// through the passwordGate seam; nil without Options.PasswordPolicy.
+	passwords *passwordEngine
 
 	// ldapAddr and ldapsAddr hold the bound net.Addr once Serve has
 	// opened the listeners (atomic.Value of net.Addr).
@@ -214,6 +226,14 @@ func New(opts Options) (*Server, error) {
 	}
 	if s.opts.LDAPSAddress, err = loopbackDefault(opts.LDAPSAddress); err != nil {
 		return nil, fieldErr("ldapsAddress", "invalid_address", "LDAPS listener address is invalid")
+	}
+	if opts.PasswordPolicy != nil {
+		eng, err := newPasswordEngine(*opts.PasswordPolicy, opts.Logger)
+		if err != nil {
+			return nil, err
+		}
+		s.passwords = eng
+		s.opts.Plugins = append(s.opts.Plugins, eng)
 	}
 	s.opts.Limits = opts.Limits.withDefaults()
 	return s, nil

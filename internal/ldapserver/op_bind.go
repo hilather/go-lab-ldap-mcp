@@ -2,7 +2,6 @@ package ldapserver
 
 import (
 	"context"
-	"crypto/subtle"
 	"errors"
 
 	"github.com/hilather/go-lab-ldap-mcp/internal/config"
@@ -100,16 +99,16 @@ func (s *Server) authenticate(ctx context.Context, c *conn, req *BindRequest) (R
 	if err != nil {
 		return Result{Code: ResultInvalidCredentials, DiagnosticMessage: "invalid credentials"}, false
 	}
-	for _, v := range entry.Values("userPassword") {
-		// T-134 replaces this plaintext comparison with scheme-aware hash
-		// verification (PBKDF2-SHA256 / SSHA512) behind a password-policy
-		// seam; the constant-time comparison discipline stays.
-		if subtle.ConstantTimeCompare(v, req.Password) == 1 {
-			c.setSubject(Subject{DN: dn})
-			return Result{Code: ResultSuccess}, true
-		}
+	// T-134 password-policy seam: scheme-aware hash verification
+	// (PBKDF2-SHA256 / SSHA512), maximum-age, and failure lockout live in
+	// password.go (Server.passwordGate); the constant-time comparison
+	// discipline is kept by the hasher. With no PasswordPolicy configured
+	// the gate preserves the T-126 constant-time plaintext compare.
+	res, ok := s.passwordGate(ctx, dn, entry, req.Password)
+	if ok {
+		c.setSubject(Subject{DN: dn})
 	}
-	return Result{Code: ResultInvalidCredentials, DiagnosticMessage: "invalid credentials"}, false
+	return res, ok
 }
 
 // lookupEntry reads one entry for the bind path; every failure maps to the
