@@ -2,6 +2,7 @@ package ldapserver
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -59,14 +60,11 @@ func TestRootDSESearch(t *testing.T) {
 	if got := dseAttr(e, "supportedLDAPVersion"); len(got) != 1 || got[0] != "3" {
 		t.Errorf("supportedLDAPVersion = %v", got)
 	}
+	// C9: exactly the honored set — paged results (T-140) and the RFC 4528
+	// assertion control (T-141), both order-independent.
 	controls := dseAttr(e, "supportedControl")
-	if len(controls) != 1 || controls[0] != OIDSimplePagedResults {
-		t.Errorf("supportedControl = %v", controls)
-	}
-	for _, ctl := range controls {
-		if ctl == OIDAssertion {
-			t.Error("assertion control advertised before T-141 honors it (C9)")
-		}
+	if len(controls) != 2 || !slices.Contains(controls, OIDSimplePagedResults) || !slices.Contains(controls, OIDAssertion) {
+		t.Errorf("supportedControl = %v, want paged results + assertion", controls)
 	}
 	if got := dseAttr(e, "supportedExtension"); len(got) == 0 {
 		t.Error("supportedExtension empty")

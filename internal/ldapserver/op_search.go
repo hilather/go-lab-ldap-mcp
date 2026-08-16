@@ -179,13 +179,13 @@ func (s *Server) projectEntry(ctx context.Context, tx ReadTx, subj Subject, dn c
 const VendorName = "LabLDAP"
 
 // rootDSE builds the RFC 4512 section 5.1 Root DSE (parity contract C10).
-// Only capabilities the engine honors are advertised: supportedControl
-// lists Simple Paged Results (T-127, cookie integrity since T-140); the
-// RFC 4528 assertion control stays unadvertised until T-141 honors it (C9:
-// never advertise-and-no-op). supportedExtension lists the recognized
-// extension OIDs whose handlers land in T-133 (StartTLS) and T-142
-// (WhoAmI) — dispatch answers them with unwillingToPerform until then.
-// Delta D6: unknown 389 extras are omitted.
+// Only capabilities the engine honors are advertised (C9: never
+// advertise-and-no-op): supportedControl lists Simple Paged Results
+// (T-127, cookie integrity since T-140) and the RFC 4528 assertion control
+// (T-141). supportedExtension lists the recognized extension OIDs whose
+// handlers land in T-133 (StartTLS) and T-142 (WhoAmI) — dispatch answers
+// them with unwillingToPerform until then. Delta D6: unknown 389 extras
+// are omitted.
 func (s *Server) rootDSE() *Entry {
 	return &Entry{
 		DN: "",
@@ -194,7 +194,7 @@ func (s *Server) rootDSE() *Entry {
 			StringAttribute("namingContexts", s.suffix.String()),
 			StringAttribute("subschemaSubentry", SubschemaDN),
 			StringAttribute("supportedLDAPVersion", "3"),
-			StringAttribute("supportedControl", OIDSimplePagedResults),
+			StringAttribute("supportedControl", OIDSimplePagedResults, OIDAssertion),
 			StringAttribute("supportedExtension", OIDStartTLS, OIDWhoAmI),
 			StringAttribute("vendorName", VendorName),
 			StringAttribute("vendorVersion", observability.CurrentBuild("labldapd").Version),

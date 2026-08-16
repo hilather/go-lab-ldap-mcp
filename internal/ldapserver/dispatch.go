@@ -71,13 +71,17 @@ func (s *Server) checkControls(m *Message) (Result, bool) {
 				}, false
 			}
 		case OIDAssertion:
-			// RFC 4528 assertion control lands in T-141; never silently
-			// ignore a critical assertion (parity contract C9: do not
+			// RFC 4528 assertion control (T-141): honored on Modify at
+			// either criticality. On other operations a critical assertion
+			// must not be silently ignored (parity contract C9: do not
 			// advertise and no-op).
+			if _, isModify := m.Op.(*ModifyRequest); isModify {
+				continue
+			}
 			if ctrl.Critical {
 				return Result{
 					Code:              ResultUnavailableCriticalExtension,
-					DiagnosticMessage: "assertion control not implemented",
+					DiagnosticMessage: "assertion control is only honored on modify",
 				}, false
 			}
 		default:

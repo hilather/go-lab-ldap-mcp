@@ -149,6 +149,11 @@ func mapWriteError(err error) Result {
 		// A plugin aborts the whole commit (C7); the client sees an
 		// unwillingToPerform, matching 389's plugin-failure surface.
 		return Result{Code: ResultUnwillingToPerform, DiagnosticMessage: "write rejected by plugin"}
+	case errors.Is(err, errAssertionFailed):
+		// RFC 4528: the entry did not match the assertion; nothing was
+		// applied. The diagnostic stays static (no filter or attribute
+		// content); 389's exact message is a Delta candidate for T-147.
+		return Result{Code: ResultAssertionFailed, DiagnosticMessage: "assertion failed"}
 	default:
 		return resultFromError(err)
 	}
@@ -170,7 +175,11 @@ func (s *Server) runPlugins(ctx context.Context, tx UpdateTx, ev WriteEvent) err
 	return nil
 }
 
-// handleModify applies RFC 4511 section 4.6 changes to one entry.
+// handleModify applies RFC 4511 section 4.6 changes to one entry. When the
+// request carries the RFC 4528 assertion control (T-141, ctrl_assert.go),
+// the assertion filter is evaluated against the pre-modification entry
+// inside the same Store.Update transaction as the write, so the check and
+// the change commit atomically (parity contract C9; ADR-0009 decision 7).
 func (s *Server) handleModify(ctx context.Context, c *conn, m *Message, req *ModifyRequest) ResultCode {
 	subj := c.subject()
 	respond := func(res Result) ResultCode {
@@ -178,6 +187,10 @@ func (s *Server) handleModify(ctx context.Context, c *conn, m *Message, req *Mod
 			c.sendResult(m.ID, &ModifyResponse{Result: res})
 		}
 		return res.Code
+	}
+	assertion, asserted, res, err := parseAssertionFilter(m.Controls)
+	if err != nil {
+		return respond(res)
 	}
 	dn, err := config.ParseDN(req.DN)
 	if err != nil {
@@ -190,6 +203,12 @@ func (s *Server) handleModify(ctx context.Context, c *conn, m *Message, req *Mod
 		before, err := tx.Entry(ctx, dn)
 		if err != nil {
 			return err
+		}
+		// T-141: a false assertion aborts the transaction; nothing is
+		// applied. ACI denial takes precedence over the assertion outcome
+		// so a denied caller cannot probe entry state through the codes.
+		if asserted && !s.assertionMatches(before, assertion) {
+			return errAssertionFailed
 		}
 		after := cloneEntry(before)
 		for _, ch := range req.Changes {
