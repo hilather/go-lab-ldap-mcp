@@ -1,16 +1,18 @@
 # Native engine parity contract
 
-**Status:** accepted with [ADR-0008](../adr/0008-dual-directory-engines.md) and [ADR-0009](../adr/0009-native-engine-topology-and-storage.md)
+**Status:** accepted with [ADR-0008](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/adr/0008-dual-directory-engines.md) and [ADR-0009](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/adr/0009-native-engine-topology-and-storage.md)
 
 **Version:** `labldap.parity.v1`
 
-**Date:** 2026-08-15
+**Date:** 2026-08-16
 
 **Oracle:** pinned 389 Directory Server 2.4.6 (digest in `deploy/docker/dirsrv.digest`)
 
 **Subject:** Go-native engine (`cmd/labldapd`, `internal/ldapserver`)
 
 This file is the Contract / Delta / Excluded ledger for dual-engine work. Expanding the Contract tier, shrinking Excluded, or promoting a Delta to Contract requires a dated amendment here and, if it changes a public engine guarantee, an ADR.
+
+**Observation source of truth** for what each engine actually returned is the machine ledger [`test/parity/delta-ledger.json`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/test/parity/delta-ledger.json) plus probe comments in [`test/parity/probes.go`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/test/parity/probes.go). The human adjudication record is [`docs/design/parity-delta-log.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/design/parity-delta-log.md). If those artifacts disagree on observed polarity, the JSON + probes win and the human log is corrected.
 
 Agents implementing M9 tasks must read this document and the two ADRs before writing code.
 
@@ -61,7 +63,7 @@ Wrong CA and wrong server name fail closed. Independent clients in `test/compati
 - Cleartext simple bind default off.
 - SASL: none required (no YAML `RequiredSASL` today). Native advertises none. See E2.
 - Disabled account: `nsAccountLock: true` → bind fails with LDAP 53 (`unwillingToPerform` / unwilling) matching 389 observed behavior in `test/integration/dirsrv/plugins_test.go`.
-- Lockout: after configured failures, bind fails and `pwdAccountLockedTime` is present on the entry (bind-test reads this attribute).
+- Lockout: after configured failures, bind fails and bind-test reports `locked`. Lock *marker* attributes are not a single-attr Contract (see C4, D19).
 
 Unknown user vs wrong password remain indistinguishable on the **management** bind-test API. Direct LDAP result codes may follow 389 (typically `invalidCredentials` for both).
 
@@ -75,7 +77,7 @@ Public policy fields in `spec.passwordPolicy` that 389 applies via `dsconf pwpol
 | History | Reuse of a recent password rejected. |
 | Maximum age | Expired password cannot bind (or must change — match 389 observed). |
 | Warning | Operational; if 389 exposes it, native may expose the same operational attr; not required on management APIs. |
-| Lockout max failures + duration | Bind lockout + `pwdAccountLockedTime`. |
+| Lockout max failures + duration | Lockout *effect* after N failures: subsequent bind fails. Bind-test reports `locked`. Marker attributes are **not** a single-attr Contract: 389 stamps `accountUnlockTime` / `passwordRetryCount` (D19); native may publish extra lock attrs (`pwdAccountLockedTime`). Control plane unions observed lock stamps. |
 | Storage scheme | `PBKDF2-SHA256` (default) and `SSHA512` hashes **verify**. Hash *encoding* is Delta D3. |
 
 Passwords are never returned, logged, or placed on argv.
@@ -152,7 +154,7 @@ T-036 probes (runtime allow/deny, including `cn=config` denial) are Contract. Na
 | Control | OID | Contract |
 | --- | --- | --- |
 | Simple Paged Results | `1.2.840.113556.1.4.319` | List/search/inventory/export paging. |
-| Assertion (RFC 4528) | `1.3.6.1.1.12` | Advertised on Root DSE. Used by If-Match updates. Must be transactional (ADR-0009). If native advertises it, it must honor it; do not advertise and no-op. |
+| Assertion (RFC 4528) | `1.3.6.1.1.12` | **Native:** advertised on Root DSE and honored (pass commits; fail → `assertionFailed(122)`). Must be transactional ([ADR-0009](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/adr/0009-native-engine-topology-and-storage.md)). Do not advertise and no-op. **Pinned 389:** does not implement the control — OID omitted from `supportedControl`; critical assertion → `unavailableCriticalExtension(12)` (D7 / D28, CAND-26). **Control plane:** attach the control only when `assertionEnabledOn` (Root DSE probe); `checkRev` always runs first. If-Match / MCP `revision` identity does not depend on the engine advertising the OID. |
 
 Critical unsupported controls → `unavailableCriticalExtension`.
 
@@ -187,17 +189,33 @@ A user created through REST or MCP is visible to `ldapsearch` against the direct
 | D4 | On-disk format | 389 `/data` (nsslapd db) | bbolt `/data/labldapd.bolt` | Lifecycle tests (ephemeral/persistent) only. |
 | D5 | Backend name | `userroot` via `dsconf backend` | Suffix exists; backend name need not be `userroot` | Do not assert backend CN on native. |
 | D6 | Root DSE extra attrs | 389-specific operational attrs | Honest advertisement; omit unknown 389 extras | Capabilities test uses allowlisted fields. |
-| D7 | Assertion absence path | If 389 ever omits RFC 4528, control uses TOCTOU+lock | Native **must** advertise and honor RFC 4528 | Native-only assertion atomicity test. |
-| D8 | Bind with malformed DN | `invalidDNSyntax(34)` | `invalidCredentials(49)` | `TestDifferential389Oracle/bind-malformed-dn`; see parity-delta-log.md. |
+| D7 | Assertion absence path | Pinned 389 does **not** implement RFC 4528: omits OID `1.3.6.1.1.12` from `supportedControl`; critical assertion → `unavailableCriticalExtension(12)` (CAND-25/26). Control uses `assertionEnabledOn` + `checkRev` (and keyed lock). | Native **must** advertise and honor RFC 4528. | Native-only assertion atomicity test; D28 / CAND-26. |
+| D8 | Bind with malformed DN | `invalidDNSyntax(34)` | `invalidCredentials(49)` | `TestDifferential389Oracle/bind-malformed-dn`; see [parity-delta-log.md](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/design/parity-delta-log.md). |
 | D9 | Anonymous bind while disabled | `inappropriateAuthentication(48)` | `unwillingToPerform(53)` | `TestDifferential389Oracle/anon-bind-disabled`; CAND-1 adjudicated 2026-08-15. |
 | D10 | LDAPv2 bind attempt | `invalidCredentials(49)` | `protocolError(2)` | `TestDifferential389Oracle/bind-version-2`. |
 | D11 | ModifyDN with out-of-suffix `newSuperior` | `affectsMultipleDSAs(71)` | `unwillingToPerform(53)` | `TestDifferential389Oracle/modifydn-cross-suffix`; CAND-4 adjudicated 2026-08-15. |
 | D12 | Paged-results cookie tamper | Accepts tampered cookie (`success`); no integrity protection | HMAC-signed cookie fails closed, `unwillingToPerform(53)` | `TestDifferential389Oracle/paged-tampered-cookie`; CAND-5/CAND-18 adjudicated 2026-08-15. |
 | D13 | WhoAmI bound authzId rendering | `dn: <case-folded dn>` | `dn:<as-bound dn>` | `TestDifferential389Oracle/whoami-bound`; CAND-20 bound case. |
 | D14 | WhoAmI anonymous with anonymous access off | `inappropriateAuthentication(48)` | `success` + empty authzId | `TestDifferential389Oracle/whoami-anonymous`; CAND-20 anonymous case. |
+| D15 | `approxMatch` filter (`~=`) | Real approx matching; a near-miss can return the entry | Folds to equality (near-miss returns nothing) | `test/parity` CAND-2. |
+| D16 | ModifyDN rename into own subtree | Rejects `unwillingToPerform(53)`; tree intact | Permits the rename; later subtree walks detach (`noSuchObject(32)`) | `test/parity` CAND-6. |
+| D17 | Schema MAY / unknown-attribute writes | Rejects marker extras and unknown attrs with `objectClassViolation(65)` | Accepts both, `success(0)` | `test/parity` CAND-8. |
+| D18 | Password-policy-violation write code | `constraintViolation(19)` (min-length and history) | `unwillingToPerform(53)` via plugin-abort | `test/parity` CAND-9. |
+| D19 | Lockout bind code + lock markers | 5th failure → `constraintViolation(19)`; stamps `accountUnlockTime` / `passwordRetryCount` | 5th failure → `invalidCredentials(49)`; stamps `pwdAccountLockedTime` | `test/parity` CAND-10. C4 is lockout *effect* + bind-test `locked`, not a single marker. |
+| D20 | Re-setting the current password | Rejected with `constraintViolation(19)` | Rejected as in-history, `unwillingToPerform(53)` | `test/parity` CAND-11. Both reject; codes differ. |
+| D21 | `anyone` / `all` / anonymous bind-rule | Anonymous `anyone` denied `inappropriateAuthentication(48)` when anonymous is off | Pre-bind read of an `anyone` ACI succeeds | `test/parity` CAND-15. |
+| D22 | `groupdn` membership nesting | Nested `groupdn` grant resolves | Direct `member` / `uniqueMember` only | `test/parity` CAND-17. |
+| D23 | Malformed-DN bind result code | `invalidDNSyntax(34)` | `invalidCredentials(49)` | `test/parity` CAND-21 (same divergence as D8). |
+| D24 | Pre-bind Root DSE, anonymous off | Refused `inappropriateAuthentication(48)` | Pre-bind Root DSE read allowed, `success(0)` | `test/parity` CAND-22. |
+| D25 | Compare against an absent attribute | `noSuchAttribute(16)` | `compareFalse(5)` | `test/parity` CAND-23. |
+| D26 | memberOf auxiliary OC after retract | **Keeps** leftover `nsmemberof` after last-member removal | **Retracts** today (post-retract `objectClass` has no `nsmemberof`) | `test/parity` CAND-24. Do not invert: 389 keeps; native retracts. |
+| D27 | `supportedLDAPVersion` advertisement | `2, 3` | `3` only | `test/parity` CAND-25. Contract is “v3 is served.” |
+| D28 | Critical RFC 4528 assertion on Modify | `unavailableCriticalExtension(12)`; OID not advertised | Advertised and honored (`success(0)` / `assertionFailed(122)`) | `test/parity` CAND-26. Observed form of D7. |
+| D29 | DM password reset vs history | DM bypasses history, `success(0)` | DM in-history reset rejected, `unwillingToPerform(53)` | `test/parity` CAND-27. |
+| D30 | Subschema publishes `pwdAccountLockedTime` | Publishes `nsAccountLock` only | Publishes `nsAccountLock` **and** `pwdAccountLockedTime` | `test/parity` CAND-28. Honest listing (see C4). |
 
 The adjudication record (observed values, rationale, controlling tests)
-is `docs/design/parity-delta-log.md` (T-150).
+is [`docs/design/parity-delta-log.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/design/parity-delta-log.md). Observed polarity is taken from [`test/parity/delta-ledger.json`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/test/parity/delta-ledger.json) and [`test/parity/probes.go`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/test/parity/probes.go). There are no remaining pending Wave-1 CAND rows.
 
 ## 4. Excluded (not in M9)
 
@@ -220,11 +238,11 @@ is `docs/design/parity-delta-log.md` (T-150).
 4. Do not compare: `vendorVersion`, password hashes, `createTimestamp` clock values beyond “present and RFC3339-ish”, backend CNs.
 5. Failures attach redacted engine logs. Secret scan of the parity run must pass.
 6. `make test-parity` runs both engines. `make test-integration` remains 389-only until T-148 parametrizes it.
-7. A living **delta ledger** (section 3 of this file, plus the adjudication record `docs/design/parity-delta-log.md` created by T-150) records observed-but-accepted differences with the test name that proves them.
+7. A living **delta ledger** (section 3 of this file, the human record [`docs/design/parity-delta-log.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/design/parity-delta-log.md), and the machine SoT [`test/parity/delta-ledger.json`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/test/parity/delta-ledger.json)) records observed-but-accepted differences with the test name that proves them.
 
 ## 6. Implementation notes for agents
 
-- Package and import rules: [ADR-0009](../adr/0009-native-engine-topology-and-storage.md) §Package layout.
+- Package and import rules: [ADR-0009](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/adr/0009-native-engine-topology-and-storage.md) §Package layout.
 - Interface skeletons land in T-122 **before** parallel work. Do not invent a second `Store` or `Codec` API in a feature branch.
 - Reuse `internal/config` ACI golden text as the ACI parser corpus (T-138).
 - Reuse `internal/config` DN helpers; do not fork DN canonicalization.
@@ -237,35 +255,15 @@ is `docs/design/parity-delta-log.md` (T-150).
 | Date | Change |
 | --- | --- |
 | 2026-08-15 | Initial contract (`labldap.parity.v1`) accepted with ADR-0008 / ADR-0009. |
-| 2026-08-15 | Wave 1 (T-125–T-128) recorded Delta **candidates** below; none are promoted to section 3 until adjudicated against the 389 oracle in T-147/T-150. |
-| 2026-08-15 | T-150 differential harness (`internal/ldapserver/differential_test.go`) adjudicated CAND-1, CAND-3, CAND-4, CAND-5, CAND-18, CAND-20 against the pinned 389 oracle: CAND-3 resolved as Contract; the rest promoted to section 3 as D8–D14 (with newly observed D10). Record: `docs/design/parity-delta-log.md`. |
+| 2026-08-15 | Wave 1 (T-125–T-128) recorded Delta **candidates**; none were promoted to section 3 until adjudicated against the 389 oracle in T-147/T-150. |
+| 2026-08-15 | T-150 differential harness (`internal/ldapserver/differential_test.go`) adjudicated CAND-1, CAND-3, CAND-4, CAND-5, CAND-18, CAND-20 against the pinned 389 oracle: CAND-3 resolved as Contract; the rest promoted to section 3 as D8–D14 (with newly observed D10). Record: [parity-delta-log.md](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/design/parity-delta-log.md). |
+| 2026-08-16 | T-147 machine ledger ([`test/parity/delta-ledger.json`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/test/parity/delta-ledger.json) + [`probes.go`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/test/parity/probes.go)) promoted D15–D30 into section 3. Corrected D7 (pinned 389 omits RFC 4528; it does **not** honor it) and D26 (389 **keeps** leftover `nsmemberof`; native **retracts** today). Amended C4 (lockout *effect* + bind-test `locked`; native may publish extra lock attrs) and C9 (`assertionEnabledOn` + `checkRev`; assertion is Contract on native only). Struck the stale Wave-1 “pending adjudication” CAND table — no pending CAND rows remain. |
 
-### Delta candidates observed in Wave 1 (pending adjudication, T-147/T-150)
+### Adjudicated Wave-1 candidates (no pending rows)
 
-| Ref | Topic | Native behavior (as implemented) | 389 expectation | Provenance |
-| --- | --- | --- | --- | --- |
-| ~~CAND-1~~ → D9 | Anonymous-bind-disabled result code | `unwillingToPerform(53)` | Oracle 2026-08-15: 389 returns `inappropriateAuthentication(48)` (contrary to the earlier note); accepted as D9 | T-126 `op_bind.go` |
-| CAND-2 | `approxMatch` filter | Folds to equality until T-131 matching rules | 389 applies real approx rules | T-127 `filter_eval.go` |
-| ~~CAND-3~~ → Contract | Modify delete-of-missing / replace-of-missing attribute | Strict RFC 4511 (`noSuchAttribute`) | Oracle 2026-08-15: 389 agrees (`noSuchAttribute`); resolved as Contract, harness step untagged | T-128 `op_write.go` |
-| ~~CAND-4~~ → D11 | Cross/out-of-suffix ModifyDN | `unwillingToPerform(53)` | Oracle 2026-08-15 confirmed `affectsMultipleDSAs(71)`; accepted as D11 | T-128 `op_write.go` |
-| ~~CAND-5~~ → D12 | Paged-results cookie integrity | HMAC-signed since T-140, fails closed | Oracle 2026-08-15: 389 has no cookie integrity (tamper → success); accepted as D12 | T-127 `op_search.go`, T-140 `ctrl_paged.go` |
+Wave-1 CAND rows are closed. Verdicts live in section 3 and in [parity-delta-log.md](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/design/parity-delta-log.md):
 
-When adjudicated, each moves into section 3 (accepted Delta) with the test name that proves the difference, or is fixed to match the oracle (Contract).
-
-| CAND-6 | ModifyDN rename into own subtree | bbolt store allows it; index-based Subtree walks can detach the subtree (no store sentinel exists) — needs a dispatch guard | 389 rejects (LDAP-illegal) | T-129 `store.go`; guard belongs in ModifyDN dispatch (T-143/T-144 hardening) |
-| CAND-17 | groupdn membership scope | direct `member`/`uniqueMember` only, no nesting; group objectClass not required | confirm vs 389 | T-139 `aci_eval.go` |
-| ~~CAND-18~~ → D12 | Paged-cookie tamper result code | `unwillingToPerform(53)`; cookie is HMAC-SHA256 (offset + base DN + scope + filter), per-server random secret | Oracle 2026-08-15: 389 accepts a tampered cookie (`success`); accepted as D12 | T-140 `ctrl_paged.go` |
-| CAND-19 | Assertion control scope | Modify-only; critical assertion on non-Modify → `unavailableCriticalExtension`; `assertionFailed(122)` on mismatch | 389 assertion-on-Add / non-critical behavior unverified | T-141 `ctrl_assert.go`; adjudicate in T-147 |
-| ~~CAND-20~~ → D13/D14 | WhoAmI authzid rendering | `dn:<dn>` with case-preserving `DN.String()`; present-but-empty value for anonymous | Oracle 2026-08-15: 389 renders `dn: <case-folded dn>` (D13) and, with anonymous access off, refuses the op with `inappropriateAuthentication(48)` (D14) | T-142 `ext_whoami.go` |
-
-**Resolved:** ~~CAND-7~~ (supportedExtension advertised StartTLS/WhoAmI pre-handler) — both handlers now exist (T-133 StartTLS, T-142 WhoAmI); the Root DSE advertisement is truthful. CAND-7 is removed from the candidate set.
-| CAND-8 | MAY-attribute allow-listing not enforced on writes | Only MUST enforced; 389 accepts marker attrs (destinationIndicator/owner on device) | Matches 389-observed | T-132 `schema_registry.go`; confirm vs oracle in T-147 |
-| CAND-9 | Password-policy-violation writes (min length, history) | `unwillingToPerform(53)` via the plugin-abort path | 389 returns `constraintViolation(19)` | T-134 `password.go`; adjudicate in T-147 |
-| CAND-10 | Lockout / expired-password bind failure code | `invalidCredentials(49)` | confirm 389's exact bind-path code | T-134 `password.go`; adjudicate in T-147 |
-| CAND-11 | Re-setting the current password | Rejected as in-history (stricter) | 389 known to allow re-set in some paths | T-134 `password.go`; adjudicate in T-147 |
-| CAND-12 | Empty groupOfNames after RI member removal | handling per 389-observed (groupOfNames cannot be empty) | 389-observed fail-or-keep | T-136 `refint.go`; confirm vs oracle in T-147 |
-| CAND-13 | ACI evaluation order | Order-independent deny-wins | 389 never first-match/subtree-distance on the T-036 set | T-139 `aci_eval.go`; confirm vs oracle in T-147 |
-| CAND-14 | `userPassword` read under `ou=people` | `runtime-people-write` (targetattr!=aci) grants it; suffix/marker deny it via `runtime-suffix-read` | pin 389's answer on a person entry | T-139; T-036 probes suffix/marker only |
-| CAND-15 | self/all/anyone semantics | pre-bind = anonymous for `all`; `self` = bound DN vs target DN only | confirm vs 389 | T-139 `aci_eval.go` |
-| CAND-16 | ACI target scope + entry-level attr | "at or under target DN", fold-correct; entry add/delete ignore `targetattr` | 389 add checks may differ for entries carrying `aci` | T-139 `aci_eval.go` |
-| CAND-17 | groupdn membership scope | direct `member`/`uniqueMember` only, no nesting; group objectClass not required | confirm vs 389 | T-139 `aci_eval.go` |
+| Disposition | Refs |
+| --- | --- |
+| Promoted to Delta (section 3) | CAND-1 → D9; CAND-2 → D15; CAND-4 → D11; CAND-5/18 → D12; CAND-6 → D16; CAND-8 → D17; CAND-9 → D18; CAND-10 → D19; CAND-11 → D20; CAND-15 → D21; CAND-17 → D22; CAND-20 → D13/D14; CAND-21 → D8/D23; CAND-22 → D24; CAND-23 → D25; CAND-24 → D26; CAND-25 → D27; CAND-26 → D28; CAND-27 → D29; CAND-28 → D30 |
+| Resolved as Contract (engines agree; harness step untagged) | CAND-3, CAND-7, CAND-12, CAND-13, CAND-14, CAND-16, CAND-19 |

@@ -2,7 +2,15 @@
 
 Contract-tier comparison of the pinned 389 Directory Server (the oracle)
 and the native engine (`internal/ldapserver`, run in-process), per
-[`docs/design/native-engine-parity-contract.md`](../../docs/design/native-engine-parity-contract.md).
+[`docs/design/native-engine-parity-contract.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/design/native-engine-parity-contract.md).
+
+Observation source of truth is this directory's
+[`delta-ledger.json`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/test/parity/delta-ledger.json)
+plus probe comments in
+[`probes.go`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/test/parity/probes.go).
+The human adjudication record is
+[`docs/design/parity-delta-log.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/design/parity-delta-log.md).
+If those disagree on observed polarity, the JSON + probes win.
 
 ## What lives here
 
@@ -18,7 +26,7 @@ and the native engine (`internal/ldapserver`, run in-process), per
 | `native_test.go` | always | Hermetic run: all cases/probes against native only, verified against the ledger's native columns; engine-log secret scan. |
 | `excluded_test.go` | always | Excluded-tier (E1–E8) inertness on the native surface. |
 | `ledger_test.go` | always | Structural validation of the committed ledger. |
-| `delta-ledger.json` | — | The adjudicated golden ledger T-150 consumes. |
+| `delta-ledger.json` | — | Machine observation SoT. Adjudicated golden ledger T-150 consumes. Delta verdicts CAND-2/6/8–11/15/17/21–28 are D15–D30 in the contract. |
 
 ## Running
 
@@ -52,17 +60,21 @@ behavior fails the run.
   - The subschema is read at the DN advertised in `subschemaSubentry`
     (`cn=subschema` is a 389 alias native does not carry);
     `pwdAccountLockedTime` publication is CAND-28.
-  - RFC 4528 assertion semantics are not dual-engine Contract: the
-    pinned 389 does not implement the control (CAND-26). Native's
-    honor-and-advertise behavior (D7) is locked through the native
+  - RFC 4528 assertion semantics are not dual-engine Contract (C9): the
+    pinned 389 does not implement the control — `unavailableCriticalExtension(12)`
+    on critical Modify, OID omitted (CAND-26 / D28). Native advertises
+    and honors it (D7). The control plane uses `assertionEnabledOn` +
+    `checkRev`. Native honor-and-advertise is locked through the native
     columns of CAND-19/26 in the ledger.
   - Password-policy refusal codes are normalized to "policy-rejected"
-    (exact codes: CAND-9); the lockout case normalizes the locked-bind
-    code (exact codes and lock-marker attributes: CAND-10, which uses a
-    dedicated account so the Contract lockout cannot pollute it).
+    (exact codes: CAND-9 / D18). Contract C4 lockout is the *effect* plus
+    bind-test `locked` (not a single marker attribute). The lockout case
+    normalizes the locked-bind code; exact codes and lock-marker
+    attributes are CAND-10 / D19 (dedicated account so the Contract
+    lockout cannot pollute it). Native may publish extra lock attrs.
   - Member-entry object classes are compared only on never-membered
-    entries (389 keeps the auto-added `nsmemberof` class after memberOf
-    retraction; native drops it — CAND-24).
+    entries (D26 / CAND-24: 389 **keeps** leftover `nsmemberof` after
+    last-member removal; native **retracts** it today).
 - `userPassword` and password history never enter an outcome, a log, or
   the ledger; 389-internal operational attributes (`entryid`,
   `parentid`, `entrydn`, `dsentrydn`) are dropped as non-comparable.

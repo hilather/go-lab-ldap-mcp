@@ -1,11 +1,11 @@
 # Native-Engine Parity Delta Log
 
 Status: living ledger (T-150). Companion to
-[native-engine-parity-contract.md](native-engine-parity-contract.md): the
-contract's section 3 defines the Delta tier; this log is the adjudication
-record — every accepted Delta with the observed behavior on each engine,
-the rationale for accepting the difference, and the controlling test that
-keeps it stable.
+[native-engine-parity-contract.md](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/design/native-engine-parity-contract.md):
+the contract's section 3 defines the Delta tier; this log is the
+adjudication record — every accepted Delta with the observed behavior on
+each engine, the rationale for accepting the difference, and the
+controlling test that keeps it stable.
 
 A difference between engines is **not** a Delta until it is adjudicated.
 Undecided divergences found by the differential harness
@@ -23,22 +23,26 @@ behavior) or recorded here with evidence.
 3. The controlling test fails if either engine's behavior changes, so a
    resolved Delta is detected by the harness itself ("engines agree …
    delta may be resolved"), not by remembering to edit this file.
-4. T-147's machine-readable ledger (`test/parity/delta-ledger.json`,
+4. Observation source of truth is T-147's machine-readable ledger
+   ([`test/parity/delta-ledger.json`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/test/parity/delta-ledger.json),
    schema `labldap.parity.v1`, golden file regenerated via
-   `PARITY_UPDATE_LEDGER=1`) is generated from the same observations;
-   this document is the human narrative. The two must not disagree — if
-   they do, this log wins per the repository source-of-truth hierarchy
-   and the JSON is regenerated. T-147's ledger is now generated; the
-   D8–D14 adjudications from this task's differential harness are
-   consistent with it (T-147 records D8 as its `CAND-21`, D9 as
-   `CAND-1`, D11 as `CAND-4`, D12 as `CAND-5`/`CAND-18`, and D13/D14 as
-   `CAND-20`), and the sections below fold in the additional candidates
-   T-147's oracle probes adjudicated.
+   `PARITY_UPDATE_LEDGER=1`) plus probe comments in
+   [`test/parity/probes.go`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/test/parity/probes.go).
+   This document is the human narrative. The two must not disagree — if
+   they do, the ledger + probes win for observed polarity and this log
+   is corrected. (2026-08-16: D7 claimed 389 honors RFC 4528, D26
+   swapped the engines, and D20 claimed 389 allows current-password
+   re-set; those sentences were false relative to the ledger and are
+   corrected below.) T-147's ledger is generated; D8–D14
+   from the differential harness map as `CAND-21` / `CAND-1` / `CAND-4`
+   / `CAND-5`+`CAND-18` / `CAND-20`; D15–D30 are the T-147 probe
+   promotions in the table below and in contract section 3.
 
 ## Accepted Deltas
 
 D1–D7 are design-time acceptances defined in the contract (section 3).
-D8 onward are adjudicated against the running oracle.
+D8 onward are adjudicated against the running oracle. D15–D30 were
+promoted into contract §3 on 2026-08-16 from the machine ledger.
 
 | ID | Topic | 389 (observed) | Native (observed) | Rationale | Controlling test |
 | --- | --- | --- | --- | --- | --- |
@@ -48,7 +52,7 @@ D8 onward are adjudicated against the running oracle.
 | D4 | On-disk format | `/data` nsslapd db | bbolt `/data/labldapd.bolt` | Storage is engine-owned | lifecycle tests |
 | D5 | Backend name | `userroot` | no backend CN | Suffix, not backend, is the contract | bootstrap tests |
 | D6 | Root DSE / entry operational extras | 389 emits `entrydn`, `dsentrydn`, `entryid`, `parentid`, `nsuniqueid` on `+` | honest advertisement; omits 389-specific attrs | Capability inspection is measured, not name-assumed | `TestDifferential389Oracle/search-base-attrs` (strips the 389 set) |
-| D7 | Assertion absence path | n/a (389 honors RFC 4528) | must advertise and honor | Safety floor | native assertion atomicity tests |
+| D7 | Assertion absence path | Pinned 389 does **not** implement RFC 4528: `unavailableCriticalExtension(12)` on critical assertion; OID `1.3.6.1.1.12` not advertised (CAND-25/26) | must advertise and honor | Absence path, not “389 honors assertion.” Control uses `assertionEnabledOn` + `checkRev` when the OID is missing | native assertion atomicity tests; D28 / CAND-26 |
 | D8 | Bind with malformed DN | `invalidDNSyntax(34)` | `invalidCredentials(49)` | Fail-closed without revealing DN-shape validation to unauthenticated callers | `TestDifferential389Oracle/bind-malformed-dn` |
 | D9 | Anonymous bind while disabled | `inappropriateAuthentication(48)` | `unwillingToPerform(53)` | Both deny; code choice differs (CAND-1 adjudicated 2026-08-15; supersedes the earlier "389 observed 53" note) | `TestDifferential389Oracle/anon-bind-disabled` |
 | D10 | LDAPv2 bind attempt | `invalidCredentials(49)` | `protocolError(2)` | Native is strict RFC 4511 §4.2; 389 folds version rejection into credential failure | `TestDifferential389Oracle/bind-version-2` |
@@ -76,28 +80,32 @@ engine fails as an undecided divergence.
 ## Deltas adjudicated by T-147's oracle probes
 
 The differential harness adjudicated D8–D14. T-147's parity probes
-(`test/parity/probes.go`, recorded in `test/parity/delta-ledger.json`)
+([`test/parity/probes.go`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/test/parity/probes.go),
+recorded in
+[`test/parity/delta-ledger.json`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/test/parity/delta-ledger.json))
 adjudicated the remaining Wave-1 candidates against the same pinned 389
 oracle. Each `delta` verdict below is an accepted engine difference; the
 controlling evidence is the named probe plus the ledger's `oracle` /
 `native` outcome columns. D-numbers continue the sequence from D14.
+Polarity below follows the JSON, not earlier human drafts. These IDs
+are also in contract section 3 (2026-08-16).
 
 | Ref | Topic | 389 (observed) | Native (observed) | Verdict |
 | --- | --- | --- | --- | --- |
 | D15 (CAND-2) | `approxMatch` filter semantics | real approx matching, extra step returns the entry | folds to equality (one step returns nothing) | delta |
 | D16 (CAND-6) | ModifyDN rename into own subtree | rejects, `unwillingToPerform(53)`; subtree stays put | permits the rename; later subtree walks detach it (`noSuchObject(32)`) | delta |
-| D17 (CAND-8) | Schema MAY / unknown-attribute enforcement on writes | rejects MAY-violation adds with `objectClassViolation(65)`; unknown attrs `noSuchObject(32)` paths | accepts marker attrs (`destinationIndicator`/`owner` on device) and unknown attrs, `success(0)` | delta |
+| D17 (CAND-8) | Schema MAY / unknown-attribute enforcement on writes | marker-extra and unknown-attr adds both `objectClassViolation(65)`; follow-up reads `noSuchObject(32)` | both adds `success(0)` | delta |
 | D18 (CAND-9) | Password-policy-violation write code | `constraintViolation(19)` | `unwillingToPerform(53)` (plugin-abort path) | delta |
-| D19 (CAND-10) | Lockout bind failure code | 5th failure → `constraintViolation(19)`; 389 stamps `accountUnlockTime`/`nsUniqueId`/`passwordRetryCount` | 5th failure → `invalidCredentials(49)`; native stamps `pwdAccountLockedTime`/`pwdChangedTime` | delta |
-| D20 (CAND-11) | Re-setting the current password | allowed (`success`) | rejected as in-history, `unwillingToPerform(53)` | delta |
+| D19 (CAND-10) | Lockout bind failure code | 5th failure → `constraintViolation(19)`; 389 stamps `accountUnlockTime`/`nsUniqueId`/`passwordRetryCount` | 5th failure → `invalidCredentials(49)`; native stamps `pwdAccountLockedTime`/`pwdChangedTime` | delta (C4 is lockout *effect* + bind-test `locked`, not a single marker attr) |
+| D20 (CAND-11) | Re-setting the current password | rejected, `constraintViolation(19)` | rejected as in-history, `unwillingToPerform(53)` | delta (both reject; codes differ; ledger, not the earlier “389 allows re-set” note) |
 | D21 (CAND-15) | self/all/anyone bind-rule semantics | anonymous under `anyone` denied `inappropriateAuthentication(48)` when anonymous is off | anonymous read of `ou=probe-anyone` allowed, `success(0)` | delta |
 | D22 (CAND-17) | groupdn membership scope (nesting) | nested groupdn grant resolves, leaf readable both times | second groupdn read returns empty (no nesting) | delta |
 | D23 (CAND-21) | Malformed-DN bind result code | `invalidDNSyntax(34)` | `invalidCredentials(49)` | delta (same divergence as D8; T-147's ledger records it as `CAND-21`) |
 | D24 (CAND-22) | Pre-bind Root DSE read with anonymous off | anonymous op refused `inappropriateAuthentication(48)` | pre-bind Root DSE read allowed, `success(0)` | delta |
 | D25 (CAND-23) | Compare against an absent attribute | `noSuchAttribute(16)` | `compareFalse(5)` | delta |
-| D26 (CAND-24) | memberOf auxiliary object class add/retract | adds and **retracts** `nsMemberOf` objectclass with membership | adds `nsMemberOf` on grant but does not retract it on removal | delta |
+| D26 (CAND-24) | memberOf auxiliary object class add/retract | **keeps** leftover `nsmemberof` after last-member removal (post-retract objectClass still lists it) | **retracts** today (post-retract objectClass has no `nsmemberof`) | delta (corrected 2026-08-16: earlier sentence swapped the engines) |
 | D27 (CAND-25) | `supportedLDAPVersion` advertises v2 | `2, 3` | `3` only | delta |
-| D28 (CAND-26) | Critical passing assertion on Modify | `unavailableCriticalExtension(12)`; asserts value `assert-v4` | honored, `success(0)`; asserts value `assert-v5` | delta |
+| D28 (CAND-26) | Critical RFC 4528 assertion on Modify | `unavailableCriticalExtension(12)` on critical assertion; OID not advertised; non-critical fail is ignored and the modify commits (`description=assert-v3`) | advertised and honored: passing critical commits (`description=assert-v5`); fail → `assertionFailed(122)` | delta |
 | D29 (CAND-27) | DM password reset vs history policy | DM reset bypasses history, `success(0)` throughout | DM reset of an in-history password rejected, `unwillingToPerform(53)` | delta |
 | D30 (CAND-28) | Subschema publishes `pwdAccountLockedTime` | publishes only `nsAccountLock` | publishes `nsAccountLock` **and** `pwdAccountLockedTime` | delta |
 
