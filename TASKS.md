@@ -1703,16 +1703,18 @@ Acceptance:
 
 Note: overlay uses Compose `!override` (≥ 2.24.4) — `!reset <list>` silently drops the list in compose-go (found during validation). Live bring-up lands in T-147.
 
-## [ ] T-146 Control-plane engine selection wiring
+## [x] T-146 Control-plane engine selection wiring
 
 Priority: P0 | Size: M | Depends on: T-123, T-144 | Wave 5 | Cloud fit: high
 
 Deliverables: `labldap serve` and `labldap-bootstrap` switch reconciler set on `EnginePlan.Engine`; runtime remains `ds389.Runtime` + `ldapclient` pointed at the configured LDAP URL. `native` before T-144 landed already fails closed (T-123); this task makes it succeed.
 
 Acceptance:
-- [ ] `engine: 389ds` path unchanged (existing IT still pass).
-- [ ] `engine: native` uses native reconcilers only.
-- [ ] Control still has no DM secret.
+- [x] `engine: 389ds` path unchanged (existing IT still pass; `TestWireEngineReconcilersDS389`).
+- [x] `engine: native` uses native reconcilers only (`TestWireEngineReconcilersNative`; no ds389/runner in native path).
+- [x] Control still has no DM secret (`TestControlPlaneNeverLoadsDirectoryManagerSecret`).
+
+Engine-switch seam: `cmd/labldap-bootstrap/engine.go` `wireEngineReconcilers`. Note: no native `CapabilityInspector` existed (T-144 built reconcilers only; the ds389 one needs `cn=plugins,cn=config` + would exec dsconf), so the seam wires a measured `nativeCapabilities` inspector that proves plugins/scheme via the read-back reconcilers (keeps C10 "measured, not name-assumed"); Root DSE vendor strings left empty (parity harness owns vendor assertions). `labldap-bootstrap` usage text still says "389 Directory Server" — doc fix deferred to T-150.
 
 ## [ ] T-147 Dual-engine parity harness
 
