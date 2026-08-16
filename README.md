@@ -23,15 +23,15 @@
   <img alt="Go" src="https://img.shields.io/badge/Go-1.26-00ADD8?style=flat-square&logo=go&logoColor=white" />
   <img alt="389-ds" src="https://img.shields.io/badge/389--ds-2.4.6-3D9B8F?style=flat-square" />
   <img alt="MCP" src="https://img.shields.io/badge/MCP-2026--07--28-111111?style=flat-square" />
-  <img alt="Release" src="https://img.shields.io/badge/release-v0.1.0-ecece8?style=flat-square&labelColor=111111" />
+  <img alt="Release" src="https://img.shields.io/badge/release-v0.2.0-ecece8?style=flat-square&labelColor=111111" />
 </p>
 
 ![LabLDAP console](docs/assets/console.jpg)
 
-LabLDAP is a control plane around a directory engine. v0.1.0 ships **389 Directory
-Server** as the engine of record. [ADR-0008](docs/adr/0008-dual-directory-engines.md)
-adds a second, Go-native engine (`labldapd`) with [LabLDAP-surface parity](docs/design/native-engine-parity-contract.md);
-native mode is milestone M9 and is not ready until those tasks complete.
+LabLDAP is a control plane around a directory engine. v0.2.0 ships **389 Directory
+Server** as the default engine and an opt-in Go-native engine (`labldapd`) with
+[LabLDAP-surface parity](docs/design/native-engine-parity-contract.md)
+([ADR-0008](docs/adr/0008-dual-directory-engines.md)).
 
 The Go process bootstraps a lab suffix, then exposes the same authorized
 operations over HTTPS, Model Context Protocol, and an embedded UI. Directory
@@ -186,7 +186,7 @@ Bind the management listener to loopback, which compose already does.
 | [Operator guide](docs/operations/operator-guide.md) | Day-2 limits and failure modes |
 | [Troubleshooting](docs/operations/troubleshooting.md) | Ready checks, TLS, tokens, vanished entries |
 | [MCP catalog](docs/mcp/catalog.md) | Tools, resources, scopes |
-| [Release notes](docs/release/notes.md) | v0.1.0 contents and residuals |
+| [Release notes](docs/release/notes.md) | v0.2.0 contents and residuals |
 
 Architecture and design live under [`docs/`](docs/). Contributing:
 [`CONTRIBUTING.md`](CONTRIBUTING.md).
@@ -205,10 +205,9 @@ not pushed to a public registry.
 
 ## Status
 
-**v0.1.0** — first usable release. One suffix, one 389 DS, REST + UI + MCP,
-ephemeral and persistent compose. Dual-engine native mode is accepted in
-[ADR-0008](docs/adr/0008-dual-directory-engines.md) and implemented as
-milestone M9 in [`TASKS.md`](TASKS.md); it is not part of v0.1.0.
+**v0.2.0** — native engine (M9) as opt-in, dual-engine parity harness, and
+named account-workflow QA operations on REST and MCP. 389 DS remains the
+default. See [release notes](docs/release/notes.md).
 
 No project license file yet; treat it as source-available until one is added.
 

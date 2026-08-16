@@ -164,8 +164,11 @@ func TestPersistentUpgradeHasNoPriorAPIVersion(t *testing.T) {
 		}
 	}
 	notes := read(t, filepath.Join(root, "docs", "release", "notes.md"))
-	if !strings.Contains(notes, "no prior") && !strings.Contains(strings.ToLower(notes), "first packaged") {
-		t.Fatal("release notes must say this is the first packaged release")
+	if !strings.Contains(notes, "labldap.dev/v1alpha1") {
+		t.Fatal("release notes must record that apiVersion stays v1alpha1")
+	}
+	if strings.Contains(notes, "v1beta1") || strings.Contains(notes, "v1alpha2") {
+		t.Fatal("release notes introduced a new apiVersion without a dedicated migration")
 	}
 }
 
