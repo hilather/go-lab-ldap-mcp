@@ -267,6 +267,17 @@ func TestPasswordEnableDisableAndUserGroups(t *testing.T) {
 	if spr.Body.Len() != 0 {
 		t.Fatalf("password body %q", spr.Body.String())
 	}
+	mustPW := httptest.NewRequest(http.MethodPost, "/api/v1/users/carol/password", strings.NewReader(`{"password":"lab-new-password-99","revision":"`+created.Revision+`","mustChange":true}`))
+	mustPW.Header.Set("Authorization", "Bearer "+passwordOnlyToken)
+	mustPW.Header.Set("Content-Type", "application/json")
+	mpr := httptest.NewRecorder()
+	h.ServeHTTP(mpr, mustPW)
+	if mpr.Code != http.StatusNoContent {
+		t.Fatalf("set password mustChange %d %s", mpr.Code, mpr.Body.String())
+	}
+	if !users.mustChange[directory.UserID("carol")] {
+		t.Fatal("mustChange should stamp expire after set password")
+	}
 	assertNoSecret(t, spr.Body.String(), "lab-new-password-99", userPass)
 	if users.passwords[directory.UserID("carol")] != "lab-new-password-99" {
 		t.Fatalf("stored password %q", users.passwords[directory.UserID("carol")])
@@ -300,6 +311,42 @@ func TestPasswordEnableDisableAndUserGroups(t *testing.T) {
 	decodeOpenAPI(t, erec, &enabled)
 	if !enabled.Enabled {
 		t.Fatal("expected enabled")
+	}
+
+	exp := httptest.NewRequest(http.MethodPost, "/api/v1/users/carol/expire-password", nil)
+	exp.Header.Set("Authorization", "Bearer "+passwordOnlyToken)
+	exp.Header.Set("If-Match", erec.Header().Get("ETag"))
+	exprec := httptest.NewRecorder()
+	h.ServeHTTP(exprec, exp)
+	if exprec.Code != http.StatusOK {
+		t.Fatalf("expire %d %s", exprec.Code, exprec.Body.String())
+	}
+	var expired generated.AccountState
+	decodeOpenAPI(t, exprec, &expired)
+	if !expired.MustChange {
+		t.Fatalf("expire state %+v", expired)
+	}
+
+	lock := httptest.NewRequest(http.MethodPost, "/api/v1/users/carol/lock", nil)
+	lock.Header.Set("Authorization", "Bearer "+testToken)
+	lock.Header.Set("If-Match", erec.Header().Get("ETag"))
+	lockrec := httptest.NewRecorder()
+	h.ServeHTTP(lockrec, lock)
+	if lockrec.Code != http.StatusOK {
+		t.Fatalf("lock %d %s", lockrec.Code, lockrec.Body.String())
+	}
+	var locked generated.AccountState
+	decodeOpenAPI(t, lockrec, &locked)
+	if !locked.Locked {
+		t.Fatalf("lock state %+v", locked)
+	}
+
+	st := httptest.NewRequest(http.MethodGet, "/api/v1/users/carol/account-state", nil)
+	st.Header.Set("Authorization", "Bearer "+testToken)
+	strec := httptest.NewRecorder()
+	h.ServeHTTP(strec, st)
+	if strec.Code != http.StatusOK {
+		t.Fatalf("account-state %d %s", strec.Code, strec.Body.String())
 	}
 
 	noMatch := httptest.NewRequest(http.MethodPost, "/api/v1/users/carol/disable", nil)

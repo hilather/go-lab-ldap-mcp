@@ -4,19 +4,23 @@ import "strings"
 
 // Operational and managed attributes that operators may not set on users.
 var operationalDeny = map[string]struct{}{
-	"userpassword":         {},
-	"memberof":             {},
-	"modifiersname":        {},
-	"modifytimestamp":      {},
-	"entryuuid":            {},
-	"nsuniqueid":           {},
-	"createtimestamp":      {},
-	"creatorsname":         {},
-	"aci":                  {},
-	"pwdaccountlockedtime": {},
-	"nsaccountlock":        {},
-	"entrydn":              {},
-	"numsubordinates":      {},
+	"userpassword":           {},
+	"memberof":               {},
+	"modifiersname":          {},
+	"modifytimestamp":        {},
+	"entryuuid":              {},
+	"nsuniqueid":             {},
+	"createtimestamp":        {},
+	"creatorsname":           {},
+	"aci":                    {},
+	"pwdaccountlockedtime":   {},
+	"nsaccountlock":          {},
+	"pwdreset":               {},
+	"passwordexpirationtime": {},
+	"accountunlocktime":      {},
+	"passwordretrycount":     {},
+	"entrydn":                {},
+	"numsubordinates":        {},
 }
 
 func CanonicalAttr(name string) string {

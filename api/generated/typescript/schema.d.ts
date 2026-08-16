@@ -214,7 +214,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Set a user password */
+        /** Set a user password. Optional mustChange forces a reset on next bind. */
         post: operations["setUserPassword"];
         delete?: never;
         options?: never;
@@ -250,6 +250,91 @@ export interface paths {
         put?: never;
         /** Disable a user */
         post: operations["disableUser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/users/{id}/account-state": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read enable, lock, and must-change state */
+        get: operations["getUserAccountState"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/users/{id}/expire-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Force must-change on next successful bind-test */
+        post: operations["expireUserPassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/users/{id}/clear-password-expiry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Clear must-change without setting a new password */
+        post: operations["clearUserPasswordExpiry"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/users/{id}/lock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Administratively lock a user */
+        post: operations["lockUser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/users/{id}/unlock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Clear lockout stamps */
+        post: operations["unlockUser"];
         delete?: never;
         options?: never;
         head?: never;
@@ -645,6 +730,8 @@ export interface components {
             /** Format: password */
             password: string;
             revision: string;
+            /** @description After setting the password, force must-change on next bind. */
+            mustChange?: boolean;
         };
         BindTestBody: {
             identity: string;
@@ -655,7 +742,14 @@ export interface components {
         };
         BindTestResult: {
             /** @enum {string} */
-            outcome: "success" | "invalid_credentials" | "locked" | "disabled" | "unavailable";
+            outcome: "success" | "invalid_credentials" | "locked" | "disabled" | "must_change" | "unavailable";
+        };
+        AccountState: {
+            id: string;
+            enabled: boolean;
+            locked: boolean;
+            mustChange: boolean;
+            revision: string;
         };
         RootDSE: {
             namingContexts?: string[];
@@ -1361,6 +1455,164 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["User"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            412: components["responses"]["PreconditionFailed"];
+        };
+    };
+    getUserAccountState: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["UserID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Account workflow state */
+            200: {
+                headers: {
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountState"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    expireUserPassword: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Required for cookie-authenticated unsafe methods */
+                "X-CSRF-Token"?: components["parameters"]["CSRFToken"];
+                /** @description Quoted revision hex */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                id: components["parameters"]["UserID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Password marked must-change */
+            200: {
+                headers: {
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountState"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            412: components["responses"]["PreconditionFailed"];
+        };
+    };
+    clearUserPasswordExpiry: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Required for cookie-authenticated unsafe methods */
+                "X-CSRF-Token"?: components["parameters"]["CSRFToken"];
+                /** @description Quoted revision hex */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                id: components["parameters"]["UserID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Must-change cleared */
+            200: {
+                headers: {
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountState"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            412: components["responses"]["PreconditionFailed"];
+        };
+    };
+    lockUser: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Required for cookie-authenticated unsafe methods */
+                "X-CSRF-Token"?: components["parameters"]["CSRFToken"];
+                /** @description Quoted revision hex */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                id: components["parameters"]["UserID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Locked */
+            200: {
+                headers: {
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountState"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            412: components["responses"]["PreconditionFailed"];
+        };
+    };
+    unlockUser: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Required for cookie-authenticated unsafe methods */
+                "X-CSRF-Token"?: components["parameters"]["CSRFToken"];
+                /** @description Quoted revision hex */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                id: components["parameters"]["UserID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Unlocked */
+            200: {
+                headers: {
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountState"];
                 };
             };
             400: components["responses"]["BadRequest"];

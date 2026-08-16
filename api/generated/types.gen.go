@@ -33,6 +33,7 @@ const (
 	Disabled           BindTestResultOutcome = "disabled"
 	InvalidCredentials BindTestResultOutcome = "invalid_credentials"
 	Locked             BindTestResultOutcome = "locked"
+	MustChange         BindTestResultOutcome = "must_change"
 	Success            BindTestResultOutcome = "success"
 	Unavailable        BindTestResultOutcome = "unavailable"
 )
@@ -45,6 +46,8 @@ func (e BindTestResultOutcome) Valid() bool {
 	case InvalidCredentials:
 		return true
 	case Locked:
+		return true
+	case MustChange:
 		return true
 	case Success:
 		return true
@@ -191,6 +194,15 @@ func (e SessionViewKind) Valid() bool {
 	default:
 		return false
 	}
+}
+
+// AccountState defines model for AccountState.
+type AccountState struct {
+	Enabled    bool   `json:"enabled"`
+	Id         string `json:"id"`
+	Locked     bool   `json:"locked"`
+	MustChange bool   `json:"mustChange"`
+	Revision   string `json:"revision"`
 }
 
 // AttrKV defines model for AttrKV.
@@ -355,8 +367,10 @@ type ObjectClass struct {
 
 // PasswordBody defines model for PasswordBody.
 type PasswordBody struct {
-	Password string `json:"password"`
-	Revision string `json:"revision"`
+	// MustChange After setting the password, force must-change on next bind.
+	MustChange *bool  `json:"mustChange,omitempty"`
+	Password   string `json:"password"`
+	Revision   string `json:"revision"`
 }
 
 // PoolStats defines model for PoolStats.
@@ -670,6 +684,15 @@ type UpdateUserParams struct {
 	IfMatch IfMatch `json:"If-Match"`
 }
 
+// ClearUserPasswordExpiryParams defines parameters for ClearUserPasswordExpiry.
+type ClearUserPasswordExpiryParams struct {
+	// XCSRFToken Required for cookie-authenticated unsafe methods
+	XCSRFToken *CSRFToken `json:"X-CSRF-Token,omitempty"`
+
+	// IfMatch Quoted revision hex
+	IfMatch IfMatch `json:"If-Match"`
+}
+
 // DisableUserParams defines parameters for DisableUser.
 type DisableUserParams struct {
 	// XCSRFToken Required for cookie-authenticated unsafe methods
@@ -688,10 +711,37 @@ type EnableUserParams struct {
 	IfMatch IfMatch `json:"If-Match"`
 }
 
+// ExpireUserPasswordParams defines parameters for ExpireUserPassword.
+type ExpireUserPasswordParams struct {
+	// XCSRFToken Required for cookie-authenticated unsafe methods
+	XCSRFToken *CSRFToken `json:"X-CSRF-Token,omitempty"`
+
+	// IfMatch Quoted revision hex
+	IfMatch IfMatch `json:"If-Match"`
+}
+
+// LockUserParams defines parameters for LockUser.
+type LockUserParams struct {
+	// XCSRFToken Required for cookie-authenticated unsafe methods
+	XCSRFToken *CSRFToken `json:"X-CSRF-Token,omitempty"`
+
+	// IfMatch Quoted revision hex
+	IfMatch IfMatch `json:"If-Match"`
+}
+
 // SetUserPasswordParams defines parameters for SetUserPassword.
 type SetUserPasswordParams struct {
 	// XCSRFToken Required for cookie-authenticated unsafe methods
 	XCSRFToken *CSRFToken `json:"X-CSRF-Token,omitempty"`
+}
+
+// UnlockUserParams defines parameters for UnlockUser.
+type UnlockUserParams struct {
+	// XCSRFToken Required for cookie-authenticated unsafe methods
+	XCSRFToken *CSRFToken `json:"X-CSRF-Token,omitempty"`
+
+	// IfMatch Quoted revision hex
+	IfMatch IfMatch `json:"If-Match"`
 }
 
 // CreateAuthTestJSONRequestBody defines body for CreateAuthTest for application/json ContentType.

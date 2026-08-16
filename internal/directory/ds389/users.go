@@ -268,7 +268,7 @@ func (r *Runtime) Delete(ctx context.Context, id directory.UserID, rev directory
 	})
 }
 
-func (r *Runtime) SetPassword(ctx context.Context, id directory.UserID, password observability.Secret, rev directory.Revision) error {
+func (r *Runtime) SetPassword(ctx context.Context, id directory.UserID, password observability.Secret, rev directory.Revision, mustChange bool) error {
 	dn, err := r.userDN(string(id))
 	if err != nil {
 		return err
@@ -281,7 +281,7 @@ func (r *Runtime) SetPassword(ctx context.Context, id directory.UserID, password
 	}
 	size, seconds := r.searchLimits()
 	err = r.pool.Do(ctx, func(c *ldapclient.Conn) error {
-		live, e := searchBaseConn(ctx, c, dn, runtimeUserReadAttrs(), size, seconds)
+		live, e := searchBaseConn(ctx, c, dn, accountStateReadAttrs(), size, seconds)
 		if e != nil {
 			return e
 		}
@@ -293,7 +293,25 @@ func (r *Runtime) SetPassword(ctx context.Context, id directory.UserID, password
 			controls = append(controls, ctl)
 		}
 		r.afterSearch(ctx, dn)
-		return replaceUserPassword(ctx, c, dn, password, controls...)
+		if e := replaceUserPassword(ctx, c, dn, password, controls...); e != nil {
+			return e
+		}
+		stamps := ldap.NewModifyRequest(dn, nil)
+		if mustChange {
+			stamps.Replace(attrPwdReset, []string{pwdResetTrue})
+			stamps.Replace(attrPasswordExpirationTime, []string{passwordExpiredGeneralized})
+		} else {
+			if hasAttr(live, attrPwdReset) {
+				stamps.Delete(attrPwdReset, nil)
+			}
+			if hasAttr(live, attrPasswordExpirationTime) {
+				stamps.Delete(attrPasswordExpirationTime, nil)
+			}
+		}
+		if len(stamps.Changes) == 0 {
+			return nil
+		}
+		return applyAccountChanges(ctx, c, dn, stamps)
 	})
 	return redactSecrets(err, password)
 }

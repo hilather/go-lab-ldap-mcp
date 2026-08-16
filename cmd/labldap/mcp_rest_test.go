@@ -63,8 +63,23 @@ func (m *memUsers) SetEnabled(context.Context, directory.UserID, bool, directory
 func (m *memUsers) Delete(context.Context, directory.UserID, directory.Revision) error {
 	return nil
 }
-func (m *memUsers) SetPassword(context.Context, directory.UserID, observability.Secret, directory.Revision) error {
+func (m *memUsers) SetPassword(context.Context, directory.UserID, observability.Secret, directory.Revision, bool) error {
 	return nil
+}
+func (m *memUsers) AccountState(context.Context, directory.UserID) (directory.AccountState, error) {
+	return directory.AccountState{}, directory.Error("entry", directory.FieldNotFound, "unused")
+}
+func (m *memUsers) ExpirePassword(context.Context, directory.UserID, directory.Revision) (directory.AccountState, error) {
+	return directory.AccountState{}, directory.Error("entry", directory.FieldNotFound, "unused")
+}
+func (m *memUsers) ClearPasswordExpiry(context.Context, directory.UserID, directory.Revision) (directory.AccountState, error) {
+	return directory.AccountState{}, directory.Error("entry", directory.FieldNotFound, "unused")
+}
+func (m *memUsers) Lock(context.Context, directory.UserID, directory.Revision) (directory.AccountState, error) {
+	return directory.AccountState{}, directory.Error("entry", directory.FieldNotFound, "unused")
+}
+func (m *memUsers) Unlock(context.Context, directory.UserID, directory.Revision) (directory.AccountState, error) {
+	return directory.AccountState{}, directory.Error("entry", directory.FieldNotFound, "unused")
 }
 
 func TestMCPCreateVisibleOnREST(t *testing.T) {

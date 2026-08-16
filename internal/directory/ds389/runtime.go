@@ -306,7 +306,9 @@ func skipReturnedAttr(name string) bool {
 		"nsmultiplexorbindcred", "nsmultiplexorcredentials",
 		"entrycsn", "modifytimestamp", "entryuuid", "nsuniqueid",
 		"createtimestamp", "creatorsname", "modifiersname",
-		"entrydn", "numsubordinates":
+		"entrydn", "numsubordinates",
+		"pwdreset", "passwordexpirationtime", "pwdaccountlockedtime",
+		"accountunlocktime", "passwordretrycount":
 		return true
 	default:
 		return false

@@ -57,10 +57,10 @@ func TestEveryOperationCoverage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := svc.Users.SetPassword(ctx, w, "alice", observability.Secret(unitPass+"x"), u.Revision); err != nil {
+	if err := svc.Users.SetPassword(ctx, w, "alice", observability.Secret(unitPass+"x"), u.Revision, false); err != nil {
 		t.Fatal(err)
 	}
-	if err := svc.Users.SetPassword(ctx, w, "alice", observability.Secret(""), u.Revision); err == nil {
+	if err := svc.Users.SetPassword(ctx, w, "alice", observability.Secret(""), u.Revision, false); err == nil {
 		t.Fatal("password validation")
 	}
 

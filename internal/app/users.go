@@ -143,7 +143,7 @@ func (s *Users) SetEnabled(ctx context.Context, p Principal, id directory.UserID
 	return u, nil
 }
 
-func (s *Users) SetPassword(ctx context.Context, p Principal, id directory.UserID, pw observability.Secret, rev directory.Revision) error {
+func (s *Users) SetPassword(ctx context.Context, p Principal, id directory.UserID, pw observability.Secret, rev directory.Revision, mustChange bool) error {
 	if err := s.hooks.authorize(ctx, p, OpUserPassword); err != nil {
 		return err
 	}
@@ -165,13 +165,61 @@ func (s *Users) SetPassword(ctx context.Context, p Principal, id directory.UserI
 			Path: "password", Code: "required", Message: "password is required",
 		})
 	}
-	err := s.repo.SetPassword(ctx, id, pw, rev)
+	err := s.repo.SetPassword(ctx, id, pw, rev, mustChange)
 	if err != nil {
 		s.hooks.record(ctx, p, OpUserPassword.Name, string(id), AuditFailure, string(rev), "")
 		return err
 	}
 	s.hooks.record(ctx, p, OpUserPassword.Name, string(id), AuditSuccess, string(rev), "")
 	return nil
+}
+
+func (s *Users) AccountState(ctx context.Context, p Principal, id directory.UserID) (directory.AccountState, error) {
+	if err := s.hooks.authorize(ctx, p, OpUserAccountState); err != nil {
+		return directory.AccountState{}, err
+	}
+	if err := s.hooks.allowRead(ctx); err != nil {
+		return directory.AccountState{}, err
+	}
+	return s.repo.AccountState(ctx, id)
+}
+
+func (s *Users) ExpirePassword(ctx context.Context, p Principal, id directory.UserID, rev directory.Revision) (directory.AccountState, error) {
+	return s.mutateAccount(ctx, p, OpUserExpirePassword, id, rev, s.repo.ExpirePassword)
+}
+
+func (s *Users) ClearPasswordExpiry(ctx context.Context, p Principal, id directory.UserID, rev directory.Revision) (directory.AccountState, error) {
+	return s.mutateAccount(ctx, p, OpUserClearExpiry, id, rev, s.repo.ClearPasswordExpiry)
+}
+
+func (s *Users) Lock(ctx context.Context, p Principal, id directory.UserID, rev directory.Revision) (directory.AccountState, error) {
+	return s.mutateAccount(ctx, p, OpUserLock, id, rev, s.repo.Lock)
+}
+
+func (s *Users) Unlock(ctx context.Context, p Principal, id directory.UserID, rev directory.Revision) (directory.AccountState, error) {
+	return s.mutateAccount(ctx, p, OpUserUnlock, id, rev, s.repo.Unlock)
+}
+
+func (s *Users) mutateAccount(ctx context.Context, p Principal, op Operation, id directory.UserID, rev directory.Revision, fn func(context.Context, directory.UserID, directory.Revision) (directory.AccountState, error)) (directory.AccountState, error) {
+	if err := s.hooks.authorize(ctx, p, op); err != nil {
+		return directory.AccountState{}, err
+	}
+	if err := s.hooks.allowWrite(ctx); err != nil {
+		return directory.AccountState{}, err
+	}
+	unlock := s.hooks.lock(userLockKey(string(id)))
+	defer unlock()
+	if err := requireRevision(rev); err != nil {
+		s.hooks.record(ctx, p, op.Name, string(id), AuditFailure, string(rev), "")
+		return directory.AccountState{}, err
+	}
+	st, err := fn(ctx, id, rev)
+	if err != nil {
+		s.hooks.record(ctx, p, op.Name, string(id), AuditFailure, string(rev), "")
+		return directory.AccountState{}, err
+	}
+	s.hooks.record(ctx, p, op.Name, string(id), AuditSuccess, string(rev), string(st.Revision))
+	return st, nil
 }
 
 func validateCreateUser(spec CreateUser) error {

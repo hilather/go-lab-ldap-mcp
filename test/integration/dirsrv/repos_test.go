@@ -167,7 +167,7 @@ func testRuntimeUsers(t *testing.T, env *runtimeEnv) {
 	}
 
 	nextPW := "repo-user-pass-99"
-	if err := users.SetPassword(t.Context(), "alice", observability.Secret(nextPW), enabled.Revision); err != nil {
+	if err := users.SetPassword(t.Context(), "alice", observability.Secret(nextPW), enabled.Revision, false); err != nil {
 		t.Fatalf("set password: %v", err)
 	}
 	if err := userBind(t, env.inst, enabled.DN, nextPW); err != nil {
@@ -190,7 +190,7 @@ func testRuntimeUsers(t *testing.T, env *runtimeEnv) {
 	if _, err := users.SetEnabled(t.Context(), "rt", false, ""); err == nil || fieldCode(err) != directory.FieldForbidden {
 		t.Fatalf("disable runtime: %v", err)
 	}
-	if err := users.SetPassword(t.Context(), "rt", observability.Secret("repo-runtime-pass-12"), ""); err == nil || fieldCode(err) != directory.FieldForbidden {
+	if err := users.SetPassword(t.Context(), "rt", observability.Secret("repo-runtime-pass-12"), "", false); err == nil || fieldCode(err) != directory.FieldForbidden {
 		t.Fatalf("rotate runtime: %v", err)
 	}
 

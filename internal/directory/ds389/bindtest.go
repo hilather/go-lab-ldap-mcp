@@ -13,7 +13,7 @@ import (
 func (r *Runtime) BindTest(ctx context.Context, identity string, password observability.Secret, transport directory.Transport) (directory.BindTestResult, error) {
 	// Identity is resolved on the pooled runtime session; the bind itself
 	// always uses a disposable connection that is never returned to the pool.
-	dn, found, disabled, locked, err := r.lookupBindIdentity(ctx, identity)
+	dn, found, disabled, locked, mustChange, err := r.lookupBindIdentity(ctx, identity)
 	if err != nil {
 		return directory.BindTestResult{Outcome: directory.BindOutcomeUnavailable}, redactSecrets(err, password)
 	}
@@ -38,34 +38,34 @@ func (r *Runtime) BindTest(ctx context.Context, identity string, password observ
 	}
 
 	bindErr := conn.Bind(ctx, dn, password)
-	outcome := bindOutcome(found, disabled, locked, bindErr)
+	outcome := bindOutcome(found, disabled, locked, mustChange, bindErr)
 	if bindErr != nil && outcome == directory.BindOutcomeUnavailable {
 		return directory.BindTestResult{Outcome: outcome}, redactSecrets(bindErr, password)
 	}
 	return directory.BindTestResult{Outcome: outcome}, nil
 }
 
-func (r *Runtime) lookupBindIdentity(ctx context.Context, identity string) (dn string, found, disabled, locked bool, err error) {
+func (r *Runtime) lookupBindIdentity(ctx context.Context, identity string) (dn string, found, disabled, locked, mustChange bool, err error) {
 	identity = strings.TrimSpace(identity)
 	if identity == "" {
-		return "", false, false, false, nil
+		return "", false, false, false, false, nil
 	}
 	size, seconds := r.searchLimits()
 	var target string
 	if strings.Contains(identity, "=") {
 		parsed, perr := config.ParseDN(identity)
 		if perr != nil || !r.underPeople(parsed.String()) {
-			return "", false, false, false, nil
+			return "", false, false, false, false, nil
 		}
 		target = parsed.String()
 	} else {
 		target, err = r.userDN(identity)
 		if err != nil {
-			return "", false, false, false, nil
+			return "", false, false, false, false, nil
 		}
 	}
 	err = r.pool.Do(ctx, func(c *ldapclient.Conn) error {
-		ent, e := searchBaseConn(ctx, c, target, []string{"uid", "nsAccountLock", "pwdAccountLockedTime"}, size, seconds)
+		ent, e := searchBaseConn(ctx, c, target, accountStateReadAttrs(), size, seconds)
 		if e != nil {
 			if fieldOf(e) == directory.FieldNotFound {
 				return nil
@@ -75,10 +75,11 @@ func (r *Runtime) lookupBindIdentity(ctx context.Context, identity string) (dn s
 		found = true
 		dn = ent.DN
 		disabled = accountLocked(ent)
-		locked = len(ent.GetAttributeValues("pwdAccountLockedTime")) > 0
+		locked = accountLockStamped(ent)
+		mustChange = accountMustChange(ent)
 		return nil
 	})
-	return dn, found, disabled, locked, err
+	return dn, found, disabled, locked, mustChange, err
 }
 
 func (r *Runtime) dialBindTest(ctx context.Context, transport directory.Transport) (*ldapclient.Conn, error) {
@@ -105,12 +106,18 @@ func accountInactivated(err error) bool {
 	return strings.Contains(msg, "inactivated") || strings.Contains(msg, "account disabled")
 }
 
-func bindOutcome(found, disabled, locked bool, bindErr error) string {
+func bindOutcome(found, disabled, locked, mustChange bool, bindErr error) string {
 	if bindErr == nil {
+		if mustChange {
+			return directory.BindOutcomeMustChange
+		}
 		return directory.BindOutcomeSuccess
 	}
 	if disabled || accountInactivated(bindErr) {
 		return directory.BindOutcomeDisabled
+	}
+	if passwordMustChangeDiag(bindErr) {
+		return directory.BindOutcomeMustChange
 	}
 	code := fieldOf(bindErr)
 	switch code {
@@ -131,6 +138,9 @@ func bindOutcome(found, disabled, locked bool, bindErr error) string {
 		if locked {
 			return directory.BindOutcomeLocked
 		}
+		if mustChange {
+			return directory.BindOutcomeMustChange
+		}
 		return directory.BindOutcomeInvalidCredentials
 	}
 	if disabled {
@@ -140,4 +150,12 @@ func bindOutcome(found, disabled, locked bool, bindErr error) string {
 		return directory.BindOutcomeLocked
 	}
 	return directory.BindOutcomeInvalidCredentials
+}
+
+func passwordMustChangeDiag(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "password expired") || strings.Contains(msg, "must be reset") || strings.Contains(msg, "must change")
 }

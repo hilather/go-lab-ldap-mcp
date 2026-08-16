@@ -100,6 +100,7 @@ func addAlice(t *testing.T, cl *ldapTestClient, password string) Result {
 		Attributes: []Attribute{
 			StringAttribute("objectClass", "top", "person"),
 			StringAttribute("uid", "alice"),
+			StringAttribute("cn", "Alice Adams"),
 			StringAttribute("sn", "Adams"),
 			StringAttribute("userPassword", password),
 		},
@@ -363,6 +364,162 @@ func TestPolicyMaxAgeWithFakeClock(t *testing.T) {
 	}
 	if res := bindResult(t, cl, alice, "alice-new-password"); res.Code != ResultSuccess {
 		t.Fatalf("bind after reset = %v", res)
+	}
+}
+
+func TestPolicyPwdResetMustChange(t *testing.T) {
+	t.Parallel()
+	s, addr := serveTestServerFrom(t, policyOptions(t, newTestNow(), nil), nil)
+	cl := dialTestClient(t, addr)
+	bindDM(t, cl)
+	if res := addAlice(t, cl, "alice-fixture-password"); res.Code != ResultSuccess {
+		t.Fatalf("add: %v", res)
+	}
+	const alice = "uid=alice,ou=people,dc=example,dc=test"
+	id := cl.send(&ModifyRequest{
+		DN: alice,
+		Changes: []ModifyChange{{
+			Op:   ModifyReplace,
+			Attr: Attribute{Name: "pwdReset", Values: [][]byte{[]byte("TRUE")}},
+		}},
+	})
+	m := cl.recv()
+	if m.ID != id {
+		t.Fatalf("response id = %d, want %d", m.ID, id)
+	}
+	if res, ok := m.Op.(*ModifyResponse); !ok || res.Result.Code != ResultSuccess {
+		t.Fatalf("pwdReset modify = %v", m.Op)
+	}
+	res := bindResult(t, cl, alice, "alice-fixture-password")
+	if res.Code != ResultInvalidCredentials {
+		t.Fatalf("must-change bind = %v", res)
+	}
+	if !strings.Contains(strings.ToLower(res.DiagnosticMessage), "expired") {
+		t.Fatalf("must-change diagnostic = %q", res.DiagnosticMessage)
+	}
+	bindDM(t, cl)
+	if res := setAlicePassword(t, cl, "alice-new-password"); res.Code != ResultSuccess {
+		t.Fatalf("reset = %v", res)
+	}
+	if res := bindResult(t, cl, alice, "alice-new-password"); res.Code != ResultSuccess {
+		t.Fatalf("bind after password set = %v", res)
+	}
+	if entry := readAlice(t, s); pwdResetTrue(entry) {
+		t.Fatal("pwdReset survived administrative password replace")
+	}
+}
+
+func TestPolicyPasswordExpirationTimeMustChange(t *testing.T) {
+	t.Parallel()
+	s, addr := serveTestServerFrom(t, policyOptions(t, newTestNow(), nil), nil)
+	cl := dialTestClient(t, addr)
+	bindDM(t, cl)
+	if res := addAlice(t, cl, "alice-fixture-password"); res.Code != ResultSuccess {
+		t.Fatalf("add: %v", res)
+	}
+	const alice = "uid=alice,ou=people,dc=example,dc=test"
+	id := cl.send(&ModifyRequest{
+		DN: alice,
+		Changes: []ModifyChange{{
+			Op:   ModifyReplace,
+			Attr: Attribute{Name: "passwordExpirationTime", Values: [][]byte{[]byte("19700101000000Z")}},
+		}},
+	})
+	m := cl.recv()
+	if m.ID != id {
+		t.Fatalf("response id = %d, want %d", m.ID, id)
+	}
+	if res, ok := m.Op.(*ModifyResponse); !ok || res.Result.Code != ResultSuccess {
+		t.Fatalf("passwordExpirationTime modify = %v", m.Op)
+	}
+	res := bindResult(t, cl, alice, "alice-fixture-password")
+	if res.Code != ResultInvalidCredentials {
+		t.Fatalf("expired bind = %v", res)
+	}
+	if !strings.Contains(strings.ToLower(res.DiagnosticMessage), "expired") {
+		t.Fatalf("expired diagnostic = %q", res.DiagnosticMessage)
+	}
+	bindDM(t, cl)
+	if res := setAlicePassword(t, cl, "alice-new-password"); res.Code != ResultSuccess {
+		t.Fatalf("reset = %v", res)
+	}
+	if res := bindResult(t, cl, alice, "alice-new-password"); res.Code != ResultSuccess {
+		t.Fatalf("bind after password set = %v", res)
+	}
+	if entry := readAlice(t, s); len(entry.Values("passwordExpirationTime")) > 0 {
+		t.Fatal("passwordExpirationTime survived administrative password replace")
+	}
+}
+
+func TestStandardSchemaAllowsAccountWorkflowWrites(t *testing.T) {
+	t.Parallel()
+	schema, err := StandardSchema()
+	if err != nil {
+		t.Fatal(err)
+	}
+	opts := policyOptions(t, newTestNow(), nil)
+	opts.Schema = schema
+	opts.ACI = &FakeACI{Decide: func(context.Context, ReadTx, ACICheck) (bool, error) {
+		return true, nil
+	}}
+	_, addr := serveTestServerFrom(t, opts, nil)
+	cl := dialTestClient(t, addr)
+	bindDM(t, cl)
+	if res := addAlice(t, cl, "alice-fixture-password"); res.Code != ResultSuccess {
+		t.Fatalf("add: %v", res)
+	}
+	const alice = "uid=alice,ou=people,dc=example,dc=test"
+	if res := bindResult(t, cl, alice, "alice-fixture-password"); res.Code != ResultSuccess {
+		t.Fatalf("alice bind: %v", res)
+	}
+	id := cl.send(&ModifyRequest{
+		DN: alice,
+		Changes: []ModifyChange{{
+			Op:   ModifyReplace,
+			Attr: Attribute{Name: "pwdReset", Values: [][]byte{[]byte("TRUE")}},
+		}},
+	})
+	m := cl.recv()
+	if m.ID != id {
+		t.Fatalf("response id = %d, want %d", m.ID, id)
+	}
+	res, ok := m.Op.(*ModifyResponse)
+	if !ok || res.Result.Code != ResultSuccess {
+		t.Fatalf("non-DM StandardSchema pwdReset write = %v", m.Op)
+	}
+}
+
+func TestAdminUnlockTimeSurvivesPolicyWindow(t *testing.T) {
+	t.Parallel()
+	clock := newTestNow()
+	opts := policyOptions(t, clock, func(p *PasswordPolicy) {
+		p.MaxFailures = 3
+		p.LockoutDuration = time.Minute
+	})
+	_, addr := serveTestServerFrom(t, opts, nil)
+	cl := dialTestClient(t, addr)
+	bindDM(t, cl)
+	if res := addAlice(t, cl, "alice-fixture-password"); res.Code != ResultSuccess {
+		t.Fatalf("add: %v", res)
+	}
+	const alice = "uid=alice,ou=people,dc=example,dc=test"
+	id := cl.send(&ModifyRequest{
+		DN: alice,
+		Changes: []ModifyChange{{
+			Op:   ModifyReplace,
+			Attr: Attribute{Name: "accountUnlockTime", Values: [][]byte{[]byte("20380119031407Z")}},
+		}},
+	})
+	m := cl.recv()
+	if m.ID != id {
+		t.Fatalf("response id = %d, want %d", m.ID, id)
+	}
+	if res, ok := m.Op.(*ModifyResponse); !ok || res.Result.Code != ResultSuccess {
+		t.Fatalf("accountUnlockTime modify = %v", m.Op)
+	}
+	clock.Advance(2 * time.Minute)
+	if res := bindResult(t, cl, alice, "alice-fixture-password"); res.Code != ResultInvalidCredentials {
+		t.Fatalf("admin lock after policy window = %v", res)
 	}
 }
 

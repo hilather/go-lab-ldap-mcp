@@ -519,6 +519,13 @@ Create user → `201` + `Location: /api/v1/users/{id}` + `ETag`. Empty group →
 | `ldap_update_user` | proposed | T-089 | if mutations | `directory:write` |
 | `ldap_delete_user` | proposed | T-089 | if mutations | `directory:write` |
 | `ldap_set_password` | proposed | T-089 | if `registerPassword` | `directory:password` |
+| `ldap_get_account_state` | proposed | T-089 | yes | `directory:read` |
+| `ldap_expire_password` | proposed | T-089 | if `registerPassword` | `directory:password` |
+| `ldap_clear_password_expiry` | proposed | T-089 | if `registerPassword` | `directory:password` |
+| `ldap_lock_user` | proposed | T-089 | if mutations | `directory:write` |
+| `ldap_unlock_user` | proposed | T-089 | if mutations | `directory:write` |
+| `ldap_enable_user` | proposed | T-089 | if mutations | `directory:write` |
+| `ldap_disable_user` | proposed | T-089 | if mutations | `directory:write` |
 | `ldap_create_group` | proposed | T-090 | if mutations | `directory:write` |
 | `ldap_delete_group` | proposed | T-090 | if mutations | `directory:write` |
 | `ldap_add_members` | proposed | T-090 | if mutations | `directory:write` |

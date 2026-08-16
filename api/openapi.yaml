@@ -429,7 +429,7 @@ paths:
     post:
       operationId: setUserPassword
       tags: [Users]
-      summary: Set a user password
+      summary: Set a user password. Optional mustChange forces a reset on next bind.
       x-labldap-contract: proposed
       x-required-scope: directory:password
       security:
@@ -522,6 +522,175 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "412":
+          $ref: "#/components/responses/PreconditionFailed"
+  /api/v1/users/{id}/account-state:
+    get:
+      operationId: getUserAccountState
+      tags: [Users]
+      summary: Read enable, lock, and must-change state
+      x-labldap-contract: proposed
+      x-required-scope: directory:read
+      security:
+        - bearerAuth: [directory:read]
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/UserID"
+      responses:
+        "200":
+          description: Account workflow state
+          headers:
+            ETag:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountState"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /api/v1/users/{id}/expire-password:
+    post:
+      operationId: expireUserPassword
+      tags: [Users]
+      summary: Force must-change on next successful bind-test
+      x-labldap-contract: proposed
+      x-required-scope: directory:password
+      security:
+        - bearerAuth: [directory:password]
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/UserID"
+        - $ref: "#/components/parameters/CSRFToken"
+        - $ref: "#/components/parameters/IfMatch"
+      responses:
+        "200":
+          description: Password marked must-change
+          headers:
+            ETag:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountState"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "412":
+          $ref: "#/components/responses/PreconditionFailed"
+  /api/v1/users/{id}/clear-password-expiry:
+    post:
+      operationId: clearUserPasswordExpiry
+      tags: [Users]
+      summary: Clear must-change without setting a new password
+      x-labldap-contract: proposed
+      x-required-scope: directory:password
+      security:
+        - bearerAuth: [directory:password]
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/UserID"
+        - $ref: "#/components/parameters/CSRFToken"
+        - $ref: "#/components/parameters/IfMatch"
+      responses:
+        "200":
+          description: Must-change cleared
+          headers:
+            ETag:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountState"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "412":
+          $ref: "#/components/responses/PreconditionFailed"
+  /api/v1/users/{id}/lock:
+    post:
+      operationId: lockUser
+      tags: [Users]
+      summary: Administratively lock a user
+      x-labldap-contract: proposed
+      x-required-scope: directory:write
+      security:
+        - bearerAuth: [directory:write]
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/UserID"
+        - $ref: "#/components/parameters/CSRFToken"
+        - $ref: "#/components/parameters/IfMatch"
+      responses:
+        "200":
+          description: Locked
+          headers:
+            ETag:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountState"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "412":
+          $ref: "#/components/responses/PreconditionFailed"
+  /api/v1/users/{id}/unlock:
+    post:
+      operationId: unlockUser
+      tags: [Users]
+      summary: Clear lockout stamps
+      x-labldap-contract: proposed
+      x-required-scope: directory:write
+      security:
+        - bearerAuth: [directory:write]
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/UserID"
+        - $ref: "#/components/parameters/CSRFToken"
+        - $ref: "#/components/parameters/IfMatch"
+      responses:
+        "200":
+          description: Unlocked
+          headers:
+            ETag:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountState"
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -1558,6 +1727,9 @@ components:
           format: password
         revision:
           type: string
+        mustChange:
+          type: boolean
+          description: After setting the password, force must-change on next bind.
     BindTestBody:
       type: object
       additionalProperties: false
@@ -1578,7 +1750,22 @@ components:
       properties:
         outcome:
           type: string
-          enum: [success, invalid_credentials, locked, disabled, unavailable]
+          enum: [success, invalid_credentials, locked, disabled, must_change, unavailable]
+    AccountState:
+      type: object
+      additionalProperties: false
+      required: [id, enabled, locked, mustChange, revision]
+      properties:
+        id:
+          type: string
+        enabled:
+          type: boolean
+        locked:
+          type: boolean
+        mustChange:
+          type: boolean
+        revision:
+          type: string
     RootDSE:
       type: object
       additionalProperties: false

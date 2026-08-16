@@ -30,8 +30,23 @@ func (stubDirectory) SetEnabled(context.Context, directory.UserID, bool, directo
 func (stubDirectory) Delete(context.Context, directory.UserID, directory.Revision) error {
 	return nil
 }
-func (stubDirectory) SetPassword(context.Context, directory.UserID, observability.Secret, directory.Revision) error {
+func (stubDirectory) SetPassword(context.Context, directory.UserID, observability.Secret, directory.Revision, bool) error {
 	return nil
+}
+func (stubDirectory) AccountState(context.Context, directory.UserID) (directory.AccountState, error) {
+	return directory.AccountState{}, nil
+}
+func (stubDirectory) ExpirePassword(context.Context, directory.UserID, directory.Revision) (directory.AccountState, error) {
+	return directory.AccountState{}, nil
+}
+func (stubDirectory) ClearPasswordExpiry(context.Context, directory.UserID, directory.Revision) (directory.AccountState, error) {
+	return directory.AccountState{}, nil
+}
+func (stubDirectory) Lock(context.Context, directory.UserID, directory.Revision) (directory.AccountState, error) {
+	return directory.AccountState{}, nil
+}
+func (stubDirectory) Unlock(context.Context, directory.UserID, directory.Revision) (directory.AccountState, error) {
+	return directory.AccountState{}, nil
 }
 
 type stubGroups struct{}

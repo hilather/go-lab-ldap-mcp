@@ -49,7 +49,7 @@ func TestStandardSchemaContents(t *testing.T) {
 	for _, name := range []string{
 		"objectClass", "cn", "sn", "ou", "dc", "uid", "description",
 		"member", "uniqueMember", "memberOf", "userPassword",
-		"nsAccountLock", "pwdAccountLockedTime", "aci",
+		"nsAccountLock", "pwdAccountLockedTime", "pwdReset", "passwordExpirationTime", "accountUnlockTime", "aci",
 		"createTimestamp", "modifyTimestamp", "modifiersName", "entryUUID",
 		"namingContexts", "subschemaSubentry", "supportedControl",
 		"supportedExtension", "supportedLDAPVersion", "vendorName", "vendorVersion",

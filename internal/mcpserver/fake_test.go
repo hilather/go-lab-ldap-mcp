@@ -13,13 +13,18 @@ import (
 )
 
 type fakeUsers struct {
-	mu        sync.Mutex
-	byID      map[directory.UserID]directory.User
-	passwords map[directory.UserID]string
+	mu         sync.Mutex
+	byID       map[directory.UserID]directory.User
+	passwords  map[directory.UserID]string
+	mustChange map[directory.UserID]bool
+	locked     map[directory.UserID]bool
 }
 
 func newFakeUsers() *fakeUsers {
-	return &fakeUsers{byID: map[directory.UserID]directory.User{}, passwords: map[directory.UserID]string{}}
+	return &fakeUsers{
+		byID: map[directory.UserID]directory.User{}, passwords: map[directory.UserID]string{},
+		mustChange: map[directory.UserID]bool{}, locked: map[directory.UserID]bool{},
+	}
 }
 
 func (f *fakeUsers) put(u directory.User) directory.User {
@@ -134,7 +139,7 @@ func (f *fakeUsers) Delete(_ context.Context, id directory.UserID, rev directory
 	return nil
 }
 
-func (f *fakeUsers) SetPassword(_ context.Context, id directory.UserID, password observability.Secret, rev directory.Revision) error {
+func (f *fakeUsers) SetPassword(_ context.Context, id directory.UserID, password observability.Secret, rev directory.Revision, mustChange bool) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	u, ok := f.byID[id]
@@ -145,7 +150,77 @@ func (f *fakeUsers) SetPassword(_ context.Context, id directory.UserID, password
 		return directory.Error("revision", directory.FieldConflict, "directory entry revision does not match")
 	}
 	f.passwords[id] = password.Reveal()
+	if mustChange {
+		f.mustChange[id] = true
+	} else {
+		delete(f.mustChange, id)
+	}
 	return nil
+}
+
+func (f *fakeUsers) accountOf(id directory.UserID) (directory.AccountState, error) {
+	u, ok := f.byID[id]
+	if !ok {
+		return directory.AccountState{}, directory.Error("entry", directory.FieldNotFound, "directory entry not found")
+	}
+	return directory.AccountState{ID: u.ID, Enabled: u.Enabled, Locked: f.locked[id], MustChange: f.mustChange[id], Revision: u.Revision}, nil
+}
+
+func (f *fakeUsers) AccountState(_ context.Context, id directory.UserID) (directory.AccountState, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.accountOf(id)
+}
+
+func (f *fakeUsers) ExpirePassword(_ context.Context, id directory.UserID, rev directory.Revision) (directory.AccountState, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if _, err := f.match(id, rev); err != nil {
+		return directory.AccountState{}, err
+	}
+	f.mustChange[id] = true
+	return f.accountOf(id)
+}
+
+func (f *fakeUsers) ClearPasswordExpiry(_ context.Context, id directory.UserID, rev directory.Revision) (directory.AccountState, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if _, err := f.match(id, rev); err != nil {
+		return directory.AccountState{}, err
+	}
+	delete(f.mustChange, id)
+	return f.accountOf(id)
+}
+
+func (f *fakeUsers) Lock(_ context.Context, id directory.UserID, rev directory.Revision) (directory.AccountState, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if _, err := f.match(id, rev); err != nil {
+		return directory.AccountState{}, err
+	}
+	f.locked[id] = true
+	return f.accountOf(id)
+}
+
+func (f *fakeUsers) Unlock(_ context.Context, id directory.UserID, rev directory.Revision) (directory.AccountState, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if _, err := f.match(id, rev); err != nil {
+		return directory.AccountState{}, err
+	}
+	delete(f.locked, id)
+	return f.accountOf(id)
+}
+
+func (f *fakeUsers) match(id directory.UserID, rev directory.Revision) (directory.User, error) {
+	u, ok := f.byID[id]
+	if !ok {
+		return directory.User{}, directory.Error("entry", directory.FieldNotFound, "directory entry not found")
+	}
+	if rev != "" && u.Revision != rev {
+		return directory.User{}, directory.Error("revision", directory.FieldConflict, "directory entry revision does not match")
+	}
+	return u, nil
 }
 
 type fakeGroups struct {

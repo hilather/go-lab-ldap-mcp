@@ -192,6 +192,11 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/users/{id}/password", s.handleSetUserPassword)
 	mux.HandleFunc("POST /api/v1/users/{id}/enable", s.handleEnableUser)
 	mux.HandleFunc("POST /api/v1/users/{id}/disable", s.handleDisableUser)
+	mux.HandleFunc("GET /api/v1/users/{id}/account-state", s.handleGetAccountState)
+	mux.HandleFunc("POST /api/v1/users/{id}/expire-password", s.handleExpirePassword)
+	mux.HandleFunc("POST /api/v1/users/{id}/clear-password-expiry", s.handleClearPasswordExpiry)
+	mux.HandleFunc("POST /api/v1/users/{id}/lock", s.handleLockUser)
+	mux.HandleFunc("POST /api/v1/users/{id}/unlock", s.handleUnlockUser)
 	mux.HandleFunc("GET /api/v1/users/{id}/groups", s.handleListUserGroups)
 
 	// No PATCH /api/v1/groups/{id} in v1 — membership writes are the update path.

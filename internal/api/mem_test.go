@@ -13,13 +13,18 @@ import (
 // repository contracts; handlers still go through internal/app.
 
 type memUsers struct {
-	mu        sync.Mutex
-	byID      map[directory.UserID]directory.User
-	passwords map[directory.UserID]string
+	mu         sync.Mutex
+	byID       map[directory.UserID]directory.User
+	passwords  map[directory.UserID]string
+	mustChange map[directory.UserID]bool
+	locked     map[directory.UserID]bool
 }
 
 func newMemUsers() *memUsers {
-	return &memUsers{byID: map[directory.UserID]directory.User{}, passwords: map[directory.UserID]string{}}
+	return &memUsers{
+		byID: map[directory.UserID]directory.User{}, passwords: map[directory.UserID]string{},
+		mustChange: map[directory.UserID]bool{}, locked: map[directory.UserID]bool{},
+	}
 }
 
 func (m *memUsers) put(u directory.User) directory.User {
@@ -133,14 +138,73 @@ func (m *memUsers) Delete(_ context.Context, id directory.UserID, rev directory.
 	return nil
 }
 
-func (m *memUsers) SetPassword(_ context.Context, id directory.UserID, password observability.Secret, rev directory.Revision) error {
+func (m *memUsers) SetPassword(_ context.Context, id directory.UserID, password observability.Secret, rev directory.Revision, mustChange bool) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if _, err := m.match(id, rev); err != nil {
 		return err
 	}
 	m.passwords[id] = password.Reveal()
+	if mustChange {
+		m.mustChange[id] = true
+	} else {
+		delete(m.mustChange, id)
+	}
 	return nil
+}
+
+func (m *memUsers) accountOf(id directory.UserID) (directory.AccountState, error) {
+	u, ok := m.byID[id]
+	if !ok {
+		return directory.AccountState{}, directory.Error("entry", directory.FieldNotFound, "directory entry not found")
+	}
+	return directory.AccountState{ID: u.ID, Enabled: u.Enabled, Locked: m.locked[id], MustChange: m.mustChange[id], Revision: u.Revision}, nil
+}
+
+func (m *memUsers) AccountState(_ context.Context, id directory.UserID) (directory.AccountState, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.accountOf(id)
+}
+
+func (m *memUsers) ExpirePassword(_ context.Context, id directory.UserID, rev directory.Revision) (directory.AccountState, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, err := m.match(id, rev); err != nil {
+		return directory.AccountState{}, err
+	}
+	m.mustChange[id] = true
+	return m.accountOf(id)
+}
+
+func (m *memUsers) ClearPasswordExpiry(_ context.Context, id directory.UserID, rev directory.Revision) (directory.AccountState, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, err := m.match(id, rev); err != nil {
+		return directory.AccountState{}, err
+	}
+	delete(m.mustChange, id)
+	return m.accountOf(id)
+}
+
+func (m *memUsers) Lock(_ context.Context, id directory.UserID, rev directory.Revision) (directory.AccountState, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, err := m.match(id, rev); err != nil {
+		return directory.AccountState{}, err
+	}
+	m.locked[id] = true
+	return m.accountOf(id)
+}
+
+func (m *memUsers) Unlock(_ context.Context, id directory.UserID, rev directory.Revision) (directory.AccountState, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, err := m.match(id, rev); err != nil {
+		return directory.AccountState{}, err
+	}
+	delete(m.locked, id)
+	return m.accountOf(id)
 }
 
 func (m *memUsers) match(id directory.UserID, rev directory.Revision) (directory.User, error) {

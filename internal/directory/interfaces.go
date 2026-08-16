@@ -15,7 +15,12 @@ type UserRepository interface {
 	Modify(ctx context.Context, id UserID, patch UserPatch, rev Revision) (User, error)
 	SetEnabled(ctx context.Context, id UserID, enabled bool, rev Revision) (User, error)
 	Delete(ctx context.Context, id UserID, rev Revision) error
-	SetPassword(ctx context.Context, id UserID, password observability.Secret, rev Revision) error
+	SetPassword(ctx context.Context, id UserID, password observability.Secret, rev Revision, mustChange bool) error
+	AccountState(ctx context.Context, id UserID) (AccountState, error)
+	ExpirePassword(ctx context.Context, id UserID, rev Revision) (AccountState, error)
+	ClearPasswordExpiry(ctx context.Context, id UserID, rev Revision) (AccountState, error)
+	Lock(ctx context.Context, id UserID, rev Revision) (AccountState, error)
+	Unlock(ctx context.Context, id UserID, rev Revision) (AccountState, error)
 }
 
 // GroupRepository is list/get/add/delete plus membership. v1 has no Modify/GroupPatch.

@@ -26,7 +26,12 @@ type Users interface {
 	Update(ctx context.Context, p app.Principal, id directory.UserID, patch app.UpdateUser) (directory.User, error)
 	Delete(ctx context.Context, p app.Principal, id directory.UserID, rev directory.Revision) error
 	SetEnabled(ctx context.Context, p app.Principal, id directory.UserID, enabled bool, rev directory.Revision) (directory.User, error)
-	SetPassword(ctx context.Context, p app.Principal, id directory.UserID, pw app.Secret, rev directory.Revision) error
+	SetPassword(ctx context.Context, p app.Principal, id directory.UserID, pw app.Secret, rev directory.Revision, mustChange bool) error
+	AccountState(ctx context.Context, p app.Principal, id directory.UserID) (directory.AccountState, error)
+	ExpirePassword(ctx context.Context, p app.Principal, id directory.UserID, rev directory.Revision) (directory.AccountState, error)
+	ClearPasswordExpiry(ctx context.Context, p app.Principal, id directory.UserID, rev directory.Revision) (directory.AccountState, error)
+	Lock(ctx context.Context, p app.Principal, id directory.UserID, rev directory.Revision) (directory.AccountState, error)
+	Unlock(ctx context.Context, p app.Principal, id directory.UserID, rev directory.Revision) (directory.AccountState, error)
 }
 
 // Query is the application search, bind-test, and schema surface.

@@ -313,7 +313,7 @@ func (s *Reset) upsertUser(ctx context.Context, u config.NormalizedUser) error {
 	if ferr != nil {
 		return ferr
 	}
-	return s.users.SetPassword(ctx, directory.UserID(u.ID), pw, fresh.Revision)
+	return s.users.SetPassword(ctx, directory.UserID(u.ID), pw, fresh.Revision, false)
 }
 
 func (s *Reset) upsertGroup(ctx context.Context, g config.NormalizedGroup) error {

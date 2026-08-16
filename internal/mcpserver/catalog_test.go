@@ -19,6 +19,8 @@ func TestCatalogUniqueAndComplete(t *testing.T) {
 	want := []string{
 		ToolSearch, ToolCapabilities, ToolBaseline, ToolGetEntry,
 		ToolCreateUser, ToolUpdateUser, ToolDeleteUser, ToolSetPassword,
+		ToolAccountState, ToolExpirePassword, ToolClearPasswordExpiry, ToolLockUser, ToolUnlockUser,
+		ToolEnableUser, ToolDisableUser,
 		ToolCreateGroup, ToolDeleteGroup, ToolAddMembers, ToolRemoveMembers, ToolReplaceMembers,
 		ToolBindTest, ToolResetSuffix, ToolExportLDIF,
 	}

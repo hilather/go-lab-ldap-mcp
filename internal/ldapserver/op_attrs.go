@@ -17,13 +17,10 @@ import (
 // plugin ops do, which is recorded as a Delta candidate for the T-147
 // oracle.
 //
-// Attributes declared Operational by the schema (these five plus memberOf
-// and pwdAccountLockedTime) are rejected when they arrive on a client Add
-// or Modify: RFC 4512 NO-USER-MODIFICATION. 389's exact result code for
-// this is recorded as a Delta candidate; constraintViolation (19) is used
-// here. nsAccountLock is a *user* attribute (the registry deliberately does
-// not mark it operational) because disabling an account is a client write
-// of nsAccountLock: true — the bind gate below enforces it.
+// Attributes declared Operational by the schema (these five plus memberOf)
+// are rejected on client Add/Modify (RFC 4512 NO-USER-MODIFICATION), except
+// the account-workflow stamps the runtime account must write. nsAccountLock
+// is a user attribute so disable remains a client write.
 
 // errOperationalAttr marks client writes carrying server-owned attributes.
 var errOperationalAttr = errors.New("ldapserver: operational attribute is not client-modifiable")
@@ -101,13 +98,26 @@ func (s *Server) applyModifyOpAttrs(e *Entry, subj Subject) {
 
 // clientModifiable reports whether a client write may carry attr. Unknown
 // attributes are treated as user attributes; schema-declared Operational
-// attributes are server-owned.
+// attributes are server-owned except the account-workflow stamps the
+// runtime account must write (expire/lock) without Directory Manager.
 func (s *Server) clientModifiable(attr string) bool {
+	if accountWorkflowWritable(attr) {
+		return true
+	}
 	at, ok := s.opts.Schema.AttributeType(attr)
 	if !ok {
 		return true
 	}
 	return !at.Operational
+}
+
+func accountWorkflowWritable(attr string) bool {
+	switch strings.ToLower(strings.TrimSpace(attr)) {
+	case "pwdreset", "passwordexpirationtime", "pwdaccountlockedtime", "accountunlocktime":
+		return true
+	default:
+		return false
+	}
 }
 
 // checkClientAttrs rejects server-owned operational attributes in a client

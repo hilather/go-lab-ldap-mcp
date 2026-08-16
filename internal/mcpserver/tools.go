@@ -43,6 +43,20 @@ func (s *Server) registerTools(ms *mcp.Server) {
 			mcp.AddTool(ms, toolMeta(d), s.callDeleteUser)
 		case ToolSetPassword:
 			mcp.AddTool(ms, toolMeta(d), s.callSetPassword)
+		case ToolAccountState:
+			mcp.AddTool(ms, toolMeta(d), s.callAccountState)
+		case ToolExpirePassword:
+			mcp.AddTool(ms, toolMeta(d), s.callExpirePassword)
+		case ToolClearPasswordExpiry:
+			mcp.AddTool(ms, toolMeta(d), s.callClearPasswordExpiry)
+		case ToolLockUser:
+			mcp.AddTool(ms, toolMeta(d), s.callLockUser)
+		case ToolUnlockUser:
+			mcp.AddTool(ms, toolMeta(d), s.callUnlockUser)
+		case ToolEnableUser:
+			mcp.AddTool(ms, toolMeta(d), s.callEnableUser)
+		case ToolDisableUser:
+			mcp.AddTool(ms, toolMeta(d), s.callDisableUser)
 		case ToolCreateGroup:
 			mcp.AddTool(ms, toolMeta(d), s.callCreateGroup)
 		case ToolDeleteGroup:
@@ -179,10 +193,78 @@ func (s *Server) callSetPassword(ctx context.Context, _ *mcp.CallToolRequest, in
 	}
 	pw := observability.Secret(in.Password)
 	in.Password = ""
-	if err := users.SetPassword(ctx, p, directory.UserID(in.ID), pw, directory.Revision(in.Revision)); err != nil {
+	if err := users.SetPassword(ctx, p, directory.UserID(in.ID), pw, directory.Revision(in.Revision), in.MustChange); err != nil {
 		return nil, IDResult{}, publicToolErr(err)
 	}
 	return toolResult(ctx), IDResult{ID: in.ID}, nil
+}
+
+func (s *Server) callAccountState(ctx context.Context, _ *mcp.CallToolRequest, in IDOnlyInput) (*mcp.CallToolResult, directory.AccountState, error) {
+	p, users, err := s.readyUsers(ctx, ToolAccountState)
+	if err != nil {
+		return nil, directory.AccountState{}, err
+	}
+	st, err := users.AccountState(ctx, p, directory.UserID(in.ID))
+	if err != nil {
+		return nil, directory.AccountState{}, publicToolErr(err)
+	}
+	return toolResult(ctx), st, nil
+}
+
+func (s *Server) callExpirePassword(ctx context.Context, _ *mcp.CallToolRequest, in RevisionIDInput) (*mcp.CallToolResult, directory.AccountState, error) {
+	return s.callAccountMut(ctx, ToolExpirePassword, in, func(users *app.Users, p app.Principal) (directory.AccountState, error) {
+		return users.ExpirePassword(ctx, p, directory.UserID(in.ID), directory.Revision(in.Revision))
+	})
+}
+
+func (s *Server) callClearPasswordExpiry(ctx context.Context, _ *mcp.CallToolRequest, in RevisionIDInput) (*mcp.CallToolResult, directory.AccountState, error) {
+	return s.callAccountMut(ctx, ToolClearPasswordExpiry, in, func(users *app.Users, p app.Principal) (directory.AccountState, error) {
+		return users.ClearPasswordExpiry(ctx, p, directory.UserID(in.ID), directory.Revision(in.Revision))
+	})
+}
+
+func (s *Server) callLockUser(ctx context.Context, _ *mcp.CallToolRequest, in RevisionIDInput) (*mcp.CallToolResult, directory.AccountState, error) {
+	return s.callAccountMut(ctx, ToolLockUser, in, func(users *app.Users, p app.Principal) (directory.AccountState, error) {
+		return users.Lock(ctx, p, directory.UserID(in.ID), directory.Revision(in.Revision))
+	})
+}
+
+func (s *Server) callUnlockUser(ctx context.Context, _ *mcp.CallToolRequest, in RevisionIDInput) (*mcp.CallToolResult, directory.AccountState, error) {
+	return s.callAccountMut(ctx, ToolUnlockUser, in, func(users *app.Users, p app.Principal) (directory.AccountState, error) {
+		return users.Unlock(ctx, p, directory.UserID(in.ID), directory.Revision(in.Revision))
+	})
+}
+
+func (s *Server) callEnableUser(ctx context.Context, _ *mcp.CallToolRequest, in RevisionIDInput) (*mcp.CallToolResult, directory.User, error) {
+	return s.callSetEnabled(ctx, ToolEnableUser, in, true)
+}
+
+func (s *Server) callDisableUser(ctx context.Context, _ *mcp.CallToolRequest, in RevisionIDInput) (*mcp.CallToolResult, directory.User, error) {
+	return s.callSetEnabled(ctx, ToolDisableUser, in, false)
+}
+
+func (s *Server) callSetEnabled(ctx context.Context, tool string, in RevisionIDInput, enabled bool) (*mcp.CallToolResult, directory.User, error) {
+	p, users, err := s.readyUsers(ctx, tool)
+	if err != nil {
+		return nil, directory.User{}, err
+	}
+	u, err := users.SetEnabled(ctx, p, directory.UserID(in.ID), enabled, directory.Revision(in.Revision))
+	if err != nil {
+		return nil, directory.User{}, publicToolErr(err)
+	}
+	return toolResult(ctx), u, nil
+}
+
+func (s *Server) callAccountMut(ctx context.Context, tool string, in RevisionIDInput, fn func(*app.Users, app.Principal) (directory.AccountState, error)) (*mcp.CallToolResult, directory.AccountState, error) {
+	p, users, err := s.readyUsers(ctx, tool)
+	if err != nil {
+		return nil, directory.AccountState{}, err
+	}
+	st, err := fn(users, p)
+	if err != nil {
+		return nil, directory.AccountState{}, publicToolErr(err)
+	}
+	return toolResult(ctx), st, nil
 }
 
 func (s *Server) callCreateGroup(ctx context.Context, _ *mcp.CallToolRequest, in directory.GroupSpec) (*mcp.CallToolResult, directory.Group, error) {
@@ -408,7 +490,7 @@ func parseBindTransport(raw string) (directory.Transport, error) {
 
 func diagnosticOutcome(outcome string) bool {
 	switch outcome {
-	case directory.BindOutcomeInvalidCredentials, directory.BindOutcomeLocked, directory.BindOutcomeDisabled:
+	case directory.BindOutcomeInvalidCredentials, directory.BindOutcomeLocked, directory.BindOutcomeDisabled, directory.BindOutcomeMustChange:
 		return true
 	default:
 		return false

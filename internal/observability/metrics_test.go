@@ -98,6 +98,15 @@ func TestRouteTemplateDoesNotEchoIDs(t *testing.T) {
 	if got := observability.RouteTemplate("POST", "/api/v1/groups/staff/members"); got != "/api/v1/groups/{id}/members" {
 		t.Fatal(got)
 	}
+	if got := observability.RouteTemplate("POST", "/api/v1/users/alice/unlock"); got != "/api/v1/users/{id}/unlock" {
+		t.Fatal(got)
+	}
+	if got := observability.RouteTemplate("POST", "/api/v1/users/alice/lock"); got != "/api/v1/users/{id}/lock" {
+		t.Fatal(got)
+	}
+	if got := observability.RouteTemplate("POST", "/api/v1/users/alice/expire-password"); got != "/api/v1/users/{id}/expire-password" {
+		t.Fatal(got)
+	}
 	if got := observability.RouteTemplate("GET", "/totally/unknown/path"); got != "other" {
 		t.Fatal(got)
 	}

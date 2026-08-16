@@ -39,6 +39,7 @@ func TestTaxonomyCoversDesignActions(t *testing.T) {
 	want := []string{
 		ActionAuthenticate, ActionSessionCreate, ActionSessionDestroy,
 		ActionUserCreate, ActionUserUpdate, ActionUserDelete, ActionUserSetEnabled, ActionUserSetPassword,
+		ActionUserAccountState, ActionUserExpirePassword, ActionUserClearExpiry, ActionUserLock, ActionUserUnlock,
 		ActionGroupCreate, ActionGroupDelete, ActionGroupMembers,
 		ActionBindTest, ActionReset, ActionExport, ActionAuthzDeny,
 	}

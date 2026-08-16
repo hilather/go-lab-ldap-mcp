@@ -1,6 +1,6 @@
 # MCP catalog
 
-Recorded: 2026-08-14  
+Recorded: 2026-08-16  
 Source: `internal/mcpserver/catalog.go` (`Catalog()`, `ResourceCatalog()`).  
 Do not rename tools without an ADR if `docs/05-mcp-api.md` is recovered.
 
@@ -24,7 +24,14 @@ register only when the matching `register*` flag is true (OD-016).
 | `ldap_create_user` | proposed | T-089 | `directory:write` | `registerMutations` | Sensitive: `password` |
 | `ldap_update_user` | proposed | T-089 | `directory:write` | `registerMutations` | Requires `revision` |
 | `ldap_delete_user` | proposed | T-089 | `directory:write` | `registerMutations` | Destructive; `confirm` + `revision` |
-| `ldap_set_password` | proposed | T-089 | `directory:password` | `registerPassword` | Sensitive: `password` |
+| `ldap_set_password` | proposed | T-089 | `directory:password` | `registerPassword` | Sensitive: `password`. Clears must-change unless `mustChange` is true. |
+| `ldap_get_account_state` | proposed | T-089 | `directory:read` | on | Enable / lock / must-change snapshot |
+| `ldap_expire_password` | proposed | T-089 | `directory:password` | `registerPassword` | Force must-change; does not change the password |
+| `ldap_clear_password_expiry` | proposed | T-089 | `directory:password` | `registerPassword` | Clear must-change without a new password |
+| `ldap_lock_user` | proposed | T-089 | `directory:write` | `registerMutations` | Administrative lockout stamp |
+| `ldap_unlock_user` | proposed | T-089 | `directory:write` | `registerMutations` | Clear lockout stamps |
+| `ldap_enable_user` | proposed | T-089 | `directory:write` | `registerMutations` | Clear `nsAccountLock` |
+| `ldap_disable_user` | proposed | T-089 | `directory:write` | `registerMutations` | Set `nsAccountLock` (distinct from lock) |
 | `ldap_create_group` | proposed | T-090 | `directory:write` | `registerMutations` | Empty members is `empty_group` |
 | `ldap_delete_group` | proposed | T-090 | `directory:write` | `registerMutations` | Destructive; `confirm` + `revision` |
 | `ldap_add_members` | proposed | T-090 | `directory:write` | `registerMutations` | |

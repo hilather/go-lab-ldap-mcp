@@ -1258,7 +1258,7 @@ Table-driven. Every tool: unique name, description, input/output schema, scopes,
 | `ldap_get_capabilities` | proposed | T-088 | yes | `directory:read` |
 | `ldap_get_baseline` | proposed | T-088 | yes | `directory:read` |
 | `ldap_get_entry` | proposed | T-088 | yes | `directory:read` |
-| `ldap_create_user` / `update` / `delete` / `set_password` | proposed | T-089 | if mutations/password enabled | write / password |
+| `ldap_create_user` / `update` / `delete` / `set_password` / account-state / expire / lock / enable | proposed | T-089 | if mutations/password enabled | write / password / read |
 | `ldap_create_group` / `update` / `delete` / `add_members` / `remove_members` / `replace_members` | proposed | T-090 | if mutations enabled | write |
 | `ldap_bind_test` | proposed | T-091 | if password tools enabled | `directory:password` |
 | `ldap_reset_suffix` / `ldap_export_ldif` | proposed | T-092 | if enabled | `lab:reset` / `lab:export` |

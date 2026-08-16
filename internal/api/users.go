@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/hilather/go-lab-ldap-mcp/internal/app"
@@ -23,8 +24,9 @@ type userPatchBody struct {
 }
 
 type passwordBody struct {
-	Password observability.Secret `json:"password"`
-	Revision string               `json:"revision"`
+	Password   observability.Secret `json:"password"`
+	Revision   string               `json:"revision"`
+	MustChange bool                 `json:"mustChange"`
 }
 
 func (s *Server) handleListUsers(w http.ResponseWriter, r *http.Request) {
@@ -148,7 +150,7 @@ func (s *Server) handleSetUserPassword(w http.ResponseWriter, r *http.Request) {
 	pw := body.Password
 	rev := directory.Revision(body.Revision)
 	body.Password = ""
-	if err := s.users.SetPassword(r.Context(), p, directory.UserID(pathID(r)), pw, rev); err != nil {
+	if err := s.users.SetPassword(r.Context(), p, directory.UserID(pathID(r)), pw, rev, body.MustChange); err != nil {
 		writeProblem(w, r, err)
 		return
 	}
@@ -181,6 +183,53 @@ func (s *Server) setUserEnabled(w http.ResponseWriter, r *http.Request, enabled 
 	}
 	view := userView(u)
 	writeEntity(w, r, view.Revision, view)
+}
+
+func (s *Server) handleGetAccountState(w http.ResponseWriter, r *http.Request) {
+	p, ok := s.requireScope(w, r, auth.ScopeDirectoryRead)
+	if !ok || !s.requireUsers(w, r) {
+		return
+	}
+	st, err := s.users.AccountState(r.Context(), p, directory.UserID(pathID(r)))
+	if err != nil {
+		writeProblem(w, r, err)
+		return
+	}
+	writeEntity(w, r, st.Revision, st)
+}
+
+func (s *Server) handleExpirePassword(w http.ResponseWriter, r *http.Request) {
+	s.mutateAccountState(w, r, auth.ScopeDirectoryPassword, s.users.ExpirePassword)
+}
+
+func (s *Server) handleClearPasswordExpiry(w http.ResponseWriter, r *http.Request) {
+	s.mutateAccountState(w, r, auth.ScopeDirectoryPassword, s.users.ClearPasswordExpiry)
+}
+
+func (s *Server) handleLockUser(w http.ResponseWriter, r *http.Request) {
+	s.mutateAccountState(w, r, auth.ScopeDirectoryWrite, s.users.Lock)
+}
+
+func (s *Server) handleUnlockUser(w http.ResponseWriter, r *http.Request) {
+	s.mutateAccountState(w, r, auth.ScopeDirectoryWrite, s.users.Unlock)
+}
+
+func (s *Server) mutateAccountState(w http.ResponseWriter, r *http.Request, scope string, fn func(context.Context, app.Principal, directory.UserID, directory.Revision) (directory.AccountState, error)) {
+	p, ok := s.requireScope(w, r, scope)
+	if !ok || !s.requireUsers(w, r) {
+		return
+	}
+	rev, err := RequireIfMatch(r)
+	if err != nil {
+		writeProblem(w, r, err)
+		return
+	}
+	st, err := fn(r.Context(), p, directory.UserID(pathID(r)), rev)
+	if err != nil {
+		writeProblem(w, r, err)
+		return
+	}
+	writeEntity(w, r, st.Revision, st)
 }
 
 func (s *Server) handleListUserGroups(w http.ResponseWriter, r *http.Request) {

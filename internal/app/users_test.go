@@ -159,8 +159,46 @@ func TestUserPasswordScopeIndependent(t *testing.T) {
 	u := repo.put(directory.User{ID: "alice", UID: "alice", Enabled: true})
 	writeOnly := Principal{Kind: KindToken, ID: "w", Scopes: directory.ScopeSet{"directory:write"}}
 	svc := New(Deps{Users: repo}).Users
-	err := svc.SetPassword(t.Context(), writeOnly, "alice", observability.Secret("unit-user-pass-99"), u.Revision)
+	err := svc.SetPassword(t.Context(), writeOnly, "alice", observability.Secret("unit-user-pass-99"), u.Revision, false)
 	if err == nil || apperr.CodeOf(err) != apperr.CodeAuth {
 		t.Fatalf("write must not imply password: %v", err)
+	}
+}
+
+func TestUserAccountWorkflow(t *testing.T) {
+	t.Parallel()
+	repo := newFakeUsers()
+	u := repo.put(directory.User{ID: "alice", UID: "alice", Enabled: true})
+	pw := Principal{Kind: KindToken, ID: "p", Scopes: directory.ScopeSet{"directory:password", "directory:write", "directory:read"}}
+	svc := New(Deps{Users: repo}).Users
+	st, err := svc.ExpirePassword(t.Context(), pw, "alice", u.Revision)
+	if err != nil || !st.MustChange {
+		t.Fatalf("expire: %+v %v", st, err)
+	}
+	got, err := svc.AccountState(t.Context(), pw, "alice")
+	if err != nil || !got.MustChange {
+		t.Fatalf("state: %+v %v", got, err)
+	}
+	st, err = svc.Lock(t.Context(), pw, "alice", u.Revision)
+	if err != nil || !st.Locked {
+		t.Fatalf("lock: %+v %v", st, err)
+	}
+	st, err = svc.Unlock(t.Context(), pw, "alice", u.Revision)
+	if err != nil || st.Locked {
+		t.Fatalf("unlock: %+v %v", st, err)
+	}
+	if err := svc.SetPassword(t.Context(), pw, "alice", observability.Secret("unit-user-pass-99"), u.Revision, false); err != nil {
+		t.Fatal(err)
+	}
+	st, err = svc.AccountState(t.Context(), pw, "alice")
+	if err != nil || st.MustChange {
+		t.Fatalf("set password should clear must-change: %+v %v", st, err)
+	}
+	if err := svc.SetPassword(t.Context(), pw, "alice", observability.Secret("unit-user-pass-99"), u.Revision, true); err != nil {
+		t.Fatal(err)
+	}
+	st, err = svc.AccountState(t.Context(), pw, "alice")
+	if err != nil || !st.MustChange {
+		t.Fatalf("set password mustChange: %+v %v", st, err)
 	}
 }

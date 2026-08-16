@@ -32,13 +32,18 @@ type Operation struct {
 }
 
 var (
-	OpUserList       = Operation{Name: "user.list", Scope: v1alpha1.ScopeDirectoryRead}
-	OpUserGet        = Operation{Name: "user.get", Scope: v1alpha1.ScopeDirectoryRead}
-	OpUserCreate     = Operation{Name: "user.create", Scope: v1alpha1.ScopeDirectoryWrite}
-	OpUserUpdate     = Operation{Name: "user.update", Scope: v1alpha1.ScopeDirectoryWrite}
-	OpUserDelete     = Operation{Name: "user.delete", Scope: v1alpha1.ScopeDirectoryWrite}
-	OpUserSetEnabled = Operation{Name: "user.set_enabled", Scope: v1alpha1.ScopeDirectoryWrite}
-	OpUserPassword   = Operation{Name: "user.set_password", Scope: v1alpha1.ScopeDirectoryPassword}
+	OpUserList           = Operation{Name: "user.list", Scope: v1alpha1.ScopeDirectoryRead}
+	OpUserGet            = Operation{Name: "user.get", Scope: v1alpha1.ScopeDirectoryRead}
+	OpUserCreate         = Operation{Name: "user.create", Scope: v1alpha1.ScopeDirectoryWrite}
+	OpUserUpdate         = Operation{Name: "user.update", Scope: v1alpha1.ScopeDirectoryWrite}
+	OpUserDelete         = Operation{Name: "user.delete", Scope: v1alpha1.ScopeDirectoryWrite}
+	OpUserSetEnabled     = Operation{Name: "user.set_enabled", Scope: v1alpha1.ScopeDirectoryWrite}
+	OpUserPassword       = Operation{Name: "user.set_password", Scope: v1alpha1.ScopeDirectoryPassword}
+	OpUserAccountState   = Operation{Name: "user.account_state", Scope: v1alpha1.ScopeDirectoryRead}
+	OpUserExpirePassword = Operation{Name: "user.expire_password", Scope: v1alpha1.ScopeDirectoryPassword}
+	OpUserClearExpiry    = Operation{Name: "user.clear_password_expiry", Scope: v1alpha1.ScopeDirectoryPassword}
+	OpUserLock           = Operation{Name: "user.lock", Scope: v1alpha1.ScopeDirectoryWrite}
+	OpUserUnlock         = Operation{Name: "user.unlock", Scope: v1alpha1.ScopeDirectoryWrite}
 
 	OpGroupList    = Operation{Name: "group.list", Scope: v1alpha1.ScopeDirectoryRead}
 	OpGroupGet     = Operation{Name: "group.get", Scope: v1alpha1.ScopeDirectoryRead}

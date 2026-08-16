@@ -210,14 +210,20 @@ On by default (when MCP is enabled):
 - `ldap_get_capabilities`
 - `ldap_get_baseline`
 - `ldap_get_entry`
+- `ldap_get_account_state`
 
 Off until the matching `register*` flag is true:
 
 - Users / groups: `ldap_create_user`, `ldap_update_user`, `ldap_delete_user`,
+  `ldap_enable_user`, `ldap_disable_user`, `ldap_lock_user`, `ldap_unlock_user`,
   `ldap_create_group`, `ldap_delete_group`, `ldap_add_members`,
   `ldap_remove_members`, `ldap_replace_members`
-- Passwords: `ldap_set_password`, `ldap_bind_test`
+- Passwords / account workflow: `ldap_set_password` (optional `mustChange`),
+  `ldap_expire_password`, `ldap_clear_password_expiry`, `ldap_bind_test`
 - Lab: `ldap_reset_suffix`, `ldap_export_ldif`
+
+Bind-test outcomes include `must_change`, `locked`, and `disabled`. Disable
+(`nsAccountLock`) is not the same as lock (`pwdAccountLockedTime`).
 
 There is no `ldap_update_group` in v1. Membership tools are the update path.
 

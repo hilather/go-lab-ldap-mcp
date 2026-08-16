@@ -18,10 +18,13 @@ import (
 // Password policy attributes (389 DS / draft-behera password policy spell;
 // parity contract C4).
 const (
-	attrUserPassword         = "userPassword"
-	attrPwdChangedTime       = "pwdChangedTime"
-	attrPwdAccountLockedTime = "pwdAccountLockedTime"
-	attrPasswordHistory      = "passwordHistory"
+	attrUserPassword           = "userPassword"
+	attrPwdChangedTime         = "pwdChangedTime"
+	attrPwdAccountLockedTime   = "pwdAccountLockedTime"
+	attrPasswordHistory        = "passwordHistory"
+	attrPwdReset               = "pwdReset"
+	attrPasswordExpirationTime = "passwordExpirationTime"
+	attrAccountUnlockTime      = "accountUnlockTime"
 )
 
 // Policy rejections on the write path. They surface through runPlugins as
@@ -138,22 +141,22 @@ func (e *passwordEngine) VerifyBind(ctx context.Context, store Store, dn config.
 	key := dn.FoldedKey()
 	now := e.now().UTC()
 
-	lockEnabled := e.policy.MaxFailures > 0
+	if accountUnlockHeld(entry, now) {
+		e.logger.LogAttrs(ctx, slog.LevelInfo, "bind rejected: account locked", slog.String("dn", dn.String()))
+		return invalid, false
+	}
+
 	lockPresent := false
-	if lockEnabled {
-		lockedAt, present, ok := generalizedTimeAttr(entry, attrPwdAccountLockedTime)
-		if !ok {
-			// Security state that cannot be parsed fails closed; the DN is
-			// logged but never the malformed value.
-			e.logger.LogAttrs(ctx, slog.LevelWarn, "unparseable pwdAccountLockedTime; failing closed",
-				slog.String("dn", dn.String()))
-			return invalid, false
-		}
-		lockPresent = present
-		if present && e.lockHeld(lockedAt, now) {
-			e.logger.LogAttrs(ctx, slog.LevelInfo, "bind rejected: account locked", slog.String("dn", dn.String()))
-			return invalid, false
-		}
+	lockedAt, present, ok := generalizedTimeAttr(entry, attrPwdAccountLockedTime)
+	if !ok {
+		e.logger.LogAttrs(ctx, slog.LevelWarn, "unparseable pwdAccountLockedTime; failing closed",
+			slog.String("dn", dn.String()))
+		return invalid, false
+	}
+	lockPresent = present
+	if present && (e.policy.MaxFailures > 0 && e.lockHeld(lockedAt, now) || e.policy.MaxFailures == 0) {
+		e.logger.LogAttrs(ctx, slog.LevelInfo, "bind rejected: account locked", slog.String("dn", dn.String()))
+		return invalid, false
 	}
 
 	matched := false
@@ -164,12 +167,15 @@ func (e *passwordEngine) VerifyBind(ctx context.Context, store Store, dn config.
 		}
 	}
 	if !matched {
-		if lockEnabled {
+		if e.policy.MaxFailures > 0 {
 			e.recordFailure(ctx, store, key, dn, now)
 		}
 		return invalid, false
 	}
 
+	if pwdResetTrue(entry) || passwordExpirationElapsed(entry, now) {
+		return Result{Code: ResultInvalidCredentials, DiagnosticMessage: "password expired"}, false
+	}
 	if e.policy.MaxAge > 0 {
 		changedAt, present, ok := generalizedTimeAttr(entry, attrPwdChangedTime)
 		if !ok {
@@ -182,7 +188,7 @@ func (e *passwordEngine) VerifyBind(ctx context.Context, store Store, dn config.
 		}
 	}
 
-	if lockEnabled {
+	if e.policy.MaxFailures > 0 {
 		e.mu.Lock()
 		delete(e.failures, key)
 		e.mu.Unlock()
@@ -355,6 +361,8 @@ func (e *passwordEngine) applyModify(ctx context.Context, tx UpdateTx, before, a
 	}
 	setAttrValues(cur, attrUserPassword, out)
 	upsertAttr(cur, attrPwdChangedTime, formatGeneralizedTime(e.now()))
+	removeAttr(cur, attrPwdReset)
+	removeAttr(cur, attrPasswordExpirationTime)
 	if e.policy.HistoryCount > 0 {
 		var prior [][]byte
 		for _, v := range beforeVals {
@@ -425,6 +433,32 @@ func generalizedTimeAttr(e *Entry, name string) (t time.Time, present, ok bool) 
 		return time.Time{}, true, false
 	}
 	return parsed, true, true
+}
+
+func accountUnlockHeld(e *Entry, now time.Time) bool {
+	t, present, ok := generalizedTimeAttr(e, attrAccountUnlockTime)
+	if !ok {
+		return true
+	}
+	return present && t.After(now)
+}
+
+func passwordExpirationElapsed(e *Entry, now time.Time) bool {
+	t, present, ok := generalizedTimeAttr(e, attrPasswordExpirationTime)
+	if !ok {
+		return true
+	}
+	return present && !t.After(now)
+}
+
+func pwdResetTrue(e *Entry) bool {
+	for _, v := range e.Values(attrPwdReset) {
+		switch strings.ToLower(strings.TrimSpace(string(v))) {
+		case "true", "1", "yes":
+			return true
+		}
+	}
+	return false
 }
 
 func formatGeneralizedTime(t time.Time) string {

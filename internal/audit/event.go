@@ -18,6 +18,11 @@ const (
 	ActionUserDelete          = "user.delete"
 	ActionUserSetEnabled      = "user.set_enabled"
 	ActionUserSetPassword     = "user.set_password"
+	ActionUserAccountState    = "user.account_state"
+	ActionUserExpirePassword  = "user.expire_password"
+	ActionUserClearExpiry     = "user.clear_password_expiry"
+	ActionUserLock            = "user.lock"
+	ActionUserUnlock          = "user.unlock"
 	ActionGroupCreate         = "group.create"
 	ActionGroupDelete         = "group.delete"
 	ActionGroupMembers        = "group.members"
@@ -47,6 +52,11 @@ func KnownActions() []string {
 		ActionUserDelete,
 		ActionUserSetEnabled,
 		ActionUserSetPassword,
+		ActionUserAccountState,
+		ActionUserExpirePassword,
+		ActionUserClearExpiry,
+		ActionUserLock,
+		ActionUserUnlock,
 		ActionGroupCreate,
 		ActionGroupDelete,
 		ActionGroupMembers,

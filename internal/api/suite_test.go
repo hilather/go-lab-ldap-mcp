@@ -53,6 +53,11 @@ func restSuite() []suiteCase {
 		{method: http.MethodPost, path: "/api/v1/users/suite/password", scope: auth.ScopeDirectoryPassword, mutate: true, body: pw},
 		{method: http.MethodPost, path: "/api/v1/users/suite/enable", scope: auth.ScopeDirectoryWrite, mutate: true},
 		{method: http.MethodPost, path: "/api/v1/users/suite/disable", scope: auth.ScopeDirectoryWrite, mutate: true},
+		{method: http.MethodGet, path: "/api/v1/users/suite/account-state", scope: auth.ScopeDirectoryRead},
+		{method: http.MethodPost, path: "/api/v1/users/suite/expire-password", scope: auth.ScopeDirectoryPassword, mutate: true},
+		{method: http.MethodPost, path: "/api/v1/users/suite/clear-password-expiry", scope: auth.ScopeDirectoryPassword, mutate: true},
+		{method: http.MethodPost, path: "/api/v1/users/suite/lock", scope: auth.ScopeDirectoryWrite, mutate: true},
+		{method: http.MethodPost, path: "/api/v1/users/suite/unlock", scope: auth.ScopeDirectoryWrite, mutate: true},
 		{method: http.MethodGet, path: "/api/v1/users/suite/groups", scope: auth.ScopeDirectoryRead},
 		{method: http.MethodGet, path: "/api/v1/groups", scope: auth.ScopeDirectoryRead},
 		{method: http.MethodPost, path: "/api/v1/groups", scope: auth.ScopeDirectoryWrite, mutate: true, body: grp},
@@ -174,7 +179,7 @@ func suiteRequest(tc suiteCase, token string) *http.Request {
 	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
-	if tc.method == http.MethodPatch || tc.method == http.MethodDelete || strings.Contains(tc.path, "/members") || strings.Contains(tc.path, "/enable") || strings.Contains(tc.path, "/disable") {
+	if tc.method == http.MethodPatch || tc.method == http.MethodDelete || strings.Contains(tc.path, "/members") || strings.Contains(tc.path, "/enable") || strings.Contains(tc.path, "/disable") || strings.Contains(tc.path, "/expire-password") || strings.Contains(tc.path, "/clear-password-expiry") || strings.Contains(tc.path, "/lock") || strings.Contains(tc.path, "/unlock") {
 		req.Header.Set("If-Match", `"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"`)
 	}
 	return req

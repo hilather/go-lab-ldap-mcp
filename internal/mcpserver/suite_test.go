@@ -89,6 +89,13 @@ func TestEveryToolPositiveAndDeniedScope(t *testing.T) {
 		{tool: ToolCreateUser, args: CreateUserInput{ID: "carol", Password: mcpUserPass}, allow: writeToken, deny: readToken},
 		{tool: ToolUpdateUser, args: UpdateUserInput{ID: "alice", Revision: userRev, Attributes: map[string]string{"sn": "X"}}, allow: writeToken, deny: readToken},
 		{tool: ToolSetPassword, args: SetPasswordInput{ID: "alice", Password: mcpUserPass, Revision: userRev}, allow: passwordToken, deny: writeToken},
+		{tool: ToolAccountState, args: IDOnlyInput{ID: "alice"}, allow: readToken, deny: schemaTok},
+		{tool: ToolExpirePassword, args: RevisionIDInput{ID: "alice", Revision: userRev}, allow: passwordToken, deny: writeToken},
+		{tool: ToolClearPasswordExpiry, args: RevisionIDInput{ID: "alice", Revision: userRev}, allow: passwordToken, deny: writeToken},
+		{tool: ToolLockUser, args: RevisionIDInput{ID: "alice", Revision: userRev}, allow: writeToken, deny: readToken},
+		{tool: ToolUnlockUser, args: RevisionIDInput{ID: "alice", Revision: userRev}, allow: writeToken, deny: readToken},
+		{tool: ToolEnableUser, args: RevisionIDInput{ID: "alice", Revision: userRev}, allow: writeToken, deny: readToken},
+		{tool: ToolDisableUser, args: RevisionIDInput{ID: "alice", Revision: userRev}, allow: writeToken, deny: readToken},
 		{tool: ToolAddMembers, args: MembersInput{ID: "staff", Revision: groupRev, Members: []directory.MemberRef{{Kind: "user", ID: "alice"}}}, allow: writeToken, deny: readToken},
 		{tool: ToolRemoveMembers, args: MembersInput{ID: "staff", Revision: groupRev, Members: []directory.MemberRef{{Kind: "user", ID: "missing"}}}, allow: writeToken, deny: readToken},
 		{tool: ToolReplaceMembers, args: MembersInput{ID: "staff", Revision: groupRev, Members: []directory.MemberRef{{Kind: "user", ID: "alice"}}}, allow: writeToken, deny: readToken},
@@ -122,6 +129,8 @@ func TestEveryToolPositiveAndDeniedScope(t *testing.T) {
 			st.args = UpdateUserInput{ID: "alice", Revision: userRevOf("alice"), Attributes: map[string]string{"sn": "X"}}
 		case ToolSetPassword:
 			st.args = SetPasswordInput{ID: "alice", Password: mcpUserPass, Revision: userRevOf("alice")}
+		case ToolExpirePassword, ToolClearPasswordExpiry, ToolLockUser, ToolUnlockUser, ToolEnableUser, ToolDisableUser:
+			st.args = RevisionIDInput{ID: "alice", Revision: userRevOf("alice")}
 		case ToolAddMembers, ToolRemoveMembers, ToolReplaceMembers:
 			in := st.args.(MembersInput)
 			in.Revision = groupRevOf("staff")

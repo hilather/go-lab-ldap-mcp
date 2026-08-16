@@ -199,26 +199,32 @@ func TestSearchConstraints(t *testing.T) {
 
 func TestBindOutcomeDoesNotEnumerate(t *testing.T) {
 	t.Parallel()
-	unknown := bindOutcome(false, false, false, directory.Error("bind", directory.FieldInvalidCredentials, "invalid credentials"))
-	wrong := bindOutcome(true, false, false, directory.Error("bind", directory.FieldInvalidCredentials, "invalid credentials"))
+	unknown := bindOutcome(false, false, false, false, directory.Error("bind", directory.FieldInvalidCredentials, "invalid credentials"))
+	wrong := bindOutcome(true, false, false, false, directory.Error("bind", directory.FieldInvalidCredentials, "invalid credentials"))
 	if unknown != directory.BindOutcomeInvalidCredentials || unknown != wrong {
 		t.Fatalf("unknown=%s wrong=%s", unknown, wrong)
 	}
-	if bindOutcome(true, true, false, directory.Error("entry", directory.FieldConstraint, "x")) != directory.BindOutcomeDisabled {
+	if bindOutcome(true, true, false, false, directory.Error("entry", directory.FieldConstraint, "x")) != directory.BindOutcomeDisabled {
 		t.Fatal("disabled")
 	}
-	if bindOutcome(true, false, false, directory.Error("connection", directory.FieldUnavailable, "Account inactivated. Contact system administrator.")) != directory.BindOutcomeDisabled {
+	if bindOutcome(true, false, false, false, directory.Error("connection", directory.FieldUnavailable, "Account inactivated. Contact system administrator.")) != directory.BindOutcomeDisabled {
 		t.Fatal("inactivated")
 	}
 	unauth := directory.Error("connection", directory.FieldUnavailable, "Unauthenticated binds are not allowed")
-	if accountInactivated(unauth) || bindOutcome(true, false, false, unauth) != directory.BindOutcomeUnavailable {
-		t.Fatalf("generic 53 / unauthenticated bind must not be disabled: %s", bindOutcome(true, false, false, unauth))
+	if accountInactivated(unauth) || bindOutcome(true, false, false, false, unauth) != directory.BindOutcomeUnavailable {
+		t.Fatalf("generic 53 / unauthenticated bind must not be disabled: %s", bindOutcome(true, false, false, false, unauth))
 	}
-	if bindOutcome(true, false, true, directory.Error("bind", directory.FieldInvalidCredentials, "x")) != directory.BindOutcomeLocked {
+	if bindOutcome(true, false, true, false, directory.Error("bind", directory.FieldInvalidCredentials, "x")) != directory.BindOutcomeLocked {
 		t.Fatal("locked")
 	}
-	if bindOutcome(true, false, false, nil) != directory.BindOutcomeSuccess {
+	if bindOutcome(true, false, false, false, nil) != directory.BindOutcomeSuccess {
 		t.Fatal("success")
+	}
+	if bindOutcome(true, false, false, true, nil) != directory.BindOutcomeMustChange {
+		t.Fatal("must_change on successful bind")
+	}
+	if bindOutcome(true, false, false, true, directory.Error("bind", directory.FieldConstraint, "password expired")) != directory.BindOutcomeMustChange {
+		t.Fatal("must_change from diagnostic")
 	}
 }
 
@@ -442,6 +448,11 @@ func TestAssertionFilterUsesOperationalAttrs(t *testing.T) {
 	}
 	for _, name := range operationalReadAttrs() {
 		if skipReturnedAttr(name) != true {
+			t.Fatalf("%s must not appear on API attributes", name)
+		}
+	}
+	for _, name := range []string{"pwdReset", "passwordExpirationTime", "pwdAccountLockedTime", "accountUnlockTime", "passwordRetryCount"} {
+		if !skipReturnedAttr(name) {
 			t.Fatalf("%s must not appear on API attributes", name)
 		}
 	}

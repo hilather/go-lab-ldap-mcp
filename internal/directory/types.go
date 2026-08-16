@@ -114,13 +114,25 @@ const (
 	BindOutcomeInvalidCredentials = "invalid_credentials"
 	BindOutcomeLocked             = "locked"
 	BindOutcomeDisabled           = "disabled"
+	BindOutcomeMustChange         = "must_change"
 	BindOutcomeUnavailable        = "unavailable"
 )
 
 type BindTestResult struct {
-	// Outcome is success | invalid_credentials | locked | disabled | unavailable.
-	// Unknown user and wrong password both map to invalid_credentials.
+	// Outcome is success | invalid_credentials | locked | disabled |
+	// must_change | unavailable. Unknown user and wrong password both
+	// map to invalid_credentials.
 	Outcome string `json:"outcome"`
+}
+
+// AccountState is the QA-visible enable/lock/must-change snapshot.
+// It is not part of User.Revision.
+type AccountState struct {
+	ID         string   `json:"id"`
+	Enabled    bool     `json:"enabled"`
+	Locked     bool     `json:"locked"`
+	MustChange bool     `json:"mustChange"`
+	Revision   Revision `json:"revision"`
 }
 
 type RootDSE struct {

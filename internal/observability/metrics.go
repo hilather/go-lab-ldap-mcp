@@ -465,6 +465,10 @@ var knownRoutes = map[string]struct{}{
 	"/api/v1/export": {}, "/api/v1/diagnostics": {},
 	"/api/v1/users/{id}": {}, "/api/v1/users/{id}/password": {},
 	"/api/v1/users/{id}/enable": {}, "/api/v1/users/{id}/disable": {},
+	"/api/v1/users/{id}/account-state":         {},
+	"/api/v1/users/{id}/expire-password":       {},
+	"/api/v1/users/{id}/clear-password-expiry": {},
+	"/api/v1/users/{id}/lock":                  {}, "/api/v1/users/{id}/unlock": {},
 	"/api/v1/users/{id}/groups": {},
 	"/api/v1/groups/{id}":       {}, "/api/v1/groups/{id}/members": {},
 	"/api/v1/schema/objectclasses/{name}": {},
@@ -479,6 +483,16 @@ func matchTemplated(path string) (string, bool) {
 		return "/api/v1/users/{id}/enable", true
 	case strings.HasPrefix(path, "/api/v1/users/") && strings.HasSuffix(path, "/disable"):
 		return "/api/v1/users/{id}/disable", true
+	case strings.HasPrefix(path, "/api/v1/users/") && strings.HasSuffix(path, "/account-state"):
+		return "/api/v1/users/{id}/account-state", true
+	case strings.HasPrefix(path, "/api/v1/users/") && strings.HasSuffix(path, "/expire-password"):
+		return "/api/v1/users/{id}/expire-password", true
+	case strings.HasPrefix(path, "/api/v1/users/") && strings.HasSuffix(path, "/clear-password-expiry"):
+		return "/api/v1/users/{id}/clear-password-expiry", true
+	case strings.HasPrefix(path, "/api/v1/users/") && strings.HasSuffix(path, "/unlock"):
+		return "/api/v1/users/{id}/unlock", true
+	case strings.HasPrefix(path, "/api/v1/users/") && strings.HasSuffix(path, "/lock"):
+		return "/api/v1/users/{id}/lock", true
 	case strings.HasPrefix(path, "/api/v1/users/") && strings.HasSuffix(path, "/groups"):
 		return "/api/v1/users/{id}/groups", true
 	case strings.HasPrefix(path, "/api/v1/users/"):

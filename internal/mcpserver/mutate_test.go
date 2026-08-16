@@ -15,6 +15,7 @@ import (
 	"github.com/hilather/go-lab-ldap-mcp/internal/app"
 	"github.com/hilather/go-lab-ldap-mcp/internal/auth"
 	"github.com/hilather/go-lab-ldap-mcp/internal/directory"
+	"github.com/hilather/go-lab-ldap-mcp/internal/observability"
 )
 
 func mutationServices(users directory.UserRepository, groups directory.GroupRepository, bind directory.BindTester) *app.Services {
@@ -164,6 +165,66 @@ func TestMCPUserUpdateDeleteAndPassword(t *testing.T) {
 	}
 	if _, err := users.Get(t.Context(), "bob"); err == nil {
 		t.Fatal("user still present")
+	}
+}
+
+func TestMCPAccountWorkflowTools(t *testing.T) {
+	t.Parallel()
+	users, groups := newFakeUsers(), newFakeGroups()
+	svc := mutationServices(users, groups, &fakeBind{})
+	s := mutationServer(t, svc, nil)
+	mux := http.NewServeMux()
+	mux.Handle(MountPath, s.Handler())
+	sess, _ := connectMCP(t, mux, testToken, "")
+	created := callTool(t, sess, ToolCreateUser, CreateUserInput{ID: "dave", Password: mcpUserPass})
+	if created.IsError {
+		t.Fatal(toolErrText(created))
+	}
+	rev := string(decodeStructured[directory.User](t, created).Revision)
+	exp := callTool(t, sess, ToolExpirePassword, RevisionIDInput{ID: "dave", Revision: rev})
+	if exp.IsError {
+		t.Fatal(toolErrText(exp))
+	}
+	st := decodeStructured[directory.AccountState](t, exp)
+	if !st.MustChange {
+		t.Fatalf("expire: %+v", st)
+	}
+	got := callTool(t, sess, ToolAccountState, IDOnlyInput{ID: "dave"})
+	if got.IsError || !decodeStructured[directory.AccountState](t, got).MustChange {
+		t.Fatalf("get state: %s", toolErrText(got))
+	}
+	lock := callTool(t, sess, ToolLockUser, RevisionIDInput{ID: "dave", Revision: rev})
+	if lock.IsError || !decodeStructured[directory.AccountState](t, lock).Locked {
+		t.Fatalf("lock: %s", toolErrText(lock))
+	}
+	unlock := callTool(t, sess, ToolUnlockUser, RevisionIDInput{ID: "dave", Revision: rev})
+	if unlock.IsError || decodeStructured[directory.AccountState](t, unlock).Locked {
+		t.Fatalf("unlock: %s", toolErrText(unlock))
+	}
+	if err := svc.Users.SetPassword(t.Context(), app.Principal{
+		Kind: app.KindToken, ID: "admin", Scopes: directory.ScopeSet{auth.ScopeDirectoryPassword},
+	}, "dave", observability.Secret(mcpUserPass), directory.Revision(rev), false); err != nil {
+		t.Fatal(err)
+	}
+	cleared := callTool(t, sess, ToolAccountState, IDOnlyInput{ID: "dave"})
+	if decodeStructured[directory.AccountState](t, cleared).MustChange {
+		t.Fatal("set password should clear must-change")
+	}
+	setMust := callTool(t, sess, ToolSetPassword, SetPasswordInput{ID: "dave", Password: mcpUserPass, Revision: rev, MustChange: true})
+	if setMust.IsError {
+		t.Fatal(toolErrText(setMust))
+	}
+	if !decodeStructured[directory.AccountState](t, callTool(t, sess, ToolAccountState, IDOnlyInput{ID: "dave"})).MustChange {
+		t.Fatal("set password mustChange should stamp must-change")
+	}
+	dis := callTool(t, sess, ToolDisableUser, RevisionIDInput{ID: "dave", Revision: rev})
+	if dis.IsError || decodeStructured[directory.User](t, dis).Enabled {
+		t.Fatalf("disable: %s", toolErrText(dis))
+	}
+	enRev := string(decodeStructured[directory.User](t, dis).Revision)
+	en := callTool(t, sess, ToolEnableUser, RevisionIDInput{ID: "dave", Revision: enRev})
+	if en.IsError || !decodeStructured[directory.User](t, en).Enabled {
+		t.Fatalf("enable: %s", toolErrText(en))
 	}
 }
 

@@ -22,7 +22,14 @@ import (
 //	ldap_create_user        proposed  T-089  registerMutations   directory:write
 //	ldap_update_user        proposed  T-089  registerMutations   directory:write
 //	ldap_delete_user        proposed  T-089  registerMutations   directory:write
-//	ldap_set_password       proposed  T-089  registerPassword    directory:password
+//	ldap_set_password              proposed  T-089  registerPassword    directory:password
+//	ldap_get_account_state         proposed  T-089  yes                 directory:read
+//	ldap_expire_password           proposed  T-089  registerPassword    directory:password
+//	ldap_clear_password_expiry     proposed  T-089  registerPassword    directory:password
+//	ldap_lock_user                 proposed  T-089  registerMutations   directory:write
+//	ldap_unlock_user               proposed  T-089  registerMutations   directory:write
+//	ldap_enable_user               proposed  T-089  registerMutations   directory:write
+//	ldap_disable_user              proposed  T-089  registerMutations   directory:write
 //	ldap_create_group       proposed  T-090  registerMutations   directory:write
 //	ldap_delete_group       proposed  T-090  registerMutations   directory:write
 //	ldap_add_members        proposed  T-090  registerMutations   directory:write
@@ -46,22 +53,29 @@ const (
 	ContractBinding  = "binding"
 	ContractProposed = "proposed"
 
-	ToolSearch         = "ldap_search_entries"
-	ToolCapabilities   = "ldap_get_capabilities"
-	ToolBaseline       = "ldap_get_baseline"
-	ToolGetEntry       = "ldap_get_entry"
-	ToolCreateUser     = "ldap_create_user"
-	ToolUpdateUser     = "ldap_update_user"
-	ToolDeleteUser     = "ldap_delete_user"
-	ToolSetPassword    = "ldap_set_password"
-	ToolCreateGroup    = "ldap_create_group"
-	ToolDeleteGroup    = "ldap_delete_group"
-	ToolAddMembers     = "ldap_add_members"
-	ToolRemoveMembers  = "ldap_remove_members"
-	ToolReplaceMembers = "ldap_replace_members"
-	ToolBindTest       = "ldap_bind_test"
-	ToolResetSuffix    = "ldap_reset_suffix"
-	ToolExportLDIF     = "ldap_export_ldif"
+	ToolSearch              = "ldap_search_entries"
+	ToolCapabilities        = "ldap_get_capabilities"
+	ToolBaseline            = "ldap_get_baseline"
+	ToolGetEntry            = "ldap_get_entry"
+	ToolCreateUser          = "ldap_create_user"
+	ToolUpdateUser          = "ldap_update_user"
+	ToolDeleteUser          = "ldap_delete_user"
+	ToolSetPassword         = "ldap_set_password"
+	ToolAccountState        = "ldap_get_account_state"
+	ToolExpirePassword      = "ldap_expire_password"
+	ToolClearPasswordExpiry = "ldap_clear_password_expiry"
+	ToolLockUser            = "ldap_lock_user"
+	ToolUnlockUser          = "ldap_unlock_user"
+	ToolEnableUser          = "ldap_enable_user"
+	ToolDisableUser         = "ldap_disable_user"
+	ToolCreateGroup         = "ldap_create_group"
+	ToolDeleteGroup         = "ldap_delete_group"
+	ToolAddMembers          = "ldap_add_members"
+	ToolRemoveMembers       = "ldap_remove_members"
+	ToolReplaceMembers      = "ldap_replace_members"
+	ToolBindTest            = "ldap_bind_test"
+	ToolResetSuffix         = "ldap_reset_suffix"
+	ToolExportLDIF          = "ldap_export_ldif"
 
 	flagMutations = "mutations"
 	flagPassword  = "password"
@@ -111,9 +125,10 @@ type DeleteInput struct {
 
 // SetPasswordInput matches POST /api/v1/users/{id}/password.
 type SetPasswordInput struct {
-	ID       string `json:"id"`
-	Password string `json:"password"`
-	Revision string `json:"revision"`
+	ID         string `json:"id"`
+	Password   string `json:"password"`
+	Revision   string `json:"revision"`
+	MustChange bool   `json:"mustChange,omitempty"`
 }
 
 // IDResult is the structured result for delete and set-password.
@@ -126,6 +141,17 @@ type MembersInput struct {
 	ID       string                `json:"id"`
 	Members  []directory.MemberRef `json:"members"`
 	Revision string                `json:"revision"`
+}
+
+// IDOnlyInput is a user id with no revision.
+type IDOnlyInput struct {
+	ID string `json:"id"`
+}
+
+// RevisionIDInput is a mutating account-state tool body.
+type RevisionIDInput struct {
+	ID       string `json:"id"`
+	Revision string `json:"revision"`
 }
 
 // BindTestInput matches POST /api/v1/auth-tests.
@@ -241,10 +267,52 @@ func Catalog() []ToolDef {
 		},
 		{
 			Name: ToolSetPassword, Contract: ContractProposed, Task: "T-089",
-			Description: "Set a user password. Input matches POST /api/v1/users/{id}/password.",
+			Description: "Set a user password. Input matches POST /api/v1/users/{id}/password. Clears must-change unless mustChange is true.",
 			Scope:       auth.ScopeDirectoryPassword, Flag: flagPassword,
 			SensitiveInputs: []string{"password"},
 			Input:           SetPasswordInput{}, Output: IDResult{},
+		},
+		{
+			Name: ToolAccountState, Contract: ContractProposed, Task: "T-089",
+			Description: "Read enable/lock/must-change state. Sibling of GET /api/v1/users/{id}/account-state.",
+			Scope:       auth.ScopeDirectoryRead, ReadOnly: true, Idempotent: true, OpenWorld: false,
+			Input: IDOnlyInput{}, Output: directory.AccountState{},
+		},
+		{
+			Name: ToolExpirePassword, Contract: ContractProposed, Task: "T-089",
+			Description: "Force must-change on next successful bind-test. Does not change the password.",
+			Scope:       auth.ScopeDirectoryPassword, Flag: flagPassword, Idempotent: true,
+			Input: RevisionIDInput{}, Output: directory.AccountState{},
+		},
+		{
+			Name: ToolClearPasswordExpiry, Contract: ContractProposed, Task: "T-089",
+			Description: "Clear the must-change flag without setting a new password.",
+			Scope:       auth.ScopeDirectoryPassword, Flag: flagPassword, Idempotent: true,
+			Input: RevisionIDInput{}, Output: directory.AccountState{},
+		},
+		{
+			Name: ToolLockUser, Contract: ContractProposed, Task: "T-089",
+			Description: "Administratively lock a user (lockout stamp). Bind-test reports locked.",
+			Scope:       auth.ScopeDirectoryWrite, Flag: flagMutations, Idempotent: true,
+			Input: RevisionIDInput{}, Output: directory.AccountState{},
+		},
+		{
+			Name: ToolUnlockUser, Contract: ContractProposed, Task: "T-089",
+			Description: "Clear lockout stamps so a correct password can bind again.",
+			Scope:       auth.ScopeDirectoryWrite, Flag: flagMutations, Idempotent: true,
+			Input: RevisionIDInput{}, Output: directory.AccountState{},
+		},
+		{
+			Name: ToolEnableUser, Contract: ContractProposed, Task: "T-089",
+			Description: "Enable a user (clear nsAccountLock). Sibling of POST /api/v1/users/{id}/enable.",
+			Scope:       auth.ScopeDirectoryWrite, Flag: flagMutations, Idempotent: true,
+			Input: RevisionIDInput{}, Output: directory.User{},
+		},
+		{
+			Name: ToolDisableUser, Contract: ContractProposed, Task: "T-089",
+			Description: "Disable a user (set nsAccountLock). Sibling of POST /api/v1/users/{id}/disable. Distinct from lock.",
+			Scope:       auth.ScopeDirectoryWrite, Flag: flagMutations, Idempotent: true,
+			Input: RevisionIDInput{}, Output: directory.User{},
 		},
 		{
 			Name: ToolCreateGroup, Contract: ContractProposed, Task: "T-090",
