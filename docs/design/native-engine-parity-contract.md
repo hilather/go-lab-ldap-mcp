@@ -242,7 +242,12 @@ A user created through REST or MCP is visible to `ldapsearch` against the direct
 When adjudicated, each moves into section 3 (accepted Delta) with the test name that proves the difference, or is fixed to match the oracle (Contract).
 
 | CAND-6 | ModifyDN rename into own subtree | bbolt store allows it; index-based Subtree walks can detach the subtree (no store sentinel exists) — needs a dispatch guard | 389 rejects (LDAP-illegal) | T-129 `store.go`; guard belongs in ModifyDN dispatch (T-143/T-144 hardening) |
-| CAND-7 | supportedExtension advertises StartTLS/WhoAmI pre-handler | Root DSE lists both OIDs; dispatch answers unwillingToPerform until T-133/T-142 land the handlers | 389 advertises only honored extensions | T-132 `op_search.go`; resolved when T-133/T-142 merge |
+| CAND-17 | groupdn membership scope | direct `member`/`uniqueMember` only, no nesting; group objectClass not required | confirm vs 389 | T-139 `aci_eval.go` |
+| CAND-18 | Paged-cookie tamper result code | `unwillingToPerform(53)`; cookie is HMAC-SHA256 (offset + base DN + scope + filter), per-server random secret | 389's exact bad-cookie code unverified | T-140 `ctrl_paged.go`; adjudicate in T-147 |
+| CAND-19 | Assertion control scope | Modify-only; critical assertion on non-Modify → `unavailableCriticalExtension`; `assertionFailed(122)` on mismatch | 389 assertion-on-Add / non-critical behavior unverified | T-141 `ctrl_assert.go`; adjudicate in T-147 |
+| CAND-20 | WhoAmI authzid rendering | `dn:<dn>` with case-preserving `DN.String()`; present-but-empty value for anonymous | 389 may normalize case or omit value for anonymous | T-142 `ext_whoami.go`; adjudicate in T-147 |
+
+**Resolved:** ~~CAND-7~~ (supportedExtension advertised StartTLS/WhoAmI pre-handler) — both handlers now exist (T-133 StartTLS, T-142 WhoAmI); the Root DSE advertisement is truthful. CAND-7 is removed from the candidate set.
 | CAND-8 | MAY-attribute allow-listing not enforced on writes | Only MUST enforced; 389 accepts marker attrs (destinationIndicator/owner on device) | Matches 389-observed | T-132 `schema_registry.go`; confirm vs oracle in T-147 |
 | CAND-9 | Password-policy-violation writes (min length, history) | `unwillingToPerform(53)` via the plugin-abort path | 389 returns `constraintViolation(19)` | T-134 `password.go`; adjudicate in T-147 |
 | CAND-10 | Lockout / expired-password bind failure code | `invalidCredentials(49)` | confirm 389's exact bind-path code | T-134 `password.go`; adjudicate in T-147 |

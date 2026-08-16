@@ -1653,15 +1653,15 @@ Acceptance:
 - [x] Concurrent conflicting assertions: at most one commit (txn test).
 - [x] Root DSE lists the OID.
 
-## [ ] T-142 WhoAmI extended operation
+## [x] T-142 WhoAmI extended operation
 
 Priority: P0 | Size: S | Depends on: T-126, T-132 | Wave 5 | Cloud fit: high
 
 Deliverables: RFC 4532 `1.3.6.1.4.1.4203.1.11.3`; advertise on Root DSE.
 
 Acceptance:
-- [ ] After simple bind, WhoAmI returns the bound DN (authzid form matching 389 observed or RFC; record Delta if formatting differs).
-- [ ] T-115 `ldapwhoami` case can be pointed at native after T-148.
+- [x] After simple bind, WhoAmI returns the bound DN (authzid form matching 389 observed or RFC; record Delta if formatting differs).
+- [x] T-115 `ldapwhoami` case can be pointed at native after T-148.
 
 ## [ ] T-143 `labldapd` daemon command
 
