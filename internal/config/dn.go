@@ -146,6 +146,24 @@ func (d DN) IsDescendantOf(ancestor DN) bool {
 	return true
 }
 
+// IsDescendantOfFold is IsDescendantOf with EqualFold on RDN values. The
+// store indexes DNs by FoldedKey, so ou=groups and ou=Groups are the same
+// entry; rename-into-self and ACI scope checks must use this, not the
+// case-sensitive walk.
+func (d DN) IsDescendantOfFold(ancestor DN) bool {
+	if len(ancestor.rdns) == 0 || len(d.rdns) <= len(ancestor.rdns) {
+		return false
+	}
+	off := len(d.rdns) - len(ancestor.rdns)
+	for i := range ancestor.rdns {
+		if d.rdns[off+i].attr != ancestor.rdns[i].attr ||
+			!strings.EqualFold(d.rdns[off+i].value, ancestor.rdns[i].value) {
+			return false
+		}
+	}
+	return true
+}
+
 func splitUnescaped(s string, sep rune) []string {
 	var parts []string
 	start := 0

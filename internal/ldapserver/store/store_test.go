@@ -295,6 +295,23 @@ func TestStoreErrors(t *testing.T) {
 	if !errors.Is(err, ldapserver.ErrEntryExists) {
 		t.Fatalf("rename onto folded-existing: %v", err)
 	}
+	err = s.Update(ctx, func(tx ldapserver.UpdateTx) error {
+		return tx.Rename(ctx,
+			mustParseDN(t, "ou=people,dc=example,dc=test"),
+			mustParseDN(t, "ou=people,uid=alice,ou=People,dc=example,dc=test"))
+	})
+	if !errors.Is(err, ldapserver.ErrRenameIntoSelf) {
+		t.Fatalf("rename into mixed-case child: %v, want ErrRenameIntoSelf", err)
+	}
+	err = s.View(ctx, func(tx ldapserver.ReadTx) error {
+		if _, err := tx.Entry(ctx, mustParseDN(t, "uid=alice,ou=people,dc=example,dc=test")); err != nil {
+			t.Fatalf("child missing after rejected rename: %v", err)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("View after rejected rename: %v", err)
+	}
 }
 
 func TestStoreUpdateRollback(t *testing.T) {

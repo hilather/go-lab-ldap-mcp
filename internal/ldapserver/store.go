@@ -12,10 +12,11 @@ import (
 // to LDAP result codes (noSuchObject, entryAlreadyExists,
 // notAllowedOnNonLeaf); compare with errors.Is through wrapping.
 var (
-	ErrNoSuchObject = errors.New("ldapserver: no such entry")
-	ErrEntryExists  = errors.New("ldapserver: entry already exists")
-	ErrNotLeaf      = errors.New("ldapserver: entry has children")
-	ErrStoreClosed  = errors.New("ldapserver: store is closed")
+	ErrNoSuchObject   = errors.New("ldapserver: no such entry")
+	ErrEntryExists    = errors.New("ldapserver: entry already exists")
+	ErrNotLeaf        = errors.New("ldapserver: entry has children")
+	ErrRenameIntoSelf = errors.New("ldapserver: cannot rename an entry into its own subtree")
+	ErrStoreClosed    = errors.New("ldapserver: store is closed")
 )
 
 // Entry is one directory entry. DN holds the canonical string form produced
@@ -92,6 +93,7 @@ type UpdateTx interface {
 	Delete(ctx context.Context, dn config.DN) error
 	// Rename moves the entry at from to to, atomically rewriting every
 	// descendant DN. ErrNoSuchObject when from is absent, ErrEntryExists
-	// when to is taken.
+	// when to is taken, ErrRenameIntoSelf when to is a fold-equal
+	// descendant of from (D16).
 	Rename(ctx context.Context, from, to config.DN) error
 }

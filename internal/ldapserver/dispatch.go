@@ -152,6 +152,8 @@ func resultFromError(err error) Result {
 		return Result{Code: ResultEntryAlreadyExists, DiagnosticMessage: "entry already exists"}
 	case errors.Is(err, ErrNotLeaf):
 		return Result{Code: ResultNotAllowedOnNonLeaf, DiagnosticMessage: "entry has children"}
+	case errors.Is(err, ErrRenameIntoSelf):
+		return Result{Code: ResultUnwillingToPerform, DiagnosticMessage: "cannot rename an entry into its own subtree"}
 	default:
 		return Result{Code: ResultOperationsError, DiagnosticMessage: "internal error"}
 	}

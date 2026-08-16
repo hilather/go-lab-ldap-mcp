@@ -98,8 +98,8 @@ are also in contract section 3 (2026-08-16).
 | Ref | Topic | 389 (observed) | Native (observed) | Verdict |
 | --- | --- | --- | --- | --- |
 | D15 (CAND-2) | `approxMatch` filter semantics | real approx matching, extra step returns the entry | folds to equality (one step returns nothing) | delta |
-| D16 (CAND-6) | ModifyDN rename into own subtree | rejects, `unwillingToPerform(53)`; subtree stays put | permits the rename; later subtree walks detach it (`noSuchObject(32)`) | delta |
-| D17 (CAND-8) | Schema MAY / unknown-attribute enforcement on writes | marker-extra and unknown-attr adds both `objectClassViolation(65)`; follow-up reads `noSuchObject(32)` | both adds `success(0)` | delta |
+| D16 (CAND-6) | ModifyDN rename into own subtree | rejects, `unwillingToPerform(53)`; subtree stays put | rejects, `unwillingToPerform(53)`; subtree stays put (unit-tested; folded NewSuperior). Ledger `native` column is pre-fix — re-probe to flip Contract | delta |
+| D17 (CAND-8) | Schema MAY / unknown-attribute enforcement on writes | marker-extra and unknown-attr adds both `objectClassViolation(65)`; follow-up reads `noSuchObject(32)` | both adds `objectClassViolation(65)` (unit-tested). Marker stays `description` JSON (OD-012). Ledger `native` column is pre-fix — re-probe to flip Contract | delta |
 | D18 (CAND-9) | Password-policy-violation write code | `constraintViolation(19)` | ~~`unwillingToPerform(53)`~~ **Closed:** `constraintViolation(19)` | match |
 | D19 (CAND-10) | Lockout bind failure code | 5th failure → `constraintViolation(19)`; 389 stamps `accountUnlockTime`/`nsUniqueId`/`passwordRetryCount` | 5th failure → `invalidCredentials(49)`; native stamps `pwdAccountLockedTime`/`pwdChangedTime` | delta (C4 is lockout *effect* + bind-test `locked`, not a single marker attr) |
 | D20 (CAND-11) | Re-setting the current password | rejected, `constraintViolation(19)` | ~~rejected as in-history, `unwillingToPerform(53)`~~ **Closed:** same reject with 19 | match (both reject; codes agree) |

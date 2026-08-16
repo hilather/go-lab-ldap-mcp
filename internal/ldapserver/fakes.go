@@ -203,6 +203,9 @@ func (t fakeTx) Rename(ctx context.Context, from, to config.DN) error {
 	if _, ok := t.entries[toKey]; ok {
 		return fmt.Errorf("ldapserver fake store rename: %w", ErrEntryExists)
 	}
+	if to.IsDescendantOfFold(from) {
+		return fmt.Errorf("ldapserver fake store rename: %w", ErrRenameIntoSelf)
+	}
 	type move struct{ oldKey, newKey, newDN string }
 	var moves []move
 	fromSuffix := "," + fromKey

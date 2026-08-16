@@ -232,6 +232,25 @@ func TestFakeStoreRenameMovesDescendants(t *testing.T) {
 	if !errors.Is(err, ErrEntryExists) {
 		t.Fatalf("rename onto existing: %v", err)
 	}
+
+	// D16: rename into own subtree (including mixed-case NewSuperior)
+	// must not detach children.
+	err = s.Update(ctx, func(tx UpdateTx) error {
+		return tx.Rename(ctx,
+			mustParseDN(t, "ou=users,dc=example,dc=test"),
+			mustParseDN(t, "ou=users,uid=alice,ou=Users,dc=example,dc=test"))
+	})
+	if !errors.Is(err, ErrRenameIntoSelf) {
+		t.Fatalf("rename into mixed-case child: %v, want ErrRenameIntoSelf", err)
+	}
+	if err := s.View(ctx, func(tx ReadTx) error {
+		if _, err := tx.Entry(ctx, mustParseDN(t, "uid=alice,ou=users,dc=example,dc=test")); err != nil {
+			t.Fatalf("child missing after rejected rename: %v", err)
+		}
+		return nil
+	}); err != nil {
+		t.Fatalf("View after rejected rename: %v", err)
+	}
 }
 
 func TestFakeStoreInvalidEntryDN(t *testing.T) {

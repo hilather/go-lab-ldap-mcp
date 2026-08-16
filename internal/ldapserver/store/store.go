@@ -386,6 +386,11 @@ func (t updateTx) Rename(ctx context.Context, from, to config.DN) error {
 	if t.tx.Bucket(bucketDN2ID).Get([]byte(toKey)) != nil {
 		return fmt.Errorf("store: rename: %w", ldapserver.ErrEntryExists)
 	}
+	// D16 defense in depth: a folded descendant destination would
+	// prefix-swap the children index off the tree.
+	if to.IsDescendantOfFold(from) {
+		return fmt.Errorf("store: rename: %w", ldapserver.ErrRenameIntoSelf)
+	}
 	moves, err := t.collectMoves(from, to)
 	if err != nil {
 		return err

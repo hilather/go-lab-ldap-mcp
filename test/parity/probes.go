@@ -142,9 +142,10 @@ func probeCAND5(c *caseCtx) []opOutcome {
 }
 
 // CAND-6: rename an entry into its own subtree. 389 rejects it as
-// LDAP-illegal; native's store historically allowed it, detaching the
-// subtree from index walks. The probe runs LAST against ou=movedemo and
-// records the post-state either way.
+// LDAP-illegal (unwillingToPerform). Native now refuses the same way in
+// handleModifyDN and store.Rename (folded DN identity). The ledger
+// native column is still the pre-fix recording; re-probe to flip
+// Contract. The probe runs LAST against ou=movedemo.
 func probeCAND6(c *caseCtx) []opOutcome {
 	e := c.e
 	dm := e.dm(c.t)
@@ -167,10 +168,12 @@ func probeCAND7(c *caseCtx) []opOutcome {
 	return []opOutcome{w, stls}
 }
 
-// CAND-8: schema enforcement depth. (a) marker attributes
-// destinationIndicator/owner on a device entry (389 accepts per the CAND
-// note); (b) an attribute undefined in the standard schema — 389 rejects
-// unknown attributes, native's gate enforces MUST only.
+// CAND-8: schema enforcement depth. 389 rejects marker extras
+// (destinationIndicator/owner on device) and unknown attributes with
+// objectClassViolation(65). Native now enforces MUST/MAY plus unknown
+// reject the same way (marker remains description JSON, OD-012). The
+// ledger native column is still the pre-fix recording; re-probe to
+// flip Contract.
 func probeCAND8(c *caseCtx) []opOutcome {
 	t, e := c.t, c.e
 	dm := e.dm(t)

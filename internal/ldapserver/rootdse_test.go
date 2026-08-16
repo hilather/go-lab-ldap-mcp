@@ -369,6 +369,19 @@ func TestAddSchemaEnforcement(t *testing.T) {
 	if !strings.Contains(res.DiagnosticMessage, "xyzzyUndefinedAttr") {
 		t.Fatalf("diagnostic should name the unknown attribute: %q", res.DiagnosticMessage)
 	}
+
+	// OID-form AttributeDescription is a legal MAY (description = 2.5.4.13).
+	res = roundTrip(t, cl, &AddRequest{
+		DN: "cn=oid-desc,dc=example,dc=test",
+		Attributes: []Attribute{
+			StringAttribute("objectClass", "top", "device"),
+			StringAttribute("cn", "oid-desc"),
+			StringAttribute("2.5.4.13", "{}"),
+		},
+	})
+	if res.Code != ResultSuccess {
+		t.Fatalf("add description by OID = %v, want success", res)
+	}
 }
 
 // TestModifySchemaEnforcement: a modify leaving the entry without a MUST

@@ -303,7 +303,7 @@ func checkEntrySchema(s Schema, e *Entry) error {
 	if len(s.ObjectClasses()) == 0 {
 		return nil
 	}
-	ocValues := e.Values("objectClass")
+	ocValues := entryValues(s, e, "objectClass")
 	if len(ocValues) == 0 {
 		return &schemaViolation{reason: "entry has no objectClass attribute"}
 	}
@@ -318,8 +318,7 @@ func checkEntrySchema(s Schema, e *Entry) error {
 		collectMustMay(s, oc, must, allowed, visited)
 	}
 	for _, attr := range sortedKeys(must) {
-		idx := attrIndex(e, attr)
-		if idx < 0 || len(e.Attributes[idx].Values) == 0 {
+		if len(entryValues(s, e, attr)) == 0 {
 			return &schemaViolation{reason: fmt.Sprintf("missing required attribute %q", attr)}
 		}
 	}
@@ -334,7 +333,7 @@ func checkEntrySchema(s Schema, e *Entry) error {
 		if at.Operational {
 			continue
 		}
-		if _, ok := allowed[strings.ToLower(a.Name)]; !ok {
+		if !attrAllowed(allowed, at) {
 			return &schemaViolation{reason: fmt.Sprintf("attribute %q is not permitted by object class", a.Name)}
 		}
 	}
@@ -353,18 +352,62 @@ func collectMustMay(s Schema, oc ObjectClassDef, must, allowed, visited map[stri
 	}
 	visited[key] = struct{}{}
 	for _, m := range oc.Must {
-		k := strings.ToLower(m)
-		must[k] = struct{}{}
-		allowed[k] = struct{}{}
+		must[strings.ToLower(m)] = struct{}{}
+		markAttrKeys(s, m, allowed)
 	}
 	for _, m := range oc.May {
-		allowed[strings.ToLower(m)] = struct{}{}
+		markAttrKeys(s, m, allowed)
 	}
 	for _, sup := range oc.Sup {
 		if supOC, ok := s.ObjectClass(sup); ok {
 			collectMustMay(s, supOC, must, allowed, visited)
 		}
 	}
+}
+
+// markAttrKeys records the schema name and, when the type resolves, its
+// canonical name and OID so a client AttributeDescription in either form
+// matches the MUST/MAY allow-list (RFC 4512).
+func markAttrKeys(s Schema, name string, dest map[string]struct{}) {
+	dest[strings.ToLower(name)] = struct{}{}
+	if at, ok := s.AttributeType(name); ok {
+		dest[strings.ToLower(at.Name)] = struct{}{}
+		if at.OID != "" {
+			dest[at.OID] = struct{}{}
+		}
+	}
+}
+
+func attrAllowed(allowed map[string]struct{}, at AttributeTypeDef) bool {
+	if _, ok := allowed[strings.ToLower(at.Name)]; ok {
+		return true
+	}
+	if at.OID != "" {
+		_, ok := allowed[at.OID]
+		return ok
+	}
+	return false
+}
+
+// entryValues returns the named attribute, accepting the schema name or
+// the type's OID so MUST presence is not name-only.
+func entryValues(s Schema, e *Entry, name string) [][]byte {
+	if v := e.Values(name); len(v) > 0 {
+		return v
+	}
+	at, ok := s.AttributeType(name)
+	if !ok {
+		return nil
+	}
+	if !strings.EqualFold(at.Name, name) {
+		if v := e.Values(at.Name); len(v) > 0 {
+			return v
+		}
+	}
+	if at.OID != "" && !strings.EqualFold(at.OID, name) {
+		return e.Values(at.OID)
+	}
+	return nil
 }
 
 func sortedKeys(m map[string]struct{}) []string {

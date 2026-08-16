@@ -100,3 +100,31 @@ func TestDescendantIsStructural(t *testing.T) {
 		t.Fatal("equal is not a descendant")
 	}
 }
+
+func TestIsDescendantOfFold(t *testing.T) {
+	t.Parallel()
+	parent, err := config.ParseDN("ou=groups,dc=example,dc=test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	mixed, err := config.ParseDN("cn=admins,ou=Groups,dc=example,dc=test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parent.IsDescendantOf(mixed) || mixed.IsDescendantOf(parent) {
+		t.Fatal("case-sensitive IsDescendantOf must not treat ou=Groups as ou=groups")
+	}
+	if !mixed.IsDescendantOfFold(parent) {
+		t.Fatal("IsDescendantOfFold should treat ou=Groups as under ou=groups")
+	}
+	if parent.IsDescendantOfFold(parent) {
+		t.Fatal("equal is not a descendant")
+	}
+	other, err := config.ParseDN("ou=people,dc=example,dc=test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if mixed.IsDescendantOfFold(other) {
+		t.Fatal("admins/groups is not under people")
+	}
+}

@@ -470,9 +470,10 @@ func (s *Server) handleModifyDN(ctx context.Context, c *conn, m *Message, req *M
 	}
 	newDN := joinDN(newRDN, superior)
 	// D16: 389 rejects a rename that would place the entry inside its
-	// own old subtree (unwillingToPerform). Doing the move detaches the
-	// subtree from later walks (noSuchObject); refuse before Store.Rename.
-	if newDN.IsDescendantOf(dn) {
+	// own old subtree (unwillingToPerform). Folded comparison matches
+	// store identity (ou=groups vs ou=Groups). Doing the move detaches
+	// the subtree from later walks (noSuchObject); refuse before Update.
+	if newDN.IsDescendantOfFold(dn) {
 		return respond(Result{Code: ResultUnwillingToPerform, DiagnosticMessage: "cannot rename an entry into its own subtree"})
 	}
 

@@ -227,6 +227,16 @@ func TestCheckEntrySchema(t *testing.T) {
 				StringAttribute("modifyTimestamp", "20260815120000Z")),
 		},
 		{
+			// RFC 4512 AttributeDescriptions may be OIDs; MUST/MAY
+			// must accept the resolved type, not only the schema name.
+			name:   "MAY and MUST accepted by attribute OID",
+			schema: std,
+			entry: NewEntry("cn=labldap-baseline,dc=example,dc=test",
+				StringAttribute("objectClass", "top", "device"),
+				StringAttribute("2.5.4.3", "labldap-baseline"),
+				StringAttribute("2.5.4.13", "{}")),
+		},
+		{
 			name:    "empty registry permits everything (T-128 seam)",
 			schema:  NewFakeSchema(nil, nil),
 			entry:   NewEntry("cn=x,dc=example,dc=test", StringAttribute("objectClass", "bogusClass")),

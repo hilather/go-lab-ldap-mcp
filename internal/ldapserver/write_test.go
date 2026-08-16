@@ -479,6 +479,18 @@ func TestModifyDNIntoOwnSubtree(t *testing.T) {
 		t.Fatalf("rename into self = %v, want unwillingToPerform", res)
 	}
 
+	// Mixed-case NewSuperior still folds to the same child (store
+	// FoldedKey). Case-sensitive IsDescendantOf would miss this.
+	res = roundTrip(t, cl, &ModifyDNRequest{
+		DN:           parent,
+		NewRDN:       "ou=groups",
+		DeleteOldRDN: true,
+		NewSuperior:  "cn=admins,ou=Groups,dc=example,dc=test",
+	})
+	if res.Code != ResultUnwillingToPerform {
+		t.Fatalf("rename into mixed-case child = %v, want unwillingToPerform", res)
+	}
+
 	if _, err := fetchEntry(t, opts, parent); err != nil {
 		t.Fatalf("parent missing after rejected rename: %v", err)
 	}
