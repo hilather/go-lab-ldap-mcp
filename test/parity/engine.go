@@ -56,6 +56,10 @@ type engine interface {
 	// clientTLS is the engine's normal client TLS config (fixture CA for
 	// native, container CA + hostname for the oracle) for raw-wire TLS.
 	clientTLS() *tls.Config
+	// caFile writes the engine's TLS CA to a temp file for ldapclient.
+	caFile(t *testing.T) string
+	// serverName is the TLS server name clients must present.
+	serverName() string
 	close(t *testing.T)
 }
 

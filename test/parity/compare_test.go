@@ -55,6 +55,40 @@ func TestDualEngineParity(t *testing.T) {
 		}
 	}
 
+	// Control-plane Contract (section 5 rule 2): app + Runtime, no HTTP.
+	// Not written into the LDAP ledger — compare live, 389 is oracle.
+	nativeCP := map[string][]opOutcome{}
+	oracleCP := map[string][]opOutcome{}
+	t.Run("control-plane-native", func(t *testing.T) {
+		cp := startControlPlane(t, fx, native)
+		for _, e := range runControlPlane(t, cp) {
+			nativeCP[e.ID+"/"+e.Name] = e.Agreed
+		}
+	})
+	t.Run("control-plane-oracle", func(t *testing.T) {
+		cp := startControlPlane(t, fx, oracle)
+		for _, e := range runControlPlane(t, cp) {
+			oracleCP[e.ID+"/"+e.Name] = e.Agreed
+		}
+	})
+	for _, cs := range controlPlaneCases {
+		key := cs.id + "/" + cs.name
+		got, oracleGot := nativeCP[key], oracleCP[key]
+		want := wantControlPlane(cs.name)
+		if !outcomesEqual(got, oracleGot) {
+			t.Errorf("CONTROL-PLANE MISMATCH %s (389 is oracle):\n%s",
+				key, diffOutcomes(key, oracleGot, got))
+		}
+		if want != nil && !outcomesEqual(want, got) {
+			t.Errorf("CONTROL-PLANE %s native drifted from the expected sequence:\n%s",
+				key, diffOutcomes(key, want, got))
+		}
+		if want != nil && !outcomesEqual(want, oracleGot) {
+			t.Errorf("CONTROL-PLANE %s oracle drifted from the expected sequence:\n%s",
+				key, diffOutcomes(key, want, oracleGot))
+		}
+	}
+
 	// --- Delta candidates: record, don't fail. ---
 	nativeCands := map[string][]opOutcome{}
 	oracleCands := map[string][]opOutcome{}

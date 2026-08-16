@@ -17,6 +17,22 @@ func runContract(t *testing.T, fx *fixture, e engine) []ledgerCaseEntry {
 	return out
 }
 
+// runControlPlane executes every control-plane Contract case against one
+// already-wired Runtime/app pair (contract section 5 rule 2).
+func runControlPlane(t *testing.T, cp *cpEnv) []ledgerCaseEntry {
+	t.Helper()
+	out := make([]ledgerCaseEntry, 0, len(controlPlaneCases))
+	for _, cs := range controlPlaneCases {
+		cs := cs
+		t.Run(cp.e.name()+"/"+cs.id+"/"+cs.name, func(t *testing.T) {
+			c := *cp
+			c.t = t
+			out = append(out, ledgerCaseEntry{ID: cs.id, Name: cs.name, Agreed: cs.run(&c)})
+		})
+	}
+	return out
+}
+
 // runCandidates executes every CAND probe against one engine, in id
 // order, returning outcomes keyed by candidate id.
 func runCandidates(t *testing.T, fx *fixture, e engine) map[string][]opOutcome {

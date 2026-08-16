@@ -251,6 +251,15 @@ func (e *oracleEngine) addr(ldaps bool) string {
 
 func (e *oracleEngine) clientTLS() *tls.Config { return e.clientTLSFor(dialSpec{ldaps: true}) }
 
+func (e *oracleEngine) caFile(t *testing.T) string {
+	t.Helper()
+	dest := filepath.Join(t.TempDir(), "ca.pem")
+	e.writeCA(t, dest)
+	return dest
+}
+
+func (e *oracleEngine) serverName() string { return e.hostname }
+
 // --- container lifecycle helpers (mirrors dirsrv/harness.go) ---
 
 func parityImageRef() (string, error) {

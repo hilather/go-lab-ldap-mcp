@@ -233,7 +233,7 @@ is [`docs/design/parity-delta-log.md`](https://github.com/hilather/go-lab-ldap-m
 ## 5. Parity harness rules (T-147+)
 
 1. One scenario fixture compiled once; applied to a fresh 389 instance and a fresh native instance.
-2. For each Contract case: perform the operation through **direct LDAP** (independent client) and, where listed, through the control plane against each engine.
+2. For each Contract case: perform the operation through **direct LDAP** (independent client) and, where listed, through the control plane against each engine. Control-plane Contract cases live in `test/parity/controlplane.go` and call `internal/app` + `ds389.Runtime` (no HTTP) against each engine: `cp-create-user-visible` (C13), `cp-ldapadd-visible` (C13), `cp-set-password` (C4/C11), `cp-bind-test` (C3), `cp-if-match` (C9), `cp-memberof` (C7/D26). 389 remains oracle; secrets are stripped from outcomes.
 3. Compare: result code, normalized DN set, normalized attribute sets (secrets stripped), bind success boolean, `memberOf` sets, enablement, lockout.
 4. Do not compare: `vendorVersion`, password hashes, `createTimestamp` clock values beyond “present and RFC3339-ish”, backend CNs.
 5. Failures attach redacted engine logs. Secret scan of the parity run must pass.
@@ -261,6 +261,7 @@ is [`docs/design/parity-delta-log.md`](https://github.com/hilather/go-lab-ldap-m
 | 2026-08-16 | Native password-policy write path: D18/D20/D29 closed. Policy errors map to `constraintViolation(19)`; current-password re-set stays rejected with 19; DM `BypassACI` skips history. Ledger CAND-9/11/27 verdict `match`. |
 | 2026-08-16 | KD-6 / PR-2B: native refuses unauthenticated directory operations (suffix search, Root DSE, subschema, Compare, writes, WhoAmI) with `inappropriateAuthentication(48)` when `allowAnonymousBind` is off. D14, D21, and D24 collapse. CAND-15 and CAND-22 native columns updated to 48 (`match`). CAND-20 remains a Delta for bound authzId rendering (D13); native anonymous WhoAmI is now 48 (oracle column not rewritten). |
 | 2026-08-16 | Native D16/D17 now reject the same way as 389 (`unwillingToPerform(53)` / `objectClassViolation(65)`); unit-tested. Section 3 native *description* updated. Ledger `native` columns and verdict=Delta stay until an oracle re-probe. |
+| 2026-08-16 | Control-plane Contract cases (`test/parity/controlplane.go`) implement section 5 rule 2: `internal/app` + `ds389.Runtime` against each engine, no HTTP. LDAP contract cases and the delta ledger are unchanged. |
 
 ### Adjudicated Wave-1 candidates (no pending rows)
 

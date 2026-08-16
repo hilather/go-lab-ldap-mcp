@@ -7,6 +7,8 @@
 // (the oracle). Every Contract-tier case executes the SAME LDAP operation
 // sequence against both engines and compares canonicalized outcomes
 // (result codes, normalized DNs, attribute sets with secrets stripped).
+// Control-plane cases (controlplane.go) additionally drive internal/app
+// + ds389.Runtime against each engine (contract section 5 rule 2).
 //
 // Contract mismatches fail the build. Known differences are adjudicated
 // through the CAND-* probe set: each probe runs against both engines and

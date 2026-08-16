@@ -67,18 +67,20 @@ func TestNativeContractBaseline(t *testing.T) {
 func TestNativeRunLogRedaction(t *testing.T) {
 	fx := compileFixture(t)
 	ne := startNative(t, fx)
-	defer ne.close(t)
+	t.Cleanup(func() { ne.close(t) })
 
 	runContract(t, fx, ne)
 	runCandidates(t, fx, ne)
+	runControlPlane(t, startControlPlane(t, fx, ne))
 
 	logs := ne.logs.String()
 	secrets := []string{runtimePassword, nativeDMSecret}
 	for _, pw := range userPasswords {
 		secrets = append(secrets, pw)
 	}
-	// Also the rotated/new passwords used by the policy cases.
-	secrets = append(secrets, "parity-pwprobe-NEW-pass1", "parity-hist-second-01", "parity-zoe-secret-001")
+	// Also the rotated/new passwords used by the policy and control-plane cases.
+	secrets = append(secrets, "parity-pwprobe-NEW-pass1", "parity-hist-second-01", "parity-zoe-secret-001",
+		cpUserPass, cpUserPassNew, cpShortPass, "parity-cp-WRONG-00")
 	for _, s := range secrets {
 		if strings.Contains(logs, s) {
 			t.Errorf("native engine log contains a secret value (%q...)", s[:12])

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"os"
 	"path/filepath"
 	"sync"
 	"testing"
@@ -182,6 +183,17 @@ func (e *nativeEngine) addr(ldaps bool) string {
 }
 
 func (e *nativeEngine) clientTLS() *tls.Config { return e.fx.tls.client }
+
+func (e *nativeEngine) caFile(t *testing.T) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "ca.pem")
+	if err := os.WriteFile(path, e.fx.tls.caPEM, 0o600); err != nil {
+		t.Fatalf("parity: native CA file: %v", err)
+	}
+	return path
+}
+
+func (e *nativeEngine) serverName() string { return "localhost" }
 
 func (e *nativeEngine) dial(t *testing.T, spec dialSpec) (*ldap.Conn, error) {
 	t.Helper()
