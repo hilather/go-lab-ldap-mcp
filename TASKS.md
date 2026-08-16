@@ -1728,16 +1728,18 @@ Acceptance:
 - [ ] Secret scan of the run passes.
 - [ ] D1 vendor strings are asserted different, not equal.
 
-## [ ] T-148 Parametrize existing integration tests
+## [x] T-148 Parametrize existing integration tests
 
 Priority: P0 | Size: L | Depends on: T-147 | Wave 6 | Cloud fit: medium
 
 Deliverables: run the T-043 observed suite and T-115 client matrix against native where Contract applies; skip Deltas by ID; `ldapwhoami` / `ldapsearch` / go-ldap / ldap3 vs native.
 
 Acceptance:
-- [ ] Documented skip list is only Delta/Excluded IDs from the parity contract.
-- [ ] Compatibility report records native engine version beside 389.
-- [ ] 389-only tests remain the default `make test-integration`.
+- [x] Documented skip list is only Delta/Excluded IDs (ledger at top of `test/integration/dirsrv/engine.go`: D2/D4/D5/E7).
+- [x] Compatibility report records native engine version beside 389 (`engine_identity_D1` logs Root DSE identity both runs, asserts native != 389).
+- [x] 389-only tests remain the default `make test-integration` (exit 0, unchanged; native opt-in via `LABLDAP_IT_ENGINE=native` / `make test-integration-native`).
+
+Native fixture is **in-process** (`test/integration/dirsrv/native.go`): real `internal/ldapserver` stack on ephemeral loopback ports, hermetic, no Docker; seeds via shared `ds389.Engine` LDAP-as-DM data plane (ADR-0009 decision 12). Native run: 12 pass / 51 delta-ID skips / 0 fail.
 
 ## [ ] T-149 Differential fuzzing
 
