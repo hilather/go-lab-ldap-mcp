@@ -259,9 +259,9 @@ func probeCAND10(c *caseCtx) []opOutcome {
 	return out
 }
 
-// CAND-11: re-setting the *current* password. Native's history check
-// includes the current password (stricter); 389 is known to allow re-set
-// on some paths.
+// CAND-11: re-setting the *current* password. Both engines reject;
+// 389 returns constraintViolation(19), native unwillingToPerform(53)
+// (history check includes the current password).
 func probeCAND11(c *caseCtx) []opOutcome {
 	t, e := c.t, c.e
 	dm := e.dm(t)
@@ -273,8 +273,8 @@ func probeCAND11(c *caseCtx) []opOutcome {
 	same.Replace("userPassword", []string{histProbeAfterCAND9})
 	out := []opOutcome{codeOutcome(self.Modify(same))}
 	out = append(out, dialCode(t, e, userSpec(dn, histProbeAfterCAND9)))
-	// Restore to a fresh value (DM) so post-state is clean regardless of
-	// which engine accepted the same-password re-set.
+	// Restore to a fresh value (DM) so post-state is identical after the
+	// rejected same-password re-set.
 	restore := ldap.NewModifyRequest(dn, nil)
 	restore.Replace("userPassword", []string{"parity-hist-fourth-01"})
 	out = append(out, codeOutcome(dm.Modify(restore)))

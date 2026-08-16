@@ -26,10 +26,12 @@ behavior) or recorded here with evidence.
 4. Observation source of truth is T-147's machine-readable ledger
    ([`test/parity/delta-ledger.json`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/test/parity/delta-ledger.json),
    schema `labldap.parity.v1`, golden file regenerated via
-   `PARITY_UPDATE_LEDGER=1`) plus probe comments in
-   [`test/parity/probes.go`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/test/parity/probes.go).
-   This document is the human narrative. The two must not disagree — if
-   they do, the ledger + probes win for observed polarity and this log
+   `PARITY_UPDATE_LEDGER=1`) — the structured `oracle` / `native`
+   outcome columns. Probe *code* and step comments in
+   [`test/parity/probes.go`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/test/parity/probes.go)
+   may narrate those steps only when they do not contradict the JSON;
+   if a comment disagrees, the JSON wins. This document is the human
+   narrative. If it disagrees with the JSON, the JSON wins and this log
    is corrected. (2026-08-16: D7 claimed 389 honors RFC 4528, D26
    swapped the engines, and D20 claimed 389 allows current-password
    re-set; those sentences were false relative to the ledger and are

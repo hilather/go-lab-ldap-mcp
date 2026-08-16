@@ -12,7 +12,7 @@
 
 This file is the Contract / Delta / Excluded ledger for dual-engine work. Expanding the Contract tier, shrinking Excluded, or promoting a Delta to Contract requires a dated amendment here and, if it changes a public engine guarantee, an ADR.
 
-**Observation source of truth** for what each engine actually returned is the machine ledger [`test/parity/delta-ledger.json`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/test/parity/delta-ledger.json) plus probe comments in [`test/parity/probes.go`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/test/parity/probes.go). The human adjudication record is [`docs/design/parity-delta-log.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/design/parity-delta-log.md). If those artifacts disagree on observed polarity, the JSON + probes win and the human log is corrected.
+**Observation source of truth** for what each engine actually returned is the structured `oracle` / `native` outcomes in [`test/parity/delta-ledger.json`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/test/parity/delta-ledger.json). Probe *code* and step comments in [`test/parity/probes.go`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/test/parity/probes.go) may narrate those steps only when they do not contradict the JSON; if a comment disagrees, the JSON wins. The human adjudication record is [`docs/design/parity-delta-log.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/design/parity-delta-log.md). If that log disagrees with the JSON, the JSON wins and the human log is corrected.
 
 Agents implementing M9 tasks must read this document and the two ADRs before writing code.
 
@@ -215,7 +215,7 @@ A user created through REST or MCP is visible to `ldapsearch` against the direct
 | D30 | Subschema publishes `pwdAccountLockedTime` | Publishes `nsAccountLock` only | Publishes `nsAccountLock` **and** `pwdAccountLockedTime` | `test/parity` CAND-28. Honest listing (see C4). |
 
 The adjudication record (observed values, rationale, controlling tests)
-is [`docs/design/parity-delta-log.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/design/parity-delta-log.md). Observed polarity is taken from [`test/parity/delta-ledger.json`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/test/parity/delta-ledger.json) and [`test/parity/probes.go`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/test/parity/probes.go). There are no remaining pending Wave-1 CAND rows.
+is [`docs/design/parity-delta-log.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/design/parity-delta-log.md). Observed polarity is taken from [`test/parity/delta-ledger.json`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/test/parity/delta-ledger.json); probe comments that contradict the JSON do not win. There are no remaining pending Wave-1 CAND rows.
 
 ## 4. Excluded (not in M9)
 

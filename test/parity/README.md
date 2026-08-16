@@ -4,13 +4,15 @@ Contract-tier comparison of the pinned 389 Directory Server (the oracle)
 and the native engine (`internal/ldapserver`, run in-process), per
 [`docs/design/native-engine-parity-contract.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/design/native-engine-parity-contract.md).
 
-Observation source of truth is this directory's
-[`delta-ledger.json`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/test/parity/delta-ledger.json)
-plus probe comments in
-[`probes.go`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/test/parity/probes.go).
-The human adjudication record is
+Observation source of truth is the structured `oracle` / `native`
+outcomes in this directory's
+[`delta-ledger.json`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/test/parity/delta-ledger.json).
+Probe *code* and step comments in
+[`probes.go`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/test/parity/probes.go)
+may narrate those steps only when they do not contradict the JSON; if a
+comment disagrees, the JSON wins. The human adjudication record is
 [`docs/design/parity-delta-log.md`](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/design/parity-delta-log.md).
-If those disagree on observed polarity, the JSON + probes win.
+If that log disagrees with the JSON, the JSON wins.
 
 ## What lives here
 
