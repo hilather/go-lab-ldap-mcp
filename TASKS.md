@@ -1716,7 +1716,7 @@ Acceptance:
 
 Engine-switch seam: `cmd/labldap-bootstrap/engine.go` `wireEngineReconcilers`. Note: no native `CapabilityInspector` existed (T-144 built reconcilers only; the ds389 one needs `cn=plugins,cn=config` + would exec dsconf), so the seam wires a measured `nativeCapabilities` inspector that proves plugins/scheme via the read-back reconcilers (keeps C10 "measured, not name-assumed"); Root DSE vendor strings left empty (parity harness owns vendor assertions). `labldap-bootstrap` usage text still says "389 Directory Server" — doc fix deferred to T-150.
 
-## [ ] T-147 Dual-engine parity harness
+## [x] T-147 Dual-engine parity harness
 
 Priority: P0 | Size: L | Depends on: T-144, T-145 | Wave 6 | Cloud fit: medium
 
