@@ -10,6 +10,9 @@
 // implementations wired by cmd/labldap-bootstrap, and runtime repositories
 // stay ds389.Runtime over LDAP (ADR-0009 rule 17).
 //
-// This package must not import internal/directory/ds389. The reconcilers
-// land in T-144; T-122 pins only the package contract.
+// This package must not import internal/directory/ds389 (no dsconf path)
+// or internal/ldapserver; read-back goes through internal/directory/ldapclient
+// only, via string-typed Compare probes so go-ldap types never cross the
+// boundary. T-122 pinned the package contract; the reconcilers landed in
+// T-144.
 package native

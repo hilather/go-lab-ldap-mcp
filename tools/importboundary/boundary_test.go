@@ -222,6 +222,7 @@ func TestKDR8LDAPClientImportEdges(t *testing.T) {
 	for _, rel := range []string{
 		"internal/directory/ldapclient",
 		"internal/directory/ds389",
+		"internal/directory/native", // T-144: native read-back reconcilers
 		"cmd/labldap",
 		"test/integration/dirsrv",
 	} {
@@ -346,6 +347,11 @@ func forbiddenLDAPClient(rel string, imps []string) bool {
 	case rel == "internal/directory/ldapclient" || strings.HasPrefix(rel, "internal/directory/ldapclient/"):
 		return false
 	case rel == "internal/directory/ds389" || strings.HasPrefix(rel, "internal/directory/ds389/"):
+		return false
+	case rel == "internal/directory/native" || strings.HasPrefix(rel, "internal/directory/native/"):
+		// ADR-0009 decisions 11-12 / T-144: the native engine-plane
+		// reconcilers read the daemon's applied plan back over LDAP via
+		// ldapclient (string-typed probes only; go-ldap stays forbidden).
 		return false
 	}
 	return hasImportPrefix(imps, "github.com/hilather/go-lab-ldap-mcp/internal/directory/ldapclient")
