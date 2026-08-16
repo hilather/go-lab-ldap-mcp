@@ -1741,7 +1741,7 @@ Acceptance:
 
 Native fixture is **in-process** (`test/integration/dirsrv/native.go`): real `internal/ldapserver` stack on ephemeral loopback ports, hermetic, no Docker; seeds via shared `ds389.Engine` LDAP-as-DM data plane (ADR-0009 decision 12). Native run: 12 pass / 51 delta-ID skips / 0 fail.
 
-## [ ] T-149 Differential fuzzing
+## [x] T-149 Differential fuzzing
 
 Priority: P0 | Size: L | Depends on: T-124, T-127, T-138, T-147 | Wave 6 | Cloud fit: high (oracle step may be local)
 
@@ -1751,7 +1751,7 @@ Acceptance:
 - [ ] Native fuzz of codec, filter, ACI runs under `go test -fuzz` with a time-boxed CI job or documented nightly.
 - [ ] No crashers committed; any 389/native parse divergence is a Delta or a native bug.
 
-## [ ] T-150 Soak, leak, redaction, delta ledger, verify gate
+## [x] T-150 Soak, leak, redaction, delta ledger, verify gate
 
 Priority: P0 | Size: M | Depends on: T-147, T-148 | Wave 6 | Cloud fit: medium
 
