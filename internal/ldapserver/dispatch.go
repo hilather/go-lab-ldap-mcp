@@ -130,13 +130,17 @@ func resultFromError(err error) Result {
 	}
 }
 
-// Extended operations land in T-133 (StartTLS) and T-142 (WhoAmI).
+// Extended operations: StartTLS (T-133) is intercepted inline by the
+// connection read loop before dispatch (conn.go), so it never reaches
+// here; WhoAmI (T-142) is dispatched like any other operation.
 
 func (s *Server) handleExtended(ctx context.Context, c *conn, m *Message, req *ExtendedRequest) ResultCode {
 	var code ResultCode
 	switch req.Name {
-	case OIDStartTLS, OIDWhoAmI:
-		// Recognized OIDs whose handlers land in T-133 / T-142.
+	case OIDWhoAmI:
+		return s.handleWhoAmI(ctx, c, m, req)
+	case OIDStartTLS:
+		// Unreachable: the read loop handles StartTLS inline. Defensive.
 		code = ResultUnwillingToPerform
 	default:
 		// RFC 4511 section 4.12: unrecognized extended request.

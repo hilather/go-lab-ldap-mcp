@@ -375,7 +375,9 @@ func encodeExtendedResponse(r *ExtendedResponse) (*ber.Packet, error) {
 	if r.Name != "" {
 		p.AppendChild(ber.NewString(ber.ClassContext, ber.TypePrimitive, tagExtendedRespName, r.Name, "ResponseName"))
 	}
-	if len(r.Value) > 0 {
+	// A non-nil Value encodes even when empty: RFC 4532 WhoAmI answers the
+	// anonymous identity with a present, zero-length responseValue.
+	if r.Value != nil {
 		p.AppendChild(ber.NewString(ber.ClassContext, ber.TypePrimitive, tagExtendedRespValue, string(r.Value), "ResponseValue"))
 	}
 	return p, nil
