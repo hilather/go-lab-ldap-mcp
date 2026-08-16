@@ -445,6 +445,68 @@ func TestModifyDN(t *testing.T) {
 	}
 }
 
+// TestModifyDNIntoOwnSubtree is D16: 389 rejects a rename that would
+// place the entry inside its own old subtree (unwillingToPerform) and
+// the tree stays searchable. Native historically allowed the move and
+// later subtree walks detached (noSuchObject).
+func TestModifyDNIntoOwnSubtree(t *testing.T) {
+	t.Parallel()
+	opts := writeOptions(t, nil)
+	_, addr := serveTestServerFrom(t, opts, nil)
+	cl := dialTestClient(t, addr)
+
+	parent := "ou=groups,dc=example,dc=test"
+	child := "cn=admins,ou=groups,dc=example,dc=test"
+
+	// CAND-6 shape: rename the container under its own child.
+	res := roundTrip(t, cl, &ModifyDNRequest{
+		DN:           parent,
+		NewRDN:       "ou=groups",
+		DeleteOldRDN: true,
+		NewSuperior:  child,
+	})
+	if res.Code != ResultUnwillingToPerform {
+		t.Fatalf("rename into child = %v, want unwillingToPerform", res)
+	}
+
+	// Leaf under itself is the same class of illegal rename.
+	res = roundTrip(t, cl, &ModifyDNRequest{
+		DN:          "uid=alice,ou=people,dc=example,dc=test",
+		NewRDN:      "uid=alice",
+		NewSuperior: "uid=alice,ou=people,dc=example,dc=test",
+	})
+	if res.Code != ResultUnwillingToPerform {
+		t.Fatalf("rename into self = %v, want unwillingToPerform", res)
+	}
+
+	if _, err := fetchEntry(t, opts, parent); err != nil {
+		t.Fatalf("parent missing after rejected rename: %v", err)
+	}
+	if _, err := fetchEntry(t, opts, child); err != nil {
+		t.Fatalf("child missing after rejected rename: %v", err)
+	}
+
+	entries, done := search(t, cl, &SearchRequest{
+		BaseDN: "dc=example,dc=test",
+		Scope:  ScopeWholeSubtree,
+		Filter: &FilterEquality{Attr: "cn", Value: []byte("admins")},
+	})
+	if done.Result.Code != ResultSuccess {
+		t.Fatalf("subtree search after rejected rename: %v", done.Result)
+	}
+	if len(entries) != 1 || entries[0].DN != child {
+		t.Fatalf("child not searchable after rejected rename: %+v", entries)
+	}
+	entries, done = search(t, cl, &SearchRequest{
+		BaseDN: "dc=example,dc=test",
+		Scope:  ScopeWholeSubtree,
+		Filter: &FilterEquality{Attr: "ou", Value: []byte("groups")},
+	})
+	if done.Result.Code != ResultSuccess || len(entries) != 1 || entries[0].DN != parent {
+		t.Fatalf("parent not searchable after rejected rename: %v %+v", done.Result, entries)
+	}
+}
+
 func TestModifyDNDeniedByACI(t *testing.T) {
 	t.Parallel()
 	_, addr := serveTestServerFrom(t, writeOptions(t, func(o *Options) {

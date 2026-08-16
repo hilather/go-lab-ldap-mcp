@@ -259,9 +259,9 @@ func TestSubschemaSearch(t *testing.T) {
 	}
 }
 
-// TestAddSchemaEnforcement wires the T-132 gate over the wire: a user
-// without sn fails objectClassViolation (acceptance), and the 389-observed
-// marker shape (device with out-of-MAY attributes) is accepted.
+// TestAddSchemaEnforcement wires the T-132 / D17 gate over the wire: a
+// user without sn fails objectClassViolation, unknown attributes and
+// marker extras fail, and a device with description JSON (OD-012) succeeds.
 func TestAddSchemaEnforcement(t *testing.T) {
 	t.Parallel()
 	opts := schemaWireOptions(t, nil)
@@ -328,21 +328,46 @@ func TestAddSchemaEnforcement(t *testing.T) {
 		t.Fatalf("read back = %v, %v", e, err)
 	}
 
-	// The 389-observed baseline marker shape succeeds: device carries
-	// serialNumber/owner/destinationIndicator/description.
+	// OD-012: device + namespaced description JSON is the marker shape.
 	res = roundTrip(t, cl, &AddRequest{
 		DN: "cn=labldap-baseline,dc=example,dc=test",
 		Attributes: []Attribute{
 			StringAttribute("objectClass", "top", "device"),
 			StringAttribute("cn", "labldap-baseline"),
-			StringAttribute("serialNumber", "rev-1"),
-			StringAttribute("owner", "v0.1.0"),
-			StringAttribute("destinationIndicator", "rev-1"),
-			StringAttribute("description", "{}"),
+			StringAttribute("description", `{"serialNumber":"rev-1"}`),
 		},
 	})
 	if res.Code != ResultSuccess {
-		t.Fatalf("add marker = %v, want success (389 marker parity)", res)
+		t.Fatalf("add marker = %v, want success (OD-012 description JSON)", res)
+	}
+
+	// D17: destinationIndicator is not in device MAY — 389 objectClassViolation.
+	res = roundTrip(t, cl, &AddRequest{
+		DN: "cn=marker-extra,dc=example,dc=test",
+		Attributes: []Attribute{
+			StringAttribute("objectClass", "top", "device"),
+			StringAttribute("cn", "marker-extra"),
+			StringAttribute("destinationIndicator", "rev-1"),
+		},
+	})
+	if res.Code != ResultObjectClassViolation {
+		t.Fatalf("add marker extra = %v, want objectClassViolation", res)
+	}
+
+	// D17: unknown attribute — 389 objectClassViolation.
+	res = roundTrip(t, cl, &AddRequest{
+		DN: "cn=unknownattr,dc=example,dc=test",
+		Attributes: []Attribute{
+			StringAttribute("objectClass", "top", "device"),
+			StringAttribute("cn", "unknownattr"),
+			StringAttribute("xyzzyUndefinedAttr", "1"),
+		},
+	})
+	if res.Code != ResultObjectClassViolation {
+		t.Fatalf("add unknown attr = %v, want objectClassViolation", res)
+	}
+	if !strings.Contains(res.DiagnosticMessage, "xyzzyUndefinedAttr") {
+		t.Fatalf("diagnostic should name the unknown attribute: %q", res.DiagnosticMessage)
 	}
 }
 
@@ -383,23 +408,69 @@ func TestModifySchemaEnforcement(t *testing.T) {
 		t.Fatalf("delete oc = %v, want objectClassViolation", res)
 	}
 
+	// Seeded alice carries x-bin (search fixture); add a clean person
+	// for success-path and D17 modify checks.
+	clean := "uid=schemau,ou=people,dc=example,dc=test"
+	res = roundTrip(t, cl, &AddRequest{
+		DN: clean,
+		Attributes: []Attribute{
+			StringAttribute("objectClass", "top", "person"),
+			StringAttribute("cn", "Schema User"),
+			StringAttribute("sn", "User"),
+		},
+	})
+	if res.Code != ResultSuccess {
+		t.Fatalf("add clean person = %v", res)
+	}
+
 	// An ordinary attribute edit passes the gate.
-	res = roundTrip(t, cl, &ModifyRequest{DN: dn, Changes: []ModifyChange{
+	res = roundTrip(t, cl, &ModifyRequest{DN: clean, Changes: []ModifyChange{
 		{Op: ModifyAdd, Attr: StringAttribute("description", "schema-checked")},
 	}})
 	if res.Code != ResultSuccess {
 		t.Fatalf("add description = %v", res)
 	}
 
-	// Upgrading alice to the full user chain keeps MUSTs satisfied.
-	res = roundTrip(t, cl, &ModifyRequest{DN: dn, Changes: []ModifyChange{
+	// Upgrading to the full user chain keeps MUSTs satisfied.
+	res = roundTrip(t, cl, &ModifyRequest{DN: clean, Changes: []ModifyChange{
 		{Op: ModifyReplace, Attr: StringAttribute("objectClass", "top", "person", "organizationalPerson", "inetOrgPerson")},
 	}})
 	if res.Code != ResultSuccess {
 		t.Fatalf("upgrade oc = %v", res)
 	}
-	if e, err := fetchEntry(t, opts, dn); err != nil || len(e.Values("objectClass")) != 4 {
+	if e, err := fetchEntry(t, opts, clean); err != nil || len(e.Values("objectClass")) != 4 {
 		t.Fatalf("objectClass after upgrade = %v, %v", e, err)
+	}
+
+	// D17: adding an unknown attribute fails and rolls back.
+	res = roundTrip(t, cl, &ModifyRequest{DN: clean, Changes: []ModifyChange{
+		{Op: ModifyAdd, Attr: StringAttribute("xyzzyUndefinedAttr", "1")},
+	}})
+	if res.Code != ResultObjectClassViolation {
+		t.Fatalf("modify unknown attr = %v, want objectClassViolation", res)
+	}
+	if e, err := fetchEntry(t, opts, clean); err != nil || len(e.Values("xyzzyUndefinedAttr")) != 0 {
+		t.Fatalf("unknown attr after rollback = %v, %v", e, err)
+	}
+
+	// D17: destinationIndicator is MAY on organizationalPerson, not person.
+	personOnly := "cn=person-only,ou=people,dc=example,dc=test"
+	res = roundTrip(t, cl, &AddRequest{
+		DN: personOnly,
+		Attributes: []Attribute{
+			StringAttribute("objectClass", "top", "person"),
+			StringAttribute("cn", "Person Only"),
+			StringAttribute("sn", "Only"),
+		},
+	})
+	if res.Code != ResultSuccess {
+		t.Fatalf("add person-only = %v", res)
+	}
+	res = roundTrip(t, cl, &ModifyRequest{DN: personOnly, Changes: []ModifyChange{
+		{Op: ModifyAdd, Attr: StringAttribute("destinationIndicator", "rev-1")},
+	}})
+	if res.Code != ResultObjectClassViolation {
+		t.Fatalf("modify MAY extra = %v, want objectClassViolation", res)
 	}
 }
 

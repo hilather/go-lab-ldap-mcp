@@ -184,18 +184,47 @@ func TestCheckEntrySchema(t *testing.T) {
 				StringAttribute("uniqueMember", "uid=u,ou=people,dc=example,dc=test")),
 		},
 		{
-			// The baseline marker: device plus attributes outside the
-			// strict MAY list (destinationIndicator). 389 accepts this;
-			// MAY is published, not enforced.
-			name:   "marker device with out-of-MAY attributes passes",
+			// OD-012: the baseline marker is device + description JSON.
+			// destinationIndicator/owner extras are not required and
+			// destinationIndicator is not in device MAY (D17).
+			name:   "marker device with description JSON passes",
 			schema: std,
 			entry: NewEntry("cn=labldap-baseline,dc=example,dc=test",
 				StringAttribute("objectClass", "top", "device"),
 				StringAttribute("cn", "labldap-baseline"),
-				StringAttribute("serialNumber", "rev-1"),
-				StringAttribute("owner", "v0.1.0"),
+				StringAttribute("description", `{"serialNumber":"rev-1"}`)),
+		},
+		{
+			name:   "marker extra destinationIndicator fails MAY",
+			schema: std,
+			entry: NewEntry("cn=labldap-baseline,dc=example,dc=test",
+				StringAttribute("objectClass", "top", "device"),
+				StringAttribute("cn", "labldap-baseline"),
 				StringAttribute("destinationIndicator", "rev-1"),
 				StringAttribute("description", "{}")),
+			wantErr: `"destinationIndicator"`,
+		},
+		{
+			name:   "unknown attribute fails",
+			schema: std,
+			entry: NewEntry("cn=unknownattr,dc=example,dc=test",
+				StringAttribute("objectClass", "top", "device"),
+				StringAttribute("cn", "unknownattr"),
+				StringAttribute("xyzzyUndefinedAttr", "1")),
+			wantErr: `"xyzzyUndefinedAttr"`,
+		},
+		{
+			// Server-owned operational stamps ride on every stored
+			// entry; they are not in device MAY and must still pass.
+			name:   "operational attributes remain allowed",
+			schema: std,
+			entry: NewEntry("cn=labldap-baseline,dc=example,dc=test",
+				StringAttribute("objectClass", "top", "device"),
+				StringAttribute("cn", "labldap-baseline"),
+				StringAttribute("description", "{}"),
+				StringAttribute("entryUUID", "uuid-1"),
+				StringAttribute("createTimestamp", "20260815120000Z"),
+				StringAttribute("modifyTimestamp", "20260815120000Z")),
 		},
 		{
 			name:    "empty registry permits everything (T-128 seam)",

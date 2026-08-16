@@ -14,10 +14,12 @@ import (
 // before existence where possible, so a denied caller gets
 // insufficientAccessRights without learning whether the target exists.
 //
-// Schema enforcement (T-132, schema_registry.go): when the registry knows
-// object classes at all, Add and Modify must leave the entry with
-// resolvable objectClass values and every MUST attribute (inherited
-// through SUP chains) present; an empty registry permits everything.
+// Schema enforcement (T-132 / D17, schema_registry.go): when the registry
+// knows object classes at all, Add and Modify must leave the entry with
+// resolvable objectClass values, every MUST attribute (inherited through
+// SUP chains) present, and only known user attributes that sit on the
+// inherited MUST/MAY allow-list. Operational attributes the server writes
+// remain allowed. An empty registry permits everything.
 
 // inSuffix reports whether dn is the suffix or a descendant. Writes outside
 // the managed suffix fail noSuchObject, matching 389's "no such suffix"
@@ -467,6 +469,12 @@ func (s *Server) handleModifyDN(ctx context.Context, c *conn, m *Message, req *M
 		return respond(Result{Code: ResultUnwillingToPerform, DiagnosticMessage: "rename must stay within the managed suffix"})
 	}
 	newDN := joinDN(newRDN, superior)
+	// D16: 389 rejects a rename that would place the entry inside its
+	// own old subtree (unwillingToPerform). Doing the move detaches the
+	// subtree from later walks (noSuchObject); refuse before Store.Rename.
+	if newDN.IsDescendantOf(dn) {
+		return respond(Result{Code: ResultUnwillingToPerform, DiagnosticMessage: "cannot rename an entry into its own subtree"})
+	}
 
 	err = s.opts.Store.Update(ctx, func(tx UpdateTx) error {
 		if !s.allowed(ctx, tx, subj, dn, "", PermWrite) {

@@ -12,8 +12,9 @@ import (
 // schema_registry.go is the T-132 implementation behind the pinned Schema
 // interface (schema.go, T-122): the RFC 4512 subset registry for the
 // parity-contract C5 object classes plus the 389-isms ADR-0009 decisions
-// 18-21 require (nsAccountLock, nsmemberof, device), MUST enforcement on
-// writes, and subschema subentry publication (C10).
+// 18-21 require (nsAccountLock, nsmemberof, device), MUST/MAY and
+// unknown-attribute enforcement on writes (D17), and subschema subentry
+// publication (C10).
 
 // Registry is a validated, immutable Schema implementation. Construction
 // checks referential integrity (SUP chains and MUST/MAY attribute names
@@ -284,20 +285,20 @@ func (e *schemaViolation) Error() string { return "ldapserver: schema violation:
 func (e *schemaViolation) Unwrap() error { return errSchemaViolation }
 
 // checkEntrySchema enforces the write-path schema gate on the final
-// attribute set of an Add or Modify (T-132, replacing the T-128 stub):
+// attribute set of an Add or Modify (T-132, D17):
 //
 //   - A registry with no object classes (the FakeSchema default) permits
 //     everything, preserving the pre-T-132 test seam.
 //   - Otherwise the entry must carry objectClass, every value must
 //     resolve, and every MUST attribute — including those inherited
 //     through SUP chains — must be present with at least one value.
-//
-// MAY lists are published in the subschema but deliberately not enforced
-// as an allow-list: 389-observed lab entries carry attributes outside the
-// strict MAY lists (the baseline marker writes destinationIndicator and
-// owner on device entries against the real oracle), so allow-listing would
-// diverge from 389. Recorded as a parity Delta candidate for the T-147
-// oracle.
+//   - Every user attribute must resolve in the registry and sit on the
+//     inherited MUST/MAY allow-list. Unknown names and marker extras
+//     (destinationIndicator on device) fail objectClassViolation, matching
+//     389 (D17). The baseline marker stays description JSON (OD-012).
+//   - Operational attributes the server itself writes (entryUUID,
+//     timestamps, memberOf, …) remain allowed even when no class lists
+//     them in MAY.
 func checkEntrySchema(s Schema, e *Entry) error {
 	if len(s.ObjectClasses()) == 0 {
 		return nil
@@ -307,13 +308,14 @@ func checkEntrySchema(s Schema, e *Entry) error {
 		return &schemaViolation{reason: "entry has no objectClass attribute"}
 	}
 	must := map[string]struct{}{}
+	allowed := map[string]struct{}{}
 	visited := map[string]struct{}{}
 	for _, v := range ocValues {
 		oc, ok := s.ObjectClass(string(v))
 		if !ok {
 			return &schemaViolation{reason: fmt.Sprintf("unknown object class %q", string(v))}
 		}
-		collectMust(s, oc, must, visited)
+		collectMustMay(s, oc, must, allowed, visited)
 	}
 	for _, attr := range sortedKeys(must) {
 		idx := attrIndex(e, attr)
@@ -321,25 +323,46 @@ func checkEntrySchema(s Schema, e *Entry) error {
 			return &schemaViolation{reason: fmt.Sprintf("missing required attribute %q", attr)}
 		}
 	}
+	for _, a := range e.Attributes {
+		if len(a.Values) == 0 {
+			continue
+		}
+		at, ok := s.AttributeType(a.Name)
+		if !ok {
+			return &schemaViolation{reason: fmt.Sprintf("unknown attribute %q", a.Name)}
+		}
+		if at.Operational {
+			continue
+		}
+		if _, ok := allowed[strings.ToLower(a.Name)]; !ok {
+			return &schemaViolation{reason: fmt.Sprintf("attribute %q is not permitted by object class", a.Name)}
+		}
+	}
 	return nil
 }
 
-// collectMust unions oc's MUST set into must, walking SUP chains
-// transitively. The visited set makes malformed diamond/cyclic chains
-// terminate; NewRegistry already rejects unresolvable SUPs, and lookups
-// through the interface simply skip a registry that cannot resolve one.
-func collectMust(s Schema, oc ObjectClassDef, must, visited map[string]struct{}) {
+// collectMustMay unions oc's MUST into must and MUST+MAY into allowed,
+// walking SUP chains transitively. The visited set makes malformed
+// diamond/cyclic chains terminate; NewRegistry already rejects
+// unresolvable SUPs, and lookups through the interface simply skip a
+// registry that cannot resolve one.
+func collectMustMay(s Schema, oc ObjectClassDef, must, allowed, visited map[string]struct{}) {
 	key := strings.ToLower(oc.Name)
 	if _, seen := visited[key]; seen {
 		return
 	}
 	visited[key] = struct{}{}
 	for _, m := range oc.Must {
-		must[strings.ToLower(m)] = struct{}{}
+		k := strings.ToLower(m)
+		must[k] = struct{}{}
+		allowed[k] = struct{}{}
+	}
+	for _, m := range oc.May {
+		allowed[strings.ToLower(m)] = struct{}{}
 	}
 	for _, sup := range oc.Sup {
 		if supOC, ok := s.ObjectClass(sup); ok {
-			collectMust(s, supOC, must, visited)
+			collectMustMay(s, supOC, must, allowed, visited)
 		}
 	}
 }

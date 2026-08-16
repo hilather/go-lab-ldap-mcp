@@ -53,13 +53,13 @@ func opAttrsOptions(t *testing.T, mutate func(*Options)) (Options, *fakeClock) {
 		if err := o.Store.Update(ctx, func(tx UpdateTx) error {
 			for _, e := range []*Entry{
 				NewEntry("uid=carol,ou=people,dc=example,dc=test",
-					StringAttribute("objectClass", "top", "person"),
+					StringAttribute("objectClass", "top", "person", "organizationalPerson", "inetOrgPerson"),
 					StringAttribute("uid", "carol"),
 					StringAttribute("cn", "Carol Clark"),
 					StringAttribute("sn", "Clark"),
 					StringAttribute("userPassword", "carol-fixture-password")),
 				NewEntry("uid=frank,ou=people,dc=example,dc=test",
-					StringAttribute("objectClass", "top", "person"),
+					StringAttribute("objectClass", "top", "person", "organizationalPerson", "inetOrgPerson"),
 					StringAttribute("uid", "frank"),
 					StringAttribute("cn", "Frank Fox"),
 					StringAttribute("sn", "Fox"),
@@ -157,7 +157,7 @@ func TestOpAttrsAddStamps(t *testing.T) {
 	}
 	dn := "uid=dave,ou=people,dc=example,dc=test"
 	res := roundTrip(t, cl, &AddRequest{DN: dn, Attributes: []Attribute{
-		StringAttribute("objectClass", "top", "person"),
+		StringAttribute("objectClass", "top", "person", "organizationalPerson", "inetOrgPerson"),
 		StringAttribute("uid", "dave"),
 		StringAttribute("cn", "Dave Doe"),
 		StringAttribute("sn", "Doe"),
@@ -214,7 +214,7 @@ func TestOpAttrsAnonymousStamp(t *testing.T) {
 	cl := dialTestClient(t, addr)
 	dn := "uid=erin,ou=people,dc=example,dc=test"
 	res := roundTrip(t, cl, &AddRequest{DN: dn, Attributes: []Attribute{
-		StringAttribute("objectClass", "top", "person"),
+		StringAttribute("objectClass", "top", "person", "organizationalPerson", "inetOrgPerson"),
 		StringAttribute("uid", "erin"),
 		StringAttribute("cn", "Erin Earp"),
 		StringAttribute("sn", "Earp"),
@@ -240,7 +240,7 @@ func TestOpAttrsModifyAndRenameBump(t *testing.T) {
 	}
 	dn := "uid=dave,ou=people,dc=example,dc=test"
 	res := roundTrip(t, cl, &AddRequest{DN: dn, Attributes: []Attribute{
-		StringAttribute("objectClass", "top", "person"),
+		StringAttribute("objectClass", "top", "person", "organizationalPerson", "inetOrgPerson"),
 		StringAttribute("uid", "dave"),
 		StringAttribute("cn", "Dave Doe"),
 		StringAttribute("sn", "Doe"),
@@ -293,7 +293,7 @@ func TestOpAttrsClientGate(t *testing.T) {
 	cl := dialTestClient(t, addr)
 	dn := "uid=gwen,ou=people,dc=example,dc=test"
 	base := []Attribute{
-		StringAttribute("objectClass", "top", "person"),
+		StringAttribute("objectClass", "top", "person", "organizationalPerson", "inetOrgPerson"),
 		StringAttribute("uid", "gwen"),
 		StringAttribute("cn", "Gwen Gray"),
 		StringAttribute("sn", "Gray"),
