@@ -1663,27 +1663,31 @@ Acceptance:
 - [x] After simple bind, WhoAmI returns the bound DN (authzid form matching 389 observed or RFC; record Delta if formatting differs).
 - [x] T-115 `ldapwhoami` case can be pointed at native after T-148.
 
-## [ ] T-143 `labldapd` daemon command
+## [x] T-143 `labldapd` daemon command
 
 Priority: P0 | Size: M | Depends on: T-133, T-134, T-132 | Wave 5 | Cloud fit: medium
 
 Deliverables: `cmd/labldapd` flags: config/engine-plan path, data dir, listen, TLS files, DM password file, health; structured logs; graceful shutdown.
 
 Acceptance:
-- [ ] `--help` documents flags; missing DM password file exits non-zero without protocol start.
-- [ ] Process applies engine plan at start (suffix, policy, plugin hooks).
-- [ ] Logs contain no secrets.
+- [x] `--help` documents flags; missing DM password file exits non-zero without protocol start.
+- [x] Process applies engine plan at start (suffix, policy, plugin hooks).
+- [x] Logs contain no secrets.
 
-## [ ] T-144 Native bootstrap reconcilers
+Engine-plan → `ldapserver.Options` mapping lives in `cmd/labldapd/serve.go` (`serverOptions`). DM DN is hardcoded to `cn=Directory Manager` (ADR-0009 default) in both `cmd/labldapd` and `internal/directory/native` — candidate config field `spec.directory.directoryManager` reported, not added. `warningAge` has no native counterpart (read-back skips it).
+
+## [x] T-144 Native bootstrap reconcilers
 
 Priority: P0 | Size: L | Depends on: T-123, T-143, T-139 | Wave 5 | Cloud fit: medium
 
-Deliverables: `internal/directory/native` implements **engine-plan read-back** reconcilers only (`BackendReconciler`, `TLSReconciler`, `PolicyReconciler`, `PluginReconciler`) per ADR-0009. Wait, tree, ACI, seed, verify, drift, and marker stay the existing LDAP-as-DM implementations (they already speak LDAP, not `dsconf`) wired by `cmd/labldap-bootstrap`. Fail closed if the daemon’s applied engine plan does not match. Known boundary amendment: `tools/importboundary` `forbiddenLDAPClient` currently bars `internal/directory/native` from importing `ldapclient` — this task amends that edge (native reconcilers read back over LDAP), with a boundary-test edge update.
+Deliverables: `internal/directory/native` implements **engine-plan read-back** reconcilers only (`BackendReconciler`, `TLSReconciler`, `PolicyReconciler`, `PluginReconciler`) per ADR-0009. Wait, tree, ACI, seed, verify, drift, and marker stay the existing LDAP-as-DM implementations (they already speak LDAP, not `dsconf`) wired by `cmd/labldap-bootstrap`. Fail closed if the daemon’s applied engine plan does not match. Boundary amended: `tools/importboundary` `forbiddenLDAPClient` now permits `internal/directory/native` → `ldapclient` (ADR-0009 decisions 11–12).
 
 Acceptance:
-- [ ] `labldap-bootstrap apply` against a running `labldapd` with `engine: native` exits 0 on a minimal scenario.
-- [ ] Mismatch (wrong suffix / policy) fails with a phase code, no marker commit.
-- [ ] No `dsconf` invocation in the native path (test spy).
+- [x] `labldap-bootstrap apply` against a running `labldapd` with `engine: native` exits 0 on a minimal scenario (`TestBootstrapApplyAgainstLabldapd`).
+- [x] Mismatch (wrong suffix / policy) fails with a phase code, no marker commit.
+- [x] No `dsconf` invocation in the native path (structural: no runner seam; boundary test bars ds389/go-ldap imports).
+
+Read-back contract: `labldapd` publishes its applied plan at `cn=config` (DM-only, outside managed suffix); reconcilers dial via a string-typed `Probe` seam over `ldapclient`. T-146 constructs `native.Engine{Address, Transport, ServerName, CAFile, Insecure, DialTimeout}` from the scenario.
 
 ## [x] T-145 Native image and compose-native profile
 
