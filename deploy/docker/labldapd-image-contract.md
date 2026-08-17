@@ -26,7 +26,7 @@ match the digest files.
 | Setting | Value |
 | --- | --- |
 | User | `65532:65532` (`labldapd`; same non-root uid convention as control) |
-| Root filesystem | read-only in Compose (`compose.native.yaml`) |
+| Root filesystem | read-only in Compose (`compose.yaml`; `compose.native.yaml` is a one-release alias) |
 | Capabilities | `cap_drop: ALL` (Compose) |
 | Privileges | `no-new-privileges:true` (Compose) |
 | Writable paths | mounted `/data` volume + `/tmp` tmpfs only |
@@ -73,9 +73,6 @@ persistent native modes.
 
 ## Status dependencies
 
-The image builds from `cmd/labldapd` as soon as that package compiles
-(T-143 owns it). A live `make compose-up-native` additionally requires
-T-143 (`labldapd serve`), T-144 (native bootstrap reconcilers), and T-146
-(control engine wiring); until those merge, the Compose overlay is validated
-statically (`docker compose ... config`) and must not be reported as a
-passing bring-up.
+The image builds from `cmd/labldapd`. Default `make compose-up` is this
+image. `make compose-up-native` is an alias. 389 rollback is
+`make compose-up-389ds`.

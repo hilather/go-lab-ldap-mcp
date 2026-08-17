@@ -5,7 +5,7 @@
 <h1 align="center">LabLDAP</h1>
 
 <p align="center">
-  <strong>A disposable 389 Directory Server laboratory.</strong><br />
+  <strong>A disposable LDAP laboratory.</strong><br />
   Real LDAP on the wire. A Go control plane for REST, MCP, and a browser UI.<br />
   Directory Manager never touches the long-running service.
 </p>
@@ -23,13 +23,14 @@
   <img alt="Go" src="https://img.shields.io/badge/Go-1.26-00ADD8?style=flat-square&logo=go&logoColor=white" />
   <img alt="389-ds" src="https://img.shields.io/badge/389--ds-2.4.6-3D9B8F?style=flat-square" />
   <img alt="MCP" src="https://img.shields.io/badge/MCP-2026--07--28-111111?style=flat-square" />
-  <img alt="Release" src="https://img.shields.io/badge/release-v0.2.2-ecece8?style=flat-square&labelColor=111111" />
+  <img alt="Release" src="https://img.shields.io/badge/release-v0.3.0-ecece8?style=flat-square&labelColor=111111" />
 </p>
 
 ![LabLDAP console](docs/assets/console.jpg)
 
-LabLDAP is a control plane around a directory engine. v0.2.2 ships **389 Directory
-Server** as the default engine and an opt-in Go-native engine (`labldapd`) with
+LabLDAP is a control plane around a directory engine. v0.3.0 ships the
+Go-native engine (`labldapd`) as the **default** and keeps pinned **389
+Directory Server** as the oracle and rollback (`engine: 389ds`) with
 [LabLDAP-surface parity](docs/design/native-engine-parity-contract.md)
 ([ADR-0008](docs/adr/0008-dual-directory-engines.md)).
 
@@ -52,7 +53,7 @@ LabLDAP splits the job the way an operator would:
 
 | Role | Process | Privilege |
 | --- | --- | --- |
-| **directory** | long-running 389 DS | owns `/data` |
+| **directory** | long-running `labldapd` (default) or 389 DS | owns `/data` |
 | **bootstrap** | one-shot `labldap-bootstrap` | Directory Manager, via a secret file, then exits |
 | **control** | long-running `labldap` | restricted service account. No DM secret. No Docker socket. |
 
@@ -70,8 +71,9 @@ cd go-lab-ldap-mcp
 make compose-up
 ```
 
-That builds the local images, mints lab secrets and a lab CA, starts 389 DS,
-runs bootstrap, and brings the control plane up.
+That builds the local images, mints lab secrets and a lab CA, starts
+`labldapd`, runs bootstrap, and brings the control plane up. Use
+`make compose-up-389ds` for the pinned 389 DS stack.
 
 | Surface | Where |
 | --- | --- |
@@ -97,8 +99,9 @@ Full walkthrough: **[docs/guides/quickstart.md](docs/guides/quickstart.md)**.
 
 ## What you get
 
-- **A real 389 DS instance.** Pinned by digest. Users, groups, memberships, and
-  passwords live in the directory — not in Go maps.
+- **A real LDAP engine.** Default is `labldapd` (bbolt store). 389 DS is
+  still first-class (`engine: 389ds`, pinned by digest). Users, groups,
+  memberships, and passwords live in the directory — not in Go maps.
 - **A browser UI.** Users, groups, search, bind test, schema, audit, LDIF
   export, and a gated soft reset.
 - **A versioned REST API.** OpenAPI 3 at [`api/openapi.yaml`](api/openapi.yaml).
@@ -131,8 +134,8 @@ Catalog: **[docs/mcp/catalog.md](docs/mcp/catalog.md)**.
 ## Declare users and groups
 
 The lab tree is a YAML scenario, not a Go map. Bootstrap compiles
-[`deploy/compose/scenario.yaml`](deploy/compose/scenario.yaml) into real 389
-DS entries.
+[`deploy/compose/scenario.yaml`](deploy/compose/scenario.yaml) into real
+directory entries.
 
 ```yaml
 spec:
@@ -161,20 +164,22 @@ restores this file. Full rules and ACL example:
 
 LabLDAP is a laboratory. It is not a production identity system.
 
-1. **LDAP bind is against the directory engine, not the Go control plane.** Point `ldapsearch`, apps, and simple bind at `ldap://127.0.0.1:3389` / `ldaps://127.0.0.1:3636`. The control plane is HTTPS only (UI, REST, MCP). It is an LDAP *client*. In 389 mode the listener is 389 DS; in native mode (M9) it is `labldapd`. Neither `labldap` nor `labldap-bootstrap` listens for LDAP.
+1. **LDAP bind is against the directory engine, not the Go control plane.** Point `ldapsearch`, apps, and simple bind at `ldap://127.0.0.1:3389` / `ldaps://127.0.0.1:3636`. The control plane is HTTPS only (UI, REST, MCP). It is an LDAP *client*. The default listener is `labldapd`; in 389 mode it is 389 DS. Neither `labldap` nor `labldap-bootstrap` listens for LDAP.
 2. The selected engine is the source of truth for users, groups, memberships, and passwords.
 3. The control plane never mounts the Docker socket.
 4. Directory Manager is bootstrap-only.
 5. Static bearer tokens are an explicit lab mode, not an accident.
 6. Ephemeral tmpfs is not a forensic wipe — host swap can still hold pages.
 7. Soft reset restores the compiled suffix. It does not delete the volume.
-8. First usable release: one managed suffix, one engine instance. Engine default is 389 DS.
+8. First usable release: one managed suffix, one engine instance. Engine default is `labldapd` (v0.3.0). Set `engine: 389ds` to keep 389 DS.
 9. Active Directory emulation is out of scope.
-10. Native Go engine (`labldapd`) is a dual-mode lab option under ADR-0008; it is not a silent replacement for 389 DS and is not advertised ready until M9 exit criteria pass.
+10. Native Go engine (`labldapd`) is the omitted-field default under ADR-0008. It is a laboratory directory, not a production identity system. 389 DS remains the behavioral oracle.
 
 Management TLS in the shipped compose stack is a **lab certificate**. Trust
-`secrets/tls/instance-ca.crt` (ephemeral) or `secrets/tls/ca.crt` (persistent).
-Bind the management listener to loopback, which compose already does.
+`secrets/tls/ca.crt` on the default native stack (ephemeral and persistent).
+The 389 rollback stack uses `secrets/tls/instance-ca.crt` for ephemeral
+and `secrets/tls/ca.crt` for persistent. Bind the management listener to
+loopback, which compose already does.
 
 ## Documentation
 
@@ -186,7 +191,7 @@ Bind the management listener to loopback, which compose already does.
 | [Operator guide](docs/operations/operator-guide.md) | Day-2 limits and failure modes |
 | [Troubleshooting](docs/operations/troubleshooting.md) | Ready checks, TLS, tokens, vanished entries |
 | [MCP catalog](docs/mcp/catalog.md) | Tools, resources, scopes |
-| [Release notes](docs/release/notes.md) | v0.2.2 contents and residuals |
+| [Release notes](docs/release/notes.md) | v0.3.0 contents and residuals |
 
 Architecture and design live under [`docs/`](docs/). Contributing:
 [`CONTRIBUTING.md`](CONTRIBUTING.md).
@@ -206,9 +211,9 @@ not pushed to a public registry.
 
 ## Status
 
-**v0.2.2** — dual-engine REST→LDAP workflow integration in CI, native
-integration gated on native LDAP paths, and ldap3 client no longer
-requests 389-only `entryDN`. See [release notes](docs/release/notes.md).
+**v0.3.0** — omitted `spec.directory.engine` and `make compose-up` now
+select native `labldapd`. 389 DS remains available as `engine: 389ds` /
+`make compose-up-389ds`. See [release notes](docs/release/notes.md).
 
 No project license file yet; treat it as source-available until one is added.
 

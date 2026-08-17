@@ -28,7 +28,7 @@ type Spec struct {
 
 type Directory struct {
 	// Engine selects the directory engine (389ds | native). Empty defaults
-	// to Engine389DS. Backward-compatible addition per ADR-0008 decision 7.
+	// to EngineNative (v0.3.0; ADR-0008 amendment 2026-08-17).
 	Engine       string `json:"engine" yaml:"engine"`
 	Suffix       string `json:"suffix" yaml:"suffix"`
 	PeopleRDN    string `json:"peopleRDN" yaml:"peopleRDN"`

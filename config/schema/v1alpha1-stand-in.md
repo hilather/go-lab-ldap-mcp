@@ -25,3 +25,10 @@ Compiler contract string (mixed into revisions in T-021): `labldap.config.v1alph
   closed (`configuration` / `engine_not_available`) in `labldap serve` and
   `labldap-bootstrap` until milestone M9 wires it (T-146); see
   `docs/design/native-engine-parity-contract.md`.
+- **2026-08-17 (v0.3.0, ADR-0008 amendment):** omitted `spec.directory.engine`
+  now defaults to `native`. Stay on `apiVersion: labldap.dev/v1alpha1` (owner
+  resolution: this one omitted-field reinterpretation does not take a new
+  apiVersion). Compiler contract string is unchanged. Directory revision
+  changes for labs that omitted the field (they are now native labs). Add
+  `engine: 389ds` before upgrading if you must keep 389 DS. `labldapd`
+  fails closed when `--data-dir` looks like a 389 nsslapd tree.

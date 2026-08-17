@@ -163,7 +163,7 @@ func TestComposeEnvPersistentBindings(t *testing.T) {
 		labCA:      "/tmp/ca.crt",
 		instanceCA: "/tmp/instance-ca.crt",
 		caFile:     "/tmp/instance-ca.crt",
-		scenario:   filepath.Join(root, "deploy", "compose", "scenario.yaml"),
+		scenario:   filepath.Join(root, "deploy", "compose", "scenario.389ds.yaml"),
 	}
 	bindEnv(&env, root, true)
 	got := map[string]string{}
@@ -176,7 +176,7 @@ func TestComposeEnvPersistentBindings(t *testing.T) {
 	if got["LABLDAP_TLS_CA"] != env.labCA {
 		t.Fatalf("LABLDAP_TLS_CA=%q, want lab CA %q", got["LABLDAP_TLS_CA"], env.labCA)
 	}
-	wantScenario := filepath.Join(root, "deploy", "compose", "scenario.persistent.yaml")
+	wantScenario := filepath.Join(root, "deploy", "compose", "scenario.389ds-persistent.yaml")
 	if got["LABLDAP_SCENARIO_FILE"] != wantScenario {
 		t.Fatalf("LABLDAP_SCENARIO_FILE=%q, want %q", got["LABLDAP_SCENARIO_FILE"], wantScenario)
 	}
@@ -227,7 +227,7 @@ func requireCompose(t *testing.T) string {
 	// T-148: the native engine run (LABLDAP_IT_ENGINE=native, see
 	// test/integration/dirsrv/engine.go) is the hermetic in-process fixture;
 	// these tests exercise the 389 Compose overlay only (parity contract
-	// D2/D4). The native overlay is `make compose-up-native` (T-145).
+	// D2/D4). Default `make compose-up` is native; 389 is compose-up-389ds.
 	if os.Getenv("LABLDAP_IT_ENGINE") == "native" {
 		t.Skip("389 compose overlay only under LABLDAP_IT_ENGINE=native (parity contract D2/D4)")
 	}
@@ -285,25 +285,25 @@ func writeLabMaterial(t *testing.T, root, dir string) labEnv {
 		labCA:      filepath.Join(tlsDir, "ca.crt"),
 		instanceCA: filepath.Join(tlsDir, "instance-ca.crt"),
 		caFile:     filepath.Join(tlsDir, "instance-ca.crt"),
-		scenario:   filepath.Join(root, "deploy", "compose", "scenario.yaml"),
+		scenario:   filepath.Join(root, "deploy", "compose", "scenario.389ds.yaml"),
 		token:      token,
 	}
 }
 
 func overlayFiles(root string, persistent bool) []string {
-	files := []string{filepath.Join(root, "deploy/compose/compose.yaml")}
+	files := []string{filepath.Join(root, "deploy/compose/compose.389ds.yaml")}
 	if persistent {
-		return append(files, filepath.Join(root, "deploy/compose/compose.persistent.yaml"))
+		return append(files, filepath.Join(root, "deploy/compose/compose.389ds-persistent.yaml"))
 	}
-	return append(files, filepath.Join(root, "deploy/compose/compose.ephemeral.yaml"))
+	return append(files, filepath.Join(root, "deploy/compose/compose.389ds-ephemeral.yaml"))
 }
 
 func bindEnv(env *labEnv, root string, persistent bool) {
 	env.files = overlayFiles(root, persistent)
 	if persistent {
 		env.caFile = env.labCA
-		if env.scenario == filepath.Join(root, "deploy", "compose", "scenario.yaml") {
-			env.scenario = filepath.Join(root, "deploy", "compose", "scenario.persistent.yaml")
+		if env.scenario == filepath.Join(root, "deploy", "compose", "scenario.389ds.yaml") {
+			env.scenario = filepath.Join(root, "deploy", "compose", "scenario.389ds-persistent.yaml")
 		}
 		return
 	}

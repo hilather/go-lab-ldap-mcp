@@ -2,8 +2,8 @@
 
 Users, groups, ACLs, tokens, and lab policy are declared in a
 `labldap.dev/v1alpha1` **LabScenario** file. Bootstrap compiles that file
-and writes real 389 DS entries. The YAML is the lab definition — not an
-in-memory directory.
+and writes real directory entries in the selected engine. The YAML is the
+lab definition — not an in-memory directory.
 
 Shipped examples:
 
@@ -18,12 +18,14 @@ Shipped examples:
 
 | Value | Meaning |
 | --- | --- |
-| `389ds` | Pinned 389 Directory Server container. **Default** when the field is omitted. |
-| `native` | In-repo Go engine (`labldapd`). **Accepted but not ready**: the control plane and bootstrap fail closed with `engine_not_available` until milestone M9 completes (T-146/T-150). See [`docs/design/native-engine-parity-contract.md`](../design/native-engine-parity-contract.md). |
+| `native` | In-repo Go engine (`labldapd`). **Default** when the field is omitted (v0.3.0). |
+| `389ds` | Pinned 389 Directory Server container. Oracle and rollback. |
 
-The field is optional and backward-compatible; omitting it keeps the `389ds`
-behavior. Engine is part of the compiled plan (`labldap plan` output) and the
-directory revision, so switching engines is a re-bootstrap, not a live change.
+The field is optional. Omitting it now selects `native`. Add `engine: 389ds`
+before upgrading if you must keep 389 DS. Engine is part of the compiled
+plan (`labldap plan` output) and the directory revision, so switching
+engines is a re-bootstrap / hard reset, not a live change. See
+[`docs/design/native-engine-parity-contract.md`](../design/native-engine-parity-contract.md).
 
 ## Declare users and groups
 
@@ -69,7 +71,7 @@ What that becomes on the wire:
 | YAML | Directory |
 | --- | --- |
 | `users[].id` / `uid` | `uid=<id>,ou=people,<suffix>` |
-| `passwordFile` | `userPassword` (hashed by 389 DS, `PBKDF2-SHA256` in the example) |
+| `passwordFile` | `userPassword` (hashed by the engine, `PBKDF2-SHA256` in the example) |
 | `enabled: false` | `nsAccountLock` |
 | `attributes` | extra string attrs (`givenName`, `sn`, `mail`, …) |
 | `groups[].id` | `cn=<id>,ou=groups,<suffix>` (`groupOfNames`) |
@@ -143,7 +145,7 @@ Exact DNs follow `spec.directory.suffix`. The example suffix is
 | Path | What happens |
 | --- | --- |
 | Scenario YAML | Compiled once at bootstrap. Soft reset target. |
-| UI / REST / MCP | Live mutations on 389 DS. Survive until reset or volume wipe. |
+| UI / REST / MCP | Live mutations on the selected engine. Survive until reset or volume wipe. |
 | `make compose-reset` | Destroy the volume, apply the YAML again. |
 
 Next: [User guide](user-guide.md) · [Quick start](quickstart.md) · [Deploy](deploy.md)

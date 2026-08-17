@@ -4,15 +4,15 @@ metadata:
   name: compose-lab
 spec:
   directory:
-    # engine: native selects labldapd (default as of v0.3.0).
-    engine: native
+    engine: 389ds
     suffix: "dc=example,dc=test"
     peopleRDN: "ou=people"
     groupsRDN: "ou=groups"
     nestedGroups: false
     allowRawACI: false
   lifecycle:
-    storageMode: ephemeral
+    storageMode: persistent
+    # Named-volume Compose overlay (compose.persistent.yaml).
     startupMode: merge
     softReset: true
   transport:

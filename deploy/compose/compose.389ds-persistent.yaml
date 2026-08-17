@@ -1,5 +1,5 @@
-# Persistent /data for the default native stack. Merge with compose.yaml:
-#   docker compose -f compose.yaml -f compose.persistent.yaml up
+# Persistent /data for the 389 DS rollback stack. Merge with compose.389ds.yaml:
+#   docker compose -f compose.389ds.yaml -f compose.389ds-persistent.yaml up
 #
 # Ordinary restart keeps runtime entries. Soft reset (REST/MCP lab:reset)
 # restores the compiled baseline and does not remove the volume.

@@ -331,7 +331,7 @@ Ship `labldapd` as a selectable directory engine with LabLDAP-surface parity aga
 
 - Contract-tier cases in `docs/design/native-engine-parity-contract.md` pass against both engines.
 - `labldap` / `labldap-bootstrap` do not import `internal/ldapserver`.
-- Default `engine: 389ds` behavior is unchanged.
+- Default `engine: 389ds` behavior is unchanged through M9. **v0.3.0** (2026-08-17) flips the omitted-field default to `native`; explicit `engine: 389ds` remains the oracle.
 - Native mode is not advertised as ready until T-150.
 
 ## 12. Critical path

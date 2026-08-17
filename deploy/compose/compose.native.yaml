@@ -1,6 +1,8 @@
-# Native engine overlay (T-145; ADR-0008, ADR-0009). Replaces the 389 DS
-# `directory` service with `labldapd` (labldapd:dev) and re-points bootstrap
-# at it. Always stack a storage overlay on top:
+# Native engine overlay kept as a one-release alias (v0.3.0).
+# Default compose.yaml is already native labldapd. Prefer:
+#   docker compose -f compose.yaml -f compose.ephemeral.yaml
+# This file still replaces `directory` with labldapd when stacked on the
+# 389 rollback base. Always stack a storage overlay on top:
 #   docker compose -f compose.yaml -f compose.native.yaml -f compose.native-ephemeral.yaml
 #   docker compose -f compose.yaml -f compose.native.yaml -f compose.native-persistent.yaml
 #
@@ -14,10 +16,8 @@
 # and no shared /data mount. TLS is the lab CA directory certificate
 # mounted as files — there is no cert-import or instance-CA publish step.
 #
-# Runtime dependency: a live bring-up needs T-143 (labldapd serve), T-144
-# (native bootstrap reconcilers), and T-146 (control engine wiring) merged.
-# Until then this file is correct-by-construction and validated with
-# `docker compose ... config`, not reported as a passing bring-up.
+# Alias of the default native stack. Prefer compose.yaml + compose.ephemeral.yaml.
+# 389 rollback is compose.389ds.yaml.
 volumes:
   # DM password and the directory TLS key/cert, copied to 0400/65532 by the
   # native-secret-prep one-shot (host secret files are 0600 and unreadable

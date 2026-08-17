@@ -4,8 +4,8 @@ Start here: **[docs/guides/deploy.md](../docs/guides/deploy.md)**.
 Operator package: [docs/operations/operator-guide.md](../docs/operations/operator-guide.md).
 Release notes: [docs/release/notes.md](../docs/release/notes.md).
 
-Compose topology: directory (pinned 389 DS) → CA publish or lab TLS import
-→ bootstrap one-shot → hardened `labldap-control:dev`.
+Compose topology: directory (`labldapd` by default, or pinned 389 DS) →
+bootstrap one-shot → hardened `labldap-control:dev`.
 
 Release files pin images by digest, never a floating tag. Control never
 receives Directory Manager and never mounts the Docker socket.
@@ -34,20 +34,21 @@ make compose-down
 make compose-reset           # operator hard reset: down -v, then compose-up
 ```
 
-`make compose-up` (ephemeral) generates gitignored secrets and a lab CA,
-starts directory, publishes the **instance CA** to
-`secrets/tls/instance-ca.crt` (it does **not** overwrite `ca.crt`), then
-starts bootstrap and control. Ephemeral tmpfs `/data` remounts empty on
-container restart, so `dsctl tls import-*` is refused on that volume.
+`make compose-up` (ephemeral, native) generates gitignored secrets and a
+lab CA, starts `labldapd`, then bootstrap and control. TLS files are the
+lab CA mounted into the engine. Ephemeral tmpfs `/data` remounts empty on
+container restart.
+
+`make compose-up-389ds` is the 389 DS rollback: it publishes the
+**instance CA** to `secrets/tls/instance-ca.crt` (it does **not** overwrite
+`ca.crt`). `make compose-up-389ds-persistent` imports the generated lab
+CA/server cert with `dsctl tls import-*` after first boot.
 
 `make compose-up-persistent` uses `scenario.persistent.yaml`
-(`storageMode: persistent`), imports the generated lab CA/server cert with
-`dsctl tls import-*` after first boot, restarts directory so NSS reloads,
-and points bootstrap/control at `secrets/tls/ca.crt`. That is the T-113
-generated-PKI path. `import` without `-f` defaults to the persistent overlay
-and fails if `/data` is tmpfs-backed.
+(`storageMode: persistent`) on the native stack and points
+bootstrap/control at `secrets/tls/ca.crt`.
 
-The directory service uses `secrets/directory.env`. Bootstrap uses
+The 389 directory service uses `secrets/directory.env`. Bootstrap uses
 `--directory-manager-password-file`. Control never receives Directory
 Manager. The private CA key stays on the host under `secrets/tls/ca.key`
 and is not mounted into any runtime service.
@@ -68,11 +69,11 @@ baseline match.
 ### Ephemeral vs persistent
 
 Ephemeral (`compose.ephemeral.yaml`) uses a **tmpfs-backed Docker volume**
-for `/data` so bootstrap can still mount it read-only (LDAPI). UID 389,
-GID 389, mode 0750, size **2GiB** (the pinned 389 DS 2.4.6 first-boot
-fails on a 512Mi tmpfs). Runtime entries disappear after volume unmount
-or `compose-reset`. Ordinary container recreate that keeps the volume
-object may remount an empty tmpfs.
+for `/data`. Default native: UID 65532, 256Mi. 389 rollback
+(`compose.389ds-ephemeral.yaml`): UID 389, **2GiB** (the pinned 389 DS
+2.4.6 first-boot fails on a 512Mi tmpfs). Runtime entries disappear after
+volume unmount or `compose-reset`. Ordinary container recreate that keeps
+the volume object may remount an empty tmpfs.
 
 **Host swap can still persist tmpfs pages** unless the host is configured
 otherwise. Ephemeral mode is not a forensic wipe (non-negotiable 7).

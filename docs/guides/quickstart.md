@@ -1,7 +1,7 @@
 # Quick start
 
-Stand up a disposable 389 DS lab, sign in to the UI, and make one change
-you can see over REST, LDAP, and MCP.
+Stand up a disposable native-engine lab, sign in to the UI, and make one
+change you can see over REST, LDAP, and MCP.
 
 ## What you need
 
@@ -23,12 +23,14 @@ make compose-up
 
 This will:
 
-1. Build `labldap-bootstrap:dev` and `labldap-control:dev`
+1. Build `labldapd:dev`, `labldap-bootstrap:dev`, and `labldap-control:dev`
 2. Generate gitignored secrets under `secrets/`
 3. Generate a lab CA and certificates
-4. Start 389 DS (tmpfs-backed `/data` — ephemeral)
+4. Start `labldapd` (tmpfs-backed `/data` — ephemeral)
 5. Run bootstrap against Directory Manager, then exit
 6. Start the control plane
+
+To run pinned 389 Directory Server instead: `make compose-up-389ds`.
 
 First run is image-build heavy. Later runs reuse the local images.
 
@@ -56,8 +58,8 @@ If ready never comes, see [Troubleshooting](../operations/troubleshooting.md).
 Browse to **https://127.0.0.1:8443/**.
 
 The management certificate is a lab cert. Your browser will warn. Continue
-anyway, or trust `secrets/tls/instance-ca.crt` (ephemeral) /
-`secrets/tls/ca.crt` (persistent).
+anyway, or trust `secrets/tls/ca.crt` (default native stack). The 389
+rollback stack uses `secrets/tls/instance-ca.crt` for ephemeral.
 
 Sign in with the token in `secrets/token-admin`:
 

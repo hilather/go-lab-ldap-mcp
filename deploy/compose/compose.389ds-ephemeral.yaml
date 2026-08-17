@@ -1,0 +1,22 @@
+# Ephemeral /data for the 389 DS rollback stack (make compose-up-389ds).
+#
+# A tmpfs-backed Docker volume is used instead of a container-local tmpfs
+# so bootstrap can mount /data:ro (LDAPI socket + instance config).
+# Contents vanish when the volume is unmounted or removed.
+#
+# Size is 2GiB: the pinned 389 DS 2.4.6 first-boot fails on a 512Mi tmpfs
+# (ns-slapd never writes container.inf). UID/GID 389 match the dirsrv user.
+#
+# docker compose restart remounts this volume empty. Lab CA import
+# (dsctl tls import-* + NSS reload) is refused on tmpfs /data.
+# Ephemeral compose-up publishes the instance CA to instance-ca.crt.
+#
+# Host swap can still persist tmpfs pages unless the host is configured
+# otherwise (non-negotiable 7). Do not treat ephemeral as forensic wipe.
+volumes:
+  directory-data:
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: size=2147483648,uid=389,gid=389,mode=0750

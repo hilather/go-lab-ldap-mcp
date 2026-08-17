@@ -4,7 +4,7 @@ This file governs implementation by automated coding agents and human contributo
 
 ## Mission
 
-Implement LabLDAP as a safe, deterministic laboratory directory platform using the architecture and requirements in this package. The control plane is not an LDAP server. Directory data lives in a selected engine: pinned 389 Directory Server (default) or the in-repo native engine (`labldapd`). Dual-engine work follows ADR-0008, ADR-0009, and `docs/design/native-engine-parity-contract.md`.
+Implement LabLDAP as a safe, deterministic laboratory directory platform using the architecture and requirements in this package. The control plane is not an LDAP server. Directory data lives in a selected engine: the in-repo native engine (`labldapd`, default as of v0.3.0) or pinned 389 Directory Server (`engine: 389ds`). Dual-engine work follows ADR-0008, ADR-0009, and `docs/design/native-engine-parity-contract.md`.
 
 ## Required reading before changes
 

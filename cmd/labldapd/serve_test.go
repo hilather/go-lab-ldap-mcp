@@ -165,6 +165,46 @@ func TestServeRequiresConfigAndDMFile(t *testing.T) {
 	_ = ln.Close()
 }
 
+func TestServeRejects389DataDir(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	data := filepath.Join(dir, "data")
+	if err := os.MkdirAll(filepath.Join(data, "config"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(data, "config", "container.inf"), []byte("[slapd]\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg := writeFile(t, dir, "lab.yaml", minimalScenario)
+	dm := writeFile(t, dir, "dm.secret", dmCanary)
+	ldapAddr := freeAddr(t)
+	var stdout, stderr bytes.Buffer
+	code := run([]string{
+		"serve", "--config", cfg,
+		"--data-dir", data,
+		"--listen", ldapAddr, "--ldaps-listen=", "--health-listen=",
+		"--directory-manager-password-file", dm,
+	}, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("exit %d, want 1", code)
+	}
+	msg := stderr.String()
+	if !strings.Contains(msg, "engine_data_mismatch") || !strings.Contains(msg, "compose-reset") {
+		t.Fatalf("stderr = %q", msg)
+	}
+	if strings.Contains(msg, dmCanary) || strings.Contains(msg, "[slapd]") {
+		t.Fatal("fail-closed diagnostic leaked secret or file contents")
+	}
+	if _, err := os.Stat(filepath.Join(data, store.StoreFileName)); !os.IsNotExist(err) {
+		t.Fatal("must not create labldapd.bolt beside 389 files")
+	}
+	ln, err := net.Listen("tcp", ldapAddr)
+	if err != nil {
+		t.Fatalf("LDAP address %s still bound after failed startup: %v", ldapAddr, err)
+	}
+	_ = ln.Close()
+}
+
 func TestServeRejectsNonNativeEngine(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()

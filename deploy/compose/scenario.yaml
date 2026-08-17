@@ -4,6 +4,7 @@ metadata:
   name: compose-lab
 spec:
   directory:
+    engine: native
     suffix: "dc=example,dc=test"
     peopleRDN: "ou=people"
     groupsRDN: "ou=groups"

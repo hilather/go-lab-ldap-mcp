@@ -176,7 +176,7 @@ func TestPlanSucceedsOnDefaultEngine(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit %d stderr=%s", code, stderr.String())
 	}
-	if !strings.Contains(stdout.String(), `"engine": "389ds"`) {
+	if !strings.Contains(stdout.String(), `"engine": "native"`) {
 		t.Fatalf("plan stdout missing compiled engine:\n%s", stdout.String())
 	}
 }

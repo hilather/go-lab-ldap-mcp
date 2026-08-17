@@ -23,11 +23,6 @@ func TestReleaseComposeTopology(t *testing.T) {
 		t.Fatal("compose must not mount the private CA key")
 	}
 
-	pin := strings.TrimSpace(string(read(t, filepath.Join(root, "deploy", "docker", "dirsrv.digest"))))
-	if !strings.Contains(pin, "@sha256:") {
-		t.Fatalf("dirsrv.digest is not a digest pin: %s", pin)
-	}
-
 	var doc struct {
 		Services map[string]map[string]any `yaml:"services"`
 		Volumes  map[string]any            `yaml:"volumes"`
@@ -36,7 +31,7 @@ func TestReleaseComposeTopology(t *testing.T) {
 	if err := yaml.Unmarshal(raw, &doc); err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"directory", "bootstrap", "control"} {
+	for _, name := range []string{"directory", "bootstrap", "control", "native-secret-prep"} {
 		if _, ok := doc.Services[name]; !ok {
 			t.Fatalf("missing service %s", name)
 		}
@@ -49,11 +44,11 @@ func TestReleaseComposeTopology(t *testing.T) {
 	}
 
 	dir := doc.Services["directory"]
-	if img, _ := dir["image"].(string); img != pin {
-		t.Fatalf("directory image %q, want pinned %q", img, pin)
+	if img, _ := dir["image"].(string); img != "labldapd:dev" {
+		t.Fatalf("directory image %q, want labldapd:dev (native default)", img)
 	}
-	if _, ok := dir["env_file"]; !ok {
-		t.Fatal("directory must use env_file (KD-R20)")
+	if _, ok := dir["env_file"]; ok {
+		t.Fatal("native directory must not take the 389 env_file")
 	}
 	if env, _ := dir["environment"].(map[string]any); env != nil {
 		if _, ok := env["DS_DM_PASSWORD"]; ok {
@@ -145,17 +140,44 @@ func TestEphemeralTmpfsVolumeOptions(t *testing.T) {
 	if !strings.Contains(text, "type: tmpfs") {
 		t.Fatal("ephemeral overlay must use a tmpfs-backed volume")
 	}
-	if !strings.Contains(text, "uid=389") || !strings.Contains(text, "gid=389") {
-		t.Fatal("tmpfs must set uid/gid 389 (dirsrv)")
+	if !strings.Contains(text, "uid=65532") || !strings.Contains(text, "gid=65532") {
+		t.Fatal("tmpfs must set uid/gid 65532 (labldapd)")
 	}
 	if !strings.Contains(text, "mode=0750") {
 		t.Fatal("tmpfs must set mode=0750")
 	}
-	if !strings.Contains(text, "size=2147483648") {
-		t.Fatal("tmpfs must set a 2GiB size (512Mi is too small for 389 DS first-boot)")
+	if !strings.Contains(text, "size=268435456") {
+		t.Fatal("native ephemeral tmpfs must set a 256Mi size")
 	}
 	if !strings.Contains(text, "host swap") && !strings.Contains(text, "Host swap") {
 		t.Fatal("ephemeral overlay must document the host-swap caveat")
+	}
+}
+
+func TestReleaseCompose389DSTopology(t *testing.T) {
+	root := repoRoot(t)
+	raw := read(t, filepath.Join(root, "deploy", "compose", "compose.389ds.yaml"))
+	text := string(raw)
+	if strings.Contains(text, "docker.sock") {
+		t.Fatal("389 compose must not mount the Docker socket")
+	}
+	pin := strings.TrimSpace(string(read(t, filepath.Join(root, "deploy", "docker", "dirsrv.digest"))))
+	if !strings.Contains(pin, "@sha256:") {
+		t.Fatalf("dirsrv.digest is not a digest pin: %s", pin)
+	}
+	if !strings.Contains(text, pin) {
+		t.Fatal("389 compose must pin the dirsrv digest")
+	}
+	if !strings.Contains(text, "env_file") {
+		t.Fatal("389 directory must use env_file (KD-R20)")
+	}
+	eph := string(read(t, filepath.Join(root, "deploy", "compose", "compose.389ds-ephemeral.yaml")))
+	if !strings.Contains(eph, "uid=389") || !strings.Contains(eph, "size=2147483648") {
+		t.Fatal("389 ephemeral tmpfs must stay 2GiB uid 389")
+	}
+	scenario := string(read(t, filepath.Join(root, "deploy", "compose", "scenario.389ds.yaml")))
+	if !strings.Contains(scenario, "engine: 389ds") {
+		t.Fatal("389 scenario must select engine: 389ds")
 	}
 }
 
@@ -179,6 +201,9 @@ func TestComposeScenarioListensAllInterfaces(t *testing.T) {
 	text := string(read(t, filepath.Join(root, "deploy", "compose", "scenario.yaml")))
 	if !strings.Contains(text, `listen: "0.0.0.0:8443"`) {
 		t.Fatal("compose scenario must listen on 0.0.0.0 inside the container")
+	}
+	if !strings.Contains(text, "engine: native") {
+		t.Fatal("default scenario must select engine: native")
 	}
 	if !strings.Contains(text, "storageMode: ephemeral") {
 		t.Fatal("default scenario must be ephemeral")
@@ -204,8 +229,11 @@ func TestMakefileComposeResetIsReal(t *testing.T) {
 	if !strings.Contains(text, "tools/setupsecrets") || !strings.Contains(text, "tools/setuptls") {
 		t.Fatal("compose-up must use the secret and TLS helpers")
 	}
-	if !strings.Contains(text, "instance-ca.crt") {
-		t.Fatal("ephemeral compose-up must publish instance-ca.crt")
+	if !strings.Contains(text, "compose-up-389ds:") || !strings.Contains(text, "instance-ca.crt") {
+		t.Fatal("389 rollback compose-up-389ds must publish instance-ca.crt")
+	}
+	if !strings.Contains(text, "compose.389ds.yaml") {
+		t.Fatal("389 rollback must use compose.389ds.yaml")
 	}
 	if !strings.Contains(text, "scenario.persistent.yaml") {
 		t.Fatal("persistent compose-up must use scenario.persistent.yaml")

@@ -34,7 +34,7 @@ const (
 	defaultHealthListen = "127.0.0.1:8389"
 	// storeFileName is the bbolt database file inside the data directory
 	// (deploy/docker/labldapd-image-contract.md).
-	storeFileName = "labldapd.bolt"
+	storeFileName = store.StoreFileName
 	// directoryManagerDN is the native root identity (ADR-0009 decision 13,
 	// default value). Bootstrap binds it as defaultBindDN; no scenario
 	// field renames it yet (tracked for T-146 documentation).
@@ -248,6 +248,13 @@ func startDaemon(ctx context.Context, f serveFlags, log *slog.Logger) (*daemon, 
 		return nil, err
 	}
 
+	if err := store.AssertNativeDataDir(f.dataDir); err != nil {
+		if errors.Is(err, store.ErrEngineDataMismatch) {
+			return nil, configFieldErr("dataDir", "engine_data_mismatch",
+				"directory looks like a 389 Directory Server tree or a non-bbolt labldapd.bolt; run compose-reset or set engine: 389ds")
+		}
+		return nil, fmt.Errorf("labldapd: check data directory: %w", err)
+	}
 	if err := os.MkdirAll(f.dataDir, 0o700); err != nil {
 		return nil, fmt.Errorf("labldapd: create data directory: %w", err)
 	}

@@ -64,7 +64,34 @@ spec:
 }
 
 func TestWireEngineReconcilersDS389(t *testing.T) {
-	opt, err := bootstrap.ParseArgs("plan", []string{"--config", "../../config/examples/example-lab.yaml"})
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "secrets"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for name, val := range map[string]string{
+		"runtime-ldap": "lab-fixture-runtime-password",
+		"user-alice":   "lab-fixture-alice-password",
+	} {
+		if err := os.WriteFile(filepath.Join(dir, "secrets", name), []byte(val+"\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	path := filepath.Join(dir, "lab.yaml")
+	src := `apiVersion: labldap.dev/v1alpha1
+kind: LabScenario
+metadata: { name: wiring-389 }
+spec:
+  directory: { engine: 389ds, suffix: "dc=example,dc=test" }
+  transport: { ldaps: { enabled: true, port: 3636 } }
+  runtimeAccount: { id: rt, passwordFile: secrets/runtime-ldap }
+  users:
+    - id: alice
+      passwordFile: secrets/user-alice
+`
+	if err := os.WriteFile(path, []byte(src), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	opt, err := bootstrap.ParseArgs("plan", []string{"--config", path})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -213,7 +240,7 @@ func TestNativeEngineCoordinates(t *testing.T) {
 }
 
 func TestWireEngineReconcilersCompileFailureKeepsDefault(t *testing.T) {
-	// A missing/uncompilable scenario leaves the default 389ds set in place
+	// A missing/uncompilable scenario leaves the 389ds fallback set in place
 	// and returns no gate error: bootstrap.Run stays the single reporter of
 	// configuration errors.
 	opt := bootstrap.Options{Command: "apply", ConfigPath: filepath.Join(t.TempDir(), "missing.yaml")}

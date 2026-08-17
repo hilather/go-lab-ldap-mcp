@@ -20,9 +20,11 @@ import documented in the
 Typical causes:
 
 - Invalid scenario YAML (unknown fields, missing secrets).
-- Directory not healthy (`/data/config/container.inf` missing).
+- Directory not healthy (native: health listener; 389: `/data/config/container.inf` missing).
 - Wrong CA / SAN: TLS verify fails closed.
 - DM password file missing or empty.
+- Native daemon pointed at a 389 `/data` tree (`engine_data_mismatch`).
+  Run `compose-reset` or set `engine: 389ds`.
 
 Fix the scenario or secrets, then `make compose-up` again. Do not pass
 `--directory-manager-password` on the command line.
@@ -30,8 +32,9 @@ Fix the scenario or secrets, then `make compose-up` again. Do not pass
 ## LDAPS / StartTLS fails from the host
 
 - Ports are **3636** (LDAPS) and **3389** (LDAP / StartTLS).
-- Ephemeral: trust `secrets/tls/instance-ca.crt`.
-- Persistent: trust `secrets/tls/ca.crt` after `setuptls import`.
+- Default native stack: trust `secrets/tls/ca.crt`.
+- 389 rollback ephemeral: trust `secrets/tls/instance-ca.crt`.
+- 389 rollback persistent: trust `secrets/tls/ca.crt` after `setuptls import`.
 - A wrong CA or hostname fails closed. That is required, not a bug.
 
 ## Runtime entries vanished (ephemeral)

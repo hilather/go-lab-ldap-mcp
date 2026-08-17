@@ -20,17 +20,20 @@ Local images only. No distribution LICENSE file yet.
 | Direct LDAP | `ldap://127.0.0.1:3389` and `ldaps://127.0.0.1:3636` |
 | MCP | `POST /mcp` (bearer) and `labldap mcp-stdio`. Read tools on by default; mutations off until `register*`. Catalog: [docs/mcp/catalog.md](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/mcp/catalog.md). |
 
-389 Directory Server is the directory engine. The Go service does **not**
+The default directory engine is native `labldapd`. Pinned 389 Directory
+Server remains the oracle and rollback (`engine: 389ds`,
+`make compose-up-389ds`). The control plane (`labldap`) does **not**
 implement the LDAP wire protocol.
 
 ## Limitations (read first)
 
 - **Not Active Directory.** There is no NTLM, Kerberos, GPOs, `sAMAccountName`
   uniqueness model, SID history, or AD-style schema. Clients that assume
-  Active Directory will not work. LabLDAP is generic LDAPv3 against 389 DS.
+  Active Directory will not work. LabLDAP is generic LDAPv3 against the
+  selected engine.
 - **Ephemeral tmpfs is not a forensic wipe.** Host swap can still persist
   tmpfs pages (non-negotiable 7).
-- **One suffix, one 389 DS instance, one control replica.** Not HA.
+- **One suffix, one engine instance, one control replica.** Not HA.
 - **Hard engine reset is not an API.** `make compose-reset` (volume removal)
   is operator-only. REST/MCP expose suffix-scoped soft reset only.
 - **Directory Manager never goes to control.** DM is bootstrap-only.
@@ -53,9 +56,10 @@ implement the LDAP wire protocol.
 
 | Path | Role |
 | --- | --- |
-| `deploy/compose/compose.yaml` | Base topology (pinned 389 DS digest) |
+| `deploy/compose/compose.yaml` | Default native topology (`labldapd:dev`) |
 | `deploy/compose/compose.ephemeral.yaml` | Default: tmpfs-backed `/data` |
 | `deploy/compose/compose.persistent.yaml` | Named volume |
+| `deploy/compose/compose.389ds.yaml` | 389 DS oracle/rollback |
 | `deploy/compose/scenario.yaml` | Ephemeral lab scenario |
 | `deploy/compose/scenario.persistent.yaml` | Persistent lab scenario |
 | `config/examples/example-lab.yaml` | Compiler example |
@@ -72,10 +76,10 @@ From a clean checkout:
 make compose-up
 ```
 
-That builds `labldap-control:dev` and `labldap-bootstrap:dev`, generates
-gitignored secrets and a lab CA, starts 389 DS, publishes the **instance
-CA** to `secrets/tls/instance-ca.crt`, runs bootstrap `apply`, then starts
-control.
+That builds `labldapd:dev`, `labldap-control:dev`, and
+`labldap-bootstrap:dev`, generates gitignored secrets and a lab CA, starts
+`labldapd`, runs bootstrap `apply`, then starts control. Use
+`make compose-up-389ds` for the pinned 389 DS stack (instance CA publish).
 
 Host publishes (loopback only):
 
@@ -94,16 +98,18 @@ Stop: `make compose-down`. Operator hard reset: `make compose-reset`
 make compose-up-persistent
 ```
 
-Uses a named volume for `/data`. After first boot the helper runs the
-**documented** TLS import:
+Uses a named volume for `/data`. Default native mode mounts the lab CA
+files into `labldapd`; there is no `dsctl` import. The 389 rollback
+(`make compose-up-389ds-persistent`) runs the **documented** TLS import
+after first boot:
 
 ```text
 dsctl localhost tls import-ca …
 dsctl localhost tls import-server-key-cert …
 ```
 
-That is the only directory-engine CLI path operators need. Do not hand-edit
-`cn=config`. Restart keeps runtime entries. Soft reset
+That is the only 389 directory-engine CLI path operators need. Do not
+hand-edit `cn=config`. Restart keeps runtime entries. Soft reset
 (`POST /api/v1/reset` with `lab:reset`, scenario name, and expected
 revision) restores the compiled baseline without removing the volume.
 

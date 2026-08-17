@@ -35,7 +35,7 @@ import (
 // wireEngineReconcilers compiles the scenario and selects the reconciler
 // set for its engine. It returns the engine-availability gate error: both
 // wired engines return nil, anything else fails closed. A read or compile
-// failure leaves the default 389ds set wired and returns nil so
+// failure leaves the 389ds fallback reconciler set wired and returns nil so
 // bootstrap.Run stays the single reporter of configuration errors.
 func wireEngineReconcilers(ctx context.Context, opt *bootstrap.Options) error {
 	src, err := os.ReadFile(opt.ConfigPath)
@@ -59,8 +59,9 @@ func wireEngineReconcilers(ctx context.Context, opt *bootstrap.Options) error {
 	return config.RequireAvailableEngine(compiled.Engine.Engine)
 }
 
-// wireDS389 selects the 389 DS reconciler set (the default, unchanged since
-// before T-146): dsconf-backed engine plane and LDAP-as-DM data plane.
+// wireDS389 selects the 389 DS reconciler set (compile-failure fallback
+// and explicit engine: 389ds): dsconf-backed engine plane and LDAP-as-DM
+// data plane.
 func wireDS389(opt *bootstrap.Options) {
 	opt.Waiter = ds389.Admin{}
 	eng := ds389.Engine{}

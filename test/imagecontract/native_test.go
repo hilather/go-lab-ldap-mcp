@@ -141,8 +141,11 @@ func TestMakefileNativeTargetsAreReal(t *testing.T) {
 	if !strings.Contains(text, "Dockerfile.labldapd") || !strings.Contains(text, "labldapd:dev") {
 		t.Fatal("make image-native must build labldapd:dev from Dockerfile.labldapd")
 	}
-	if !strings.Contains(text, "compose.native.yaml") || !strings.Contains(text, "compose.native-ephemeral.yaml") {
-		t.Fatal("make compose-up-native must stack the native overlays")
+	if !strings.Contains(text, "compose-up-native: compose-up") {
+		t.Fatal("make compose-up-native must alias compose-up after the native default flip")
+	}
+	if !strings.Contains(text, "compose.389ds.yaml") {
+		t.Fatal("Makefile must keep a 389 DS rollback compose target")
 	}
 	if !strings.Contains(text, "labldapd.digest") {
 		t.Fatal("make image-native must pin the labldapd base from labldapd.digest")

@@ -2,7 +2,7 @@
 
 ## 1. Architecture summary
 
-LabLDAP is a control plane around a directory engine. The architecture deliberately separates engine bootstrap privileges from runtime management privileges. v0.1.0 ships 389 Directory Server as the sole engine. [ADR-0008](adr/0008-dual-directory-engines.md) adds a second engine (`native` / `labldapd`) with the same three lifecycle roles; native mode is milestone M9.
+LabLDAP is a control plane around a directory engine. The architecture deliberately separates engine bootstrap privileges from runtime management privileges. v0.1.0 shipped 389 Directory Server as the sole engine. [ADR-0008](adr/0008-dual-directory-engines.md) adds a second engine (`native` / `labldapd`) with the same three lifecycle roles. As of v0.3.0 the omitted-field default is native; 389 DS remains the oracle and an explicit rollback (`engine: 389ds`).
 
 There are three lifecycle roles:
 

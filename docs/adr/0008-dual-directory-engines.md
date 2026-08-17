@@ -23,14 +23,14 @@ Literal 389 feature parity (replication, changelog, the unused plugin catalog, S
 ## Decision
 
 1. LabLDAP supports **two directory engines**, selected by configuration:
-   - `389ds` — the existing pinned 389 Directory Server container. **Default.** Unchanged compose topology.
-   - `native` — a Go LDAP server in this repository (`cmd/labldapd` + `internal/ldapserver`), specified by ADR-0009.
+   - `native` — a Go LDAP server in this repository (`cmd/labldapd` + `internal/ldapserver`), specified by ADR-0009. **Default** when `spec.directory.engine` is omitted (amendment 2026-08-17 / v0.3.0).
+   - `389ds` — the existing pinned 389 Directory Server container. First-class oracle and rollback (`engine: 389ds`, `make compose-up-389ds`).
 2. **389 DS remains the behavioral oracle.** When the engines disagree on a Contract-tier behavior, the native engine is wrong until the [parity contract](../design/native-engine-parity-contract.md) records an explicit, reviewed Delta.
 3. **The control plane does not become an LDAP server.** `labldap` and `labldap-bootstrap` stay LDAP *clients*. They must not import `internal/ldapserver` in production code. Native mode talks to `labldapd` over LDAP / LDAPS / StartTLS, the same way 389 mode talks to 389 DS.
 4. **Directory data still does not live in the control process.** Users, groups, memberships, password hashes, ACIs, and account state live in the selected engine. An application-only in-memory map remains forbidden.
 5. **Privilege separation is unchanged.** Directory Manager is bootstrap-only. The long-running control service never receives the DM secret and never mounts the Docker socket. Soft reset stays suffix-scoped. Hard reset stays an operator compose/volume action.
 6. **Parity scope is LabLDAP-surface**, not “all of 389.” Contract / Delta / Excluded tiers in the parity contract are the source of truth. Expanding the Contract tier is a new ADR or a dated amendment of that contract.
-7. **Existing public contracts stay stable.** REST, MCP, the UI, and `v1alpha1` remain valid. Engine selection is a backward-compatible optional field defaulting to `389ds` (see T-123). No new REST version.
+7. **Existing public contracts stay stable.** REST, MCP, the UI, and `v1alpha1` remain valid. Engine selection is an optional field. The omitted-field default was `389ds` (T-123) and is `native` as of v0.3.0 (amendment below). No new REST version. No new `apiVersion` for this one omitted-field reinterpretation.
 8. **Native mode is lab-scoped.** It is a laboratory directory, like 389 mode. It is not a production identity system. Docs must not present it as a 389 replacement outside this product.
 
 Rejected options are listed below. Silence would otherwise re-open A1 as “embed LDAP in `labldap`” or “in-memory SoT.”
@@ -74,3 +74,13 @@ Rejected options are listed below. Silence would otherwise re-open A1 as “embe
 - Accepted ADRs outrank other repository documents. This ADR occupies the AGENTS rank-1 slot for engine choice.
 - Security defaults may become stricter in a minor release; insecure behavior must never become the silent default. Native mode inherits 389-mode defaults: anonymous bind off, cleartext simple bind off unless explicit insecure lab mode.
 - Do not cite stub ADR-0001 as an accepted decision. This file is the accepted decision.
+
+## Amendment (2026-08-17)
+
+Owner directed the omitted-field default flip to `native` for **v0.3.0**.
+
+- Decision 1: omitted `spec.directory.engine` now means `native`. `389ds` remains a first-class engine and the behavioral oracle.
+- Decision 7: the omitted-field default is no longer `389ds`. **This one reinterpretation stays on `apiVersion: labldap.dev/v1alpha1`** and does not bump REST `/api/v1` or `CompilerContract`. That supersedes the AGENTS.md letter (“breaking configuration changes require a new apiVersion”) for this change only. Explicit `engine: 389ds` is unchanged.
+- On-disk formats are not migrated. Switching engine on an existing volume is a hard reset (`compose-reset`). `labldapd` fails closed if `--data-dir` looks like a 389 nsslapd tree or `labldapd.bolt` is not a bbolt file.
+- Security defaults (anonymous bind off, cleartext simple bind off) are unchanged.
+- Residual LabLDAP-surface deltas remain tracked in `docs/design/native-engine-parity-contract.md` and `test/parity`. The flip does not claim every agent-visible delta is closed.

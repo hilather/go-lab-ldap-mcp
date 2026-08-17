@@ -17,7 +17,7 @@ file — [Scenario YAML](scenario.md).
 | OS | Linux `amd64` (advertised). `arm64` is not advertised. |
 | Docker Engine | 24+ |
 | Compose | v2.24+ |
-| Disk | enough for two local images plus 389 DS data |
+| Disk | enough for local images plus `/data` (native bbolt is small; 389 DS rollback needs more) |
 | Ports on loopback | `8443` (management), `3389` (LDAP), `3636` (LDAPS) |
 
 Optional for from-source work: Go 1.26 (toolchain `go1.26.5`), Node 22.12+,
@@ -33,20 +33,21 @@ pnpm. Pins live in [docs/toolchain.md](../toolchain.md).
   metrics        │        MCP  │         │
                  └─────────────┘         │ runtime account
                                          ▼
-  ldapsearch     :3389 / :3636      389 Directory Server
+  ldapsearch     :3389 / :3636      labldapd (default) or 389 DS
                                          ▲
                          one-shot        │ Directory Manager
                       labldap-bootstrap ─┘  (secret file, then gone)
 ```
 
-Three compose roles:
+Three compose roles (default native stack):
 
 | Service | Image | Lifetime | Privilege |
 | --- | --- | --- | --- |
-| `directory` | pinned `quay.io/389ds/dirsrv` | long-running | owns `/data` |
+| `directory` | `labldapd:dev` (389 rollback: pinned `quay.io/389ds/dirsrv`) | long-running | owns `/data` |
 | `bootstrap` | `labldap-bootstrap:dev` | one-shot | DM via `--directory-manager-password-file` |
 | `control` | `labldap-control:dev` | long-running | restricted account, no DM, no Docker socket |
 | `secret-prep` | `labldap-control:dev` | one-shot | copies secret files into a 0400 volume for uid 65532 |
+| `native-secret-prep` | `labldapd:dev` | one-shot | copies DM/TLS files into a 0400 volume for uid 65532 |
 
 Control never receives Directory Manager. Bootstrap never stays up.
 
@@ -64,7 +65,8 @@ not a forensic wipe.
 make compose-up-persistent
 ```
 
-Named volume. Runtime entries survive restart. After first boot the helper
+Named volume. Runtime entries survive restart. Native mode mounts the lab
+CA files directly. The 389 rollback stack (`make compose-up-389ds-persistent`)
 imports the lab CA and server cert into 389 DS and restarts the directory
 for NSS reload.
 
@@ -131,10 +133,12 @@ go run ./tools/setuptls generate --dir secrets/tls --host management
 
 - Private CA key stays on the **host** (`secrets/tls/ca.key`). It is not
   mounted into containers.
-- Ephemeral: trust `secrets/tls/instance-ca.crt`. tmpfs `/data` cannot take
-  `dsctl tls import-*`.
-- Persistent: `setuptls import` then 389 DS picks up the lab CA / server
-  cert after first boot.
+- Default native stack (ephemeral and persistent): trust
+  `secrets/tls/ca.crt`. labldapd mounts the lab directory cert/key as files.
+- 389 rollback ephemeral: trust `secrets/tls/instance-ca.crt`. tmpfs
+  `/data` cannot take `dsctl tls import-*`.
+- 389 rollback persistent: `setuptls import` then 389 DS picks up the lab
+  CA / server cert after first boot.
 
 Wrong CA or SAN: connections fail closed.
 
@@ -147,11 +151,16 @@ Under [`deploy/compose/`](../../deploy/compose/):
 
 | File | Role |
 | --- | --- |
-| `compose.yaml` | base: directory, bootstrap, secret-prep, control |
-| `compose.ephemeral.yaml` | tmpfs `/data` |
-| `compose.persistent.yaml` | named volume + TLS import |
-| `scenario.yaml` | compiled baseline for ephemeral |
-| `scenario.persistent.yaml` | baseline for persistent |
+| `compose.yaml` | default native base: labldapd, bootstrap, secret-prep, control |
+| `compose.ephemeral.yaml` | native tmpfs `/data` (256Mi, uid 65532) |
+| `compose.persistent.yaml` | native named volume |
+| `compose.389ds.yaml` | 389 DS oracle/rollback base |
+| `compose.389ds-ephemeral.yaml` | 389 tmpfs `/data` (2GiB, uid 389) |
+| `compose.389ds-persistent.yaml` | 389 named volume |
+| `scenario.yaml` | compiled baseline for ephemeral (engine: native) |
+| `scenario.persistent.yaml` | baseline for persistent (engine: native) |
+| `scenario.389ds.yaml` | 389 rollback baseline |
+| `scenario.389ds-persistent.yaml` | 389 persistent baseline |
 
 Published ports are **loopback only**:
 
@@ -161,12 +170,13 @@ Published ports are **loopback only**:
 127.0.0.1:3636 → LDAPS
 ```
 
-Minimum resource guidance (not enforced everywhere): directory 512Mi / 1
-CPU, control 256Mi, bootstrap 256Mi.
+Minimum resource guidance (not enforced everywhere): native directory
+256Mi / 1 CPU; 389 directory 512Mi / 1 CPU (ephemeral tmpfs 2GiB);
+control 256Mi; bootstrap 256Mi.
 
 ## From source, no compose
 
-Useful when you already have a 389 DS and a compiled scenario:
+Useful when you already have a directory engine and a compiled scenario:
 
 ```bash
 go run ./cmd/labldap-bootstrap --help

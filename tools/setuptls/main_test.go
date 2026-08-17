@@ -183,10 +183,10 @@ func TestComposePassthroughEnvIncludesOverlayVars(t *testing.T) {
 func TestImportDefaultsToPersistentOverlay(t *testing.T) {
 	got := defaultImportComposeFiles()
 	joined := strings.Join(got, " ")
-	if !strings.Contains(joined, "compose.persistent.yaml") {
+	if !strings.Contains(joined, "compose.389ds-persistent.yaml") {
 		t.Fatalf("import default files = %v", got)
 	}
-	if strings.Contains(joined, "compose.ephemeral.yaml") {
+	if strings.Contains(joined, "compose.ephemeral.yaml") || strings.Contains(joined, "compose.389ds-ephemeral.yaml") {
 		t.Fatal("import must not default to the ephemeral overlay")
 	}
 }

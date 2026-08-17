@@ -371,20 +371,20 @@ func TestEngineDefaultAndRedactedPlan(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.Public.Spec.Directory.Engine != v1alpha1.Engine389DS {
+	if c.Public.Spec.Directory.Engine != v1alpha1.EngineNative {
 		t.Fatalf("public engine = %q", c.Public.Spec.Directory.Engine)
 	}
-	if c.Normalized.Engine != v1alpha1.Engine389DS {
+	if c.Normalized.Engine != v1alpha1.EngineNative {
 		t.Fatalf("normalized engine = %q", c.Normalized.Engine)
 	}
-	if c.Engine.Engine != v1alpha1.Engine389DS {
+	if c.Engine.Engine != v1alpha1.EngineNative {
 		t.Fatalf("plan engine = %q", c.Engine.Engine)
 	}
 	plan, err := c.RedactedJSON()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Contains(plan, []byte(`"engine": "`+v1alpha1.Engine389DS+`"`)) {
+	if !bytes.Contains(plan, []byte(`"engine": "`+v1alpha1.EngineNative+`"`)) {
 		t.Fatalf("redacted plan missing engine:\n%s", plan)
 	}
 	if bytes.Contains(plan, []byte("lab-fixture")) {
@@ -418,22 +418,28 @@ func TestEngineMixesIntoDirectoryRevision(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	explicit, err := config.Compile(t.Context(), engineScenario(t, v1alpha1.Engine389DS), "eng-b.yaml", opt)
+	explicit389, err := config.Compile(t.Context(), engineScenario(t, v1alpha1.Engine389DS), "eng-b.yaml", opt)
 	if err != nil {
 		t.Fatal(err)
 	}
-	native, err := config.Compile(t.Context(), engineScenario(t, v1alpha1.EngineNative), "eng-c.yaml", opt)
+	explicitNative, err := config.Compile(t.Context(), engineScenario(t, v1alpha1.EngineNative), "eng-c.yaml", opt)
 	if err != nil {
-		t.Fatal(err) // native compiles; serve/bootstrap fail closed, not the compiler
+		t.Fatal(err)
 	}
-	if omitted.Revisions.Directory != explicit.Revisions.Directory {
-		t.Fatal("omitted engine must equal explicit 389ds after defaulting")
+	if omitted.Revisions.Directory != explicitNative.Revisions.Directory {
+		t.Fatal("omitted engine must equal explicit native after defaulting")
 	}
-	if omitted.Revisions.Directory == native.Revisions.Directory {
+	if omitted.Revisions.Directory == explicit389.Revisions.Directory {
 		t.Fatal("a different engine is a different lab: directory revision must change")
 	}
-	if omitted.Revisions.Control != native.Revisions.Control {
+	if omitted.Revisions.Control != explicit389.Revisions.Control {
 		t.Fatal("engine is not control-plane state: control revision must not change")
+	}
+	if omitted.Public.Spec.Transport.AllowAnonymousBind || omitted.Public.Spec.Transport.AllowCleartextBind {
+		t.Fatal("engine default flip must not change transport security defaults")
+	}
+	if explicit389.Engine.Engine != v1alpha1.Engine389DS {
+		t.Fatalf("explicit 389ds = %q", explicit389.Engine.Engine)
 	}
 }
 

@@ -245,7 +245,7 @@ func runImport(args []string, stdout, stderr io.Writer) int {
 }
 
 func defaultImportComposeFiles() []string {
-	return []string{"deploy/compose/compose.yaml", "deploy/compose/compose.persistent.yaml"}
+	return []string{"deploy/compose/compose.389ds.yaml", "deploy/compose/compose.389ds-persistent.yaml"}
 }
 
 func importTLS(ctx context.Context, dir, project, service string, composeFiles []string, stdout io.Writer) error {
@@ -431,7 +431,7 @@ func runPublish(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 	if len(files) == 0 {
-		files = []string{"deploy/compose/compose.yaml", "deploy/compose/compose.ephemeral.yaml"}
+		files = []string{"deploy/compose/compose.389ds.yaml", "deploy/compose/compose.389ds-ephemeral.yaml"}
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()

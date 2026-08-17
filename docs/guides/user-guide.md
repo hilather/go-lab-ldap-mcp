@@ -27,7 +27,7 @@ tree is YAML — [Scenario YAML](scenario.md).
 ## Scenario YAML
 
 Users and groups can be declared in the LabScenario file before the lab
-starts. Bootstrap writes them into 389 DS.
+starts. Bootstrap writes them into the selected directory engine.
 
 ```yaml
 spec:
@@ -155,9 +155,10 @@ return **412** on conflict.
 ## Direct LDAP
 
 Yes — you can authenticate against the lab as an LDAP server. The listener is
-**389 Directory Server**, not the Go control plane. Point clients at
-`127.0.0.1:3389` (StartTLS) or `127.0.0.1:3636` (LDAPS). Do not point an
-LDAP client at `:8443`; that port is HTTPS (UI / REST / MCP).
+**`labldapd` by default** (or 389 DS when `engine: 389ds`), not the Go
+control plane. Point clients at `127.0.0.1:3389` (StartTLS) or
+`127.0.0.1:3636` (LDAPS). Do not point an LDAP client at `:8443`; that
+port is HTTPS (UI / REST / MCP).
 
 | Port | Use |
 | --- | --- |
@@ -169,8 +170,9 @@ StartTLS is on.
 
 Trust the lab CA:
 
-- ephemeral: `secrets/tls/instance-ca.crt`
-- persistent: `secrets/tls/ca.crt` after import
+- default native stack (ephemeral and persistent): `secrets/tls/ca.crt`
+- 389 rollback ephemeral: `secrets/tls/instance-ca.crt`
+- 389 rollback persistent: `secrets/tls/ca.crt` after import
 
 A wrong CA or SAN fails closed. That is required behavior, not a bug.
 
