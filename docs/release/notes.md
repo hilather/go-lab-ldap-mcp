@@ -1,9 +1,17 @@
-# LabLDAP v0.2.1 release notes
+# LabLDAP v0.2.2 release notes
 
 Date: 2026-08-16  
-Tag: **v0.2.1**  
-Prior: [v0.2.0](https://github.com/hilather/go-lab-ldap-mcp/releases/tag/v0.2.0)  
+Tag: **v0.2.2**  
+Prior: [v0.2.1](https://github.com/hilather/go-lab-ldap-mcp/releases/tag/v0.2.1)  
 Images: `labldap-control:dev`, `labldap-bootstrap:dev`, `labldapd:dev` (OD-004; do not push)
+
+## Highlights since v0.2.1
+
+- **Native CI python ldap3.** The independent ldap3 client no longer
+  requests 389-only `entryDN` (parity D6) or downloads schema
+  (`get_info=ALL`), which made `TestCompatibilityLDAPClients/python_ldap3`
+  fail under `make test-integration-native`. It searches `uid`. Native CI
+  also installs `python3-venv`.
 
 ## Highlights since v0.2.0
 
@@ -23,13 +31,13 @@ Images: `labldap-control:dev`, `labldap-bootstrap:dev`, `labldapd:dev` (OD-004; 
   succeeds. Set-password stamp cleanup ignores missing attributes after
   the password replace.
 
-Catalog: [docs/mcp/catalog.md](https://github.com/hilather/go-lab-ldap-mcp/blob/v0.2.1/docs/mcp/catalog.md).
+Catalog: [docs/mcp/catalog.md](https://github.com/hilather/go-lab-ldap-mcp/blob/v0.2.2/docs/mcp/catalog.md).
 
 ## Versions
 
 | Component | Pin |
 | --- | --- |
-| LabLDAP source | `v0.2.1` (`git describe`; see `dist/release/provenance.json`) |
+| LabLDAP source | `v0.2.2` (`git describe`; see `dist/release/provenance.json`) |
 | Go | 1.26 / toolchain `go1.26.5` |
 | Node / pnpm | 22.14.0 / `pnpm@10.14.0` |
 | React | 19.2.8 |
@@ -46,7 +54,7 @@ Build application images with the same `VERSION` so
 - **Advertised:** `linux/amd64`
 - **Not advertised:** `linux/arm64` (upstream dirsrv digest includes it;
   no arm64 smoke in this environment). See
-  [architectures.md](https://github.com/hilather/go-lab-ldap-mcp/blob/v0.2.1/deploy/docker/architectures.md).
+  [architectures.md](https://github.com/hilather/go-lab-ldap-mcp/blob/v0.2.2/deploy/docker/architectures.md).
 - Host: Docker Engine 24+, Compose v2.24+.
 
 ## Known limitations
@@ -69,7 +77,7 @@ Build application images with the same `VERSION` so
 
 ## Migration guidance
 
-v0.2.0 → v0.2.1 is additive. `apiVersion` stays `labldap.dev/v1alpha1`.
+v0.2.1 → v0.2.2 is additive. `apiVersion` stays `labldap.dev/v1alpha1`.
 
 - Bind-test `outcome` may now be `locked` or `must_change` when those
   stamps are present even if a raw LDAP bind still succeeds on 389.
@@ -88,5 +96,5 @@ integration and native integration. Product acceptance:
 Security: five dated **approved** exceptions for the pinned `go1.26.5`
 standard library (`GO-2026-6090`, `GO-2026-6089`, `GO-2026-5972`,
 `GO-2026-6218`, `GO-2026-5026`). See
-[dependency-policy.md](https://github.com/hilather/go-lab-ldap-mcp/blob/v0.2.1/docs/security/dependency-policy.md).
+[dependency-policy.md](https://github.com/hilather/go-lab-ldap-mcp/blob/v0.2.2/docs/security/dependency-policy.md).
 No other criticals.

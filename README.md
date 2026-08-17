@@ -23,12 +23,12 @@
   <img alt="Go" src="https://img.shields.io/badge/Go-1.26-00ADD8?style=flat-square&logo=go&logoColor=white" />
   <img alt="389-ds" src="https://img.shields.io/badge/389--ds-2.4.6-3D9B8F?style=flat-square" />
   <img alt="MCP" src="https://img.shields.io/badge/MCP-2026--07--28-111111?style=flat-square" />
-  <img alt="Release" src="https://img.shields.io/badge/release-v0.2.1-ecece8?style=flat-square&labelColor=111111" />
+  <img alt="Release" src="https://img.shields.io/badge/release-v0.2.2-ecece8?style=flat-square&labelColor=111111" />
 </p>
 
 ![LabLDAP console](docs/assets/console.jpg)
 
-LabLDAP is a control plane around a directory engine. v0.2.1 ships **389 Directory
+LabLDAP is a control plane around a directory engine. v0.2.2 ships **389 Directory
 Server** as the default engine and an opt-in Go-native engine (`labldapd`) with
 [LabLDAP-surface parity](docs/design/native-engine-parity-contract.md)
 ([ADR-0008](docs/adr/0008-dual-directory-engines.md)).
@@ -186,7 +186,7 @@ Bind the management listener to loopback, which compose already does.
 | [Operator guide](docs/operations/operator-guide.md) | Day-2 limits and failure modes |
 | [Troubleshooting](docs/operations/troubleshooting.md) | Ready checks, TLS, tokens, vanished entries |
 | [MCP catalog](docs/mcp/catalog.md) | Tools, resources, scopes |
-| [Release notes](docs/release/notes.md) | v0.2.1 contents and residuals |
+| [Release notes](docs/release/notes.md) | v0.2.2 contents and residuals |
 
 Architecture and design live under [`docs/`](docs/). Contributing:
 [`CONTRIBUTING.md`](CONTRIBUTING.md).
@@ -206,10 +206,9 @@ not pushed to a public registry.
 
 ## Status
 
-**v0.2.1** — dual-engine REST→LDAP workflow integration in CI, agent rules
-that native directory behavior must match 389 in integration, and
-account-workflow bind-test/set-password fixes. See
-[release notes](docs/release/notes.md).
+**v0.2.2** — dual-engine REST→LDAP workflow integration in CI, native
+integration gated on native LDAP paths, and ldap3 client no longer
+requests 389-only `entryDN`. See [release notes](docs/release/notes.md).
 
 No project license file yet; treat it as source-available until one is added.
 
