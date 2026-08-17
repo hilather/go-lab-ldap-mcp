@@ -49,7 +49,7 @@ def main() -> int:
         return 0
 
     try:
-        from ldap3 import ALL, Connection, Server, Tls
+        from ldap3 import NONE, Connection, Server, Tls
     except ImportError:
         print("ldap3-missing", file=sys.stderr)
         return 2
@@ -69,7 +69,9 @@ def main() -> int:
             tls_kwargs["valid_names"] = names
         tls = Tls(**tls_kwargs)
     use_ssl = args.url.startswith("ldaps://")
-    server = Server(args.url, get_info=ALL, use_ssl=use_ssl, tls=tls)
+    # NONE: do not download schema. ldap3 SCHEMA/ALL rejects attributes the
+    # engine does not advertise (389 extras such as entryDN, parity D6).
+    server = Server(args.url, get_info=NONE, use_ssl=use_ssl, tls=tls)
     conn = Connection(server, user=args.bind_dn or None, password=password or None, auto_bind=False)
     if args.starttls:
         conn.open()
@@ -85,7 +87,7 @@ def main() -> int:
 
     who = conn.extend.standard.who_am_i()
     print("whoami", who or "")
-    conn.search(args.base, args.filter, attributes=["entryDN"])
+    conn.search(args.base, args.filter, attributes=["uid"])
     for entry in conn.entries:
         print("dn", entry.entry_dn)
     conn.unbind()

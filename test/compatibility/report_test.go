@@ -77,6 +77,19 @@ func TestCompatSuiteDoesNotUseInContainerPasswordModify(t *testing.T) {
 	}
 }
 
+func TestPythonClientUsesContractAttributes(t *testing.T) {
+	src := read(t, filepath.Join(repoRoot(t), "test", "compatibility", "clients", "python", "client.py"))
+	if strings.Contains(src, `attributes=["entryDN"]`) || strings.Contains(src, "attributes=['entryDN']") {
+		t.Fatal("python ldap3 client must not request 389-only entryDN (parity D6); use uid")
+	}
+	if !strings.Contains(src, `attributes=["uid"]`) && !strings.Contains(src, "attributes=['uid']") {
+		t.Fatal("python ldap3 client must search a contract attribute (uid)")
+	}
+	if strings.Contains(src, "get_info=ALL") {
+		t.Fatal("ldap3 get_info=ALL schema-validates against advertised types and rejects native (no entryDN)")
+	}
+}
+
 func TestIndependentClientDoesNotImportLabLDAPPool(t *testing.T) {
 	root := repoRoot(t)
 	src := read(t, filepath.Join(root, "test", "compatibility", "goindep", "client.go"))

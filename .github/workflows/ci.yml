@@ -304,13 +304,14 @@ jobs:
           cache: true
           cache-dependency-path: go.mod
 
-      - name: Install host LDAP tools
+      - name: Install host LDAP and Python tools
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends ldap-utils
+          sudo apt-get install -y --no-install-recommends ldap-utils python3-venv python3-pip
           command -v ldapsearch
           command -v ldapwhoami
+          python3 --version
 
       - name: Integration tests (native engine)
         run: |
