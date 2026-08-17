@@ -22,7 +22,7 @@ Images: `labldap-control:dev`, `labldap-bootstrap:dev`, `labldapd:dev` (OD-004; 
   still runs on heavy (non-docs) changes. `make test-integration-native`
   runs only when native LDAP paths change (`internal/ldapserver`,
   `cmd/labldapd`, `internal/directory/native`, dual-engine IT/parity,
-  native compose/image).
+  T-115 compatibility clients, native compose/image).
 - **Agent rules.** New operator REST/MCP actions must be usable in the
   UI. New native directory behavior that 389 also implements must have a
   parametrized integration test on both engines.
