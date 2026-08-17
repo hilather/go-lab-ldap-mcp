@@ -87,6 +87,7 @@ def main() -> int:
 
     who = conn.extend.standard.who_am_i()
     print("whoami", who or "")
+    # uid is Contract (both engines). Do not request entryDN (389-only).
     conn.search(args.base, args.filter, attributes=["uid"])
     for entry in conn.entries:
         print("dn", entry.entry_dn)

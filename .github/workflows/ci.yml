@@ -78,7 +78,7 @@ jobs:
               *) heavy=true ;;
             esac
             case "${f}" in
-              internal/ldapserver/*|cmd/labldapd/*|internal/directory/native/*|test/integration/dirsrv/*|test/compatibility/*|test/parity/*|deploy/compose/compose.native*|deploy/docker/labldapd*|deploy/docker/*native*)
+              internal/ldapserver/*|cmd/labldapd/*|internal/directory/native/*|test/integration/dirsrv/*|test/compatibility/*|test/parity/*|deploy/compose/compose.native*|deploy/docker/labldapd*|deploy/docker/*native*|.github/workflows/ci.yml)
                 native=true
                 ;;
             esac
