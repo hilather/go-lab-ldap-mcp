@@ -50,6 +50,7 @@ func (n *nativeInstance) Password() observability.Secret { return observability.
 // reconcilers (ADR-0009 decision 12).
 func startNative(t *testing.T, yaml string) *nativeInstance {
 	t.Helper()
+	yaml = withITEngine(yaml)
 
 	// TLS material is the same test CA the 389 run imports via dsctl;
 	// clients trust ca.crt and verify the "localhost" name on both engines.

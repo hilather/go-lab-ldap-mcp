@@ -104,7 +104,7 @@ func TestShippedApplySeedBindAndMembership(t *testing.T) {
 	}
 
 	resetYAML := seedYAML("reset")
-	if err := os.WriteFile(filepath.Join(hostDir, "lab.yaml"), []byte(resetYAML), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(hostDir, "lab.yaml"), []byte(withITEngine(resetYAML)), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if out, err := exec.Command("docker", "cp", filepath.Join(hostDir, "lab.yaml"), inst.Name+":/tmp/labldap-apply/lab.yaml").CombinedOutput(); err != nil {
@@ -278,7 +278,7 @@ func stageSeedApply(t *testing.T, inst *Instance, yaml, alicePW string) (string,
 		t.Fatal(err)
 	}
 	cfg := filepath.Join(hostDir, "lab.yaml")
-	if err := os.WriteFile(cfg, []byte(yaml), 0o600); err != nil {
+	if err := os.WriteFile(cfg, []byte(withITEngine(yaml)), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	pw := filepath.Join(hostDir, "dm.pw")

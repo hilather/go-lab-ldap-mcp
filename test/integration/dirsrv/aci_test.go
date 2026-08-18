@@ -75,7 +75,7 @@ spec:
       rawACI: '` + invalidNamedACI + `'
 `
 	hostBad := filepath.Join(hostDir, "bad.yaml")
-	if err := os.WriteFile(hostBad, []byte(bad), 0o600); err != nil {
+	if err := os.WriteFile(hostBad, []byte(withITEngine(bad)), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if out, err := exec.Command("docker", "cp", hostBad, inst.Name+":/tmp/labldap-apply/bad.yaml").CombinedOutput(); err != nil {

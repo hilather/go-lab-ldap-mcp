@@ -124,7 +124,7 @@ func stageApply(t *testing.T, inst *Instance, suffix string) (hostDir string, g 
 		"  directory: { suffix: \"" + suffix + "\" }\n" +
 		"  transport: { ldaps: { enabled: true, port: 3636 } }\n" +
 		"  runtimeAccount: { id: rt, passwordFile: secrets/runtime-ldap }\n"
-	if err := os.WriteFile(cfg, []byte(src), 0o600); err != nil {
+	if err := os.WriteFile(cfg, []byte(withITEngine(src)), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	pw := filepath.Join(hostDir, "dm.pw")

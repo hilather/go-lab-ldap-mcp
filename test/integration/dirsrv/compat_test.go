@@ -37,6 +37,7 @@ func startCompatEngine(t *testing.T) compatEnv {
 
 func startCompatEngineFromYAML(t *testing.T, yaml string) compatEnv {
 	t.Helper()
+	yaml = withITEngine(yaml)
 	if itEngine(t) == EngineNative {
 		n := startNative(t, yaml)
 		return compatEnv{
