@@ -55,4 +55,33 @@ spec:
 			t.Fatalf("allowRawACI: %s", got)
 		}
 	})
+
+	const block = `apiVersion: labldap.dev/v1alpha1
+kind: LabScenario
+metadata:
+  name: bootstrap-min
+spec:
+  directory:
+    suffix: "dc=example,dc=test"
+  transport:
+    ldaps:
+      enabled: true
+`
+
+	t.Run("block_389ds", func(t *testing.T) {
+		t.Setenv(EngineEnvVar, Engine389DS)
+		got := withITEngine(block)
+		if !strings.Contains(got, "  directory:\n    engine: 389ds\n    suffix:") {
+			t.Fatalf("block inject:\n%s", got)
+		}
+	})
+
+	t.Run("block_already_set", func(t *testing.T) {
+		t.Setenv(EngineEnvVar, Engine389DS)
+		src := strings.Replace(block, "  directory:\n    suffix:", "  directory:\n    engine: native\n    suffix:", 1)
+		got := withITEngine(src)
+		if got != src {
+			t.Fatalf("rewrote explicit block engine:\n%s", got)
+		}
+	})
 }

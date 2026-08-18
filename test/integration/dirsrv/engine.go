@@ -89,5 +89,25 @@ func withITEngine(src string) string {
 	if i := strings.Index(src, flow); i >= 0 {
 		return src[:i] + "directory: { engine: " + engine + "," + src[i+len(flow):]
 	}
+	const block = "directory:"
+	if i := strings.Index(src, block); i >= 0 {
+		rest := src[i+len(block):]
+		nl := strings.IndexByte(rest, '\n')
+		if nl >= 0 && strings.TrimSpace(rest[:nl]) == "" {
+			after := rest[nl+1:]
+			indent := leadingWS(after)
+			if indent != "" {
+				return src[:i+len(block)] + rest[:nl+1] + indent + "engine: " + engine + "\n" + after
+			}
+		}
+	}
 	return src
+}
+
+func leadingWS(s string) string {
+	n := 0
+	for n < len(s) && (s[n] == ' ' || s[n] == '\t') {
+		n++
+	}
+	return s[:n]
 }
