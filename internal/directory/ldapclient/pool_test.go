@@ -141,6 +141,32 @@ func TestPoolRecoversAfterBroken(t *testing.T) {
 	}
 }
 
+func TestPoolDoReturnsAcquireErrorOnRetry(t *testing.T) {
+	t.Parallel()
+	var n atomic.Int32
+	dial := func(ctx context.Context, cfg Config) (*Conn, error) {
+		if n.Add(1) == 1 {
+			return fakeDial(ctx, cfg)
+		}
+		return nil, directory.Error("connection", directory.FieldUnavailable, "dial failed")
+	}
+	p, err := NewPool(testPoolCfg(dial, 1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = p.Close() })
+
+	err = p.Do(t.Context(), func(*Conn) error {
+		return directory.Error("connection", directory.FieldUnavailable, "directory unavailable")
+	})
+	if err == nil {
+		t.Fatal("expected retry acquire failure")
+	}
+	if err.Error() == "directory unavailable" {
+		t.Fatal("Do hid the retry acquire error behind the original LDAP error")
+	}
+}
+
 func TestPoolDoRetriesBroken(t *testing.T) {
 	t.Parallel()
 	var n atomic.Int32

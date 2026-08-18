@@ -172,7 +172,7 @@ func parseBindTransport(raw string) (directory.Transport, error) {
 
 func diagnosticOutcome(outcome string) bool {
 	switch outcome {
-	case directory.BindOutcomeInvalidCredentials, directory.BindOutcomeLocked, directory.BindOutcomeDisabled:
+	case directory.BindOutcomeInvalidCredentials, directory.BindOutcomeLocked, directory.BindOutcomeDisabled, directory.BindOutcomeMustChange:
 		return true
 	default:
 		return false

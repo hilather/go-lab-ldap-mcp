@@ -96,6 +96,12 @@ func (s *Server) handleAdd(ctx context.Context, c *conn, m *Message, req *AddReq
 		if err := s.checkClientAttrs(req.Attributes); err != nil {
 			return err
 		}
+		// RFC 4511 4.7: the same attribute type MUST NOT appear twice in
+		// an Add. Values() only returns the first name match, so accepting
+		// duplicates would silently drop later values.
+		if err := checkDuplicateAttrTypes(req.Attributes); err != nil {
+			return err
+		}
 		if err := s.schemaCheckEntry(entry); err != nil {
 			return err
 		}
@@ -244,8 +250,9 @@ func (s *Server) handleModify(ctx context.Context, c *conn, m *Message, req *Mod
 	return respond(Result{Code: ResultSuccess})
 }
 
-// applyChange applies one RFC 4511 modification. Value matching folds case
-// per the attribute's equality rule (the T-131 stub in filter_eval.go).
+// applyChange applies one RFC 4511 modification. Value matching uses the
+// attribute's equality rule through RuleMatcher (including structural DN
+// comparison for member / uniqueMember).
 //
 // Semantics follow RFC 4511 section 4.6: add fails attributeOrValueExists
 // on a duplicate; delete of a missing attribute or value fails
@@ -256,19 +263,19 @@ func (s *Server) handleModify(ctx context.Context, c *conn, m *Message, req *Mod
 // T-147 oracle as a parity Delta.
 func (s *Server) applyChange(e *Entry, ch ModifyChange) error {
 	idx := attrIndex(e, ch.Attr.Name)
-	fold := foldCase(s.opts.Schema, ch.Attr.Name)
+	m := NewRuleMatcher(s.opts.Schema)
 	switch ch.Op {
 	case ModifyAdd:
 		if idx < 0 {
-			e.Attributes = append(e.Attributes, Attribute{Name: ch.Attr.Name, Values: dedupValues(ch.Attr.Values, fold)})
+			e.Attributes = append(e.Attributes, Attribute{Name: ch.Attr.Name, Values: dedupMatched(m, ch.Attr.Name, ch.Attr.Values)})
 			return nil
 		}
 		for _, v := range ch.Attr.Values {
-			if hasValue(e.Attributes[idx].Values, v, fold) {
+			if hasMatched(m, ch.Attr.Name, e.Attributes[idx].Values, v) {
 				return errAttributeOrValueExists
 			}
 		}
-		e.Attributes[idx].Values = append(e.Attributes[idx].Values, dedupValues(ch.Attr.Values, fold)...)
+		e.Attributes[idx].Values = append(e.Attributes[idx].Values, dedupMatched(m, ch.Attr.Name, ch.Attr.Values)...)
 		return nil
 	case ModifyDelete:
 		if idx < 0 {
@@ -279,12 +286,12 @@ func (s *Server) applyChange(e *Entry, ch ModifyChange) error {
 			return nil
 		}
 		for _, v := range ch.Attr.Values {
-			if !hasValue(e.Attributes[idx].Values, v, fold) {
+			if !hasMatched(m, ch.Attr.Name, e.Attributes[idx].Values, v) {
 				return errNoSuchAttribute
 			}
 		}
 		for _, v := range ch.Attr.Values {
-			e.Attributes[idx].Values = removeValue(e.Attributes[idx].Values, v, fold)
+			e.Attributes[idx].Values = removeMatched(m, ch.Attr.Name, e.Attributes[idx].Values, v)
 		}
 		if len(e.Attributes[idx].Values) == 0 {
 			e.Attributes = append(e.Attributes[:idx], e.Attributes[idx+1:]...)
@@ -297,7 +304,7 @@ func (s *Server) applyChange(e *Entry, ch ModifyChange) error {
 		if len(ch.Attr.Values) == 0 {
 			return nil
 		}
-		e.Attributes = append(e.Attributes, Attribute{Name: ch.Attr.Name, Values: dedupValues(ch.Attr.Values, fold)})
+		e.Attributes = append(e.Attributes, Attribute{Name: ch.Attr.Name, Values: dedupMatched(m, ch.Attr.Name, ch.Attr.Values)})
 		return nil
 	default:
 		return errInvalidDN // unreachable: the codec bounds the enum
@@ -322,10 +329,35 @@ func hasValue(values [][]byte, v []byte, fold bool) bool {
 	return false
 }
 
+func hasMatched(m Matcher, attr string, values [][]byte, v []byte) bool {
+	if m == nil {
+		return hasValue(values, v, false)
+	}
+	for _, x := range values {
+		if m.Equal(attr, x, v) {
+			return true
+		}
+	}
+	return false
+}
+
 func removeValue(values [][]byte, v []byte, fold bool) [][]byte {
 	out := values[:0]
 	for _, x := range values {
 		if !valueEqual(fold, x, v) {
+			out = append(out, x)
+		}
+	}
+	return out
+}
+
+func removeMatched(m Matcher, attr string, values [][]byte, v []byte) [][]byte {
+	if m == nil {
+		return removeValue(values, v, false)
+	}
+	out := values[:0]
+	for _, x := range values {
+		if !m.Equal(attr, x, v) {
 			out = append(out, x)
 		}
 	}
@@ -340,6 +372,30 @@ func dedupValues(values [][]byte, fold bool) [][]byte {
 		}
 	}
 	return out
+}
+
+func dedupMatched(m Matcher, attr string, values [][]byte) [][]byte {
+	var out [][]byte
+	for _, v := range values {
+		if !hasMatched(m, attr, out, v) {
+			out = append(out, v)
+		}
+	}
+	return out
+}
+
+// checkDuplicateAttrTypes rejects an Add attribute list that repeats a
+// type (RFC 4511 section 4.7). The check is case-insensitive.
+func checkDuplicateAttrTypes(attrs []Attribute) error {
+	seen := map[string]struct{}{}
+	for _, a := range attrs {
+		key := strings.ToLower(a.Name)
+		if _, ok := seen[key]; ok {
+			return &schemaViolation{reason: "duplicate attribute type " + a.Name}
+		}
+		seen[key] = struct{}{}
+	}
+	return nil
 }
 
 // handleDelete removes one leaf entry.
@@ -400,9 +456,9 @@ func (s *Server) handleCompare(ctx context.Context, c *conn, m *Message, req *Co
 		if err != nil {
 			return err
 		}
-		fold := foldCase(s.opts.Schema, req.Attr)
+		m := NewRuleMatcher(s.opts.Schema)
 		for _, v := range e.Values(req.Attr) {
-			if valueEqual(fold, v, req.Value) {
+			if m.Equal(req.Attr, v, req.Value) {
 				code = ResultCompareTrue
 				return nil
 			}
@@ -473,6 +529,11 @@ func (s *Server) handleModifyDN(ctx context.Context, c *conn, m *Message, req *M
 		if err != nil {
 			return err
 		}
+		// RFC 4511 4.9: newSuperior must name an existing entry. Moving
+		// under a missing parent orphans the entry from Subtree/Children.
+		if _, err := tx.Entry(ctx, superior); err != nil {
+			return err
+		}
 		if err := tx.Rename(ctx, dn, newDN); err != nil {
 			return err
 		}
@@ -484,12 +545,13 @@ func (s *Server) handleModifyDN(ctx context.Context, c *conn, m *Message, req *M
 		// value, and drop the old one when deleteoldrdn is set.
 		oldAttr, oldVal, _ := dn.Leaf()
 		newAttr, newVal, _ := newRDN.Leaf()
-		if !hasValue(after.Values(newAttr), []byte(newVal), foldCase(s.opts.Schema, newAttr)) {
+		m := NewRuleMatcher(s.opts.Schema)
+		if !hasMatched(m, newAttr, after.Values(newAttr), []byte(newVal)) {
 			after.Attributes = upsertValue(after, newAttr, []byte(newVal))
 		}
 		if req.DeleteOldRDN && (oldAttr != newAttr || oldVal != newVal) {
 			if idx := attrIndex(after, oldAttr); idx >= 0 {
-				after.Attributes[idx].Values = removeValue(after.Attributes[idx].Values, []byte(oldVal), foldCase(s.opts.Schema, oldAttr))
+				after.Attributes[idx].Values = removeMatched(m, oldAttr, after.Attributes[idx].Values, []byte(oldVal))
 				if len(after.Attributes[idx].Values) == 0 {
 					after.Attributes = append(after.Attributes[:idx], after.Attributes[idx+1:]...)
 				}

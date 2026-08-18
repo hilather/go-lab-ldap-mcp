@@ -29,12 +29,23 @@ func failResetAt(s *Reset, phase string) {
 }
 
 type recBind struct {
-	got directory.Transport
-	res directory.BindTestResult
+	mu   sync.Mutex
+	got  directory.Transport
+	uids []string
+	res  directory.BindTestResult
+	fail map[string]directory.BindTestResult
 }
 
-func (r *recBind) BindTest(_ context.Context, _ string, _ observability.Secret, t directory.Transport) (directory.BindTestResult, error) {
+func (r *recBind) BindTest(_ context.Context, uid string, _ observability.Secret, t directory.Transport) (directory.BindTestResult, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	r.got = t
+	r.uids = append(r.uids, uid)
+	if r.fail != nil {
+		if res, ok := r.fail[uid]; ok {
+			return res, nil
+		}
+	}
 	return r.res, nil
 }
 
@@ -265,9 +276,36 @@ func TestResetRequiresLabResetScope(t *testing.T) {
 	users, groups := newFakeUsers(), newFakeGroups()
 	inv := newLiveReset(users, groups)
 	svc := New(resetDeps(users, groups, inv, reset.NewGate()))
-	_, err := svc.Reset.Start(t.Context(), writer(), ResetRequest{Name: "lab", ExpectedRevision: "rev-dir"})
+	st, err := svc.Reset.Start(t.Context(), writer(), ResetRequest{Name: "lab", ExpectedRevision: "rev-dir"})
 	if err == nil || apperr.CodeOf(err) != apperr.CodeAuth {
 		t.Fatalf("want auth: %v", err)
+	}
+	if st != (ResetStatus{}) {
+		t.Fatalf("auth failure leaked reset status: %+v", st)
+	}
+}
+
+func TestBindCheckRequiresEverySeedUser(t *testing.T) {
+	t.Parallel()
+	bind := &recBind{
+		res: directory.BindTestResult{Outcome: directory.BindOutcomeSuccess},
+		fail: map[string]directory.BindTestResult{
+			"bob": {Outcome: directory.BindOutcomeInvalidCredentials},
+		},
+	}
+	s := &Reset{bind: bind}
+	pw := &config.ResolvedSecret{Value: observability.Secret("seed-pass-12")}
+	err := s.bindCheck(t.Context(), []config.NormalizedUser{
+		{UID: "alice", Enabled: true, Password: pw},
+		{UID: "bob", Enabled: true, Password: pw},
+	})
+	if err == nil {
+		t.Fatal("expected bind failure for later seed user")
+	}
+	bind.mu.Lock()
+	defer bind.mu.Unlock()
+	if len(bind.uids) != 2 {
+		t.Fatalf("bind-check stopped early: %v", bind.uids)
 	}
 }
 
@@ -579,8 +617,11 @@ func TestResetBindUsesConfiguredTransport(t *testing.T) {
 	if _, err := svc.Reset.Start(t.Context(), resetter(), ResetRequest{Name: "lab", ExpectedRevision: "rev-dir"}); err != nil {
 		t.Fatal(err)
 	}
-	if bind.got != directory.TransportStartTLS {
-		t.Fatalf("transport %q", bind.got)
+	bind.mu.Lock()
+	got := bind.got
+	bind.mu.Unlock()
+	if got != directory.TransportStartTLS {
+		t.Fatalf("transport %q", got)
 	}
 }
 

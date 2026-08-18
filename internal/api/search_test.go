@@ -335,6 +335,29 @@ func TestBindTestDiagnosticNot401(t *testing.T) {
 	assertField(t, tr, "transport", "invalid")
 }
 
+func TestBindTestMustChangeIsDiagnostic(t *testing.T) {
+	t.Parallel()
+	s, _, bind, _ := queryServer(t)
+	bind.mu.Lock()
+	bind.res = directory.BindTestResult{Outcome: directory.BindOutcomeMustChange}
+	bind.mu.Unlock()
+	h := s.Handler()
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth-tests", strings.NewReader(`{"identity":"alice","password":"`+bindPass+`"}`))
+	req.Header.Set("Authorization", "Bearer "+passwordOnlyToken)
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("must_change must be 200 diagnostic, got %d %s", rec.Code, rec.Body.String())
+	}
+	var out generated.BindTestResult
+	decodeOpenAPI(t, rec, &out)
+	if out.Outcome != generated.MustChange {
+		t.Fatalf("outcome %q", out.Outcome)
+	}
+}
+
 func TestBindTestRateLimitPerIPAndActor(t *testing.T) {
 	t.Parallel()
 	s, _, _, _ := queryServer(t)

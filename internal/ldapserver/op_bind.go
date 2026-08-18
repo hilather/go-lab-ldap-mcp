@@ -57,6 +57,8 @@ func (s *Server) handleBind(ctx context.Context, c *conn, m *Message, req *BindR
 			c.sendNoticeOfDisconnection(ResultUnwillingToPerform, "too many failed bind attempts")
 			return false
 		}
+	} else {
+		c.resetFailedAuth()
 	}
 	return true
 }
@@ -103,6 +105,9 @@ func (s *Server) authenticate(ctx context.Context, c *conn, req *BindRequest) (R
 
 	entry, err := s.lookupEntry(ctx, dn)
 	if err != nil {
+		// Unknown DNs must still pay the hasher cost so result codes and
+		// latency cannot enumerate existing entries (parity contract C3).
+		s.dummyVerify(req.Password)
 		return Result{Code: ResultInvalidCredentials, DiagnosticMessage: "invalid credentials"}, false
 	}
 	// nsAccountLock gate (T-137, op_attrs.go): checked before password

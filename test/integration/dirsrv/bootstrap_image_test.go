@@ -84,7 +84,7 @@ func TestBootstrapImageApplySeparateDirectory(t *testing.T) {
 		t.Fatal(err)
 	}
 	vol := dataVolume(t, inst.Name)
-	cfg := filepath.Join(root, "test", "fixtures", "config", "valid")
+	cfg := stageITConfigDir(t, filepath.Join(root, "test", "fixtures", "config", "valid"))
 	args := []string{
 		"run", "--rm",
 		"--network", "container:" + inst.Name,
@@ -117,6 +117,40 @@ func TestBootstrapImageApplySeparateDirectory(t *testing.T) {
 	if !sum.OK {
 		t.Fatalf("apply not ok:\n%s", got)
 	}
+}
+
+// stageITConfigDir copies a committed scenario tree and injects
+// LABLDAP_IT_ENGINE into YAML that omits spec.directory.engine. The
+// bootstrap image test mounts fixtures read-only; rewriting a temp copy
+// keeps the committed omitted-engine default (native) intact.
+func stageITConfigDir(t *testing.T, srcDir string) string {
+	t.Helper()
+	dst := t.TempDir()
+	err := filepath.WalkDir(srcDir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(srcDir, path)
+		if err != nil {
+			return err
+		}
+		target := filepath.Join(dst, rel)
+		if d.IsDir() {
+			return os.MkdirAll(target, 0o700)
+		}
+		b, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		if strings.HasSuffix(path, ".yaml") || strings.HasSuffix(path, ".yml") {
+			b = []byte(withITEngine(string(b)))
+		}
+		return os.WriteFile(target, b, 0o600)
+	})
+	if err != nil {
+		t.Fatalf("stage IT config %s: %v", srcDir, err)
+	}
+	return dst
 }
 
 func dataVolume(t *testing.T, name string) string {

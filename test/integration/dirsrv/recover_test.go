@@ -25,7 +25,7 @@ func TestResetRecoversPartialStates(t *testing.T) {
 	deleteNamedACI(t, inst, "ou=people,dc=example,dc=test", "labldap:runtime-people-write")
 
 	resetYAML := seedYAML("reset")
-	if err := os.WriteFile(filepath.Join(hostDir, "lab.yaml"), []byte(resetYAML), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(hostDir, "lab.yaml"), []byte(withITEngine(resetYAML)), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if out, err := exec.Command("docker", "cp", filepath.Join(hostDir, "lab.yaml"), inst.Name+":/tmp/labldap-apply/lab.yaml").CombinedOutput(); err != nil {

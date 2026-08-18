@@ -2,6 +2,7 @@ package dirsrv
 
 import (
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -64,4 +65,49 @@ func skip389Only(t *testing.T, delta, what string) {
 	if itEngine(t) == EngineNative {
 		t.Skipf("389-only under %s=native: %s (parity contract %s)", EngineEnvVar, what, delta)
 	}
+}
+
+// withITEngine injects spec.directory.engine matching LABLDAP_IT_ENGINE
+// (default 389ds) into a scenario that omits it. After v0.3.0 the compile
+// default is native; the 389 integration suite would otherwise wire the
+// native cn=config read-back reconcilers and fail with engine_mismatch.
+// YAML that already sets engine is left unchanged so an explicit fixture
+// cannot be silently rewritten.
+func withITEngine(src string) string {
+	if strings.Contains(src, "engine:") {
+		return src
+	}
+	engine := os.Getenv(EngineEnvVar)
+	if engine == "" {
+		engine = Engine389DS
+	}
+	const needle = "directory: { suffix:"
+	if strings.Contains(src, needle) {
+		return strings.Replace(src, needle, "directory: { engine: "+engine+", suffix:", 1)
+	}
+	const flow = "directory: {"
+	if i := strings.Index(src, flow); i >= 0 {
+		return src[:i] + "directory: { engine: " + engine + "," + src[i+len(flow):]
+	}
+	const block = "directory:"
+	if i := strings.Index(src, block); i >= 0 {
+		rest := src[i+len(block):]
+		nl := strings.IndexByte(rest, '\n')
+		if nl >= 0 && strings.TrimSpace(rest[:nl]) == "" {
+			after := rest[nl+1:]
+			indent := leadingWS(after)
+			if indent != "" {
+				return src[:i+len(block)] + rest[:nl+1] + indent + "engine: " + engine + "\n" + after
+			}
+		}
+	}
+	return src
+}
+
+func leadingWS(s string) string {
+	n := 0
+	for n < len(s) && (s[n] == ' ' || s[n] == '\t') {
+		n++
+	}
+	return s[:n]
 }

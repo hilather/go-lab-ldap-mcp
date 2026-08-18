@@ -250,7 +250,7 @@ func addUser(conn treeConn, u config.NormalizedUser) error {
 	add := ldap.NewAddRequest(u.DN, nil)
 	add.Attribute("objectClass", userObjectClasses(u))
 	add.Attribute("uid", []string{u.UID})
-	add.Attribute("cn", []string{u.UID})
+	add.Attribute("cn", []string{userCN(u)})
 	add.Attribute("sn", []string{userSN(u)})
 	if !u.Enabled {
 		add.Attribute("nsAccountLock", []string{"true"})
@@ -267,7 +267,7 @@ func addUser(conn treeConn, u config.NormalizedUser) error {
 func modifyUser(conn treeConn, live *ldap.Entry, u config.NormalizedUser) error {
 	// Replace only planned attributes so merge keeps unknown unmanaged values.
 	mod := ldap.NewModifyRequest(u.DN, nil)
-	mod.Replace("cn", []string{u.UID})
+	mod.Replace("cn", []string{userCN(u)})
 	mod.Replace("sn", []string{userSN(u)})
 	if !u.Enabled {
 		mod.Replace("nsAccountLock", []string{"true"})
@@ -304,6 +304,15 @@ func seedPassword(u config.NormalizedUser) (string, error) {
 		return "", bootstrap.PhaseError("seed", "password_set", "seed user password is empty")
 	}
 	return pw, nil
+}
+
+func userCN(u config.NormalizedUser) string {
+	for _, a := range u.Attributes {
+		if config.CanonicalAttr(a.Name) == "cn" && a.Value != "" {
+			return a.Value
+		}
+	}
+	return u.UID
 }
 
 func userSN(u config.NormalizedUser) string {
@@ -357,7 +366,7 @@ func userNeedsUpdate(e *ldap.Entry, u config.NormalizedUser) bool {
 	if e == nil {
 		return true
 	}
-	if !hasValue(e, "uid", u.UID) || !hasValue(e, "cn", u.UID) || !hasValue(e, "sn", userSN(u)) {
+	if !hasValue(e, "uid", u.UID) || !hasValue(e, "cn", userCN(u)) || !hasValue(e, "sn", userSN(u)) {
 		return true
 	}
 	if u.Enabled == accountLocked(e) {

@@ -39,6 +39,25 @@ func TestFileSecretResolver(t *testing.T) {
 	}
 }
 
+func TestDirSecretResolverPrefersConfigDir(t *testing.T) {
+	cfgDir := t.TempDir()
+	cwd := t.TempDir()
+	if err := os.WriteFile(filepath.Join(cfgDir, "token"), []byte("from-config"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(cwd, "token"), []byte("from-cwd"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(cwd)
+	got, err := config.DirSecretResolver(cfgDir).Resolve(t.Context(), "spec.tokens[0].secretFile", "token")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Value.Reveal() != "from-config" {
+		t.Fatalf("resolved %q, want from-config", got.Value.Reveal())
+	}
+}
+
 func TestSecretUnreadableHasPathNotContent(t *testing.T) {
 	err := mustErr(t, func() error {
 		_, e := config.FileSecretResolver().Resolve(t.Context(), "spec.runtimeAccount.passwordFile", "/no/such/secret")

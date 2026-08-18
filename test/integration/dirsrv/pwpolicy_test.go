@@ -114,7 +114,7 @@ func stagePolicyApply(t *testing.T, inst *Instance, yaml string) (string, applyG
 		t.Fatal(err)
 	}
 	cfg := filepath.Join(hostDir, "lab.yaml")
-	if err := os.WriteFile(cfg, []byte(yaml), 0o600); err != nil {
+	if err := os.WriteFile(cfg, []byte(withITEngine(yaml)), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	pw := filepath.Join(hostDir, "dm.pw")

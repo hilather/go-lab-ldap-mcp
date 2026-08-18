@@ -129,7 +129,7 @@ func (p *Pool) Do(ctx context.Context, fn func(*Conn) error) error {
 	}
 	c2, err2 := p.Acquire(ctx)
 	if err2 != nil {
-		return err
+		return err2
 	}
 	err2 = fn(c2)
 	if err2 != nil {

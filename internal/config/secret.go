@@ -27,7 +27,8 @@ type fileResolver struct{}
 
 func FileSecretResolver() SecretResolver { return fileResolver{} }
 
-// DirSecretResolver tries path as given, then relative to baseDir (the YAML file directory).
+// DirSecretResolver resolves relative secret paths against baseDir (the YAML
+// file directory) first, then the process working directory.
 func DirSecretResolver(baseDir string) SecretResolver {
 	return dirResolver{base: baseDir, inner: fileResolver{}}
 }
@@ -41,10 +42,15 @@ func (d dirResolver) Resolve(ctx context.Context, owner, path string) (ResolvedS
 	if filepath.IsAbs(path) {
 		return d.inner.Resolve(ctx, owner, path)
 	}
-	if _, err := os.Stat(path); err == nil {
-		return d.inner.Resolve(ctx, owner, path)
+	// Relative paths are scenario-relative. Prefer the YAML directory so a
+	// same-named file in the process CWD cannot substitute the secret.
+	if d.base != "" {
+		joined := filepath.Join(d.base, path)
+		if _, err := os.Stat(joined); err == nil {
+			return d.inner.Resolve(ctx, owner, joined)
+		}
 	}
-	return d.inner.Resolve(ctx, owner, filepath.Join(d.base, path))
+	return d.inner.Resolve(ctx, owner, path)
 }
 
 func (fileResolver) Resolve(ctx context.Context, owner, path string) (ResolvedSecret, error) {
