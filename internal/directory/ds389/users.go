@@ -296,7 +296,11 @@ func (r *Runtime) SetPassword(ctx context.Context, id directory.UserID, password
 		if e := replaceUserPassword(ctx, c, dn, password, controls...); e != nil {
 			return e
 		}
-		stamps := ldap.NewModifyRequest(dn, controls)
+		// The password replace already advanced entryCSN/modifyTimestamp.
+		// Reusing the pre-replace assertion here fails closed as a 412
+		// (native IT TestRESTAccountWorkflowLDAPTools). Stamps are a
+		// follow-up on the write that just committed.
+		stamps := ldap.NewModifyRequest(dn, nil)
 		if mustChange {
 			stamps.Replace(attrPwdReset, []string{pwdResetTrue})
 			stamps.Replace(attrPasswordExpirationTime, []string{passwordExpiredGeneralized})

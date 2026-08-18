@@ -27,4 +27,8 @@ func TestRetryAccountModifyKeepsControls(t *testing.T) {
 	if len(one.Changes) != 1 || one.Changes[0].Modification.Type != "pwdReset" {
 		t.Fatalf("changes = %+v", one.Changes)
 	}
+	dropped := retryAccountModify(one.DN, ch, nil)
+	if len(dropped.Controls) != 0 {
+		t.Fatalf("nil controls leaked: %d", len(dropped.Controls))
+	}
 }

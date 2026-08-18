@@ -191,8 +191,13 @@ func applyAccountChanges(ctx context.Context, c *ldapclient.Conn, dn string, mod
 		return err
 	} else {
 		applied := 0
+		// Combined modify is atomic: a schema/undefined failure leaves the
+		// entry unchanged, so the first split can still carry the original
+		// assertion. After one split succeeds, later splits must not reuse
+		// that pre-image (entryCSN/modifyTimestamp have moved).
+		controls := mod.Controls
 		for _, ch := range mod.Changes {
-			one := retryAccountModify(dn, ch, mod.Controls)
+			one := retryAccountModify(dn, ch, controls)
 			if e := c.Modify(ctx, one); e != nil {
 				if !isUndefinedAttribute(e) {
 					return e
@@ -200,6 +205,7 @@ func applyAccountChanges(ctx context.Context, c *ldapclient.Conn, dn string, mod
 				continue
 			}
 			applied++
+			controls = nil
 		}
 		if applied == 0 {
 			return err
@@ -208,8 +214,8 @@ func applyAccountChanges(ctx context.Context, c *ldapclient.Conn, dn string, mod
 	}
 }
 
-// retryAccountModify copies one change onto a new modify while preserving
-// the original assertion (and any other) controls.
+// retryAccountModify copies one change onto a new modify. controls may be
+// the original assertion set, or nil after a prior split write succeeded.
 func retryAccountModify(dn string, ch ldap.Change, controls []ldap.Control) *ldap.ModifyRequest {
 	one := ldap.NewModifyRequest(dn, controls)
 	one.Changes = []ldap.Change{ch}
