@@ -151,6 +151,41 @@ func TestStartTLSRequestValueRejected(t *testing.T) {
 	}
 }
 
+func TestStartTLSRefusesWhenOutstanding(t *testing.T) {
+	t.Parallel()
+	fix := newTLSFixture(t, "localhost")
+	s, ldapAddr, _ := serveTLS(t, func(o *Options) {
+		o.LDAPAddress = "127.0.0.1:0"
+		o.LDAPSAddress = ""
+		o.AllowStartTLS = true
+		o.TLSConfig = fix.serverConfig(t)
+	})
+	cl := dialTestClient(t, ldapAddr)
+	deadline := time.Now().Add(5 * time.Second)
+	var sc *conn
+	for time.Now().Before(deadline) {
+		s.connsMu.Lock()
+		for c := range s.conns {
+			sc = c
+		}
+		s.connsMu.Unlock()
+		if sc != nil {
+			break
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	if sc == nil {
+		t.Fatal("server-side connection not found")
+	}
+	if !sc.registerInflight(88, func() {}) {
+		t.Fatal("register failed")
+	}
+	t.Cleanup(func() { sc.unregisterInflight(88) })
+	if res := doStartTLS(t, cl); res.Code != ResultOperationsError {
+		t.Fatalf("StartTLS with outstanding op = %v, want operationsError", res)
+	}
+}
+
 func TestStartTLSHandshakeFailureClosesConnection(t *testing.T) {
 	t.Parallel()
 	fix := newTLSFixture(t, "localhost")

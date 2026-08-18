@@ -192,8 +192,7 @@ func applyAccountChanges(ctx context.Context, c *ldapclient.Conn, dn string, mod
 	} else {
 		applied := 0
 		for _, ch := range mod.Changes {
-			one := ldap.NewModifyRequest(dn, nil)
-			one.Changes = []ldap.Change{ch}
+			one := retryAccountModify(dn, ch, mod.Controls)
 			if e := c.Modify(ctx, one); e != nil {
 				if !isUndefinedAttribute(e) {
 					return e
@@ -207,4 +206,12 @@ func applyAccountChanges(ctx context.Context, c *ldapclient.Conn, dn string, mod
 		}
 		return nil
 	}
+}
+
+// retryAccountModify copies one change onto a new modify while preserving
+// the original assertion (and any other) controls.
+func retryAccountModify(dn string, ch ldap.Change, controls []ldap.Control) *ldap.ModifyRequest {
+	one := ldap.NewModifyRequest(dn, controls)
+	one.Changes = []ldap.Change{ch}
+	return one
 }

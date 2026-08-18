@@ -206,6 +206,23 @@ func (c *conn) recordFailedAuth() int {
 	return n
 }
 
+// resetFailedAuth clears the failed-bind counter after a successful bind
+// so a later typo cannot consume a pre-success budget.
+func (c *conn) resetFailedAuth() {
+	c.mu.Lock()
+	c.failedAuth = 0
+	c.mu.Unlock()
+}
+
+// outstandingCount reports in-flight dispatched operations. Bind and
+// StartTLS run inline and are not counted here.
+func (c *conn) outstandingCount() int {
+	c.mu.Lock()
+	n := len(c.inflight)
+	c.mu.Unlock()
+	return n
+}
+
 // spawnOp dispatches one request to a worker goroutine under the
 // outstanding-operations semaphore and the in-flight registry.
 func (c *conn) spawnOp(msg *Message) {

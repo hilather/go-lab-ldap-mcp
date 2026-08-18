@@ -292,8 +292,9 @@ func (e *schemaViolation) Unwrap() error { return errSchemaViolation }
 //   - A registry with no object classes (the FakeSchema default) permits
 //     everything, preserving the pre-T-132 test seam.
 //   - Otherwise the entry must carry objectClass, every value must
-//     resolve, and every MUST attribute — including those inherited
-//     through SUP chains — must be present with at least one value.
+//     resolve, every MUST attribute — including those inherited
+//     through SUP chains — must be present with at least one value,
+//     and SINGLE-VALUE attributes may not carry more than one value.
 //
 // MAY lists are published in the subschema but deliberately not enforced
 // as an allow-list: 389-observed lab entries carry attributes outside the
@@ -322,6 +323,18 @@ func checkEntrySchema(s Schema, e *Entry) error {
 		idx := attrIndex(e, attr)
 		if idx < 0 || len(e.Attributes[idx].Values) == 0 {
 			return &schemaViolation{reason: fmt.Sprintf("missing required attribute %q", attr)}
+		}
+	}
+	counts := map[string]int{}
+	for _, a := range e.Attributes {
+		counts[strings.ToLower(a.Name)] += len(a.Values)
+	}
+	for name, n := range counts {
+		if n <= 1 {
+			continue
+		}
+		if at, ok := s.AttributeType(name); ok && at.SingleValue {
+			return &schemaViolation{reason: fmt.Sprintf("single-value attribute %q has multiple values", at.Name)}
 		}
 	}
 	return nil

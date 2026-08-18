@@ -60,6 +60,30 @@ func fetchEntry(t *testing.T, opts Options, dn string) (*Entry, error) {
 	return out, err
 }
 
+func TestAddRejectsDuplicateAttributeTypes(t *testing.T) {
+	t.Parallel()
+	opts := writeOptions(t, nil)
+	_, addr := serveTestServerFrom(t, opts, nil)
+	cl := dialTestClient(t, addr)
+
+	res := roundTrip(t, cl, &AddRequest{
+		DN: "uid=dup,ou=people,dc=example,dc=test",
+		Attributes: []Attribute{
+			StringAttribute("objectClass", "top", "person"),
+			StringAttribute("uid", "dup"),
+			StringAttribute("cn", "First"),
+			StringAttribute("cn", "Second"),
+			StringAttribute("sn", "Dup"),
+		},
+	})
+	if res.Code != ResultObjectClassViolation {
+		t.Fatalf("duplicate attr add = %v, want objectClassViolation", res)
+	}
+	if _, err := fetchEntry(t, opts, "uid=dup,ou=people,dc=example,dc=test"); err == nil {
+		t.Fatal("duplicate-attribute add committed")
+	}
+}
+
 func TestAddAndReadBack(t *testing.T) {
 	t.Parallel()
 	opts := writeOptions(t, nil)
@@ -323,6 +347,15 @@ func TestCompare(t *testing.T) {
 	if res.Code != ResultCompareTrue {
 		t.Fatalf("compare fold = %v", res)
 	}
+	// distinguishedNameMatch is structural, not string EqualFold.
+	res = roundTrip(t, cl, &CompareRequest{
+		DN:    "cn=admins,ou=groups,dc=example,dc=test",
+		Attr:  "member",
+		Value: []byte("UID=Alice, OU=People, DC=Example, DC=Test"),
+	})
+	if res.Code != ResultCompareTrue {
+		t.Fatalf("compare DN = %v, want compareTrue", res)
+	}
 	// Missing attribute compares false, missing entry is noSuchObject.
 	res = roundTrip(t, cl, &CompareRequest{DN: dn, Attr: "title", Value: []byte("x")})
 	if res.Code != ResultCompareFalse {
@@ -433,6 +466,18 @@ func TestModifyDN(t *testing.T) {
 	res = roundTrip(t, cl, &ModifyDNRequest{DN: "uid=ghost,dc=example,dc=test", NewRDN: "uid=x"})
 	if res.Code != ResultNoSuchObject {
 		t.Fatalf("missing moddn = %v, want noSuchObject", res)
+	}
+	// Missing newSuperior must not orphan the entry.
+	res = roundTrip(t, cl, &ModifyDNRequest{
+		DN:          "uid=alice,ou=teams,dc=example,dc=test",
+		NewRDN:      "uid=alice",
+		NewSuperior: "ou=ghost,dc=example,dc=test",
+	})
+	if res.Code != ResultNoSuchObject {
+		t.Fatalf("missing superior moddn = %v, want noSuchObject", res)
+	}
+	if _, err := fetchEntry(t, opts, "uid=alice,ou=teams,dc=example,dc=test"); err != nil {
+		t.Fatalf("entry vanished after refused move to missing superior: %v", err)
 	}
 	// Out-of-suffix target refused.
 	res = roundTrip(t, cl, &ModifyDNRequest{

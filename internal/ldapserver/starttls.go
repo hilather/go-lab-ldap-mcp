@@ -52,6 +52,12 @@ func (s *Server) handleStartTLS(ctx context.Context, c *conn, m *Message, req *E
 		refuse(ResultUnwillingToPerform, "connection is already TLS")
 		return true
 	}
+	if c.outstandingCount() > 0 {
+		// RFC 4513 3.1.1: the client must have no outstanding operations.
+		// Refuse rather than interleave TLS records with leftover PDUs.
+		refuse(ResultOperationsError, "StartTLS requires no outstanding operations")
+		return true
+	}
 	if err := c.sendResult(m.ID, &ExtendedResponse{Result: Result{Code: ResultSuccess}}); err != nil {
 		s.metrics().ObserveOperation("extended", ResultOperationsError)
 		return false

@@ -5,6 +5,7 @@ import (
 	"crypto/subtle"
 	"errors"
 	"io"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -186,6 +187,56 @@ func TestBindPasswordZeroedAfterAuthentication(t *testing.T) {
 		if b != 0 {
 			t.Fatal("password bytes not zeroed")
 		}
+	}
+}
+
+func TestBindSuccessResetsAuthBudget(t *testing.T) {
+	t.Parallel()
+	_, addr := serveTestServerFrom(t, bindOptions(t), func(o *Options) {
+		o.Limits.MaxAuthAttempts = 3
+	})
+	cl := dialTestClient(t, addr)
+	if res := bindResult(t, cl, "uid=alice,ou=people,dc=example,dc=test", "wrong-1"); res.Code != ResultInvalidCredentials {
+		t.Fatalf("fail 1 = %v", res)
+	}
+	if res := bindResult(t, cl, "uid=alice,ou=people,dc=example,dc=test", "wrong-2"); res.Code != ResultInvalidCredentials {
+		t.Fatalf("fail 2 = %v", res)
+	}
+	if res := bindResult(t, cl, "uid=alice,ou=people,dc=example,dc=test", "alice-fixture-password"); res.Code != ResultSuccess {
+		t.Fatalf("success = %v", res)
+	}
+	if res := bindResult(t, cl, "uid=alice,ou=people,dc=example,dc=test", "wrong-3"); res.Code != ResultInvalidCredentials {
+		t.Fatalf("post-success fail = %v", res)
+	}
+	if res := bindResult(t, cl, "uid=alice,ou=people,dc=example,dc=test", "alice-fixture-password"); res.Code != ResultSuccess {
+		t.Fatalf("connection closed after post-success failure: %v", res)
+	}
+}
+
+type countHasher struct {
+	inner PasswordHasher
+	n     atomic.Int32
+}
+
+func (c *countHasher) Hash(password []byte) ([]byte, error) { return c.inner.Hash(password) }
+func (c *countHasher) Verify(stored, password []byte) bool {
+	c.n.Add(1)
+	return c.inner.Verify(stored, password)
+}
+
+func TestBindUnknownUserDoesDummyVerify(t *testing.T) {
+	t.Parallel()
+	inner := fastHasher(t, SchemeSSHA512)
+	h := &countHasher{inner: inner}
+	opts := bindOptions(t)
+	opts.PasswordPolicy = &PasswordPolicy{Hasher: h}
+	_, addr := serveTestServerFrom(t, opts, nil)
+	cl := dialTestClient(t, addr)
+	if res := bindResult(t, cl, "uid=nobody,ou=people,dc=example,dc=test", "guess"); res.Code != ResultInvalidCredentials {
+		t.Fatalf("unknown user = %v, want invalidCredentials", res)
+	}
+	if h.n.Load() < 1 {
+		t.Fatal("unknown-user bind skipped dummy password verify")
 	}
 }
 

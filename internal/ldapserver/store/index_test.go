@@ -268,6 +268,19 @@ func TestEnsureIndexBucketsIdempotent(t *testing.T) {
 	}
 }
 
+func TestNormalizeIndexKeyUniqueMemberSuffix(t *testing.T) {
+	spec := indexedAttributes["uniquemember"]
+	withSuffix := normalizeIndexKey(spec, []byte("uid=alice,ou=people,dc=example,dc=test#0B0001"))
+	without := normalizeIndexKey(spec, []byte("uid=alice,ou=people,dc=example,dc=test"))
+	if string(withSuffix) != string(without) {
+		t.Fatalf("uniqueMember suffix not stripped: %q vs %q", withSuffix, without)
+	}
+	folded := normalizeIndexKey(spec, []byte("UID=Alice,OU=People,DC=Example,DC=Test"))
+	if string(folded) != string(without) {
+		t.Fatalf("uniqueMember DN not folded: %q vs %q", folded, without)
+	}
+}
+
 func TestLookupUnindexedAttributeFallsBack(t *testing.T) {
 	db := ixOpen(t, t.TempDir()+"/ix.bolt")
 	err := db.View(func(tx *bolt.Tx) error {

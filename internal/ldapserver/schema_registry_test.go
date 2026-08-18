@@ -203,6 +203,17 @@ func TestCheckEntrySchema(t *testing.T) {
 			entry:   NewEntry("cn=x,dc=example,dc=test", StringAttribute("objectClass", "bogusClass")),
 			wantErr: "",
 		},
+		{
+			name:   "SINGLE-VALUE attribute with two values fails",
+			schema: std,
+			entry: NewEntry("uid=u,ou=people,dc=example,dc=test",
+				StringAttribute("objectClass", "top", "person", "organizationalPerson", "inetOrgPerson"),
+				StringAttribute("uid", "u"),
+				StringAttribute("cn", "U"),
+				StringAttribute("sn", "User"),
+				StringAttribute("displayName", "One", "Two")),
+			wantErr: "single-value attribute",
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

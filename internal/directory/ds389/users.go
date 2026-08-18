@@ -296,7 +296,7 @@ func (r *Runtime) SetPassword(ctx context.Context, id directory.UserID, password
 		if e := replaceUserPassword(ctx, c, dn, password, controls...); e != nil {
 			return e
 		}
-		stamps := ldap.NewModifyRequest(dn, nil)
+		stamps := ldap.NewModifyRequest(dn, controls)
 		if mustChange {
 			stamps.Replace(attrPwdReset, []string{pwdResetTrue})
 			stamps.Replace(attrPasswordExpirationTime, []string{passwordExpiredGeneralized})

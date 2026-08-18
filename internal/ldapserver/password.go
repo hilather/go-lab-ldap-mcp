@@ -99,6 +99,9 @@ type passwordEngine struct {
 
 	mu       sync.Mutex
 	failures map[string]int
+	// dummyHash is a real scheme-encoded value used to equalize unknown-user
+	// bind latency with a wrong-password verify (C3).
+	dummyHash []byte
 }
 
 func newPasswordEngine(p PasswordPolicy, logger *slog.Logger) (*passwordEngine, error) {
@@ -117,13 +120,44 @@ func newPasswordEngine(p PasswordPolicy, logger *slog.Logger) (*passwordEngine, 
 	if now == nil {
 		now = time.Now
 	}
-	return &passwordEngine{
+	eng := &passwordEngine{
 		policy:   p,
 		hasher:   hasher,
 		now:      now,
 		logger:   logger,
 		failures: map[string]int{},
-	}, nil
+	}
+	if dummy, err := hasher.Hash([]byte("labldap-dummy-bind-probe")); err == nil {
+		eng.dummyHash = dummy
+	}
+	return eng, nil
+}
+
+// dummyVerify runs hasher.Verify against a precomputed dummy hash so an
+// unknown-user bind pays the same work as a wrong-password bind.
+func (e *passwordEngine) dummyVerify(password []byte) {
+	if e == nil || e.hasher == nil {
+		return
+	}
+	stored := e.dummyHash
+	if len(stored) == 0 {
+		return
+	}
+	_ = e.hasher.Verify(stored, password)
+}
+
+// dummyVerify equalizes unknown-user bind work with a failed password
+// comparison. Without a policy engine the plaintext path still does a
+// constant-time compare against a fixed dummy.
+func (s *Server) dummyVerify(password []byte) {
+	if s == nil {
+		return
+	}
+	if s.passwords != nil {
+		s.passwords.dummyVerify(password)
+		return
+	}
+	_ = subtle.ConstantTimeCompare([]byte("labldap-dummy-bind-probe"), password)
 }
 
 // Name implements Plugin.

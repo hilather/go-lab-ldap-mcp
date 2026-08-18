@@ -97,7 +97,7 @@ func (s *Reset) Start(ctx context.Context, p Principal, req ResetRequest) (Reset
 			WithField(apperr.Field{Path: "reset", Code: "unavailable", Message: "reset is not configured"})
 	}
 	if err := s.hooks.authorize(ctx, p, OpReset); err != nil {
-		return s.Status(), err
+		return ResetStatus{}, err
 	}
 	if !s.soft {
 		err := reset.Disabled()
@@ -459,7 +459,6 @@ func (s *Reset) bindCheck(ctx context.Context, seeds []config.NormalizedUser) er
 			return apperr.New(apperr.CodeReset, "reset verification failed").
 				WithField(apperr.Field{Path: "reset", Code: "bind_failed", Message: "baseline user could not bind with seed password"})
 		}
-		return nil
 	}
 	return nil
 }

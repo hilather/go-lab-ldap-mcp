@@ -94,8 +94,9 @@ const indexBucketPrefix = "eq_"
 // indexedAttribute maps a lowercased attribute name to its posting bucket
 // and value kind. ADR-0009 decision 8 fixes the Contract-tier equality set.
 type indexedAttribute struct {
-	bucket string
-	dn     bool // value is a DN; fold structurally, not as text
+	bucket       string
+	dn           bool // value is a DN; fold structurally, not as text
+	uniqueMember bool // strip RFC 4519 '#' bit-string before DN parse
 }
 
 // indexedAttributes is the equality index registry. Attribute names are
@@ -106,7 +107,7 @@ var indexedAttributes = map[string]indexedAttribute{
 	"uid":          {bucket: "eq_uid"},
 	"cn":           {bucket: "eq_cn"},
 	"member":       {bucket: "eq_member", dn: true},
-	"uniquemember": {bucket: "eq_uniquemember", dn: true},
+	"uniquemember": {bucket: "eq_uniquemember", dn: true, uniqueMember: true},
 	"objectclass":  {bucket: "eq_objectclass"},
 }
 
@@ -164,7 +165,11 @@ func normalizeIndexKey(spec indexedAttribute, value []byte) []byte {
 		// "CN=Bob, OU=People" and "cn=bob,ou=people" share a key. Values
 		// that fail DN parse (schema enforcement may still be stubbed)
 		// fall back to the text fold so they remain searchable.
-		if d, err := config.ParseDN(string(value)); err == nil {
+		raw := value
+		if spec.uniqueMember {
+			raw = stripUniqueMemberSuffix(value)
+		}
+		if d, err := config.ParseDN(string(raw)); err == nil {
 			return []byte(d.FoldedKey())
 		}
 	}
@@ -172,6 +177,27 @@ func normalizeIndexKey(spec indexedAttribute, value []byte) []byte {
 	// whitespace. T-131 owns the final rule; keep this no finer-grained
 	// than the evaluator.
 	return []byte(strings.ToLower(strings.Join(strings.Fields(string(value)), " ")))
+}
+
+// stripUniqueMemberSuffix drops the optional RFC 4519 '#' bit-string from a
+// uniqueMember value. An escaped "\#" is DN data, not the separator.
+func stripUniqueMemberSuffix(v []byte) []byte {
+	s := string(v)
+	esc := false
+	for i := 0; i < len(s); i++ {
+		if esc {
+			esc = false
+			continue
+		}
+		if s[i] == '\\' {
+			esc = true
+			continue
+		}
+		if s[i] == '#' {
+			return []byte(s[:i])
+		}
+	}
+	return v
 }
 
 // postingKey builds the bucket key normalizedValue || 0x00 || id.

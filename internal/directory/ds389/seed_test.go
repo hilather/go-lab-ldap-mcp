@@ -448,3 +448,16 @@ func TestUserSNNeverRuntimeLiteral(t *testing.T) {
 		t.Fatalf("sn = %q", userSN(u))
 	}
 }
+
+func TestUserCNHonorsConfiguredAttribute(t *testing.T) {
+	u := config.NormalizedUser{
+		ID: "bob", UID: "bob",
+		Attributes: []config.AttrKV{{Name: "cn", Value: "Robert Example"}},
+	}
+	if userCN(u) != "Robert Example" {
+		t.Fatalf("cn = %q, want configured display name", userCN(u))
+	}
+	if userCN(config.NormalizedUser{ID: "bob", UID: "bob"}) != "bob" {
+		t.Fatalf("default cn = %q", userCN(config.NormalizedUser{ID: "bob", UID: "bob"}))
+	}
+}
