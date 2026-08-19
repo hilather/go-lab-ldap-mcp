@@ -55,7 +55,11 @@ expected. Host swap can still hold pages — ephemeral is not a wipe.
   include token IDs.
 - Browser: cookie + `X-CSRF-Token` + same-origin. Cross-origin preflight
   is 403 unless the origin is allow-listed.
-- Host header on a loopback listen (`127.0.0.1:8443`) must be loopback.
+- Host header on a loopback or bind-all listen must be loopback
+  (`127.0.0.1`, `localhost`, `::1`, `control`) or an extra from
+  `spec.management.allowedHosts`. `400 host is not allowed` for a LAN
+  or published hostname means add that host (host-only matches any
+  port). `*` is not allowed.
 
 ## Image version mismatch
 

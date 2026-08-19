@@ -58,12 +58,15 @@ type PortSpec struct {
 }
 
 type Management struct {
-	Listen  string  `json:"listen" yaml:"listen"`
-	TLS     TLSpec  `json:"tls" yaml:"tls"`
-	CORS    CORS    `json:"cors" yaml:"cors"`
-	Session Session `json:"session" yaml:"session"`
-	MCP     MCP     `json:"mcp" yaml:"mcp"`
-	Metrics Metrics `json:"metrics" yaml:"metrics"`
+	Listen string `json:"listen" yaml:"listen"`
+	// AllowedHosts is a union on top of LoopbackHosts (ADR-0010). Empty
+	// keeps the compiled loopback/bind-all default. Never "*".
+	AllowedHosts []string `json:"allowedHosts" yaml:"allowedHosts"`
+	TLS          TLSpec   `json:"tls" yaml:"tls"`
+	CORS         CORS     `json:"cors" yaml:"cors"`
+	Session      Session  `json:"session" yaml:"session"`
+	MCP          MCP      `json:"mcp" yaml:"mcp"`
+	Metrics      Metrics  `json:"metrics" yaml:"metrics"`
 }
 
 type TLSpec struct {

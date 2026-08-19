@@ -29,6 +29,9 @@ spec:
     allowAnonymousBind: false
   management:
     listen: "127.0.0.1:8443"
+    # Extra Host values, unioned with LoopbackHosts (ADR-0010). Host-only
+    # entries match any port (published-port access). Never "*".
+    allowedHosts: []
     tls:
       mode: generated
       certFile: ""

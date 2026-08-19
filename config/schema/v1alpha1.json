@@ -79,6 +79,11 @@
       "additionalProperties": false,
       "properties": {
         "listen": { "type": "string" },
+        "allowedHosts": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Extra management HTTP Host values, unioned with LoopbackHosts. A host-only entry matches any port. Wildcard '*' is rejected."
+        },
         "tls": {
           "type": "object",
           "additionalProperties": false,

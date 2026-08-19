@@ -84,6 +84,36 @@ The same file also holds the runtime service account, password policy,
 ACLs, and control-plane tokens. See the shipped scenario for a complete
 lab.
 
+## Management HTTP Host allow-list
+
+The control plane rejects `Host` headers that are not on a compiled
+allow-list (DNS-rebinding protection). Loopback and bind-all listens
+(`127.0.0.1`, `localhost`, `0.0.0.0`, `::`) already accept exact
+`host:port` values on the listen port (`control:8443`, `localhost:8443`,
+…) plus host-only `localhost` / `127.0.0.1` / `::1` / `control` so a
+published port such as `localhost:9443` works without extra config.
+
+To allow a LAN or public address, add extras. They **union** with the
+defaults; they do not replace them. `*` is rejected.
+
+```yaml
+spec:
+  management:
+    listen: "0.0.0.0:8443"
+    allowedHosts:
+      - "10.165.0.199"      # any port (published 9443, …)
+      - "lab.example.com"
+      - "localhost:9443"    # exact Host only
+```
+
+Equivalent sources (also unioned):
+
+- `LABLDAP_MANAGEMENT_ALLOWED_HOSTS=10.165.0.199,lab.example.com`
+- `labldap serve --config scenario.yaml --management-allowed-host 10.165.0.199`
+
+Unlisted hostnames such as `evil.test` stay `400 host is not allowed`.
+See [ADR-0010](../adr/0010-management-http-allowed-hosts.md).
+
 ## Rules
 
 - **No inline passwords.** Every user (and the runtime account, and every

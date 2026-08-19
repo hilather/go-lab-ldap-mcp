@@ -23,11 +23,12 @@ import (
 )
 
 type serveFlags struct {
-	placeholder bool
-	configPath  string
-	ldapURL     string
-	caFile      string
-	dirHost     string
+	placeholder  bool
+	configPath   string
+	ldapURL      string
+	caFile       string
+	dirHost      string
+	allowedHosts []string
 }
 
 func parseServeFlags(args []string) (serveFlags, error) {
@@ -72,6 +73,14 @@ func parseServeFlags(args []string) (serveFlags, error) {
 			f.dirHost = args[i]
 		case strings.HasPrefix(a, "--directory-host="):
 			f.dirHost = strings.TrimPrefix(a, "--directory-host=")
+		case a == "--management-allowed-host":
+			if i+1 >= len(args) {
+				return f, fmt.Errorf("--management-allowed-host requires a value")
+			}
+			i++
+			f.allowedHosts = append(f.allowedHosts, args[i])
+		case strings.HasPrefix(a, "--management-allowed-host="):
+			f.allowedHosts = append(f.allowedHosts, strings.TrimPrefix(a, "--management-allowed-host="))
 		case a == "-h", a == "--help":
 			return f, errServeHelp
 		default:

@@ -201,10 +201,7 @@ func hostAllowed(host string, allowed []string) bool {
 	if host == "" || strings.ContainsAny(host, " \t\r\n/") {
 		return false
 	}
-	if len(allowed) == 0 {
-		return true
-	}
-	return hostInList(host, allowed)
+	return auth.HostAllowed(host, allowed)
 }
 
 func hostInList(host string, allowed []string) bool {

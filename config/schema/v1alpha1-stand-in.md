@@ -32,3 +32,10 @@ Compiler contract string (mixed into revisions in T-021): `labldap.config.v1alph
   changes for labs that omitted the field (they are now native labs). Add
   `engine: 389ds` before upgrading if you must keep 389 DS. `labldapd`
   fails closed when `--data-dir` looks like a 389 nsslapd tree.
+- **2026-08-19 (ADR-0010):** `spec.management.allowedHosts` added
+  (`[]string`, default empty). Backward-compatible optional field: no
+  `apiVersion` bump. Extra hosts union with `LoopbackHosts` (and, for
+  loopback/bind-all listen, host-only `localhost` / `127.0.0.1` / `::1` /
+  `control`). Env `LABLDAP_MANAGEMENT_ALLOWED_HOSTS` and repeatable
+  `--management-allowed-host` are additional sources. `*` is rejected.
+  Compiler contract string and revision hashes are unchanged.

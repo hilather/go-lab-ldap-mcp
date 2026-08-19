@@ -112,6 +112,7 @@ Full walkthrough: **[docs/guides/quickstart.md](docs/guides/quickstart.md)**.
   Users, groups, ACLs, and tokens live in YAML. Soft reset restores it. Hard
   reset is Compose volume removal, not an API. See
   **[docs/guides/scenario.md](docs/guides/scenario.md)**.
+  A published or LAN `Host` needs `spec.management.allowedHosts` (ADR-0010).
 - **Ephemeral or persistent.** Default `make compose-up` uses tmpfs-backed
   `/data`. `make compose-up-persistent` keeps a named volume.
 
