@@ -63,12 +63,15 @@ func NewRefIntPlugin(suffix string, additional ...string) (*RefIntPlugin, error)
 // Name implements Plugin.
 func (p *RefIntPlugin) Name() string { return "referint" }
 
-// inScope reports whether d is the managed suffix or beneath it.
+// inScope reports whether d is a managed suffix or beneath one.
 func (p *RefIntPlugin) inScope(d config.DN) bool {
-	if d.Equal(p.suffix) || d.IsDescendantOf(p.suffix) {
-		return true
-	}
-	return config.UnderAny(d, p.extra)
+	return config.UnderAny(d, p.scopes())
+}
+
+func (p *RefIntPlugin) scopes() []config.DN {
+	out := make([]config.DN, 0, 1+len(p.extra))
+	out = append(out, p.suffix)
+	return append(out, p.extra...)
 }
 
 // AfterWrite implements Plugin.
@@ -162,22 +165,24 @@ func (p *RefIntPlugin) Fixup(ctx context.Context, store Store) error {
 // repair applies fix to every group entry in the managed suffix, writing
 // back only entries the fix changed.
 func (p *RefIntPlugin) repair(ctx context.Context, tx UpdateTx, fix func(g *Entry) (changed bool)) error {
-	entries, err := tx.Subtree(ctx, p.suffix)
-	if errors.Is(err, ErrNoSuchObject) {
-		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("ldapserver: referint: scan: %w", err)
-	}
-	for _, e := range entries {
-		if !isGroupEntry(e) {
+	for _, suf := range p.scopes() {
+		entries, err := tx.Subtree(ctx, suf)
+		if errors.Is(err, ErrNoSuchObject) {
 			continue
 		}
-		if !fix(e) {
-			continue
+		if err != nil {
+			return fmt.Errorf("ldapserver: referint: scan: %w", err)
 		}
-		if err := tx.Replace(ctx, e); err != nil {
-			return fmt.Errorf("ldapserver: referint: repair group: %w", err)
+		for _, e := range entries {
+			if !isGroupEntry(e) {
+				continue
+			}
+			if !fix(e) {
+				continue
+			}
+			if err := tx.Replace(ctx, e); err != nil {
+				return fmt.Errorf("ldapserver: referint: repair group: %w", err)
+			}
 		}
 	}
 	return nil

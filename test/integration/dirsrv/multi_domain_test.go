@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-ldap/ldap/v3"
+
 	"github.com/hilather/go-lab-ldap-mcp/internal/api"
 	"github.com/hilather/go-lab-ldap-mcp/internal/app"
 	"github.com/hilather/go-lab-ldap-mcp/internal/auth"
@@ -133,7 +135,6 @@ func startMultiDomainEnv(t *testing.T) (compatEnv, http.Handler) {
 }
 
 func TestMultiDomainOUTreesAndExactDNs(t *testing.T) {
-	requireHostTool(t, "ldapsearch")
 	env, h := startMultiDomainEnv(t)
 	t.Logf("engine=%s ldaps=%s", env.engine, env.ldapsAddr)
 
@@ -207,8 +208,7 @@ func TestMultiDomainOUTreesAndExactDNs(t *testing.T) {
 		t.Fatalf("group DN %q want %q", group.DN, groupDN)
 	}
 
-	memberOf := hostLDAPSearch(t, env, "cn=Directory Manager", env.dmPassword,
-		user.DN, "base", "(objectClass=*)", "memberOf")
+	memberOf := dmSearchAttr(t, env, user.DN, "memberOf")
 	if !strings.Contains(strings.ToLower(memberOf), "cn=region1-bind") {
 		t.Fatalf("memberOf missing same-suffix group:\n%s", memberOf)
 	}
@@ -256,4 +256,50 @@ func restRaw(t *testing.T, h http.Handler, method, path, token, ifMatch, body st
 		t.Fatalf("secret leaked on %s %s: %s", method, path, rec.Body.String())
 	}
 	return rec.Body.Bytes()
+}
+
+// dmSearchAttr reads one attribute as Directory Manager over LDAPS.
+// Uses the in-process Go client so the case does not skip without ldapsearch.
+func dmSearchAttr(t *testing.T, env compatEnv, base, attr string) string {
+	t.Helper()
+	c, err := ldapclient.Dial(t.Context(), ldapclient.Config{
+		Address:      env.ldapsAddr,
+		Transport:    directory.TransportLDAPS,
+		CAFile:       env.caFile,
+		ServerName:   env.serverName,
+		BindDN:       "cn=Directory Manager",
+		BindPassword: observability.Secret(env.dmPassword),
+		DialTimeout:  8 * time.Second,
+	})
+	if err != nil {
+		t.Fatalf("dm search dial: %v", err)
+	}
+	defer c.Close()
+	res, err := c.Search(t.Context(), &ldap.SearchRequest{
+		BaseDN:       base,
+		Scope:        ldap.ScopeBaseObject,
+		DerefAliases: ldap.NeverDerefAliases,
+		TimeLimit:    8,
+		Filter:       "(objectClass=*)",
+		Attributes:   []string{attr},
+	})
+	if err != nil {
+		t.Fatalf("dm search %s: %v", base, err)
+	}
+	var b strings.Builder
+	for _, e := range res.Entries {
+		if e == nil {
+			continue
+		}
+		b.WriteString("dn: ")
+		b.WriteString(e.DN)
+		b.WriteByte('\n')
+		for _, v := range e.GetAttributeValues(attr) {
+			b.WriteString(attr)
+			b.WriteString(": ")
+			b.WriteString(v)
+			b.WriteByte('\n')
+		}
+	}
+	return b.String()
 }
