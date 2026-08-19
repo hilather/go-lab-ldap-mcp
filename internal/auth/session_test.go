@@ -199,3 +199,47 @@ func TestHostAllowedAndLoopback(t *testing.T) {
 		t.Fatalf("bind-all listen must still allow-list loopback hosts, got %v", gotAll)
 	}
 }
+
+func TestHostAllowedExtras(t *testing.T) {
+	t.Parallel()
+	defaults := LoopbackHosts("0.0.0.0:8443")
+	hosts := append(append([]string{}, defaults...), LoopbackHostnames("0.0.0.0:8443")...)
+	extras := append(append([]string{}, hosts...), "10.165.0.199", "lab.example.com", "localhost:9443")
+
+	if !HostAllowed("control:8443", extras) {
+		t.Fatal("control:listen-port must still match LoopbackHosts")
+	}
+	if !HostAllowed("10.165.0.199:9443", extras) {
+		t.Fatal("host-only IP must match any port")
+	}
+	if !HostAllowed("localhost:9443", extras) {
+		t.Fatal("host-only localhost (default extra) must match published port")
+	}
+	if !HostAllowed("LAB.EXAMPLE.COM:443", extras) {
+		t.Fatal("host-only name match must be case-insensitive")
+	}
+	if HostAllowed("evil.test", extras) {
+		t.Fatal("unlisted hostname must be rejected")
+	}
+	if HostAllowed("evil.test:8443", extras) {
+		t.Fatal("spoofed Host must stay rejected when defaults+extras are set")
+	}
+	if HostAllowed("10.165.0.199:9443", defaults) {
+		t.Fatal("public IP must not match LoopbackHosts alone")
+	}
+	if HostAllowed("*", extras) || hostEntryMatches("evil.test", "*") {
+		t.Fatal("wildcard must never match")
+	}
+	if !HostAllowed("[::1]:9443", extras) {
+		t.Fatal("IPv6 loopback host-only must match bracketed Request.Host")
+	}
+	if !HostAllowed("[2001:db8::1]:9443", []string{"[2001:db8::1]", "2001:db8::1"}) {
+		t.Fatal("IPv6 host-only extra must match bracket form")
+	}
+	if !HostAllowed("[2001:db8::1]:9443", []string{"[2001:db8::1]:9443"}) {
+		t.Fatal("IPv6 host:port extra must exact-match")
+	}
+	if HostAllowed("[2001:db8::1]:8443", []string{"[2001:db8::1]:9443"}) {
+		t.Fatal("IPv6 host:port extra must not match a different port")
+	}
+}

@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/hilather/go-lab-ldap-mcp/internal/auth"
+	"github.com/hilather/go-lab-ldap-mcp/internal/config"
 	"github.com/hilather/go-lab-ldap-mcp/internal/directory"
 )
 
@@ -27,12 +28,15 @@ func TestParseServeFlags(t *testing.T) {
 	t.Setenv("LABLDAP_LDAP_URL", "")
 	t.Setenv("LABLDAP_DIRECTORY_CA_FILE", "")
 	t.Setenv("LABLDAP_DIRECTORY_HOST", "")
-	f, err := parseServeFlags([]string{"--config", "x.yaml", "--ldap-url", "ldaps://127.0.0.1:3636", "--directory-ca-file", "/ca.pem", "--directory-host", "dir.example"})
+	f, err := parseServeFlags([]string{"--config", "x.yaml", "--ldap-url", "ldaps://127.0.0.1:3636", "--directory-ca-file", "/ca.pem", "--directory-host", "dir.example", "--management-allowed-host", "10.165.0.199", "--management-allowed-host=lab.example.com"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if f.configPath != "x.yaml" || f.ldapURL != "ldaps://127.0.0.1:3636" || f.caFile != "/ca.pem" || f.dirHost != "dir.example" {
 		t.Fatalf("%+v", f)
+	}
+	if len(f.allowedHosts) != 2 || f.allowedHosts[0] != "10.165.0.199" || f.allowedHosts[1] != "lab.example.com" {
+		t.Fatalf("allowedHosts = %#v", f.allowedHosts)
 	}
 	if _, err := parseServeFlags(nil); err == nil {
 		t.Fatal("expected required")
@@ -51,7 +55,7 @@ func TestLDAPClientConfigFromExample(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	built, err := compileControl(context.Background(), path)
+	built, err := compileControl(context.Background(), serveFlags{configPath: path})
 	if err != nil {
 		t.Fatalf("compile: %v", err)
 	}
@@ -73,7 +77,7 @@ func TestLDAPClientConfigFromExample(t *testing.T) {
 
 func TestServeWiresCompiledRateLimits(t *testing.T) {
 	path := filepath.Join("..", "..", "config", "examples", "example-lab.yaml")
-	built, err := compileControl(context.Background(), path)
+	built, err := compileControl(context.Background(), serveFlags{configPath: path})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -113,7 +117,7 @@ func TestWarnInsecureLab(t *testing.T) {
 
 func TestLoopbackListenWiresHostAllowList(t *testing.T) {
 	path := filepath.Join("..", "..", "config", "examples", "example-lab.yaml")
-	built, err := compileControl(context.Background(), path)
+	built, err := compileControl(context.Background(), serveFlags{configPath: path})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,12 +131,46 @@ func TestLoopbackListenWiresHostAllowList(t *testing.T) {
 	if len(opt.AllowedHosts) == 0 {
 		t.Fatal("example-lab listens on 127.0.0.1 and must set Host allow-list")
 	}
+	if !auth.HostAllowed("127.0.0.1:8443", opt.AllowedHosts) || auth.HostAllowed("evil.test", opt.AllowedHosts) {
+		t.Fatalf("example-lab hosts = %v", opt.AllowedHosts)
+	}
+}
+
+func TestCompileControlUnionsCLIAllowedHosts(t *testing.T) {
+	t.Setenv(config.AllowedHostsEnv, "lab.example.com")
+	path := filepath.Join("..", "..", "config", "examples", "example-lab.yaml")
+	built, err := compileControl(context.Background(), serveFlags{
+		configPath:   path,
+		allowedHosts: []string{"10.165.0.199"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := built.Public.Spec.Management.AllowedHosts
+	if len(got) < 2 {
+		t.Fatalf("extras = %#v", got)
+	}
+	joined := strings.Join(got, ",")
+	if !strings.Contains(joined, "10.165.0.199") || !strings.Contains(joined, "lab.example.com") {
+		t.Fatalf("union missing CLI/env extras: %v", got)
+	}
+	hosts := publishedHosts(built.Public.Spec.Management.Listen, got)
+	if !auth.HostAllowed("10.165.0.199:9443", hosts) || auth.HostAllowed("evil.test", hosts) {
+		t.Fatalf("runtime hosts = %v", hosts)
+	}
 }
 
 func TestComposeBindAllWiresHostAllowList(t *testing.T) {
-	hosts := publishedHosts("0.0.0.0:8443")
+	hosts := publishedHosts("0.0.0.0:8443", nil)
 	if !auth.HostAllowed("127.0.0.1:8443", hosts) || auth.HostAllowed("evil.test", hosts) {
 		t.Fatalf("compose 0.0.0.0 listen hosts = %v", hosts)
+	}
+	if !auth.HostAllowed("localhost:9443", hosts) || !auth.HostAllowed("control:8443", hosts) {
+		t.Fatalf("published-port localhost / control:listen must work, hosts = %v", hosts)
+	}
+	withIP := publishedHosts("0.0.0.0:8443", []string{"10.165.0.199"})
+	if !auth.HostAllowed("10.165.0.199:9443", withIP) || auth.HostAllowed("evil.test", withIP) {
+		t.Fatalf("extra host-only IP hosts = %v", withIP)
 	}
 }
 
@@ -182,7 +220,7 @@ spec:
 // configured LDAP URL in both modes.
 func TestCompileControlAllowsNativeEngine(t *testing.T) {
 	path := writeNativeScenario(t)
-	built, err := compileControl(context.Background(), path)
+	built, err := compileControl(context.Background(), serveFlags{configPath: path})
 	if err != nil {
 		t.Fatalf("compileControl(native): %v", err)
 	}
@@ -224,7 +262,7 @@ func TestControlPlaneNeverLoadsDirectoryManagerSecret(t *testing.T) {
 	}
 
 	path := writeNativeScenario(t)
-	built, err := compileControl(context.Background(), path)
+	built, err := compileControl(context.Background(), serveFlags{configPath: path})
 	if err != nil {
 		t.Fatalf("compileControl(native): %v", err)
 	}

@@ -128,6 +128,7 @@ func validateSettings(f *v1alpha1.File) error {
 	if _, _, err := net.SplitHostPort(f.Spec.Management.Listen); err != nil {
 		acc = append(acc, fieldErr("spec.management.listen", "invalid_address", "listen must be host:port"))
 	}
+	acc = append(acc, checkAllowedHosts("spec.management.allowedHosts", f.Spec.Management.AllowedHosts)...)
 	acc = append(acc, checkPort("spec.transport.ldap.port", tr.LDAP.Port)...)
 	acc = append(acc, checkPort("spec.transport.ldaps.port", tr.LDAPS.Port)...)
 	acc = append(acc, checkDuration("spec.management.session.idleTimeout", f.Spec.Management.Session.IdleTimeout)...)

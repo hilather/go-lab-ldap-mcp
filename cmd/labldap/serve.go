@@ -88,7 +88,7 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 		handler = mountTransports(srv.Handler(), mcpserver.Disabled(nil))
 		readTO, writeTO, idleTO, stopTO = srv.Timeouts(30*time.Second, 15*time.Second)
 	} else {
-		built, err := compileControl(ctx, flags.configPath)
+		built, err := compileControl(ctx, flags)
 		if err != nil {
 			printConfigError(stderr, err)
 			return 1
@@ -209,14 +209,16 @@ func generatedManagementCertificate() (tls.Certificate, error) {
 	return tls.X509KeyPair(certPEM, keyPEM)
 }
 
-func compileControl(ctx context.Context, path string) (*config.Compiled, error) {
+func compileControl(ctx context.Context, flags serveFlags) (*config.Compiled, error) {
+	path := flags.configPath
 	src, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
 	built, err := config.Compile(ctx, src, path, config.LoadOptions{
-		Caller:  config.CallerControl,
-		Secrets: config.DirSecretResolver(filepath.Dir(path)),
+		Caller:            config.CallerControl,
+		Secrets:           config.DirSecretResolver(filepath.Dir(path)),
+		ExtraAllowedHosts: append([]string(nil), flags.allowedHosts...),
 	})
 	if err != nil {
 		return nil, err
@@ -294,7 +296,7 @@ func serverOptionsFromCompiled(c *config.Compiled, flags serveFlags, log *slog.L
 		Ready:           ready,
 		Logger:          log,
 		AllowedOrigins:  append([]string(nil), c.Public.Spec.Management.CORS.AllowedOrigins...),
-		AllowedHosts:    publishedHosts(c.Public.Spec.Management.Listen),
+		AllowedHosts:    publishedHosts(c.Public.Spec.Management.Listen, c.Public.Spec.Management.AllowedHosts),
 		MaxBody:         c.Public.Spec.Limits.MaxRequestBodyBytes,
 		ForceSecure:     false, // cookie Secure follows r.TLS until serve terminates TLS (OD-014)
 		MetricsAuth:     c.Public.Spec.Management.Metrics.RequireAuth,
@@ -343,7 +345,7 @@ func mcpHandlerFromCompiled(c *config.Compiled, reg *auth.Registry, svc *app.Ser
 		Services:       svc,
 		Logger:         log,
 		AllowedOrigins: append([]string(nil), c.Public.Spec.Management.CORS.AllowedOrigins...),
-		AllowedHosts:   publishedHosts(c.Public.Spec.Management.Listen),
+		AllowedHosts:   publishedHosts(c.Public.Spec.Management.Listen, c.Public.Spec.Management.AllowedHosts),
 		MaxBody:        c.Public.Spec.Limits.MaxRequestBodyBytes,
 		Flags: mcpserver.RegisterFlags{
 			Mutations: mcpCfg.RegisterMutations,
@@ -377,11 +379,15 @@ func runtimeConfigFromCompiled(c *config.Compiled) ds389.RuntimeConfig {
 	}
 }
 
-func publishedHosts(listen string) []string {
+func publishedHosts(listen string, extras []string) []string {
+	var base []string
 	if hosts := auth.LoopbackHosts(listen); len(hosts) > 0 {
-		return hosts
+		base = append(base, hosts...)
+		base = append(base, auth.LoopbackHostnames(listen)...)
+	} else {
+		base = mcpserver.HostsFromListen(listen)
 	}
-	return mcpserver.HostsFromListen(listen)
+	return config.UnionAllowedHosts(base, extras)
 }
 
 const insecureLabWarning = "insecureLabMode is enabled: cleartext LDAP bind and skipped TLS verification are allowed; this is a lab-only setting"
@@ -399,6 +405,7 @@ func warnInsecureLab(log *slog.Logger, insecure bool) {
 
 const serveUsage = `Usage:
   labldap serve --config FILE [--ldap-url URL] [--directory-ca-file FILE] [--directory-host NAME]
+              [--management-allowed-host HOST]...
   labldap serve --placeholder
 
 serve starts the management HTTP listener (REST, MCP, and embedded UI).
@@ -412,6 +419,9 @@ GET / serves hashed UI assets or index.html.
 --directory-ca-file is required unless insecure lab mode is set
 (LABLDAP_DIRECTORY_CA_FILE). --directory-host is the TLS server name
 (LABLDAP_DIRECTORY_HOST).
+--management-allowed-host is repeatable and unions with
+spec.management.allowedHosts and LABLDAP_MANAGEMENT_ALLOWED_HOSTS.
+Host-only values match any port; "*" is rejected.
 
 GET /metrics is Prometheus text. Default requireAuth is false: restrict
 the listener with loopback or network policy, or set

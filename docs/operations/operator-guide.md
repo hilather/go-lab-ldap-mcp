@@ -41,7 +41,10 @@ implement the LDAP wire protocol.
   [architectures.md](https://github.com/hilather/go-lab-ldap-mcp/blob/main/deploy/docker/architectures.md).
 - **Host checks:** Compose listens on `0.0.0.0:8443` inside the container
   but still allow-lists `127.0.0.1` / `localhost` / `control` (loopback
-  publish). A spoofed `Host: evil.test` is rejected.
+  publish, any published port for those names). A spoofed `Host: evil.test`
+  is rejected. Add `spec.management.allowedHosts` (or
+  `LABLDAP_MANAGEMENT_ALLOWED_HOSTS` / `--management-allowed-host`) for a
+  public IP or extra hostname. `*` is rejected (ADR-0010).
 
 ## Prerequisites
 

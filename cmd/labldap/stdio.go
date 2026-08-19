@@ -95,7 +95,7 @@ func runMCPStdio(args []string, stdout, stderr io.Writer) int {
 		log = observability.NewLogger(stderr, observability.FormatJSON, observability.CurrentBuild("labldap"))
 	}
 
-	built, err := compileControl(ctx, flags.configPath)
+	built, err := compileControl(ctx, flags.serveFlags)
 	if err != nil {
 		printConfigError(stderr, err)
 		return 1

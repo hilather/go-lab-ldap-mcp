@@ -20,6 +20,11 @@ file — [Scenario YAML](scenario.md).
 | Disk | enough for local images plus `/data` (native bbolt is small; 389 DS rollback needs more) |
 | Ports on loopback | `8443` (management), `3389` (LDAP), `3636` (LDAPS) |
 
+A published or LAN management Host (for example `10.165.0.199:9443`)
+needs `spec.management.allowedHosts` or `LABLDAP_MANAGEMENT_ALLOWED_HOSTS`
+([ADR-0010](../adr/0010-management-http-allowed-hosts.md)). The default
+still rejects `Host: evil.test`.
+
 Optional for from-source work: Go 1.26 (toolchain `go1.26.5`), Node 22.12+,
 pnpm. Pins live in [docs/toolchain.md](../toolchain.md).
 

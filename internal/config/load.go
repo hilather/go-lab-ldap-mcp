@@ -18,6 +18,9 @@ const (
 type LoadOptions struct {
 	Secrets SecretResolver
 	Caller  LoadCaller
+	// ExtraAllowedHosts are CLI extras (--management-allowed-host). They
+	// union with YAML and LABLDAP_MANAGEMENT_ALLOWED_HOSTS (ADR-0010).
+	ExtraAllowedHosts []string
 }
 
 // Parsed is the T-009/T-011 result. Later tasks add Normalized, plans, and hashes.
@@ -37,6 +40,9 @@ func Load(ctx context.Context, src []byte, origin string, opt LoadOptions) (*Par
 		return nil, err
 	}
 	applyDefaults(pub)
+	if err := applyAllowedHostSources(pub, opt); err != nil {
+		return nil, err
+	}
 	if err := validateSettings(pub); err != nil {
 		return nil, err
 	}
