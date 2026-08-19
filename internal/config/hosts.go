@@ -16,6 +16,7 @@ const AllowedHostsEnv = "LABLDAP_MANAGEMENT_ALLOWED_HOSTS"
 func applyAllowedHostSources(f *v1alpha1.File, opt LoadOptions) error {
 	envItems := SplitHostList(os.Getenv(AllowedHostsEnv))
 	var acc []*apperr.Error
+	acc = append(acc, checkAllowedHosts("spec.management.allowedHosts", f.Spec.Management.AllowedHosts)...)
 	acc = append(acc, checkAllowedHosts(AllowedHostsEnv, envItems)...)
 	acc = append(acc, checkAllowedHosts("--management-allowed-host", opt.ExtraAllowedHosts)...)
 	if err := joinConfig(acc); err != nil {
