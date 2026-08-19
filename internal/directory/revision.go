@@ -38,6 +38,15 @@ func RevisionOfGroup(g Group) Revision {
 	}{g.ID, ids})
 }
 
+// RevisionOfEntry is the canonical hash over API-exposed entry attributes.
+func RevisionOfEntry(e DirectoryEntry) Revision {
+	return RevisionHash(struct {
+		DN            string
+		ObjectClasses []string
+		Attributes    []AttrKV
+	}{e.DN, e.ObjectClasses, e.Attributes})
+}
+
 // RevisionHash is lowercase hex SHA-256 of canonical JSON. Never hash secrets.
 func RevisionHash(v any) Revision {
 	b, err := json.Marshal(v)

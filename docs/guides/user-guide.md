@@ -70,6 +70,7 @@ lab CA or accept the browser warning.
 | `/users` | List, create, edit, enable/disable, set password, delete |
 | `/groups` | List, create (needs an initial member), membership add/remove/replace |
 | `/search` | Explicit-submit LDAP search. Typing does not fire a query. |
+| `/tree` | Browse managed suffixes; create OU/domain/container; create user/group at an exact DN; move; delete with confirm |
 | `/auth-test` | Bind diagnostic. Password field clears after the attempt. |
 | `/schema` | Read-only Root DSE and schema browser |
 | `/audit` | In-memory audit ring, filterable, with request-id copy |
@@ -93,9 +94,20 @@ member, chosen through a bounded server search. There is no attribute-level
 
 A membership cycle is rejected and the group is left unchanged.
 
+### Directory tree
+
+`/tree` lists compiled managed suffixes (primary plus
+`additionalSuffixes`). From a chosen base you can create allowlisted
+entries (`organizationalUnit`, `domain`, or `container` stored as
+`organizationalUnit`), place a user or group at an exact DN, move or
+rename, and delete with a typed-DN confirm. Writes outside the
+configured suffixes are rejected. Multi-domain here means multiple
+suffixes in one lab, not an AD forest.
+
 ### Search
 
-Submit a base, scope, filter, attribute list, and page size. Attribute names
+Submit a base, scope, filter, attribute list, and page size. The search
+base may be any managed suffix or a DN under one. Attribute names
 are allow-listed. `userPassword` and other forbidden names cannot be
 requested. Results expand to a redacted LDIF snippet.
 

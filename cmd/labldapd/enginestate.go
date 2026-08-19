@@ -29,6 +29,7 @@ const (
 
 	attrEngine             = "labldapEngine"
 	attrEngineSuffix       = "labldapEngineSuffix"
+	attrEngineAdditional   = "labldapEngineAdditionalSuffixes"
 	attrPasswordScheme     = "labldapPasswordStorageScheme"
 	attrPasswordMinLength  = "labldapPasswordMinLength"
 	attrPasswordHistory    = "labldapPasswordHistoryCount"
@@ -60,23 +61,26 @@ func strAttr(name string, values ...string) ldapserver.Attribute {
 func engineStateEntry(c *config.Compiled) *ldapserver.Entry {
 	p := c.Engine.PasswordPolicy
 	scheme := canonicalScheme(p.StorageScheme)
-	return &ldapserver.Entry{
-		DN: configEntryDN,
-		Attributes: []ldapserver.Attribute{
-			strAttr("objectClass", "top", "extensibleObject"),
-			strAttr("cn", "config"),
-			strAttr(attrEngine, engineName),
-			strAttr(attrEngineSuffix, c.Engine.Suffix),
-			strAttr(attrPasswordScheme, scheme),
-			strAttr(attrPasswordMinLength, strconv.Itoa(p.MinLength)),
-			strAttr(attrPasswordHistory, strconv.Itoa(p.HistoryCount)),
-			strAttr(attrPasswordMaxAge, strconv.FormatInt(int64(p.MaxAge.Seconds()), 10)),
-			strAttr(attrLockoutEnabled, onOff(p.LockoutEnabled)),
-			strAttr(attrLockoutMaxFailures, strconv.Itoa(p.MaxFailures)),
-			strAttr(attrLockoutDuration, strconv.FormatInt(int64(p.LockoutDuration.Seconds()), 10)),
-			strAttr(attrPlugins, c.Engine.Plugins...),
-		},
+	attrs := []ldapserver.Attribute{
+		strAttr("objectClass", "top", "extensibleObject"),
+		strAttr("cn", "config"),
+		strAttr(attrEngine, engineName),
+		strAttr(attrEngineSuffix, c.Engine.Suffix),
 	}
+	if extras := c.Normalized.AdditionalSuffixStrings(); len(extras) > 0 {
+		attrs = append(attrs, strAttr(attrEngineAdditional, extras...))
+	}
+	attrs = append(attrs,
+		strAttr(attrPasswordScheme, scheme),
+		strAttr(attrPasswordMinLength, strconv.Itoa(p.MinLength)),
+		strAttr(attrPasswordHistory, strconv.Itoa(p.HistoryCount)),
+		strAttr(attrPasswordMaxAge, strconv.FormatInt(int64(p.MaxAge.Seconds()), 10)),
+		strAttr(attrLockoutEnabled, onOff(p.LockoutEnabled)),
+		strAttr(attrLockoutMaxFailures, strconv.Itoa(p.MaxFailures)),
+		strAttr(attrLockoutDuration, strconv.FormatInt(int64(p.LockoutDuration.Seconds()), 10)),
+		strAttr(attrPlugins, c.Engine.Plugins...),
+	)
+	return &ldapserver.Entry{DN: configEntryDN, Attributes: attrs}
 }
 
 // canonicalScheme normalizes a storage-scheme spelling exactly as

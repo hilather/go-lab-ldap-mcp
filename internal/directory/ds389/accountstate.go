@@ -66,16 +66,16 @@ func (r *Runtime) Unlock(ctx context.Context, id directory.UserID, rev directory
 }
 
 func (r *Runtime) mutateAccount(ctx context.Context, id directory.UserID, rev directory.Revision, apply func(*ldap.ModifyRequest, *ldap.Entry)) (directory.AccountState, error) {
-	dn, err := r.userDN(string(id))
-	if err != nil {
-		return directory.AccountState{}, err
-	}
-	if err := r.refuseRuntimeAccount(dn, "runtime account cannot be mutated"); err != nil {
-		return directory.AccountState{}, err
-	}
 	size, seconds := r.searchLimits()
 	var out directory.AccountState
-	err = r.pool.Do(ctx, func(c *ldapclient.Conn) error {
+	err := r.pool.Do(ctx, func(c *ldapclient.Conn) error {
+		dn, e := r.lookupUserDN(ctx, c, string(id))
+		if e != nil {
+			return e
+		}
+		if e := r.refuseRuntimeAccount(dn, "runtime account cannot be mutated"); e != nil {
+			return e
+		}
 		live, e := searchBaseConn(ctx, c, dn, accountStateReadAttrs(), size, seconds)
 		if e != nil {
 			return e
@@ -103,13 +103,13 @@ func (r *Runtime) mutateAccount(ctx context.Context, id directory.UserID, rev di
 }
 
 func (r *Runtime) readAccountState(ctx context.Context, id directory.UserID) (directory.AccountState, error) {
-	dn, err := r.userDN(string(id))
-	if err != nil {
-		return directory.AccountState{}, err
-	}
 	size, seconds := r.searchLimits()
 	var out directory.AccountState
-	err = r.pool.Do(ctx, func(c *ldapclient.Conn) error {
+	err := r.pool.Do(ctx, func(c *ldapclient.Conn) error {
+		dn, e := r.lookupUserDN(ctx, c, string(id))
+		if e != nil {
+			return e
+		}
 		ent, e := searchBaseConn(ctx, c, dn, accountStateReadAttrs(), size, seconds)
 		if e != nil {
 			return e

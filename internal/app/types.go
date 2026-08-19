@@ -52,6 +52,13 @@ var (
 	OpGroupMembers = Operation{Name: "group.members", Scope: v1alpha1.ScopeDirectoryWrite}
 
 	OpSearch       = Operation{Name: "search", Scope: v1alpha1.ScopeDirectoryRead}
+	OpEntryCreate  = Operation{Name: "entry.create", Scope: v1alpha1.ScopeDirectoryWrite}
+	OpEntryUpdate  = Operation{Name: "entry.update", Scope: v1alpha1.ScopeDirectoryWrite}
+	OpEntryDelete  = Operation{Name: "entry.delete", Scope: v1alpha1.ScopeDirectoryWrite}
+	OpEntryMove    = Operation{Name: "entry.move", Scope: v1alpha1.ScopeDirectoryWrite}
+	OpEntryTree    = Operation{Name: "entry.tree", Scope: v1alpha1.ScopeDirectoryRead}
+	OpEntryGet     = Operation{Name: "entry.get", Scope: v1alpha1.ScopeDirectoryRead}
+	OpSuffixes     = Operation{Name: "suffixes.list", Scope: v1alpha1.ScopeDirectoryRead}
 	OpBindTest     = Operation{Name: "bind_test", Scope: v1alpha1.ScopeDirectoryPassword}
 	OpSchemaRead   = Operation{Name: "schema.read", Scope: v1alpha1.ScopeSchemaRead}
 	OpCapabilities = Operation{Name: "capabilities", Scope: v1alpha1.ScopeDirectoryRead}

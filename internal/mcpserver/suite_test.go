@@ -19,8 +19,9 @@ func suiteServices() (*app.Services, *fakeUsers) {
 	users.put(directory.User{ID: "seed", UID: "seed"})
 	groups := newFakeGroups()
 	svc := app.New(app.Deps{
-		Users:  users,
-		Groups: groups,
+		Users:   users,
+		Groups:  groups,
+		Entries: newFakeEntries(),
 		Search: &fakeSearch{pages: []directory.SearchPage{{
 			Entries: []directory.SearchEntry{{DN: "uid=seed,ou=people,dc=example,dc=test", Attributes: []directory.AttrKV{{Name: "uid", Value: "seed"}}}},
 		}}},
@@ -105,6 +106,12 @@ func TestEveryToolPositiveAndDeniedScope(t *testing.T) {
 		{tool: ToolCreateGroup, args: directory.GroupSpec{ID: "crew", Members: []directory.MemberRef{{Kind: "user", ID: "alice"}}}, allow: writeToken, deny: readToken},
 		{tool: ToolDeleteGroup, args: DeleteInput{ID: "crew", Confirm: true}, allow: writeToken, deny: readToken},
 		{tool: ToolDeleteUser, args: DeleteInput{ID: "carol", Confirm: true}, allow: writeToken, deny: readToken},
+		{tool: ToolListSuffixes, args: emptyInput{}, allow: readToken, deny: schemaTok},
+		{tool: ToolListTree, args: directory.TreeQuery{Base: "dc=example,dc=test"}, allow: readToken, deny: schemaTok},
+		{tool: ToolCreateEntry, args: directory.EntrySpec{DN: "ou=lab,ou=people,dc=example,dc=test", ObjectClasses: []string{"organizationalUnit"}}, allow: writeToken, deny: readToken},
+		{tool: ToolUpdateEntry, args: UpdateEntryInput{DN: "ou=lab,ou=people,dc=example,dc=test", Changes: []directory.EntryChange{{Op: "replace", Name: "description", Values: []string{"x"}}}}, allow: writeToken, deny: readToken},
+		{tool: ToolMoveEntry, args: MoveEntryInput{DN: "ou=lab,ou=people,dc=example,dc=test", NewDN: "ou=lab2,ou=people,dc=example,dc=test"}, allow: writeToken, deny: readToken},
+		{tool: ToolDeleteEntry, args: DeleteEntryInput{DN: "ou=lab2,ou=people,dc=example,dc=test", Confirm: true}, allow: writeToken, deny: readToken},
 	}
 
 	reader := app.Principal{Kind: app.KindToken, ID: "admin", Scopes: directory.ScopeSet{auth.ScopeDirectoryRead}}
@@ -121,6 +128,13 @@ func TestEveryToolPositiveAndDeniedScope(t *testing.T) {
 			return ""
 		}
 		return string(g.Revision)
+	}
+	entryRevOf := func(dn string) string {
+		e, err := svc.Entries.Get(t.Context(), reader, dn)
+		if err != nil {
+			return ""
+		}
+		return string(e.Revision)
 	}
 	covered := map[string]bool{}
 	for _, st := range steps {
@@ -139,6 +153,20 @@ func TestEveryToolPositiveAndDeniedScope(t *testing.T) {
 			st.args = DeleteInput{ID: "crew", Revision: groupRevOf("crew"), Confirm: true}
 		case ToolDeleteUser:
 			st.args = DeleteInput{ID: "carol", Revision: userRevOf("carol"), Confirm: true}
+		case ToolUpdateEntry:
+			st.args = UpdateEntryInput{
+				DN: "ou=lab,ou=people,dc=example,dc=test", Revision: entryRevOf("ou=lab,ou=people,dc=example,dc=test"),
+				Changes: []directory.EntryChange{{Op: "replace", Name: "description", Values: []string{"x"}}},
+			}
+		case ToolMoveEntry:
+			st.args = MoveEntryInput{
+				DN: "ou=lab,ou=people,dc=example,dc=test", NewDN: "ou=lab2,ou=people,dc=example,dc=test",
+				Revision: entryRevOf("ou=lab,ou=people,dc=example,dc=test"),
+			}
+		case ToolDeleteEntry:
+			st.args = DeleteEntryInput{
+				DN: "ou=lab2,ou=people,dc=example,dc=test", Revision: entryRevOf("ou=lab2,ou=people,dc=example,dc=test"), Confirm: true,
+			}
 		}
 		denySess, _ := connectMCP(t, mux, st.deny, "")
 		denied := callTool(t, denySess, st.tool, st.args)

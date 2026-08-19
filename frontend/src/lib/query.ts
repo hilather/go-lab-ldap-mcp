@@ -13,6 +13,8 @@ export const queryKeys = {
     ready: [...directoryQueryKey, "ready"] as const,
     diagnostics: [...directoryQueryKey, "diagnostics"] as const,
     capabilities: [...directoryQueryKey, "capabilities"] as const,
+    suffixes: [...directoryQueryKey, "suffixes"] as const,
+    tree: (base: string, cursor: string) => [...directoryQueryKey, "tree", base, cursor] as const,
     baseline: [...directoryQueryKey, "baseline"] as const,
     version: [...directoryQueryKey, "version"] as const,
     audit: [...directoryQueryKey, "audit"] as const,

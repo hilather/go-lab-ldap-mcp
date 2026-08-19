@@ -58,6 +58,27 @@ func (e BindTestResultOutcome) Valid() bool {
 	}
 }
 
+// Defines values for EntryChangeOp.
+const (
+	Add     EntryChangeOp = "add"
+	Delete  EntryChangeOp = "delete"
+	Replace EntryChangeOp = "replace"
+)
+
+// Valid indicates whether the value is a known member of the EntryChangeOp enum.
+func (e EntryChangeOp) Valid() bool {
+	switch e {
+	case Add:
+		return true
+	case Delete:
+		return true
+	case Replace:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for HealthStatusStatus.
 const (
 	HealthStatusStatusLive     HealthStatusStatus = "live"
@@ -278,14 +299,15 @@ type BuildInfo struct {
 
 // Capabilities defines model for Capabilities.
 type Capabilities struct {
-	AdapterVersion string   `json:"adapterVersion"`
-	Controls       []string `json:"controls"`
-	EngineVendor   string   `json:"engineVendor"`
-	EngineVersion  string   `json:"engineVersion"`
-	PasswordScheme string   `json:"passwordScheme"`
-	Plugins        []string `json:"plugins"`
-	RequiredOK     bool     `json:"requiredOK"`
-	Transports     []string `json:"transports"`
+	AdapterVersion  string    `json:"adapterVersion"`
+	Controls        []string  `json:"controls"`
+	EngineVendor    string    `json:"engineVendor"`
+	EngineVersion   string    `json:"engineVersion"`
+	ManagedSuffixes *[]string `json:"managedSuffixes,omitempty"`
+	PasswordScheme  string    `json:"passwordScheme"`
+	Plugins         []string  `json:"plugins"`
+	RequiredOK      bool      `json:"requiredOK"`
+	Transports      []string  `json:"transports"`
 }
 
 // Diagnostics defines model for Diagnostics.
@@ -294,6 +316,43 @@ type Diagnostics struct {
 	Pool        PoolStats `json:"pool"`
 	Ready       bool      `json:"ready"`
 	Reset       ResetHint `json:"reset"`
+}
+
+// DirectoryEntry defines model for DirectoryEntry.
+type DirectoryEntry struct {
+	Attributes    []AttrKV `json:"attributes"`
+	Dn            string   `json:"dn"`
+	ObjectClasses []string `json:"objectClasses"`
+	Revision      string   `json:"revision"`
+}
+
+// EntryChange defines model for EntryChange.
+type EntryChange struct {
+	Name   string        `json:"name"`
+	Op     EntryChangeOp `json:"op"`
+	Values *[]string     `json:"values,omitempty"`
+}
+
+// EntryChangeOp defines model for EntryChange.Op.
+type EntryChangeOp string
+
+// EntryMove defines model for EntryMove.
+type EntryMove struct {
+	DeleteOldRdn *bool  `json:"deleteOldRdn,omitempty"`
+	Dn           string `json:"dn"`
+	NewDN        string `json:"newDN"`
+}
+
+// EntryPatch defines model for EntryPatch.
+type EntryPatch struct {
+	Changes []EntryChange `json:"changes"`
+}
+
+// EntrySpec defines model for EntrySpec.
+type EntrySpec struct {
+	Attributes    *map[string]string `json:"attributes,omitempty"`
+	Dn            string             `json:"dn"`
+	ObjectClasses []string           `json:"objectClasses"`
 }
 
 // FieldError defines model for FieldError.
@@ -319,8 +378,13 @@ type GroupPage struct {
 
 // GroupSpec defines model for GroupSpec.
 type GroupSpec struct {
+	// Dn Optional exact DN under a managed suffix (ADR-0011)
+	Dn      *string     `json:"dn,omitempty"`
 	Id      string      `json:"id"`
 	Members []MemberRef `json:"members"`
+
+	// ParentDN Optional parent DN under a managed suffix (ADR-0011)
+	ParentDN *string `json:"parentDN,omitempty"`
 }
 
 // HealthStatus defines model for HealthStatus.
@@ -491,6 +555,36 @@ type SessionView struct {
 // SessionViewKind defines model for SessionView.Kind.
 type SessionViewKind string
 
+// SuffixList defines model for SuffixList.
+type SuffixList struct {
+	Additional []string `json:"additional"`
+	All        []string `json:"all"`
+	Primary    string   `json:"primary"`
+}
+
+// TreeNode defines model for TreeNode.
+type TreeNode struct {
+	Dn            string   `json:"dn"`
+	HasChildren   bool     `json:"hasChildren"`
+	ObjectClasses []string `json:"objectClasses"`
+	Rdn           string   `json:"rdn"`
+	Revision      *string  `json:"revision,omitempty"`
+}
+
+// TreePage defines model for TreePage.
+type TreePage struct {
+	Base       string     `json:"base"`
+	NextCursor *string    `json:"nextCursor,omitempty"`
+	Nodes      []TreeNode `json:"nodes"`
+}
+
+// TreeQuery defines model for TreeQuery.
+type TreeQuery struct {
+	Base     *string `json:"base,omitempty"`
+	Cursor   *string `json:"cursor,omitempty"`
+	PageSize *int    `json:"pageSize,omitempty"`
+}
+
 // User defines model for User.
 type User struct {
 	Attributes    []AttrKV  `json:"attributes"`
@@ -518,10 +612,16 @@ type UserPatch struct {
 // UserSpec defines model for UserSpec.
 type UserSpec struct {
 	Attributes *map[string]string `json:"attributes,omitempty"`
-	Enabled    *bool              `json:"enabled,omitempty"`
-	Id         string             `json:"id"`
-	Password   string             `json:"password"`
-	Uid        *string            `json:"uid,omitempty"`
+
+	// Dn Optional exact DN under a managed suffix (ADR-0011)
+	Dn      *string `json:"dn,omitempty"`
+	Enabled *bool   `json:"enabled,omitempty"`
+	Id      string  `json:"id"`
+
+	// ParentDN Optional parent DN under a managed suffix (ADR-0011)
+	ParentDN *string `json:"parentDN,omitempty"`
+	Password string  `json:"password"`
+	Uid      *string `json:"uid,omitempty"`
 }
 
 // CSRFToken defines model for CSRFToken.
@@ -577,6 +677,50 @@ type ListAuditParams struct {
 type CreateAuthTestParams struct {
 	// XCSRFToken Required for cookie-authenticated unsafe methods
 	XCSRFToken *CSRFToken `json:"X-CSRF-Token,omitempty"`
+}
+
+// DeleteEntryParams defines parameters for DeleteEntry.
+type DeleteEntryParams struct {
+	Dn        string `form:"dn" json:"dn"`
+	Confirm   bool   `form:"confirm" json:"confirm"`
+	Recursive *bool  `form:"recursive,omitempty" json:"recursive,omitempty"`
+
+	// XCSRFToken Required for cookie-authenticated unsafe methods
+	XCSRFToken *CSRFToken `json:"X-CSRF-Token,omitempty"`
+
+	// IfMatch Quoted revision hex
+	IfMatch IfMatch `json:"If-Match"`
+}
+
+// GetEntryParams defines parameters for GetEntry.
+type GetEntryParams struct {
+	Dn string `form:"dn" json:"dn"`
+}
+
+// UpdateEntryParams defines parameters for UpdateEntry.
+type UpdateEntryParams struct {
+	Dn string `form:"dn" json:"dn"`
+
+	// XCSRFToken Required for cookie-authenticated unsafe methods
+	XCSRFToken *CSRFToken `json:"X-CSRF-Token,omitempty"`
+
+	// IfMatch Quoted revision hex
+	IfMatch IfMatch `json:"If-Match"`
+}
+
+// CreateEntryParams defines parameters for CreateEntry.
+type CreateEntryParams struct {
+	// XCSRFToken Required for cookie-authenticated unsafe methods
+	XCSRFToken *CSRFToken `json:"X-CSRF-Token,omitempty"`
+}
+
+// MoveEntryParams defines parameters for MoveEntry.
+type MoveEntryParams struct {
+	// XCSRFToken Required for cookie-authenticated unsafe methods
+	XCSRFToken *CSRFToken `json:"X-CSRF-Token,omitempty"`
+
+	// IfMatch Quoted revision hex
+	IfMatch IfMatch `json:"If-Match"`
 }
 
 // ExportLDIFParams defines parameters for ExportLDIF.
@@ -647,6 +791,12 @@ type SearchEntriesParams struct {
 
 // DeleteSessionParams defines parameters for DeleteSession.
 type DeleteSessionParams struct {
+	// XCSRFToken Required for cookie-authenticated unsafe methods
+	XCSRFToken *CSRFToken `json:"X-CSRF-Token,omitempty"`
+}
+
+// ListTreeParams defines parameters for ListTree.
+type ListTreeParams struct {
 	// XCSRFToken Required for cookie-authenticated unsafe methods
 	XCSRFToken *CSRFToken `json:"X-CSRF-Token,omitempty"`
 }
@@ -747,6 +897,15 @@ type UnlockUserParams struct {
 // CreateAuthTestJSONRequestBody defines body for CreateAuthTest for application/json ContentType.
 type CreateAuthTestJSONRequestBody = BindTestBody
 
+// UpdateEntryJSONRequestBody defines body for UpdateEntry for application/json ContentType.
+type UpdateEntryJSONRequestBody = EntryPatch
+
+// CreateEntryJSONRequestBody defines body for CreateEntry for application/json ContentType.
+type CreateEntryJSONRequestBody = EntrySpec
+
+// MoveEntryJSONRequestBody defines body for MoveEntry for application/json ContentType.
+type MoveEntryJSONRequestBody = EntryMove
+
 // CreateGroupJSONRequestBody defines body for CreateGroup for application/json ContentType.
 type CreateGroupJSONRequestBody = GroupSpec
 
@@ -767,6 +926,9 @@ type SearchEntriesJSONRequestBody = SearchQuery
 
 // CreateSessionJSONRequestBody defines body for CreateSession for application/json ContentType.
 type CreateSessionJSONRequestBody = SessionCreate
+
+// ListTreeJSONRequestBody defines body for ListTree for application/json ContentType.
+type ListTreeJSONRequestBody = TreeQuery
 
 // CreateUserJSONRequestBody defines body for CreateUser for application/json ContentType.
 type CreateUserJSONRequestBody = UserSpec

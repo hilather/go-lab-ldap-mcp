@@ -245,6 +245,10 @@ func (c *Conn) Modify(ctx context.Context, req *ldap.ModifyRequest) error {
 	return c.mutate(ctx, func() error { return c.raw.Modify(req) })
 }
 
+func (c *Conn) ModifyDN(ctx context.Context, req *ldap.ModifyDNRequest) error {
+	return c.mutate(ctx, func() error { return c.raw.ModifyDN(req) })
+}
+
 func (c *Conn) Del(ctx context.Context, req *ldap.DelRequest) error {
 	return c.mutate(ctx, func() error { return c.raw.Del(req) })
 }

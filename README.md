@@ -172,7 +172,7 @@ LabLDAP is a laboratory. It is not a production identity system.
 5. Static bearer tokens are an explicit lab mode, not an accident.
 6. Ephemeral tmpfs is not a forensic wipe — host swap can still hold pages.
 7. Soft reset restores the compiled suffix. It does not delete the volume.
-8. First usable release: one managed suffix, one engine instance. Engine default is `labldapd` (v0.3.0). Set `engine: 389ds` to keep 389 DS.
+8. First usable release: one engine instance. `spec.directory.suffix` is the primary managed suffix; optional `additionalSuffixes` add sibling naming contexts in the same lab (ADR-0011). Engine default is `labldapd` (v0.3.0). Set `engine: 389ds` to keep 389 DS.
 9. Active Directory emulation is out of scope.
 10. Native Go engine (`labldapd`) is the omitted-field default under ADR-0008. It is a laboratory directory, not a production identity system. 389 DS remains the behavioral oracle.
 

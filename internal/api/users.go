@@ -13,6 +13,8 @@ import (
 type userSpecBody struct {
 	ID         string               `json:"id"`
 	UID        string               `json:"uid,omitempty"`
+	DN         string               `json:"dn,omitempty"`
+	ParentDN   string               `json:"parentDN,omitempty"`
 	Enabled    *bool                `json:"enabled,omitempty"`
 	Password   observability.Secret `json:"password"`
 	Attributes map[string]string    `json:"attributes,omitempty"`
@@ -64,6 +66,8 @@ func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 	spec := app.CreateUser{
 		ID:         body.ID,
 		UID:        body.UID,
+		DN:         body.DN,
+		ParentDN:   body.ParentDN,
 		Enabled:    body.Enabled,
 		Password:   body.Password,
 		Attributes: body.Attributes,

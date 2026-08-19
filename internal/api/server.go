@@ -58,6 +58,7 @@ type Options struct {
 	Users           Users
 	Groups          Groups
 	Query           Query
+	Entries         Entries
 	Audit           audit.Lister
 	AuditHook       audit.Hook
 	Diagnostics     func() app.Diagnostics
@@ -88,6 +89,7 @@ type Server struct {
 	users           Users
 	groups          Groups
 	query           Query
+	entries         Entries
 	audit           audit.Lister
 	auditHook       audit.Hook
 	diagnostics     func() app.Diagnostics
@@ -156,6 +158,7 @@ func New(opt Options) (*Server, error) {
 		users:           opt.Users,
 		groups:          opt.Groups,
 		query:           opt.Query,
+		entries:         opt.Entries,
 		audit:           opt.Audit,
 		auditHook:       opt.AuditHook,
 		diagnostics:     opt.Diagnostics,
@@ -209,6 +212,13 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("PUT /api/v1/groups/{id}/members", s.handleReplaceGroupMembers)
 
 	mux.HandleFunc("POST /api/v1/search", s.handleSearch)
+	mux.HandleFunc("GET /api/v1/suffixes", s.handleListSuffixes)
+	mux.HandleFunc("POST /api/v1/tree", s.handleListTree)
+	mux.HandleFunc("GET /api/v1/entries", s.handleGetEntry)
+	mux.HandleFunc("POST /api/v1/entries", s.handleCreateEntry)
+	mux.HandleFunc("PATCH /api/v1/entries", s.handleUpdateEntry)
+	mux.HandleFunc("DELETE /api/v1/entries", s.handleDeleteEntry)
+	mux.HandleFunc("POST /api/v1/entries/move", s.handleMoveEntry)
 	mux.HandleFunc("POST /api/v1/auth-tests", s.handleBindTest)
 	mux.HandleFunc("GET /api/v1/rootdse", s.handleRootDSE)
 	mux.HandleFunc("GET /api/v1/schema", s.handleSchema)

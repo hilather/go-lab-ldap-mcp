@@ -42,12 +42,13 @@ type Runtime struct {
 
 // RuntimeConfig is compiled directory geometry plus search/schema limits.
 type RuntimeConfig struct {
-	Suffix       string
-	PeopleDN     string
-	GroupsDN     string
-	RuntimeDN    string
-	MarkerDN     string
-	NestedGroups bool
+	Suffix             string
+	AdditionalSuffixes []string
+	PeopleDN           string
+	GroupsDN           string
+	RuntimeDN          string
+	MarkerDN           string
+	NestedGroups       bool
 	// NestedMemberHook, if set, is the nested-group validation hook (T-049).
 	NestedMemberHook func(member directory.MemberRef) error
 
@@ -84,7 +85,7 @@ type RuntimeConfig struct {
 var defaultAllowedAttrs = []string{
 	"objectclass", "uid", "cn", "sn", "givenname", "mail", "displayname",
 	"description", "member", "uniquemember", "memberof", "ou", "dc",
-	"nsaccountlock", "ismemberof",
+	"nsaccountlock", "ismemberof", "o", "l", "st",
 }
 
 func NewRuntime(pool *ldapclient.Pool, cfg RuntimeConfig) (*Runtime, error) {
@@ -240,11 +241,7 @@ func (r *Runtime) underManaged(dn string) bool {
 	if err != nil {
 		return false
 	}
-	suf, err := config.ParseDN(r.cfg.Suffix)
-	if err != nil {
-		return false
-	}
-	return got.Equal(suf) || got.IsDescendantOf(suf)
+	return config.UnderAny(got, r.managedSuffixDNs())
 }
 
 func (r *Runtime) underPeople(dn string) bool {

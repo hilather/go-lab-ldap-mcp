@@ -226,6 +226,8 @@ export function firstForbiddenAttr(rows: readonly AttrRow[]): string | undefined
 export type UserSpecInput = {
   id: string;
   uid: string;
+  dn?: string;
+  parentDN?: string;
   enabled: boolean;
   password: string;
   attributes: readonly AttrRow[];
@@ -235,6 +237,8 @@ export function toUserSpecBody(input: UserSpecInput): {
   id: string;
   password: string;
   uid?: string;
+  dn?: string;
+  parentDN?: string;
   enabled?: boolean;
   attributes?: Record<string, string>;
 } {
@@ -242,9 +246,19 @@ export function toUserSpecBody(input: UserSpecInput): {
     id: string;
     password: string;
     uid?: string;
+    dn?: string;
+    parentDN?: string;
     enabled?: boolean;
     attributes?: Record<string, string>;
   } = { id: input.id.trim(), password: input.password };
+  const dn = input.dn?.trim() ?? "";
+  if (dn !== "") {
+    spec.dn = dn;
+  }
+  const parentDN = input.parentDN?.trim() ?? "";
+  if (parentDN !== "") {
+    spec.parentDN = parentDN;
+  }
   const uid = input.uid.trim();
   if (uid !== "") {
     spec.uid = uid;

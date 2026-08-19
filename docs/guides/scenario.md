@@ -27,6 +27,36 @@ plan (`labldap plan` output) and the directory revision, so switching
 engines is a re-bootstrap / hard reset, not a live change. See
 [`docs/design/native-engine-parity-contract.md`](../design/native-engine-parity-contract.md).
 
+## Additional managed suffixes
+
+`spec.directory.suffix` stays the primary naming context. People,
+groups, the runtime account, and the baseline marker live under it.
+
+Optional `spec.directory.additionalSuffixes` adds sibling naming
+contexts in the same lab (ADR-0011). Values must be valid DNs, distinct
+from the primary, and not nested inside the primary or each other.
+Omitted or empty keeps today's single-suffix lab. This is **not** an AD
+forest or a cross-domain trust.
+
+```yaml
+spec:
+  directory:
+    suffix: "dc=example,dc=test"
+    additionalSuffixes:
+      - "dc=region1,dc=example,dc=net"
+      - "dc=region2,dc=example,dc=net"
+```
+
+Bootstrap creates each extra suffix (389: a separate `labldapN` backend
+with `--create-suffix`; native: extra naming contexts). Runtime writes
+and search bases must stay under the compiled managed set. Extra OU
+trees and exact-DN service users are created through REST / MCP / the
+Tree console page (`ldap_create_entry`, `dn` / `parentDN` on user and
+group create) — scenario YAML users and groups still compile under
+`peopleRDN` / `groupsRDN` on the primary suffix.
+
+See [ADR-0011](../adr/0011-multi-domain-managed-suffixes-and-structured-entries.md).
+
 ## Declare users and groups
 
 ```yaml

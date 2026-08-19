@@ -228,6 +228,7 @@ func attachDirectory(opt *apiOptionsBuilder) error {
 	svc := app.New(app.Deps{
 		Users:            rt.Users(),
 		Groups:           rt.Groups(),
+		Entries:          rt,
 		Search:           rt,
 		Bind:             rt,
 		Schema:           rt,
@@ -279,6 +280,7 @@ func attachDirectory(opt *apiOptionsBuilder) error {
 	opt.users = svc.Users
 	opt.groups = svc.Groups
 	opt.query = svc.Query
+	opt.entries = svc.Entries
 	opt.system = svc.Query
 	opt.reset = svc.Reset
 	opt.export = svc.Export
@@ -301,6 +303,7 @@ type apiOptionsBuilder struct {
 	users     *app.Users
 	groups    *app.Groups
 	query     *app.Query
+	entries   *app.Entries
 	system    *app.Query
 	reset     *app.Reset
 	export    *app.Export

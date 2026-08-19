@@ -38,6 +38,8 @@ type SearchRepository interface {
 	Search(ctx context.Context, q SearchQuery) (SearchPage, error)
 }
 
+// EntryRepository is defined in entry.go (ADR-0011 structured entries).
+
 type BindTester interface {
 	BindTest(ctx context.Context, identity string, password observability.Secret, t Transport) (BindTestResult, error)
 }

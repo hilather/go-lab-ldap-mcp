@@ -131,6 +131,24 @@ func (d DN) FoldedKey() string {
 	return strings.Join(parts, ",")
 }
 
+// Parent returns the DN after dropping the leaf RDN.
+func (d DN) Parent() (DN, bool) {
+	if len(d.rdns) < 2 {
+		return DN{}, false
+	}
+	return DN{rdns: append([]rdn(nil), d.rdns[1:]...)}, true
+}
+
+// UnderAny reports whether d equals or is a descendant of any suffix.
+func UnderAny(d DN, suffixes []DN) bool {
+	for _, s := range suffixes {
+		if d.Equal(s) || d.IsDescendantOf(s) {
+			return true
+		}
+	}
+	return false
+}
+
 // IsDescendantOf reports whether d is strictly under ancestor (RDN prefix from the root).
 func (d DN) IsDescendantOf(ancestor DN) bool {
 	if len(ancestor.rdns) == 0 || len(d.rdns) <= len(ancestor.rdns) {

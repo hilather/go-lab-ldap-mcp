@@ -23,7 +23,16 @@ import (
 // the managed suffix fail noSuchObject, matching 389's "no such suffix"
 // behavior for out-of-backend targets.
 func (s *Server) inSuffix(dn config.DN) bool {
-	return dn.Equal(s.suffix) || dn.IsDescendantOf(s.suffix)
+	return config.UnderAny(dn, s.suffixes)
+}
+
+func (s *Server) isSuffixRoot(dn config.DN) bool {
+	for _, suf := range s.suffixes {
+		if dn.Equal(suf) {
+			return true
+		}
+	}
+	return false
 }
 
 // parentDN returns the parent of dn. The canonical String form is
@@ -81,7 +90,7 @@ func (s *Server) handleAdd(ctx context.Context, c *conn, m *Message, req *AddReq
 		if !s.allowed(ctx, tx, subj, dn, "", PermAdd) {
 			return errDenied
 		}
-		if !dn.Equal(s.suffix) {
+		if !s.isSuffixRoot(dn) {
 			parent, ok := parentDN(dn)
 			if !ok {
 				return errInvalidDN
@@ -503,7 +512,7 @@ func (s *Server) handleModifyDN(ctx context.Context, c *conn, m *Message, req *M
 		}
 		superior = p
 	}
-	if dn.Equal(s.suffix) {
+	if s.isSuffixRoot(dn) {
 		// Renaming the suffix root itself is outside the lab model.
 		return respond(Result{Code: ResultUnwillingToPerform, DiagnosticMessage: "cannot rename the suffix root"})
 	}

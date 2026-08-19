@@ -15,6 +15,7 @@ import { LaterTaskPage } from "./routes/LaterTaskPage";
 import { ResetPage } from "./routes/reset/ResetPage";
 import { SchemaPage } from "./routes/schema/SchemaPage";
 import { SearchPage } from "./routes/search/SearchPage";
+import { TreePage } from "./routes/tree/TreePage";
 import { UserCreatePage } from "./routes/users/UserCreatePage";
 import { UserDetailPage } from "./routes/users/UserDetailPage";
 import { UserListPage } from "./routes/users/UserListPage";
@@ -39,6 +40,7 @@ const router = createBrowserRouter([
           { path: "groups/new", element: <GroupCreatePage /> },
           { path: "groups/:id", element: <GroupDetailPage /> },
           { path: "search", element: <SearchPage /> },
+          { path: "tree", element: <TreePage /> },
           { path: "auth-test", element: <AuthTestPage /> },
           { path: "schema", element: <SchemaPage /> },
           { path: "audit", element: <AuditPage /> },

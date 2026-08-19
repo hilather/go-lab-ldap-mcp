@@ -22,6 +22,7 @@ func mutationServices(users directory.UserRepository, groups directory.GroupRepo
 	return app.New(app.Deps{
 		Users:            users,
 		Groups:           groups,
+		Entries:          newFakeEntries(),
 		Search:           &fakeSearch{},
 		Bind:             bind,
 		Caps:             fakeCaps{caps: directory.Capabilities{EngineVendor: "389 Project"}},

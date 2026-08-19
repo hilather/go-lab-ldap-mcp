@@ -29,5 +29,14 @@ func (e Engine) Reconcile(ctx context.Context, req bootstrap.BackendRequest) (bo
 	if err := compareState(ctx, pr, "backend", "readback_mismatch", attrEngineSuffix, wantDN.String()); err != nil {
 		return bootstrap.BackendResult{}, err
 	}
+	for _, extra := range req.Additional {
+		got, err := config.ParseDN(extra.Suffix)
+		if err != nil {
+			return bootstrap.BackendResult{}, bootstrap.PhaseError("backend", "conflict", "additional suffix is not a valid DN")
+		}
+		if err := compareState(ctx, pr, "backend", "readback_mismatch", attrEngineAdditional, got.String()); err != nil {
+			return bootstrap.BackendResult{}, err
+		}
+	}
 	return bootstrap.BackendResult{Action: "matched", Name: req.Name, Suffix: wantDN.String()}, nil
 }

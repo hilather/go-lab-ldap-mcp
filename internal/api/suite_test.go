@@ -67,6 +67,13 @@ func restSuite() []suiteCase {
 		{method: http.MethodDelete, path: "/api/v1/groups/suiteg/members", scope: auth.ScopeDirectoryWrite, mutate: true, body: members},
 		{method: http.MethodPut, path: "/api/v1/groups/suiteg/members", scope: auth.ScopeDirectoryWrite, mutate: true, body: members},
 		{method: http.MethodPost, path: "/api/v1/search", scope: auth.ScopeDirectoryRead, body: search},
+		{method: http.MethodGet, path: "/api/v1/suffixes", scope: auth.ScopeDirectoryRead},
+		{method: http.MethodPost, path: "/api/v1/tree", scope: auth.ScopeDirectoryRead, body: `{"base":"dc=example,dc=test"}`},
+		{method: http.MethodGet, path: "/api/v1/entries?dn=ou=people,dc=example,dc=test", scope: auth.ScopeDirectoryRead},
+		{method: http.MethodPost, path: "/api/v1/entries", scope: auth.ScopeDirectoryWrite, mutate: true, body: `{"dn":"ou=lab,ou=people,dc=example,dc=test","objectClasses":["organizationalUnit"]}`},
+		{method: http.MethodPatch, path: "/api/v1/entries?dn=ou=lab,ou=people,dc=example,dc=test", scope: auth.ScopeDirectoryWrite, mutate: true, body: `{"changes":[{"op":"replace","name":"description","values":["x"]}]}`},
+		{method: http.MethodDelete, path: "/api/v1/entries?dn=ou=lab,ou=people,dc=example,dc=test&confirm=true", scope: auth.ScopeDirectoryWrite, mutate: true},
+		{method: http.MethodPost, path: "/api/v1/entries/move", scope: auth.ScopeDirectoryWrite, mutate: true, body: `{"dn":"ou=lab,ou=people,dc=example,dc=test","newDN":"ou=lab2,ou=people,dc=example,dc=test"}`},
 		{method: http.MethodPost, path: "/api/v1/auth-tests", scope: auth.ScopeDirectoryPassword, body: bind},
 		{method: http.MethodGet, path: "/api/v1/rootdse", scope: auth.ScopeSchemaRead},
 		{method: http.MethodGet, path: "/api/v1/schema", scope: auth.ScopeSchemaRead},
@@ -85,6 +92,7 @@ func TestRESTScopeMatrixAndReadOnlyCannotMutate(t *testing.T) {
 	svc := app.New(app.Deps{
 		Users:            users,
 		Groups:           groups,
+		Entries:          newMemEntries(),
 		Search:           newMemSearch(),
 		Bind:             newMemBind(),
 		Schema:           newMemSchema(),
@@ -112,6 +120,7 @@ func TestRESTScopeMatrixAndReadOnlyCannotMutate(t *testing.T) {
 		Users:          svc.Users,
 		Groups:         svc.Groups,
 		Query:          svc.Query,
+		Entries:        svc.Entries,
 		System:         svc.Query,
 		Reset:          svc.Reset,
 		Export:         svc.Export,
@@ -179,7 +188,7 @@ func suiteRequest(tc suiteCase, token string) *http.Request {
 	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
-	if tc.method == http.MethodPatch || tc.method == http.MethodDelete || strings.Contains(tc.path, "/members") || strings.Contains(tc.path, "/enable") || strings.Contains(tc.path, "/disable") || strings.Contains(tc.path, "/expire-password") || strings.Contains(tc.path, "/clear-password-expiry") || strings.Contains(tc.path, "/lock") || strings.Contains(tc.path, "/unlock") {
+	if tc.method == http.MethodPatch || tc.method == http.MethodDelete || strings.Contains(tc.path, "/members") || strings.Contains(tc.path, "/entries/move") || strings.Contains(tc.path, "/enable") || strings.Contains(tc.path, "/disable") || strings.Contains(tc.path, "/expire-password") || strings.Contains(tc.path, "/clear-password-expiry") || strings.Contains(tc.path, "/lock") || strings.Contains(tc.path, "/unlock") {
 		req.Header.Set("If-Match", `"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"`)
 	}
 	return req
@@ -251,6 +260,7 @@ func TestRepresentativeHandlerLogsHaveNoSecrets(t *testing.T) {
 	svc := app.New(app.Deps{
 		Users:            users,
 		Groups:           groups,
+		Entries:          newMemEntries(),
 		Search:           newMemSearch(),
 		Bind:             newMemBind(),
 		Schema:           newMemSchema(),
@@ -271,6 +281,7 @@ func TestRepresentativeHandlerLogsHaveNoSecrets(t *testing.T) {
 		Users:     svc.Users,
 		Groups:    svc.Groups,
 		Query:     svc.Query,
+		Entries:   svc.Entries,
 		System:    svc.Query,
 		Logger:    slog.New(logs),
 		AuditHook: &audit.Memory{},

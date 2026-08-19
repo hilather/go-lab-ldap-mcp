@@ -35,6 +35,12 @@ import (
 //	ldap_add_members        proposed  T-090  registerMutations   directory:write
 //	ldap_remove_members     proposed  T-090  registerMutations   directory:write
 //	ldap_replace_members    proposed  T-090  registerMutations   directory:write
+//	ldap_list_suffixes      proposed  #5     yes                 directory:read
+//	ldap_list_tree          proposed  #5     yes                 directory:read
+//	ldap_create_entry       proposed  #5     registerMutations   directory:write
+//	ldap_update_entry       proposed  #5     registerMutations   directory:write
+//	ldap_delete_entry       proposed  #5     registerMutations   directory:write
+//	ldap_move_entry         proposed  #5     registerMutations   directory:write
 //	ldap_update_group       omitted   v1     no GroupPatch / no PATCH /groups/{id} (membership tools are the update path)
 //	ldap_bind_test          proposed  T-091  registerPassword    directory:password
 //	ldap_reset_suffix       proposed  T-092  registerReset       lab:reset
@@ -73,6 +79,12 @@ const (
 	ToolAddMembers          = "ldap_add_members"
 	ToolRemoveMembers       = "ldap_remove_members"
 	ToolReplaceMembers      = "ldap_replace_members"
+	ToolListSuffixes        = "ldap_list_suffixes"
+	ToolListTree            = "ldap_list_tree"
+	ToolCreateEntry         = "ldap_create_entry"
+	ToolUpdateEntry         = "ldap_update_entry"
+	ToolDeleteEntry         = "ldap_delete_entry"
+	ToolMoveEntry           = "ldap_move_entry"
 	ToolBindTest            = "ldap_bind_test"
 	ToolResetSuffix         = "ldap_reset_suffix"
 	ToolExportLDIF          = "ldap_export_ldif"
@@ -103,6 +115,8 @@ type GetEntryInput struct {
 type CreateUserInput struct {
 	ID         string            `json:"id"`
 	UID        string            `json:"uid,omitempty"`
+	DN         string            `json:"dn,omitempty"`
+	ParentDN   string            `json:"parentDN,omitempty"`
 	Enabled    *bool             `json:"enabled,omitempty"`
 	Password   string            `json:"password"`
 	Attributes map[string]string `json:"attributes,omitempty"`
@@ -178,6 +192,29 @@ type ExportLDIFOutput struct {
 	LDIF    string `json:"ldif,omitempty"`
 	Handoff string `json:"handoff,omitempty"`
 	Bytes   int    `json:"bytes,omitempty"`
+}
+
+// DeleteEntryInput is DELETE /api/v1/entries.
+type DeleteEntryInput struct {
+	DN        string `json:"dn"`
+	Revision  string `json:"revision"`
+	Confirm   bool   `json:"confirm"`
+	Recursive bool   `json:"recursive,omitempty"`
+}
+
+// UpdateEntryInput is PATCH /api/v1/entries?dn= plus revision.
+type UpdateEntryInput struct {
+	DN       string                  `json:"dn"`
+	Revision string                  `json:"revision"`
+	Changes  []directory.EntryChange `json:"changes"`
+}
+
+// MoveEntryInput is POST /api/v1/entries/move plus revision.
+type MoveEntryInput struct {
+	DN           string `json:"dn"`
+	NewDN        string `json:"newDN"`
+	Revision     string `json:"revision"`
+	DeleteOldRDN bool   `json:"deleteOldRdn,omitempty"`
 }
 
 // emptyInput is the OpenAPI-empty object for tools with no fields.
@@ -343,6 +380,42 @@ func Catalog() []ToolDef {
 			Description: "Replace group members. Empty replacement is empty_group.",
 			Scope:       auth.ScopeDirectoryWrite, Flag: flagMutations, Idempotent: true,
 			Input: MembersInput{}, Output: directory.MembershipSummary{},
+		},
+		{
+			Name: ToolListSuffixes, Contract: ContractProposed, Task: "issue-5",
+			Description: "List compiled managed suffixes. Sibling of GET /api/v1/suffixes.",
+			Scope:       auth.ScopeDirectoryRead, ReadOnly: true, Idempotent: true, OpenWorld: false,
+			Input: emptyInput{}, Output: directory.SuffixList{},
+		},
+		{
+			Name: ToolListTree, Contract: ContractProposed, Task: "issue-5",
+			Description: "List one level of a managed suffix tree. Sibling of POST /api/v1/tree.",
+			Scope:       auth.ScopeDirectoryRead, ReadOnly: true, Idempotent: true, OpenWorld: false,
+			Input: directory.TreeQuery{}, Output: directory.TreePage{},
+		},
+		{
+			Name: ToolCreateEntry, Contract: ContractProposed, Task: "issue-5",
+			Description: "Create an allowlisted structured entry under a managed suffix. Sibling of POST /api/v1/entries.",
+			Scope:       auth.ScopeDirectoryWrite, Flag: flagMutations,
+			Input: directory.EntrySpec{}, Output: directory.DirectoryEntry{},
+		},
+		{
+			Name: ToolUpdateEntry, Contract: ContractProposed, Task: "issue-5",
+			Description: "Replace/add/delete allowlisted attributes by DN. Requires revision.",
+			Scope:       auth.ScopeDirectoryWrite, Flag: flagMutations, Idempotent: true,
+			Input: UpdateEntryInput{}, Output: directory.DirectoryEntry{},
+		},
+		{
+			Name: ToolDeleteEntry, Contract: ContractProposed, Task: "issue-5",
+			Description: "Delete an entry by DN. Requires confirm and revision. Recursive delete needs recursive:true.",
+			Scope:       auth.ScopeDirectoryWrite, Destructive: true, Flag: flagMutations,
+			Input: DeleteEntryInput{}, Output: IDResult{},
+		},
+		{
+			Name: ToolMoveEntry, Contract: ContractProposed, Task: "issue-5",
+			Description: "Rename or re-parent an entry. New DN must stay under a managed suffix.",
+			Scope:       auth.ScopeDirectoryWrite, Flag: flagMutations,
+			Input: MoveEntryInput{}, Output: directory.DirectoryEntry{},
 		},
 		{
 			Name: ToolBindTest, Contract: ContractProposed, Task: "T-091",

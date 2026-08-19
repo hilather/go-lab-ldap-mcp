@@ -66,6 +66,21 @@ func (r *Runtime) Inventory(ctx context.Context) (directory.ManagedInventory, er
 			}
 			add(e.DN, &out.Users, &out.Groups, &out.Extra, false, isGroupEntry(e))
 		}
+		for _, extraBase := range r.cfg.AdditionalSuffixes {
+			ents, e := pageSubtree(ctx, c, extraBase, uint32(page), seconds)
+			if e != nil {
+				if fieldOf(e) == directory.FieldNotFound {
+					continue
+				}
+				return e
+			}
+			for _, ent := range ents {
+				if ent == nil || sameDN(ent.DN, extraBase) {
+					continue
+				}
+				add(ent.DN, &out.Users, &out.Groups, &out.Extra, isPersonEntry(ent), isGroupEntry(ent))
+			}
+		}
 		return nil
 	})
 	if err != nil {
@@ -94,8 +109,8 @@ func (r *Runtime) DeleteManaged(ctx context.Context, dn string) error {
 	if r.isProtectedDN(dn) {
 		return directory.Error("dn", directory.FieldForbidden, "protected directory entry cannot be deleted")
 	}
-	if !r.underPeople(dn) && !r.underGroups(dn) {
-		return directory.Error("dn", directory.FieldForbidden, "delete is outside managed containers")
+	if !r.underPeople(dn) && !r.underGroups(dn) && !r.underManaged(dn) {
+		return directory.Error("dn", directory.FieldForbidden, "delete is outside managed suffixes")
 	}
 	size, seconds := r.searchLimits()
 	return r.pool.Do(ctx, func(c *ldapclient.Conn) error {
@@ -132,6 +147,9 @@ func (r *Runtime) preserveDNs() map[string]string {
 		add("cn=" + markerCN + "," + r.cfg.Suffix)
 	}
 	add(r.cfg.Suffix)
+	for _, extra := range r.cfg.AdditionalSuffixes {
+		add(extra)
+	}
 	return out
 }
 

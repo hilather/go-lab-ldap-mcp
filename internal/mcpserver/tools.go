@@ -67,6 +67,18 @@ func (s *Server) registerTools(ms *mcp.Server) {
 			mcp.AddTool(ms, toolMeta(d), s.callRemoveMembers)
 		case ToolReplaceMembers:
 			mcp.AddTool(ms, toolMeta(d), s.callReplaceMembers)
+		case ToolListSuffixes:
+			mcp.AddTool(ms, toolMeta(d), s.callListSuffixes)
+		case ToolListTree:
+			mcp.AddTool(ms, toolMeta(d), s.callListTree)
+		case ToolCreateEntry:
+			mcp.AddTool(ms, toolMeta(d), s.callCreateEntry)
+		case ToolUpdateEntry:
+			mcp.AddTool(ms, toolMeta(d), s.callUpdateEntry)
+		case ToolDeleteEntry:
+			mcp.AddTool(ms, toolMeta(d), s.callDeleteEntry)
+		case ToolMoveEntry:
+			mcp.AddTool(ms, toolMeta(d), s.callMoveEntry)
 		case ToolBindTest:
 			mcp.AddTool(ms, toolMeta(d), s.callBindTest)
 		case ToolResetSuffix:
@@ -145,7 +157,7 @@ func (s *Server) callCreateUser(ctx context.Context, _ *mcp.CallToolRequest, in 
 		return nil, directory.User{}, err
 	}
 	spec := app.CreateUser{
-		ID: in.ID, UID: in.UID, Enabled: in.Enabled,
+		ID: in.ID, UID: in.UID, DN: in.DN, ParentDN: in.ParentDN, Enabled: in.Enabled,
 		Password:   observability.Secret(in.Password),
 		Attributes: in.Attributes,
 	}
@@ -323,6 +335,89 @@ func (s *Server) callMembers(ctx context.Context, tool string, _ MembersInput, f
 	return toolResult(ctx), sum, nil
 }
 
+func (s *Server) callListSuffixes(ctx context.Context, _ *mcp.CallToolRequest, _ emptyInput) (*mcp.CallToolResult, directory.SuffixList, error) {
+	p, entries, err := s.readyEntries(ctx, ToolListSuffixes)
+	if err != nil {
+		return nil, directory.SuffixList{}, err
+	}
+	out, err := entries.Suffixes(ctx, p)
+	if err != nil {
+		return nil, directory.SuffixList{}, publicToolErr(err)
+	}
+	return toolResult(ctx), out, nil
+}
+
+func (s *Server) callListTree(ctx context.Context, _ *mcp.CallToolRequest, in directory.TreeQuery) (*mcp.CallToolResult, directory.TreePage, error) {
+	p, entries, err := s.readyEntries(ctx, ToolListTree)
+	if err != nil {
+		return nil, directory.TreePage{}, err
+	}
+	page, err := entries.ListTree(ctx, p, in)
+	if err != nil {
+		return nil, directory.TreePage{}, publicToolErr(err)
+	}
+	if page.Nodes == nil {
+		page.Nodes = []directory.TreeNode{}
+	}
+	return toolResult(ctx), page, nil
+}
+
+func (s *Server) callCreateEntry(ctx context.Context, _ *mcp.CallToolRequest, in directory.EntrySpec) (*mcp.CallToolResult, directory.DirectoryEntry, error) {
+	p, entries, err := s.readyEntries(ctx, ToolCreateEntry)
+	if err != nil {
+		return nil, directory.DirectoryEntry{}, err
+	}
+	ent, err := entries.Create(ctx, p, in)
+	if err != nil {
+		return nil, directory.DirectoryEntry{}, publicToolErr(err)
+	}
+	return toolResult(ctx), ent, nil
+}
+
+func (s *Server) callUpdateEntry(ctx context.Context, _ *mcp.CallToolRequest, in UpdateEntryInput) (*mcp.CallToolResult, directory.DirectoryEntry, error) {
+	p, entries, err := s.readyEntries(ctx, ToolUpdateEntry)
+	if err != nil {
+		return nil, directory.DirectoryEntry{}, err
+	}
+	ent, err := entries.Update(ctx, p, directory.EntryPatch{
+		DN: in.DN, Revision: directory.Revision(in.Revision), Changes: in.Changes,
+	})
+	if err != nil {
+		return nil, directory.DirectoryEntry{}, publicToolErr(err)
+	}
+	return toolResult(ctx), ent, nil
+}
+
+func (s *Server) callDeleteEntry(ctx context.Context, _ *mcp.CallToolRequest, in DeleteEntryInput) (*mcp.CallToolResult, IDResult, error) {
+	p, entries, err := s.readyEntries(ctx, ToolDeleteEntry)
+	if err != nil {
+		return nil, IDResult{}, err
+	}
+	if err := requireConfirm(in.Confirm); err != nil {
+		return nil, IDResult{}, err
+	}
+	if err := entries.Delete(ctx, p, directory.EntryDelete{
+		DN: in.DN, Revision: directory.Revision(in.Revision), Confirm: in.Confirm, Recursive: in.Recursive,
+	}); err != nil {
+		return nil, IDResult{}, publicToolErr(err)
+	}
+	return toolResult(ctx), IDResult{ID: in.DN}, nil
+}
+
+func (s *Server) callMoveEntry(ctx context.Context, _ *mcp.CallToolRequest, in MoveEntryInput) (*mcp.CallToolResult, directory.DirectoryEntry, error) {
+	p, entries, err := s.readyEntries(ctx, ToolMoveEntry)
+	if err != nil {
+		return nil, directory.DirectoryEntry{}, err
+	}
+	ent, err := entries.Move(ctx, p, directory.EntryMove{
+		DN: in.DN, NewDN: in.NewDN, Revision: directory.Revision(in.Revision), DeleteOld: in.DeleteOldRDN,
+	})
+	if err != nil {
+		return nil, directory.DirectoryEntry{}, publicToolErr(err)
+	}
+	return toolResult(ctx), ent, nil
+}
+
 func (s *Server) callBindTest(ctx context.Context, _ *mcp.CallToolRequest, in BindTestInput) (*mcp.CallToolResult, directory.BindTestResult, error) {
 	p, q, err := s.ready(ctx, ToolBindTest)
 	if err != nil {
@@ -420,6 +515,18 @@ func (s *Server) readyGroups(ctx context.Context, tool string) (app.Principal, *
 		return app.Principal{}, nil, directoryUnavailable()
 	}
 	return p, s.svc.Groups, nil
+}
+
+func (s *Server) readyEntries(ctx context.Context, tool string) (app.Principal, *app.Entries, error) {
+	p, err := s.principal(ctx)
+	if err != nil {
+		return app.Principal{}, nil, err
+	}
+	s.logTool(ctx, tool, p)
+	if s == nil || s.svc == nil || s.svc.Entries == nil {
+		return app.Principal{}, nil, directoryUnavailable()
+	}
+	return p, s.svc.Entries, nil
 }
 
 func (s *Server) readyReset(ctx context.Context, tool string) (app.Principal, *app.Reset, error) {

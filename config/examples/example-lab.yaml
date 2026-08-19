@@ -8,6 +8,9 @@ spec:
     # or 389ds (oracle / rollback). See ADR-0008 amendment 2026-08-17.
     engine: native
     suffix: "dc=example,dc=test"
+    # Extra sibling naming contexts (ADR-0011). Omitted keeps a single-suffix lab.
+    # additionalSuffixes:
+    #   - "dc=region1,dc=example,dc=net"
     peopleRDN: "ou=people"
     groupsRDN: "ou=groups"
     nestedGroups: false

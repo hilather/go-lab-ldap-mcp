@@ -27,6 +27,9 @@ func hashRevisions(n *Normalized, data DataPlan) (Revisions, error) {
 		"runtimeDigest":  n.Runtime.Password.Digest,
 		"softReset":      n.SoftReset,
 	}
+	if extras := additionalSuffixStrings(n); len(extras) > 0 {
+		dir["additionalSuffixes"] = extras
+	}
 	if n.SoftReset {
 		seeds := map[string]string{}
 		for _, u := range n.Users {
@@ -54,6 +57,17 @@ func hashRevisions(n *Normalized, data DataPlan) (Revisions, error) {
 		return Revisions{}, err
 	}
 	return Revisions{Directory: dh, Control: ch, Contract: CompilerContract}, nil
+}
+
+func additionalSuffixStrings(n *Normalized) []string {
+	if n == nil || len(n.AdditionalSuffixes) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(n.AdditionalSuffixes))
+	for _, s := range n.AdditionalSuffixes {
+		out = append(out, s.String())
+	}
+	return out
 }
 
 func directoryUsers(n *Normalized) []map[string]any {

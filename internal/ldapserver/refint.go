@@ -38,17 +38,26 @@ import (
 // RefIntPlugin repairs forward membership references on delete and rename.
 type RefIntPlugin struct {
 	suffix config.DN
+	extra  []config.DN
 }
 
 var _ Plugin = (*RefIntPlugin)(nil)
 
 // NewRefIntPlugin returns the plugin scoped to suffix.
-func NewRefIntPlugin(suffix string) (*RefIntPlugin, error) {
+func NewRefIntPlugin(suffix string, additional ...string) (*RefIntPlugin, error) {
 	d, err := config.ParseDN(suffix)
 	if err != nil {
 		return nil, fmt.Errorf("ldapserver: referint: invalid suffix: %w", err)
 	}
-	return &RefIntPlugin{suffix: d}, nil
+	p := &RefIntPlugin{suffix: d}
+	for _, raw := range additional {
+		got, err := config.ParseDN(raw)
+		if err != nil {
+			return nil, fmt.Errorf("ldapserver: referint: invalid additional suffix: %w", err)
+		}
+		p.extra = append(p.extra, got)
+	}
+	return p, nil
 }
 
 // Name implements Plugin.
@@ -56,7 +65,10 @@ func (p *RefIntPlugin) Name() string { return "referint" }
 
 // inScope reports whether d is the managed suffix or beneath it.
 func (p *RefIntPlugin) inScope(d config.DN) bool {
-	return d.Equal(p.suffix) || d.IsDescendantOf(p.suffix)
+	if d.Equal(p.suffix) || d.IsDescendantOf(p.suffix) {
+		return true
+	}
+	return config.UnderAny(d, p.extra)
 }
 
 // AfterWrite implements Plugin.

@@ -40,6 +40,7 @@ import (
 // MemberOfPlugin maintains memberOf for members of changed groups.
 type MemberOfPlugin struct {
 	suffix config.DN
+	extra  []config.DN
 	nested bool
 }
 
@@ -47,12 +48,20 @@ var _ Plugin = (*MemberOfPlugin)(nil)
 
 // NewMemberOfPlugin returns the plugin scoped to suffix. nestedGroups must
 // match compiled spec.directory.nestedGroups.
-func NewMemberOfPlugin(suffix string, nestedGroups bool) (*MemberOfPlugin, error) {
+func NewMemberOfPlugin(suffix string, nestedGroups bool, additional ...string) (*MemberOfPlugin, error) {
 	d, err := config.ParseDN(suffix)
 	if err != nil {
 		return nil, fmt.Errorf("ldapserver: memberof: invalid suffix: %w", err)
 	}
-	return &MemberOfPlugin{suffix: d, nested: nestedGroups}, nil
+	p := &MemberOfPlugin{suffix: d, nested: nestedGroups, extra: nil}
+	for _, raw := range additional {
+		got, err := config.ParseDN(raw)
+		if err != nil {
+			return nil, fmt.Errorf("ldapserver: memberof: invalid additional suffix: %w", err)
+		}
+		p.extra = append(p.extra, got)
+	}
+	return p, nil
 }
 
 // Name implements Plugin.
@@ -60,7 +69,10 @@ func (p *MemberOfPlugin) Name() string { return "memberof" }
 
 // inScope reports whether d is the managed suffix or beneath it.
 func (p *MemberOfPlugin) inScope(d config.DN) bool {
-	return d.Equal(p.suffix) || d.IsDescendantOf(p.suffix)
+	if d.Equal(p.suffix) || d.IsDescendantOf(p.suffix) {
+		return true
+	}
+	return config.UnderAny(d, p.extra)
 }
 
 // AfterWrite implements Plugin. It runs inside the write's Update

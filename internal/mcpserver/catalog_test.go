@@ -22,6 +22,7 @@ func TestCatalogUniqueAndComplete(t *testing.T) {
 		ToolAccountState, ToolExpirePassword, ToolClearPasswordExpiry, ToolLockUser, ToolUnlockUser,
 		ToolEnableUser, ToolDisableUser,
 		ToolCreateGroup, ToolDeleteGroup, ToolAddMembers, ToolRemoveMembers, ToolReplaceMembers,
+		ToolListSuffixes, ToolListTree, ToolCreateEntry, ToolUpdateEntry, ToolDeleteEntry, ToolMoveEntry,
 		ToolBindTest, ToolResetSuffix, ToolExportLDIF,
 	}
 	got := Catalog()

@@ -2,17 +2,24 @@ package config
 
 import (
 	"sort"
+	"strconv"
 
 	"github.com/hilather/go-lab-ldap-mcp/internal/apperr"
 	"github.com/hilather/go-lab-ldap-mcp/internal/config/v1alpha1"
 )
 
+type EngineBackend struct {
+	Name   string `json:"name"`
+	Suffix string `json:"suffix"`
+}
+
 type EnginePlan struct {
-	Engine         string           `json:"engine"`
-	Suffix         string           `json:"suffix"`
-	BackendName    string           `json:"backendName"`
-	PasswordPolicy NormalizedPolicy `json:"passwordPolicy"`
-	Plugins        []string         `json:"plugins"`
+	Engine             string           `json:"engine"`
+	Suffix             string           `json:"suffix"`
+	BackendName        string           `json:"backendName"`
+	AdditionalBackends []EngineBackend  `json:"additionalBackends,omitempty"`
+	PasswordPolicy     NormalizedPolicy `json:"passwordPolicy"`
+	Plugins            []string         `json:"plugins"`
 }
 
 type DataOp struct {
@@ -33,13 +40,28 @@ type DataPlan struct {
 }
 
 func buildEnginePlan(n *Normalized) EnginePlan {
-	return EnginePlan{
+	p := EnginePlan{
 		Engine:         n.Engine,
 		Suffix:         n.Suffix.String(),
 		BackendName:    "userroot",
 		PasswordPolicy: n.Policy,
 		Plugins:        []string{"memberof", "referint", "account-disable"},
 	}
+	if len(n.AdditionalSuffixes) == 0 {
+		return p
+	}
+	p.AdditionalBackends = make([]EngineBackend, 0, len(n.AdditionalSuffixes))
+	for i, s := range n.AdditionalSuffixes {
+		p.AdditionalBackends = append(p.AdditionalBackends, EngineBackend{
+			Name:   additionalBackendName(i + 1),
+			Suffix: s.String(),
+		})
+	}
+	return p
+}
+
+func additionalBackendName(i int) string {
+	return "labldap" + strconv.Itoa(i)
 }
 
 // wiredEngines lists the directory engines this build of labldap and
@@ -73,6 +95,13 @@ func buildDataPlan(n *Normalized, acis []NamedACI) DataPlan {
 		{Kind: "container", ID: "people", DN: n.PeopleDN.String()},
 		{Kind: "container", ID: "groups", DN: n.GroupsDN.String()},
 		{Kind: "account", ID: n.Runtime.ID, DN: n.Runtime.DN},
+	}
+	for i, s := range n.AdditionalSuffixes {
+		creates = append(creates, DataOp{
+			Kind: "container",
+			ID:   "additional-suffix-" + strconv.Itoa(i+1),
+			DN:   s.String(),
+		})
 	}
 	var users, groups []string
 	for _, u := range n.Users {

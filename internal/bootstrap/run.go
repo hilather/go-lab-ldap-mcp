@@ -135,6 +135,7 @@ func Run(ctx context.Context, opt Options, stdout, stderr io.Writer) (Summary, e
 			Name:         compiled.Engine.BackendName,
 			Suffix:       compiled.Engine.Suffix,
 			Write:        write,
+			Additional:   additionalBackendSpecs(compiled.Engine.AdditionalBackends),
 		})
 		if e != nil {
 			return nil, e
@@ -197,11 +198,12 @@ func Run(ctx context.Context, opt Options, stdout, stderr io.Writer) (Summary, e
 			return nil, phaseErr("plugins", "plugin_missing", "plugin reconciler is not configured")
 		}
 		res, e := opt.Plugins.ReconcilePlugins(ctx, PluginRequest{
-			PasswordFile: opt.PasswordFile,
-			Instance:     opt.DSConfInstance,
-			Suffix:       compiled.Engine.Suffix,
-			Plugins:      compiled.Engine.Plugins,
-			Write:        write,
+			PasswordFile:       opt.PasswordFile,
+			Instance:           opt.DSConfInstance,
+			Suffix:             compiled.Engine.Suffix,
+			AdditionalSuffixes: compiled.Normalized.AdditionalSuffixStrings(),
+			Plugins:            compiled.Engine.Plugins,
+			Write:              write,
 		})
 		if e != nil {
 			return nil, e
@@ -561,22 +563,23 @@ func treeRequestFrom(c *config.Compiled, opt Options, dm observability.Secret, w
 	tls := tlsRequestFrom(c, opt, dm, write)
 	n := c.Normalized
 	return TreeRequest{
-		Suffix:          n.Suffix.String(),
-		PeopleDN:        n.PeopleDN.String(),
-		GroupsDN:        n.GroupsDN.String(),
-		RuntimeDN:       n.Runtime.DN,
-		RuntimePassword: n.Runtime.Password.Value,
-		DMPassword:      dm,
-		LDAPURL:         tls.LDAPURL,
-		LDAPAddr:        tls.LDAPAddr,
-		LDAPSAddr:       tls.LDAPSAddr,
-		CAFile:          tls.CAFile,
-		Host:            tls.Host,
-		UseLDAPS:        tls.UseLDAPS,
-		StartTLS:        tls.StartTLS,
-		Insecure:        tls.Insecure,
-		Write:           write,
-		DialTimeout:     tls.DialTimeout,
+		Suffix:             n.Suffix.String(),
+		AdditionalSuffixes: n.AdditionalSuffixStrings(),
+		PeopleDN:           n.PeopleDN.String(),
+		GroupsDN:           n.GroupsDN.String(),
+		RuntimeDN:          n.Runtime.DN,
+		RuntimePassword:    n.Runtime.Password.Value,
+		DMPassword:         dm,
+		LDAPURL:            tls.LDAPURL,
+		LDAPAddr:           tls.LDAPAddr,
+		LDAPSAddr:          tls.LDAPSAddr,
+		CAFile:             tls.CAFile,
+		Host:               tls.Host,
+		UseLDAPS:           tls.UseLDAPS,
+		StartTLS:           tls.StartTLS,
+		Insecure:           tls.Insecure,
+		Write:              write,
+		DialTimeout:        tls.DialTimeout,
 	}
 }
 
@@ -688,4 +691,15 @@ func ExitCode(err error) int {
 		return 0
 	}
 	return 1
+}
+
+func additionalBackendSpecs(in []config.EngineBackend) []BackendSpec {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make([]BackendSpec, 0, len(in))
+	for _, b := range in {
+		out = append(out, BackendSpec{Name: b.Name, Suffix: b.Suffix})
+	}
+	return out
 }

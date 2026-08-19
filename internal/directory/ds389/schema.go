@@ -102,6 +102,7 @@ func (r *Runtime) Capabilities(ctx context.Context) (directory.Capabilities, err
 	if r.cfg.Client.Transport != "" {
 		caps.Transports = []string{string(r.cfg.Client.Transport)}
 	}
+	caps.ManagedSuffixes = r.managedSuffixStrings()
 	if r.cfg.Suffix != "" {
 		ok := false
 		for _, nc := range dse.NamingContexts {

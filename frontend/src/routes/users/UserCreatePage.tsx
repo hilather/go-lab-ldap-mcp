@@ -30,6 +30,8 @@ const createSchema = z
         message: reservedCreateIdMessage("new") ?? 'The ID "new" is reserved.',
       }),
     uid: z.string(),
+    dn: z.string(),
+    parentDN: z.string(),
     enabled: z.boolean(),
     password: z.string().min(1, "Enter a password."),
     confirmPassword: z.string(),
@@ -68,6 +70,8 @@ export function UserCreatePage() {
     defaultValues: {
       id: "",
       uid: "",
+      dn: "",
+      parentDN: "",
       enabled: true,
       password: "",
       confirmPassword: "",
@@ -136,6 +140,14 @@ export function UserCreatePage() {
             {...form.register("uid")}
           />
           <FormError id="user-uid-error" message={uidError} />
+        </div>
+        <div className="field">
+          <label htmlFor="user-dn">Exact DN (optional)</label>
+          <input id="user-dn" autoComplete="off" spellCheck={false} {...form.register("dn")} />
+        </div>
+        <div className="field">
+          <label htmlFor="user-parent-dn">Parent DN (optional)</label>
+          <input id="user-parent-dn" autoComplete="off" spellCheck={false} {...form.register("parentDN")} />
         </div>
         <div className="field">
           <label htmlFor="user-enabled">

@@ -186,12 +186,20 @@ const VendorName = "LabLDAP"
 // handlers land in T-133 (StartTLS) and T-142 (WhoAmI) — dispatch answers
 // them with unwillingToPerform until then. Delta D6: unknown 389 extras
 // are omitted.
+func namingContextValues(dns []config.DN) []string {
+	out := make([]string, 0, len(dns))
+	for _, d := range dns {
+		out = append(out, d.String())
+	}
+	return out
+}
+
 func (s *Server) rootDSE() *Entry {
 	return &Entry{
 		DN: "",
 		Attributes: []Attribute{
 			StringAttribute("objectClass", "top"),
-			StringAttribute("namingContexts", s.suffix.String()),
+			StringAttribute("namingContexts", namingContextValues(s.suffixes)...),
 			StringAttribute("subschemaSubentry", SubschemaDN),
 			StringAttribute("supportedLDAPVersion", "3"),
 			StringAttribute("supportedControl", OIDSimplePagedResults, OIDAssertion),

@@ -68,11 +68,15 @@ func (r *Runtime) listExportDNs(ctx context.Context) ([]string, error) {
 	_, seconds := r.searchLimits()
 	var dns []string
 	err := r.pool.Do(ctx, func(c *ldapclient.Conn) error {
-		got, e := pageExportDNs(ctx, c, r.cfg.Suffix, uint32(page), seconds)
-		if e != nil {
-			return e
+		var all []string
+		for _, base := range r.managedSuffixStrings() {
+			got, e := pageExportDNs(ctx, c, base, uint32(page), seconds)
+			if e != nil {
+				return e
+			}
+			all = append(all, got...)
 		}
-		dns = got
+		dns = all
 		return nil
 	})
 	if err != nil {
