@@ -7,7 +7,7 @@ import { createUser } from "../../api/users";
 import { useSession } from "../../auth/SessionGate";
 import { queryKeys } from "../../lib/query";
 import { hasScope, SCOPE_DIRECTORY_READ, SCOPE_DIRECTORY_WRITE } from "../../lib/session-model";
-import { describedBy, FormError, ResourcePage, ScopeNote } from "../shared/ResourcePage";
+import { describedBy, ResourcePage, ScopeNote } from "../shared/ResourcePage";
 import { LiveRegion, SafeText } from "../shared/SafeText";
 
 const CLASS_OPTIONS = [
@@ -62,7 +62,7 @@ export function TreePage() {
         Browse compiled managed suffixes and create allowlisted entries. Extra regional domains belong in{" "}
         <code>additionalSuffixes</code>. This is multiple suffixes in one lab, not an AD forest or trust.
       </p>
-      <LiveRegion>{status}</LiveRegion>
+      <LiveRegion message={status} />
       {formError !== "" ? (
         <p role="alert" className="field-error">
           {formError}
@@ -97,7 +97,7 @@ export function TreePage() {
             {(tree.data?.nodes ?? []).map((node) => (
               <li key={node.dn}>
                 <button type="button" onClick={() => setBase(node.dn)}>
-                  <SafeText text={node.rdn || node.dn} />
+                  <SafeText value={node.rdn || node.dn} />
                 </button>
                 {node.hasChildren ? " (has children)" : ""}
               </li>
@@ -218,8 +218,8 @@ export function TreePage() {
             try {
               const created = await createGroup({
                 id: groupID.trim(),
-                dn: groupDN.trim() || undefined,
                 members: [{ kind: "user", id: groupMember.trim() }],
+                ...(groupDN.trim() !== "" ? { dn: groupDN.trim() } : {}),
               });
               setStatus(`Created group ${created.id} at ${created.dn}`);
               await refresh();

@@ -11,13 +11,13 @@ import (
 // dcObject → domain.
 func NormalizeObjectClass(name string) (string, bool) {
 	switch config.CanonicalAttr(name) {
-	case ClassDomain, ClassDCObject:
+	case config.CanonicalAttr(ClassDomain), config.CanonicalAttr(ClassDCObject):
 		return ClassDomain, true
-	case ClassOrganizationalUnit, ClassContainer:
+	case config.CanonicalAttr(ClassOrganizationalUnit), config.CanonicalAttr(ClassContainer):
 		return ClassOrganizationalUnit, true
-	case ClassPerson, ClassInetOrgPerson:
+	case config.CanonicalAttr(ClassPerson), config.CanonicalAttr(ClassInetOrgPerson):
 		return ClassInetOrgPerson, true
-	case ClassGroupOfNames:
+	case config.CanonicalAttr(ClassGroupOfNames):
 		return ClassGroupOfNames, true
 	default:
 		return "", false

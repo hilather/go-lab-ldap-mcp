@@ -58,6 +58,24 @@ func (r *Runtime) lookupBindIdentity(ctx context.Context, identity string) (dn s
 			return "", false, false, false, false, nil
 		}
 		target = parsed.String()
+		// Best-effort account stamps. A supplied DN is already resolved;
+		// a down runtime pool must not skip the disposable bind attempt.
+		_ = r.pool.Do(ctx, func(c *ldapclient.Conn) error {
+			ent, e := searchBaseConn(ctx, c, target, accountStateReadAttrs(), size, seconds)
+			if e != nil {
+				return nil
+			}
+			found = true
+			dn = ent.DN
+			disabled = accountLocked(ent)
+			locked = accountLockStamped(ent)
+			mustChange = accountMustChange(ent)
+			return nil
+		})
+		if dn == "" {
+			dn = target
+		}
+		return dn, found, disabled, locked, mustChange, nil
 	} else {
 		err = r.pool.Do(ctx, func(c *ldapclient.Conn) error {
 			got, e := r.lookupUserDN(ctx, c, identity)

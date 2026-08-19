@@ -12,8 +12,12 @@ export async function listSuffixes(): Promise<SuffixList> {
 }
 
 export async function listTree(base: string, cursor?: string): Promise<TreePage> {
+  const body: { base: string; cursor?: string } = { base };
+  if (cursor !== undefined && cursor !== "") {
+    body.cursor = cursor;
+  }
   const { data, error, response } = await api.POST("/api/v1/tree", {
-    body: { base, cursor },
+    body,
   });
   if (!response.ok || data === undefined) {
     throw toApiError(error, response.status, "tree unavailable");

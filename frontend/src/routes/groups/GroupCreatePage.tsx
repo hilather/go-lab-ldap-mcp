@@ -71,9 +71,9 @@ export function GroupCreatePage() {
           try {
             const created = await createGroup({
               id: values.id,
-              dn: values.dn.trim() || undefined,
-              parentDN: values.parentDN.trim() || undefined,
               members: toMemberRefs(members),
+              ...(values.dn.trim() !== "" ? { dn: values.dn.trim() } : {}),
+              ...(values.parentDN.trim() !== "" ? { parentDN: values.parentDN.trim() } : {}),
             });
             await invalidateUsersAndGroups(queryClient);
             await navigate(`/groups/${encodeURIComponent(created.id)}`);
