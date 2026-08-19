@@ -14,18 +14,18 @@ test("operator can browse the tree, create an OU and user at an explicit DN, the
   await expect(page.getByLabel("Managed suffix")).toContainText("dc=example,dc=test");
 
   await page.getByLabel("Object class").selectOption("organizationalUnit");
-  await page.getByLabel("DN", { exact: true }).fill("ou=labtree,ou=people,dc=example,dc=test");
+  await page.locator("#tree-create-dn").fill("ou=labtree,ou=people,dc=example,dc=test");
   await page.getByRole("button", { name: "Create entry" }).click();
   await expect(page.getByRole("status")).toContainText("Created ou=labtree,ou=people,dc=example,dc=test");
 
-  await page.getByLabel("User ID").fill("tree-svc");
-  await page.getByLabel("User DN").fill("uid=tree-svc,ou=labtree,ou=people,dc=example,dc=test");
-  await page.getByLabel("Password").fill("tree-svc-pass-12");
+  await page.locator("#tree-user-id").fill("tree-svc");
+  await page.locator("#tree-user-dn").fill("uid=tree-svc,ou=labtree,ou=people,dc=example,dc=test");
+  await page.locator("#tree-user-password").fill("tree-svc-pass-12");
   await page.getByRole("button", { name: "Create user at DN" }).click();
   await expect(page.getByRole("status")).toContainText("Created user tree-svc");
 
-  await page.getByLabel("Current DN").fill("ou=labtree,ou=people,dc=example,dc=test");
-  await page.getByLabel("New DN").fill("ou=labtree-moved,ou=people,dc=example,dc=test");
+  await page.locator("#tree-move-from").fill("ou=labtree,ou=people,dc=example,dc=test");
+  await page.locator("#tree-move-to").fill("ou=labtree-moved,ou=people,dc=example,dc=test");
   await page.getByRole("button", { name: "Move entry" }).click();
   await expect(page.getByRole("status")).toContainText("Moved to ou=labtree-moved,ou=people,dc=example,dc=test");
 
