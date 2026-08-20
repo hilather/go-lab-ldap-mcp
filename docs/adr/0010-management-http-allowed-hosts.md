@@ -55,6 +55,11 @@ configuration semantics.
    compile/validate time with a field error. Never treat extras as “allow
    all”. Wildcard credentialed CORS remains impossible; this ADR does not
    add a raw host-allow REST/MCP API.
+6. **Amendment 2026-08-20:** a `Request.Host` whose name is a literal IPv4
+   or IPv6 address (with or without a port, including bracketed IPv6) is
+   accepted even when it is not listed. DNS rebinding presents a hostname
+   (`Host: evil.test`), not an IP. Extra hostnames remain required for
+   non-loopback DNS names. `*` stays rejected.
 
 ## Consequences
 
@@ -83,7 +88,7 @@ configuration semantics.
 | Option | Why not chosen |
 | --- | --- |
 | Replace `LoopbackHosts` with the YAML list | Empty extras would become “allow all” or would reject `control:8443`. |
-| Silently allow any Host when listen is `0.0.0.0` | Re-opens DNS rebinding (`Host: evil.test`). |
+| Silently allow any Host when listen is `0.0.0.0` | Re-opens DNS rebinding (`Host: evil.test`). Literal IP Host headers are accepted (amendment 2026-08-20) because they are not a rebinding hostname. |
 | Accept `*` | Same as allow-all; rejected at compile time. |
 | New `apiVersion` | Backward-compatible optional field; no break. |
 

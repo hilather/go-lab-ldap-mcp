@@ -53,9 +53,10 @@ The 389 directory service uses `secrets/directory.env`. Bootstrap uses
 Manager. The private CA key stays on the host under `secrets/tls/ca.key`
 and is not mounted into any runtime service.
 
-Host publishes are loopback-only:
+Host publishes are loopback-only by default:
 
-- `127.0.0.1:8443` management (control)
+- `127.0.0.1:8443` management (control). Set `LABLDAP_CONTROL_PUBLISH=0.0.0.0`
+  to publish on all host addresses so the UI is reachable by IP.
 - `127.0.0.1:3389` LDAP
 - `127.0.0.1:3636` LDAPS
 

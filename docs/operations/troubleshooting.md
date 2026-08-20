@@ -56,10 +56,19 @@ expected. Host swap can still hold pages — ephemeral is not a wipe.
 - Browser: cookie + `X-CSRF-Token` + same-origin. Cross-origin preflight
   is 403 unless the origin is allow-listed.
 - Host header on a loopback or bind-all listen must be loopback
-  (`127.0.0.1`, `localhost`, `::1`, `control`) or an extra from
-  `spec.management.allowedHosts`. `400 host is not allowed` for a LAN
-  or published hostname means add that host (host-only matches any
-  port). `*` is not allowed.
+  (`127.0.0.1`, `localhost`, `::1`, `control`), a literal IP, or an extra
+  hostname from `spec.management.allowedHosts`. A spoofed DNS name
+  (`Host: evil.test`) is rejected with `invalid_host`. Extra hostnames
+  are host-only and match any port. `*` is not allowed.
+- Opening the UI by LAN IP also needs the control port published on that
+  address. Default Compose bind is `127.0.0.1:8443`. Set
+  `LABLDAP_CONTROL_PUBLISH=0.0.0.0` (and recreate the stack) so
+  `https://<host-ip>:8443/` can connect. Compose `tls.mode: generated`
+  mints the cert inside the container, so the SAN set is container
+  addresses, not the host LAN IP. Expect both an untrusted issuer and a
+  name mismatch (`ERR_CERT_COMMON_NAME_INVALID`); continue past the lab
+  certificate, or use `tls.mode: files` with a host-generated management
+  cert.
 
 ## Image version mismatch
 

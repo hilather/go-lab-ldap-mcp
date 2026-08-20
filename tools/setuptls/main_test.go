@@ -59,6 +59,22 @@ func TestGenerateSANsAndPermissions(t *testing.T) {
 	if err := cert.VerifyHostname("127.0.0.1"); err != nil {
 		t.Fatalf("SAN 127.0.0.1: %v", err)
 	}
+
+	mgmtPEM := readFile(t, p.ManagementCert)
+	mgmtBlock, _ := pem.Decode([]byte(mgmtPEM))
+	if mgmtBlock == nil {
+		t.Fatal("management.crt not PEM")
+	}
+	mgmt, err := x509.ParseCertificate(mgmtBlock.Bytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := mgmt.VerifyHostname("control"); err != nil {
+		t.Fatalf("management SAN control: %v", err)
+	}
+	if err := mgmt.VerifyHostname("127.0.0.1"); err != nil {
+		t.Fatalf("management SAN 127.0.0.1: %v", err)
+	}
 	if err := cert.VerifyHostname("not-the-server.example"); err == nil {
 		t.Fatal("wrong SAN must fail")
 	}

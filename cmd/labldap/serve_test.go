@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/x509"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -21,6 +22,16 @@ func TestGeneratedManagementCertificate(t *testing.T) {
 	}
 	if len(cert.Certificate) == 0 {
 		t.Fatal("empty cert")
+	}
+	leaf, err := x509.ParseCertificate(cert.Certificate[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := leaf.VerifyHostname("127.0.0.1"); err != nil {
+		t.Fatalf("generated cert must include loopback IP SAN: %v", err)
+	}
+	if err := leaf.VerifyHostname("localhost"); err != nil {
+		t.Fatalf("generated cert must include localhost DNS SAN: %v", err)
 	}
 }
 
@@ -167,6 +178,9 @@ func TestComposeBindAllWiresHostAllowList(t *testing.T) {
 	}
 	if !auth.HostAllowed("localhost:9443", hosts) || !auth.HostAllowed("control:8443", hosts) {
 		t.Fatalf("published-port localhost / control:listen must work, hosts = %v", hosts)
+	}
+	if !auth.HostAllowed("192.0.2.10:8443", hosts) {
+		t.Fatalf("compose bind-all must accept a literal IP Host, hosts = %v", hosts)
 	}
 	withIP := publishedHosts("0.0.0.0:8443", []string{"10.165.0.199"})
 	if !auth.HostAllowed("10.165.0.199:9443", withIP) || auth.HostAllowed("evil.test", withIP) {

@@ -58,8 +58,8 @@ func TestComposeControlHardening(t *testing.T) {
 		t.Fatalf("control cap_drop = %v", flatten(ctl["cap_drop"]))
 	}
 	ports := flatten(ctl["ports"])
-	if !containsExact(ports, "127.0.0.1:8443:8443") {
-		t.Fatalf("control host port must be loopback: %v", ports)
+	if !containsExact(ports, "${LABLDAP_CONTROL_PUBLISH:-127.0.0.1}:8443:8443") {
+		t.Fatalf("control host port must default to loopback with LABLDAP_CONTROL_PUBLISH override: %v", ports)
 	}
 	dir := doc.Services["directory"]
 	dports := flatten(dir["ports"])

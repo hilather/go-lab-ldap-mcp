@@ -123,8 +123,9 @@ allow-list (DNS-rebinding protection). Loopback and bind-all listens
 …) plus host-only `localhost` / `127.0.0.1` / `::1` / `control` so a
 published port such as `localhost:9443` works without extra config.
 
-To allow a LAN or public address, add extras. They **union** with the
-defaults; they do not replace them. `*` is rejected.
+Literal IP Host headers are accepted without extras. To allow an extra
+**hostname**, add extras. They **union** with the defaults; they do not
+replace them. `*` is rejected.
 
 ```yaml
 spec:

@@ -204,15 +204,6 @@ func hostAllowed(host string, allowed []string) bool {
 	return auth.HostAllowed(host, allowed)
 }
 
-func hostInList(host string, allowed []string) bool {
-	for _, a := range allowed {
-		if strings.EqualFold(strings.TrimSpace(a), host) {
-			return true
-		}
-	}
-	return false
-}
-
 func (s *Server) principal(ctx context.Context) (app.Principal, error) {
 	p, ok := auth.PrincipalFrom(ctx)
 	if ok && p.ID != "" {

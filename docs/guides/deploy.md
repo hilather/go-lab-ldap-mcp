@@ -20,10 +20,12 @@ file — [Scenario YAML](scenario.md).
 | Disk | enough for local images plus `/data` (native bbolt is small; 389 DS rollback needs more) |
 | Ports on loopback | `8443` (management), `3389` (LDAP), `3636` (LDAPS) |
 
-A published or LAN management Host (for example `10.165.0.199:9443`)
-needs `spec.management.allowedHosts` or `LABLDAP_MANAGEMENT_ALLOWED_HOSTS`
-([ADR-0010](../adr/0010-management-http-allowed-hosts.md)). The default
-still rejects `Host: evil.test`.
+A published or LAN **IP** Host is accepted without extra config. An extra
+**hostname** (for example `lab.example.com`) still needs
+`spec.management.allowedHosts` or `LABLDAP_MANAGEMENT_ALLOWED_HOSTS`
+([ADR-0010](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/adr/0010-management-http-allowed-hosts.md)).
+The default still rejects `Host: evil.test`. To bind the UI on the host's
+addresses, set `LABLDAP_CONTROL_PUBLISH=0.0.0.0`.
 
 Optional for from-source work: Go 1.26 (toolchain `go1.26.5`), Node 22.12+,
 pnpm. Pins live in [docs/toolchain.md](../toolchain.md).
@@ -167,13 +169,18 @@ Under [`deploy/compose/`](../../deploy/compose/):
 | `scenario.389ds.yaml` | 389 rollback baseline |
 | `scenario.389ds-persistent.yaml` | 389 persistent baseline |
 
-Published ports are **loopback only**:
+Published ports are **loopback only** by default:
 
 ```
 127.0.0.1:8443 → control (0.0.0.0:8443 in-container)
 127.0.0.1:3389 → LDAP
 127.0.0.1:3636 → LDAPS
 ```
+
+To open the UI at `https://<host-ip>:8443/` (in addition to
+`localhost` / `control`), set `LABLDAP_CONTROL_PUBLISH=0.0.0.0` before
+`make compose-up`. The Host allow-list accepts literal IPs; spoofed DNS
+names are still rejected. LDAP/LDAPS publishes stay loopback.
 
 Minimum resource guidance (not enforced everywhere): native directory
 256Mi / 1 CPU; 389 directory 512Mi / 1 CPU (ephemeral tmpfs 2GiB);

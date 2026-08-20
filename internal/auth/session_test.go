@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"net"
 	"net/http"
 	"testing"
 	"time"
@@ -198,6 +199,29 @@ func TestHostAllowedAndLoopback(t *testing.T) {
 	if !HostAllowed("127.0.0.1:8443", gotAll) || HostAllowed("evil.test", gotAll) {
 		t.Fatalf("bind-all listen must still allow-list loopback hosts, got %v", gotAll)
 	}
+	if !HostAllowed("192.0.2.10:8443", gotAll) || !HostAllowed("192.0.2.10", gotAll) {
+		t.Fatal("literal IPv4 Host must be accepted")
+	}
+	if !HostAllowed("[2001:db8::1]:8443", gotAll) || !HostAllowed("[2001:db8::1]", gotAll) {
+		t.Fatal("literal IPv6 Host must be accepted")
+	}
+	if HostAllowed("evil.test/path", gotAll) {
+		t.Fatal("malformed Host accepted")
+	}
+	ips := LocalIPAddresses()
+	if len(ips) == 0 {
+		t.Fatal("LocalIPAddresses empty")
+	}
+	foundLoopback := false
+	for _, ip := range ips {
+		if ip.Equal(net.ParseIP("127.0.0.1")) {
+			foundLoopback = true
+			break
+		}
+	}
+	if !foundLoopback {
+		t.Fatalf("LocalIPAddresses missing 127.0.0.1: %v", ips)
+	}
 }
 
 func TestHostAllowedExtras(t *testing.T) {
@@ -224,8 +248,8 @@ func TestHostAllowedExtras(t *testing.T) {
 	if HostAllowed("evil.test:8443", extras) {
 		t.Fatal("spoofed Host must stay rejected when defaults+extras are set")
 	}
-	if HostAllowed("10.165.0.199:9443", defaults) {
-		t.Fatal("public IP must not match LoopbackHosts alone")
+	if !HostAllowed("10.165.0.199:9443", defaults) {
+		t.Fatal("literal public IP must be accepted without extras")
 	}
 	if HostAllowed("*", extras) || hostEntryMatches("evil.test", "*") {
 		t.Fatal("wildcard must never match")
@@ -239,7 +263,7 @@ func TestHostAllowedExtras(t *testing.T) {
 	if !HostAllowed("[2001:db8::1]:9443", []string{"[2001:db8::1]:9443"}) {
 		t.Fatal("IPv6 host:port extra must exact-match")
 	}
-	if HostAllowed("[2001:db8::1]:8443", []string{"[2001:db8::1]:9443"}) {
-		t.Fatal("IPv6 host:port extra must not match a different port")
+	if HostAllowed("lab.example.com:8443", []string{"lab.example.com:9443"}) {
+		t.Fatal("hostname host:port extra must not match a different port")
 	}
 }

@@ -102,8 +102,8 @@ func TestReleaseComposeTopology(t *testing.T) {
 		t.Fatal("control must not receive DS_DM_PASSWORD")
 	}
 	ports = flatten(ctl["ports"])
-	if !containsExact(ports, "127.0.0.1:8443:8443") {
-		t.Fatalf("control host publish must be 127.0.0.1:8443:8443, got %v", ports)
+	if !containsExact(ports, "${LABLDAP_CONTROL_PUBLISH:-127.0.0.1}:8443:8443") {
+		t.Fatalf("control host publish must default to loopback with LABLDAP_CONTROL_PUBLISH override, got %v", ports)
 	}
 	hc, _ := ctl["healthcheck"].(map[string]any)
 	test := flatten(hc["test"])

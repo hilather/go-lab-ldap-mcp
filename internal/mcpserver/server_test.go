@@ -376,6 +376,9 @@ func TestHostAndOriginChecks(t *testing.T) {
 	if rec := post("127.0.0.1:8443", "https://lab.example"); rec.Code == http.StatusForbidden || rec.Code == http.StatusUnauthorized {
 		t.Fatalf("allowed origin: %d %s", rec.Code, rec.Body.String())
 	}
+	if rec := post("192.0.2.10:8443", ""); rec.Code == http.StatusForbidden || rec.Code == http.StatusUnauthorized {
+		t.Fatalf("literal IP host should pass middleware: %d %s", rec.Code, rec.Body.String())
+	}
 }
 
 func TestBodyLimit(t *testing.T) {
@@ -450,11 +453,11 @@ func TestDisabledHandler(t *testing.T) {
 func TestHostsFromListen(t *testing.T) {
 	t.Parallel()
 	got := HostsFromListen("127.0.0.1:8443")
-	if !hostInList("127.0.0.1:8443", got) || !hostInList("localhost:8443", got) {
+	if !auth.HostAllowed("127.0.0.1:8443", got) || !auth.HostAllowed("localhost:8443", got) {
 		t.Fatalf("loopback listen = %v", got)
 	}
 	all := HostsFromListen("0.0.0.0:8443")
-	if !hostInList("127.0.0.1:8443", all) || hostInList("evil.test", all) {
+	if !auth.HostAllowed("127.0.0.1:8443", all) || auth.HostAllowed("evil.test", all) {
 		t.Fatalf("bind-all must allow-list loopback hosts, got %v", all)
 	}
 	if len(HostsFromListen("10.0.0.5:9000")) != 1 || HostsFromListen("10.0.0.5:9000")[0] != "10.0.0.5:9000" {

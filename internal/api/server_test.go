@@ -66,6 +66,14 @@ func TestHostAllowListRejectsSpoof(t *testing.T) {
 	if br.Code != http.StatusBadRequest {
 		t.Fatalf("spoofed host = %d %s", br.Code, br.Body.String())
 	}
+
+	ip := httptest.NewRequest(http.MethodGet, "http://192.0.2.10:8443/health", nil)
+	ip.Host = "192.0.2.10:8443"
+	ir := httptest.NewRecorder()
+	h.ServeHTTP(ir, ip)
+	if ir.Code != http.StatusOK {
+		t.Fatalf("literal IP host = %d %s", ir.Code, ir.Body.String())
+	}
 }
 
 func TestOriginPolicyRejectsCrossSitePreflight(t *testing.T) {

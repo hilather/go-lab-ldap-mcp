@@ -9,9 +9,9 @@ JSON Schema, examples, and the `v1alpha1` stand-in live here.
 
 `spec.management.allowedHosts` is optional (default empty). Extra Host
 values union with the compiled loopback list; they do not replace it.
-`LABLDAP_MANAGEMENT_ALLOWED_HOSTS` and `--management-allowed-host` are
-additional sources. Host-only entries match any port. `*` is rejected
-(ADR-0010).
+Literal IP Host headers are accepted without extras. Extra **hostnames**
+use `LABLDAP_MANAGEMENT_ALLOWED_HOSTS` and `--management-allowed-host`.
+Host-only entries match any port. `*` is rejected (ADR-0010).
 
 `spec.management.metrics.enabled` defaults to true. `requireAuth` defaults
 to false: treat `/metrics` as network-restricted (loopback or Compose

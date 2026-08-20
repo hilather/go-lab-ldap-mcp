@@ -55,13 +55,15 @@ func RequestOrigin(r *http.Request) string {
 //
 // Allowed entries that include a port match Request.Host exactly
 // (case-insensitive). Entries without a port match the hostname of
-// Request.Host on any port. Wildcard "*" never matches.
+// Request.Host on any port. A Host whose name is a literal IP is
+// accepted even when not listed (DNS rebinding uses a hostname).
+// Wildcard "*" never matches.
 func HostAllowed(host string, allowed []string) bool {
 	if len(allowed) == 0 {
 		return true
 	}
 	host = strings.TrimSpace(host)
-	if host == "" {
+	if host == "" || strings.ContainsAny(host, " \t\r\n/") {
 		return false
 	}
 	for _, a := range allowed {
@@ -69,7 +71,17 @@ func HostAllowed(host string, allowed []string) bool {
 			return true
 		}
 	}
-	return false
+	return HostIsLiteralIP(host)
+}
+
+// HostIsLiteralIP reports whether host is an IPv4 or IPv6 address, with
+// or without a port. Bracketed IPv6 (with or without a port) is accepted.
+func HostIsLiteralIP(host string) bool {
+	name, _, ok := splitHostMaybePort(host)
+	if !ok {
+		return false
+	}
+	return net.ParseIP(strings.Trim(name, "[]")) != nil
 }
 
 func hostEntryMatches(requestHost, allowed string) bool {
@@ -119,8 +131,9 @@ func sameHostName(a, b string) bool {
 
 // LoopbackHosts returns Host values accepted when listen is loopback or
 // bind-all (0.0.0.0 / ::). Compose publishes those listeners on loopback,
-// so DNS-rebinding Host: evil.test is rejected. A specific non-loopback
-// listen returns nil (no Host restriction from this helper).
+// so DNS-rebinding Host: evil.test is rejected. Literal IP Host headers
+// are still accepted by HostAllowed. A specific non-loopback listen
+// returns nil (no Host restriction from this helper).
 func LoopbackHosts(listen string) []string {
 	host, port, err := net.SplitHostPort(strings.TrimSpace(listen))
 	if err != nil || port == "" {
@@ -148,4 +161,43 @@ func LoopbackHostnames(listen string) []string {
 		return nil
 	}
 	return []string{"127.0.0.1", "localhost", "::1", "control"}
+}
+
+// LocalIPAddresses is the IP SAN set for lab management certificates:
+// loopback plus every address on this process. Compose tls.mode=generated
+// runs inside the container, so those SANs are container addresses, not
+// the host LAN IP published by LABLDAP_CONTROL_PUBLISH.
+func LocalIPAddresses() []net.IP {
+	seen := map[string]net.IP{}
+	add := func(ip net.IP) {
+		if ip == nil || ip.IsUnspecified() {
+			return
+		}
+		if v4 := ip.To4(); v4 != nil {
+			ip = v4
+		}
+		seen[ip.String()] = ip
+	}
+	add(net.ParseIP("127.0.0.1"))
+	add(net.ParseIP("::1"))
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		out := make([]net.IP, 0, len(seen))
+		for _, ip := range seen {
+			out = append(out, ip)
+		}
+		return out
+	}
+	for _, a := range addrs {
+		n, ok := a.(*net.IPNet)
+		if !ok {
+			continue
+		}
+		add(n.IP)
+	}
+	out := make([]net.IP, 0, len(seen))
+	for _, ip := range seen {
+		out = append(out, ip)
+	}
+	return out
 }

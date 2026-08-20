@@ -20,6 +20,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/hilather/go-lab-ldap-mcp/internal/auth"
 )
 
 const (
@@ -172,7 +174,7 @@ func generate(dir, host string, force, management bool, stdout io.Writer) error 
 	fmt.Fprintf(stdout, "wrote %s\n", p.DirectoryKey)
 
 	if management {
-		if err := signServer(p.ManagementCert, p.ManagementKey, caTmpl, caKey, "control", []string{"control", "localhost"}, []net.IP{net.ParseIP("127.0.0.1")}); err != nil {
+		if err := signServer(p.ManagementCert, p.ManagementKey, caTmpl, caKey, "control", []string{"control", "localhost"}, auth.LocalIPAddresses()); err != nil {
 			return err
 		}
 		fmt.Fprintf(stdout, "wrote %s\n", p.ManagementCert)

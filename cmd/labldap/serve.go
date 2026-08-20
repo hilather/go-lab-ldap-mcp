@@ -13,7 +13,6 @@ import (
 	"io"
 	"log/slog"
 	"math/big"
-	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -198,7 +197,7 @@ func generatedManagementCertificate() (tls.Certificate, error) {
 		KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
 		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 		DNSNames:     []string{"localhost", "control"},
-		IPAddresses:  []net.IP{net.ParseIP("127.0.0.1")},
+		IPAddresses:  auth.LocalIPAddresses(),
 	}
 	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
 	if err != nil {

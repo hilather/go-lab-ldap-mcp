@@ -41,10 +41,11 @@ implement the LDAP wire protocol.
   [architectures.md](https://github.com/hilather/go-lab-ldap-mcp/blob/main/deploy/docker/architectures.md).
 - **Host checks:** Compose listens on `0.0.0.0:8443` inside the container
   but still allow-lists `127.0.0.1` / `localhost` / `control` (loopback
-  publish, any published port for those names). A spoofed `Host: evil.test`
-  is rejected. Add `spec.management.allowedHosts` (or
-  `LABLDAP_MANAGEMENT_ALLOWED_HOSTS` / `--management-allowed-host`) for a
-  public IP or extra hostname. `*` is rejected (ADR-0010).
+  publish, any published port for those names) and literal IP Host headers.
+  A spoofed `Host: evil.test` is rejected. Add `spec.management.allowedHosts`
+  (or `LABLDAP_MANAGEMENT_ALLOWED_HOSTS` / `--management-allowed-host`) for
+  an extra hostname. `*` is rejected (ADR-0010). Host publish stays loopback
+  by default; set `LABLDAP_CONTROL_PUBLISH=0.0.0.0` to reach the UI by LAN IP.
 
 ## Prerequisites
 
@@ -84,9 +85,11 @@ That builds `labldapd:dev`, `labldap-control:dev`, and
 `labldapd`, runs bootstrap `apply`, then starts control. Use
 `make compose-up-389ds` for the pinned 389 DS stack (instance CA publish).
 
-Host publishes (loopback only):
+Host publishes (loopback only by default):
 
-- `127.0.0.1:8443` management (self-signed; `wget --no-check-certificate https://127.0.0.1:8443/health`)
+- `127.0.0.1:8443` management (self-signed; `wget --no-check-certificate https://127.0.0.1:8443/health`).
+  Set `LABLDAP_CONTROL_PUBLISH=0.0.0.0` to publish the UI on all host
+  addresses so `https://<host-ip>:8443/` works.
 - `127.0.0.1:3389` LDAP
 - `127.0.0.1:3636` LDAPS
 
