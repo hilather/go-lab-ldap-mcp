@@ -109,7 +109,7 @@ func (r *Runtime) DeleteManaged(ctx context.Context, dn string) error {
 	if r.isProtectedDN(dn) {
 		return directory.Error("dn", directory.FieldForbidden, "protected directory entry cannot be deleted")
 	}
-	if !r.underPeople(dn) && !r.underGroups(dn) && !r.underManaged(dn) {
+	if !r.resetDeleteAllowed(dn) {
 		return directory.Error("dn", directory.FieldForbidden, "delete is outside managed suffixes")
 	}
 	size, seconds := r.searchLimits()
@@ -158,6 +158,35 @@ func (r *Runtime) isProtectedDN(dn string) bool {
 		return true
 	}
 	return r.cfg.RuntimeDN != "" && sameDN(dn, r.cfg.RuntimeDN)
+}
+
+// resetDeleteAllowed is the DeleteManaged write gate. Soft reset may
+// remove entries under people/groups, or operator extras under an
+// additional suffix (ADR-0011). Entries under the primary suffix that
+// are not under people/groups — such as cn=outside,<suffix> — stay
+// forbidden even though they sit inside a managed naming context.
+func (r *Runtime) resetDeleteAllowed(dn string) bool {
+	if r.underPeople(dn) || r.underGroups(dn) {
+		return true
+	}
+	return r.underAdditionalSuffix(dn)
+}
+
+func (r *Runtime) underAdditionalSuffix(dn string) bool {
+	got, err := config.ParseDN(dn)
+	if err != nil {
+		return false
+	}
+	for _, raw := range r.cfg.AdditionalSuffixes {
+		par, err := config.ParseDN(raw)
+		if err != nil {
+			continue
+		}
+		if got.IsDescendantOf(par) {
+			return true
+		}
+	}
+	return false
 }
 
 func pageSubtree(ctx context.Context, c *ldapclient.Conn, base string, page uint32, seconds int) ([]*ldap.Entry, error) {

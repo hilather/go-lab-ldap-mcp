@@ -48,14 +48,21 @@ func (s *plugScript) exec(_ context.Context, _ string, args []string) ([]byte, [
 	return []byte(`{"ok":true}`), nil, nil
 }
 
-func memberOfShow(enabled, scope string) string {
+func memberOfShow(enabled string, scopes ...string) string {
+	if len(scopes) == 0 {
+		scopes = []string{""}
+	}
+	quoted := make([]string, len(scopes))
+	for i, s := range scopes {
+		quoted[i] = `"` + s + `"`
+	}
 	return `{
   "type":"entry",
   "attrs":{
     "nsslapd-pluginenabled":["` + enabled + `"],
     "memberofattr":["memberOf"],
     "memberofgroupattr":["member"],
-    "memberofentryscope":["` + scope + `"]
+    "memberofentryscope":[` + strings.Join(quoted, ",") + `]
   }
 }`
 }
@@ -95,10 +102,13 @@ func TestReconcilePluginsApplyReadback(t *testing.T) {
 	for _, need := range []string{
 		"nsslapd-dynamic-plugins=on",
 		"plugin memberof enable",
+		"--scope dc=example,dc=test",
 		"--autoaddoc nsmemberof",
 		"plugin memberof fixup",
 		"plugin referential-integrity enable",
 		"--membership-attr member",
+		"--entry-scope dc=example,dc=test",
+		"--container-scope dc=example,dc=test",
 		"-y",
 	} {
 		if !strings.Contains(joined, need) {
@@ -183,6 +193,63 @@ func TestReconcilePluginsSetIdempotent(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestReconcilePluginsAdditionalSuffixScopes(t *testing.T) {
+	primary := "dc=example,dc=test"
+	extra := "dc=region1,dc=example,dc=net"
+	sc := &plugScript{show: map[string]string{
+		cnMemberOf: memberOfShow("on", primary, extra),
+		cnReferint: referintShow("on"),
+	}}
+	eng := Engine{Runner: Runner{Exec: sc.exec}}
+	_, err := eng.ReconcilePlugins(t.Context(), bootstrap.PluginRequest{
+		PasswordFile:       "/s",
+		Instance:           "localhost",
+		Write:              true,
+		Suffix:             primary,
+		AdditionalSuffixes: []string{extra},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	joined := strings.Join(sc.calls, "\n")
+	for _, need := range []string{
+		"--scope " + primary,
+		"--scope " + extra,
+		"plugin memberof fixup --wait --timeout 60 " + primary,
+		"plugin memberof fixup --wait --timeout 60 " + extra,
+		"--entry-scope delete",
+		"--container-scope delete",
+	} {
+		if !strings.Contains(joined, need) {
+			t.Fatalf("missing %q in\n%s", need, joined)
+		}
+	}
+	if strings.Count(joined, "plugin memberof fixup") != 2 {
+		t.Fatalf("want 2 MemberOf fixups:\n%s", joined)
+	}
+	if strings.Contains(joined, "--entry-scope "+primary) {
+		t.Fatalf("referint must not pin the primary when extras exist:\n%s", joined)
+	}
+}
+
+func TestReconcilePluginsAdditionalMemberOfReadback(t *testing.T) {
+	sc := &plugScript{show: map[string]string{
+		cnMemberOf: memberOfShow("on", "dc=example,dc=test"),
+	}}
+	eng := Engine{Runner: Runner{Exec: sc.exec}}
+	_, err := eng.ReconcilePlugins(t.Context(), bootstrap.PluginRequest{
+		PasswordFile:       "/s",
+		Instance:           "localhost",
+		Write:              false,
+		Suffix:             "dc=example,dc=test",
+		AdditionalSuffixes: []string{"dc=region1,dc=example,dc=net"},
+		Plugins:            []string{pluginMemberOf},
+	})
+	if err == nil || !fieldHas(err, "phase.plugins", "plugin_missing") {
+		t.Fatalf("missing extra MemberOf scope: %v", err)
 	}
 }
 

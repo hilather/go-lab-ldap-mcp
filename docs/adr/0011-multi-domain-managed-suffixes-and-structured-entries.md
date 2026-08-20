@@ -38,9 +38,11 @@ Constraints that this ADR must preserve:
 389 Directory Server creates one backend per suffix
 (`dsconf backend create --suffix … --be-name … --create-suffix`). Nested
 suffixes (a naming context inside another) are not a supported lab pattern.
-The MemberOf plugin is configured with a primary `--scope`; extra scopes
-are applied as additional `memberOfEntryScope` values when the engine
-accepts them. Cross-suffix membership is best-effort on 389: groups and
+The MemberOf plugin is configured in one `dsconf plugin memberof set` with
+`--scope` for every compiled suffix (primary plus additional) and a
+`memberof fixup` per suffix. 389 `dsconf --scope` is `nargs='+'`; calling
+`--scope` once per suffix in separate `set` commands last-wins and must
+not be used. Cross-suffix membership is best-effort on 389: groups and
 members in the same managed suffix are the supported memberOf path.
 
 389 has no AD `container` structural class. Native schema matches the
@@ -154,9 +156,16 @@ suffixes; embedding an LDAP listener in the control plane.
 
 ### Negative
 
-- 389 MemberOf / referint extra scopes are engine-dependent. Cross-suffix
-  membership may not refresh `memberOf` on 389; same-suffix membership is
-  the supported path and is what dual-engine tests assert.
+- 389 MemberOf extra scopes are applied as additional `memberOfEntryScope`
+  values (`--scope` for each compiled suffix, plus per-suffix fixup).
+  Referint `dsconf --entry-scope` / `--container-scope` are single-valued,
+  and `nsslapd-pluginContainerScope` is single-valued in the engine, so
+  extra backends cannot share one container-scope with the primary.
+  When additional suffixes are compiled, LabLDAP clears those attributes
+  (`--entry-scope delete --container-scope delete`) so referint covers
+  every backend rather than pinning the primary. Cross-suffix membership
+  may still not refresh `memberOf` on 389; same-suffix membership is the
+  supported path and is what dual-engine tests assert.
 - Primary-suffix ACI stays people/groups-scoped. Extra OU trees belong in
   `additionalSuffixes` (or under people/groups). Expanding primary
   suffix-wide write would reopen the T-036 runtime matrix and is out of
