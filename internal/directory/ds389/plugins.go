@@ -71,18 +71,10 @@ func (e Engine) applyPlugin(ctx context.Context, req bootstrap.PluginRequest, na
 		}); err != nil {
 			return bootstrap.PhaseError("plugins", "plugin_missing", "could not enable MemberOf").Wrap(err)
 		}
-		// One set with every compiled suffix. dsconf --scope is nargs='+'
-		// and last-wins if we issued one set per suffix.
-		mo := []string{
-			"plugin", "memberof", "set",
-			"--attr", "memberOf",
-			"--groupattr", "member",
-		}
-		for _, s := range pluginScopes(req) {
-			mo = append(mo, "--scope", s)
-		}
-		mo = append(mo, "--autoaddoc", "nsmemberof")
-		if err := e.pluginSet(ctx, req, mo); err != nil {
+		// One --scope followed by every compiled suffix. 389 argparse is
+		// nargs='+' with action=store: --scope A --scope B last-wins to B
+		// and drops the primary (CI readback then fails).
+		if err := e.pluginSet(ctx, req, memberOfSetArgs(req)); err != nil {
 			return bootstrap.PhaseError("plugins", "plugin_missing", "could not configure MemberOf").Wrap(err)
 		}
 		for _, s := range pluginScopes(req) {
@@ -212,6 +204,21 @@ func attrHasDN(attrs map[string][]string, key, want string) bool {
 		}
 	}
 	return false
+}
+
+// memberOfSetArgs is one memberof set with every compiled suffix after a
+// single --scope (dsconf nargs='+'). Do not emit repeated --scope flags.
+func memberOfSetArgs(req bootstrap.PluginRequest) []string {
+	args := []string{
+		"plugin", "memberof", "set",
+		"--attr", "memberOf",
+		"--groupattr", "member",
+	}
+	if scopes := pluginScopes(req); len(scopes) > 0 {
+		args = append(args, "--scope")
+		args = append(args, scopes...)
+	}
+	return append(args, "--autoaddoc", "nsmemberof")
 }
 
 // pluginScopes is the compiled MemberOf/referint suffix list: primary

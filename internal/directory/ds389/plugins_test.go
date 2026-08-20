@@ -196,6 +196,27 @@ func TestReconcilePluginsSetIdempotent(t *testing.T) {
 	}
 }
 
+func TestMemberOfSetArgsOneScopeFlag(t *testing.T) {
+	args := memberOfSetArgs(bootstrap.PluginRequest{
+		Suffix:             "dc=example,dc=test",
+		AdditionalSuffixes: []string{"dc=region1,dc=example,dc=net", "dc=region2,dc=example,dc=net"},
+	})
+	joined := strings.Join(args, " ")
+	want := "--scope dc=example,dc=test dc=region1,dc=example,dc=net dc=region2,dc=example,dc=net --autoaddoc"
+	if !strings.Contains(joined, want) {
+		t.Fatalf("got %s", joined)
+	}
+	scopeFlags := 0
+	for _, a := range args {
+		if a == "--scope" {
+			scopeFlags++
+		}
+	}
+	if scopeFlags != 1 {
+		t.Fatalf("scope flags = %d in %v", scopeFlags, args)
+	}
+}
+
 func TestReconcilePluginsAdditionalSuffixScopes(t *testing.T) {
 	primary := "dc=example,dc=test"
 	extra := "dc=region1,dc=example,dc=net"
@@ -216,8 +237,7 @@ func TestReconcilePluginsAdditionalSuffixScopes(t *testing.T) {
 	}
 	joined := strings.Join(sc.calls, "\n")
 	for _, need := range []string{
-		"--scope " + primary,
-		"--scope " + extra,
+		"--scope " + primary + " " + extra,
 		"plugin memberof fixup --wait --timeout 60 " + primary,
 		"plugin memberof fixup --wait --timeout 60 " + extra,
 		"--entry-scope delete",
@@ -226,6 +246,9 @@ func TestReconcilePluginsAdditionalSuffixScopes(t *testing.T) {
 		if !strings.Contains(joined, need) {
 			t.Fatalf("missing %q in\n%s", need, joined)
 		}
+	}
+	if strings.Contains(joined, "--scope "+primary+" --scope") {
+		t.Fatalf("repeated --scope last-wins on 389 argparse:\n%s", joined)
 	}
 	if strings.Count(joined, "plugin memberof fixup") != 2 {
 		t.Fatalf("want 2 MemberOf fixups:\n%s", joined)

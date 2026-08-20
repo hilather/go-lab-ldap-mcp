@@ -39,11 +39,12 @@ Constraints that this ADR must preserve:
 (`dsconf backend create --suffix … --be-name … --create-suffix`). Nested
 suffixes (a naming context inside another) are not a supported lab pattern.
 The MemberOf plugin is configured in one `dsconf plugin memberof set` with
-`--scope` for every compiled suffix (primary plus additional) and a
-`memberof fixup` per suffix. 389 `dsconf --scope` is `nargs='+'`; calling
-`--scope` once per suffix in separate `set` commands last-wins and must
-not be used. Cross-suffix membership is best-effort on 389: groups and
-members in the same managed suffix are the supported memberOf path.
+a single `--scope` followed by every compiled suffix (primary plus
+additional) and a `memberof fixup` per suffix. 389 `dsconf --scope` is
+`nargs='+'` with action `store`: `--scope A --scope B` last-wins to `B`
+and drops the primary. Pass `--scope s1 s2 s3` instead. Cross-suffix
+membership is best-effort on 389: groups and members in the same managed
+suffix are the supported memberOf path.
 
 389 has no AD `container` structural class. Native schema matches the
 LabLDAP-surface set (domain, organizationalUnit, inetOrgPerson,
@@ -157,7 +158,8 @@ suffixes; embedding an LDAP listener in the control plane.
 ### Negative
 
 - 389 MemberOf extra scopes are applied as additional `memberOfEntryScope`
-  values (`--scope` for each compiled suffix, plus per-suffix fixup).
+  values (one `--scope` followed by every compiled suffix, plus per-suffix
+  fixup). Read-back requires the full set, not `first == primary`.
   Referint `dsconf --entry-scope` / `--container-scope` are single-valued,
   and `nsslapd-pluginContainerScope` is single-valued in the engine, so
   extra backends cannot share one container-scope with the primary.
