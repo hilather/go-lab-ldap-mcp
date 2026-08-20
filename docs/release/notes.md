@@ -1,29 +1,30 @@
-# LabLDAP v0.3.0 release notes
+# LabLDAP v0.4.0 release notes
 
-Date: 2026-08-17  
-Tag: **v0.3.0**  
-Prior: [v0.2.2](https://github.com/hilather/go-lab-ldap-mcp/releases/tag/v0.2.2)  
+Date: 2026-08-20  
+Tag: **v0.4.0**  
+Prior: [v0.3.0](https://github.com/hilather/go-lab-ldap-mcp/releases/tag/v0.3.0)  
 Images: `labldap-control:dev`, `labldap-bootstrap:dev`, `labldapd:dev` (OD-004; do not push)
 
-## Highlights since v0.2.2
+## Highlights since v0.3.0
 
-- **Native is the default directory engine.** Omitted `spec.directory.engine`
-  now compiles as `native` (`labldapd`). `make compose-up` starts the
-  native stack. 389 Directory Server remains first-class:
-  `engine: 389ds` and `make compose-up-389ds`.
-- **Stay on `labldap.dev/v1alpha1`.** Dated ADR-0008 amendment records this
-  one omitted-field reinterpretation; REST `/api/v1` and the compiler
-  contract string are unchanged.
-- **Fail-closed on mixed `/data`.** `labldapd` refuses to start if
-  `--data-dir` looks like a 389 nsslapd tree or `labldapd.bolt` is not a
-  bbolt file. Diagnostic names `compose-reset` / `engine: 389ds` and
-  does not leak file contents.
+- **Multi-domain managed suffixes.** Optional `spec.directory.additionalSuffixes`
+  plus a structured entry API, tree browse in the console, and the same
+  workflows on REST and MCP ([ADR-0011](https://github.com/hilather/go-lab-ldap-mcp/blob/v0.4.0/docs/adr/0011-multi-domain-managed-suffixes-and-structured-entries.md)).
+  `apiVersion` stays `labldap.dev/v1alpha1`. No raw LDAP modify API.
+- **Configurable management Host allow-list.** Extra hostnames via
+  `spec.management.allowedHosts`, `LABLDAP_MANAGEMENT_ALLOWED_HOSTS`, or
+  `--management-allowed-host` ([ADR-0010](https://github.com/hilather/go-lab-ldap-mcp/blob/v0.4.0/docs/adr/0010-management-http-allowed-hosts.md)).
+  `*` is rejected.
+- **Open the UI by IP.** Literal IP Host headers are accepted (DNS
+  rebinding still rejects spoofed names). Compose still publishes
+  loopback by default; set `LABLDAP_CONTROL_PUBLISH=0.0.0.0` to bind the
+  management port on all host addresses.
 
 ## Versions
 
 | Component | Pin |
 | --- | --- |
-| LabLDAP source | `v0.3.0` (`git describe`; see `dist/release/provenance.json`) |
+| LabLDAP source | `v0.4.0` (`git describe`; see `dist/release/provenance.json`) |
 | Go | 1.26 / toolchain `go1.26.5` |
 | Node / pnpm | 22.14.0 / `pnpm@10.14.0` |
 | React | 19.2.8 |
@@ -40,7 +41,7 @@ Build application images with the same `VERSION` so
 - **Advertised:** `linux/amd64`
 - **Not advertised:** `linux/arm64` (upstream dirsrv digest includes it;
   no arm64 smoke in this environment). See
-  [architectures.md](https://github.com/hilather/go-lab-ldap-mcp/blob/v0.3.0/deploy/docker/architectures.md).
+  [architectures.md](https://github.com/hilather/go-lab-ldap-mcp/blob/v0.4.0/deploy/docker/architectures.md).
 - Host: Docker Engine 24+, Compose v2.24+.
 
 ## Known limitations
@@ -60,24 +61,25 @@ Build application images with the same `VERSION` so
   (`docs/operations/limits.md`).
 - Ephemeral tmpfs is not a forensic wipe (host swap).
 - Management TLS `mode: generated` is a lab certificate, not public trust.
+  Compose-generated certs use container addresses, so a LAN IP URL may
+  also show a name mismatch; continue past the lab certificate.
 - Example secret files are `lab-fixture-*` placeholders.
 - No public registry push (OD-004). No project LICENSE (OD-003).
 - Signing (`cosign`) is optional and not performed.
 
 ## Migration guidance
 
-v0.2.2 → v0.3.0 is a **behavior change** for omitted `spec.directory.engine`.
-`apiVersion` stays `labldap.dev/v1alpha1`.
+v0.3.0 → v0.4.0 is **additive**. `apiVersion` stays `labldap.dev/v1alpha1`.
 
-1. If you already set `engine: native` or `engine: 389ds`, no default
-   change applies.
-2. If you omitted `engine` and run 389 today: add `engine: 389ds`
-   **before** upgrading, or accept a new directory revision and a **hard
-   reset** of `/data` (`make compose-reset`). On-disk formats are not
-   portable between engines.
-3. Do not point native `labldapd` at an existing 389 `/data` volume —
-   the daemon refuses to start.
-4. Tokens, TLS, ports, MCP flags, and password-policy YAML are unchanged.
+1. Existing single-suffix scenarios keep working. `additionalSuffixes` is
+   optional.
+2. Extra management **hostnames** still need `allowedHosts` (or env/CLI).
+   Literal IP Host headers no longer need that list.
+3. To reach the UI at `https://<host-ip>:8443/`, set
+   `LABLDAP_CONTROL_PUBLISH=0.0.0.0` and recreate the stack. LDAP/LDAPS
+   publishes stay loopback.
+4. Tokens, TLS files, ports, MCP flags, and password-policy YAML are
+   unchanged.
 5. Persistent volume: roll back image tags/digests together.
 
 ## Acceptance
@@ -88,9 +90,10 @@ integration and native integration. Product acceptance:
 - REST account-workflow battery + host LDAP tools on both engines.
 - Native engine unit/integration and `verify-native`.
 - Playwright default remains the contract mock.
+- Structured entry / tree UI path for additional suffixes.
 
 Security: five dated **approved** exceptions for the pinned `go1.26.5`
 standard library (`GO-2026-6090`, `GO-2026-6089`, `GO-2026-5972`,
 `GO-2026-6218`, `GO-2026-5026`). See
-[dependency-policy.md](https://github.com/hilather/go-lab-ldap-mcp/blob/v0.3.0/docs/security/dependency-policy.md).
+[dependency-policy.md](https://github.com/hilather/go-lab-ldap-mcp/blob/v0.4.0/docs/security/dependency-policy.md).
 No other criticals.

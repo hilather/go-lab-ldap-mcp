@@ -23,7 +23,7 @@
   <img alt="Go" src="https://img.shields.io/badge/Go-1.26-00ADD8?style=flat-square&logo=go&logoColor=white" />
   <img alt="389-ds" src="https://img.shields.io/badge/389--ds-2.4.6-3D9B8F?style=flat-square" />
   <img alt="MCP" src="https://img.shields.io/badge/MCP-2026--07--28-111111?style=flat-square" />
-  <img alt="Release" src="https://img.shields.io/badge/release-v0.3.0-ecece8?style=flat-square&labelColor=111111" />
+  <img alt="Release" src="https://img.shields.io/badge/release-v0.4.0-ecece8?style=flat-square&labelColor=111111" />
 </p>
 
 ![LabLDAP console](docs/assets/console.jpg)
@@ -192,7 +192,7 @@ loopback, which compose already does.
 | [Operator guide](docs/operations/operator-guide.md) | Day-2 limits and failure modes |
 | [Troubleshooting](docs/operations/troubleshooting.md) | Ready checks, TLS, tokens, vanished entries |
 | [MCP catalog](docs/mcp/catalog.md) | Tools, resources, scopes |
-| [Release notes](docs/release/notes.md) | v0.3.0 contents and residuals |
+| [Release notes](docs/release/notes.md) | v0.4.0 contents and residuals |
 
 Architecture and design live under [`docs/`](docs/). Contributing:
 [`CONTRIBUTING.md`](CONTRIBUTING.md).
@@ -212,9 +212,10 @@ not pushed to a public registry.
 
 ## Status
 
-**v0.3.0** — omitted `spec.directory.engine` and `make compose-up` now
-select native `labldapd`. 389 DS remains available as `engine: 389ds` /
-`make compose-up-389ds`. See [release notes](docs/release/notes.md).
+**v0.4.0** — multi-domain suffixes and structured entries, Host allow-list
+extras, and UI access by literal IP. Native `labldapd` remains the default
+engine; 389 DS is `engine: 389ds` / `make compose-up-389ds`. See
+[release notes](docs/release/notes.md).
 
 No project license file yet; treat it as source-available until one is added.
 
