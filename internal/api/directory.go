@@ -11,11 +11,12 @@ import (
 )
 
 var (
-	_ Users  = (*app.Users)(nil)
-	_ Groups = (*app.Groups)(nil)
-	_ Query  = (*app.Query)(nil)
-	_ Reset  = (*app.Reset)(nil)
-	_ Export = (*app.Export)(nil)
+	_ Users   = (*app.Users)(nil)
+	_ Groups  = (*app.Groups)(nil)
+	_ Query   = (*app.Query)(nil)
+	_ Entries = (*app.Entries)(nil)
+	_ Reset   = (*app.Reset)(nil)
+	_ Export  = (*app.Export)(nil)
 )
 
 // Users is the application user surface. *app.Users implements it.
@@ -75,6 +76,25 @@ func (s *Server) requireGroups(w http.ResponseWriter, r *http.Request) bool {
 
 func (s *Server) requireQuery(w http.ResponseWriter, r *http.Request) bool {
 	if s == nil || s.query == nil {
+		writeProblemStatus(w, r, http.StatusServiceUnavailable, "directory", "not ready", nil)
+		return false
+	}
+	return true
+}
+
+// Entries is the structured entry surface. *app.Entries implements it.
+type Entries interface {
+	Suffixes(ctx context.Context, p app.Principal) (directory.SuffixList, error)
+	Get(ctx context.Context, p app.Principal, dn string) (directory.DirectoryEntry, error)
+	ListTree(ctx context.Context, p app.Principal, q directory.TreeQuery) (directory.TreePage, error)
+	Create(ctx context.Context, p app.Principal, spec directory.EntrySpec) (directory.DirectoryEntry, error)
+	Update(ctx context.Context, p app.Principal, patch directory.EntryPatch) (directory.DirectoryEntry, error)
+	Delete(ctx context.Context, p app.Principal, del directory.EntryDelete) error
+	Move(ctx context.Context, p app.Principal, move directory.EntryMove) (directory.DirectoryEntry, error)
+}
+
+func (s *Server) requireEntries(w http.ResponseWriter, r *http.Request) bool {
+	if s == nil || s.entries == nil {
 		writeProblemStatus(w, r, http.StatusServiceUnavailable, "directory", "not ready", nil)
 		return false
 	}

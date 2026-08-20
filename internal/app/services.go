@@ -11,22 +11,24 @@ import (
 
 // Services is the transport-neutral application surface.
 type Services struct {
-	Users  *Users
-	Groups *Groups
-	Query  *Query
-	Reset  *Reset
-	Export *Export
+	Users   *Users
+	Groups  *Groups
+	Query   *Query
+	Entries *Entries
+	Reset   *Reset
+	Export  *Export
 }
 
 // Deps are injected repositories and hooks. Transports never see ds389 types.
 type Deps struct {
-	Users  directory.UserRepository
-	Groups directory.GroupRepository
-	Search directory.SearchRepository
-	Bind   directory.BindTester
-	Schema directory.SchemaRepository
-	Caps   directory.CapabilityInspector
-	Marker directory.MarkerReader
+	Users   directory.UserRepository
+	Groups  directory.GroupRepository
+	Entries directory.EntryRepository
+	Search  directory.SearchRepository
+	Bind    directory.BindTester
+	Schema  directory.SchemaRepository
+	Caps    directory.CapabilityInspector
+	Marker  directory.MarkerReader
 
 	Authz Authorizer
 	Audit Auditor
@@ -80,8 +82,9 @@ func New(d Deps) *Services {
 	}
 	h := hooks{authz: d.Authz, audit: d.Audit, gate: d.Gate, limit: d.Limit, locks: d.Locks}
 	return &Services{
-		Users:  &Users{repo: d.Users, hooks: h},
-		Groups: &Groups{repo: d.Groups, hooks: h, peopleDN: d.PeopleDN, groupsDN: d.GroupsDN},
+		Users:   &Users{repo: d.Users, hooks: h},
+		Groups:  &Groups{repo: d.Groups, hooks: h, peopleDN: d.PeopleDN, groupsDN: d.GroupsDN},
+		Entries: &Entries{repo: d.Entries, hooks: h},
 		Query: &Query{
 			search: d.Search, bind: d.Bind, schema: d.Schema,
 			caps: d.Caps, marker: d.Marker,

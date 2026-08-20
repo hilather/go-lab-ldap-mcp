@@ -32,17 +32,35 @@ type listedBackend struct {
 }
 
 func (e Engine) Reconcile(ctx context.Context, req bootstrap.BackendRequest) (bootstrap.BackendResult, error) {
-	wantName := req.Name
-	if wantName == "" {
-		wantName = "userroot"
-	}
-	wantDN, err := config.ParseDN(req.Suffix)
-	if err != nil {
-		return bootstrap.BackendResult{}, bootstrap.PhaseError("backend", "conflict", "configured suffix is not a valid DN")
-	}
 	listed, err := e.list(ctx, req)
 	if err != nil {
 		return bootstrap.BackendResult{}, bootstrap.PhaseError("backend", "create_failed", "could not list backends").Wrap(err)
+	}
+	primary, listed, err := e.reconcileOne(ctx, req, listed, bootstrap.BackendSpec{Name: req.Name, Suffix: req.Suffix}, true)
+	if err != nil {
+		return bootstrap.BackendResult{}, err
+	}
+	for _, extra := range req.Additional {
+		if extra.Name == "" || extra.Suffix == "" {
+			return bootstrap.BackendResult{}, bootstrap.PhaseError("backend", "conflict", "additional backend name or suffix is empty")
+		}
+		_, next, err := e.reconcileOne(ctx, req, listed, extra, false)
+		if err != nil {
+			return bootstrap.BackendResult{}, err
+		}
+		listed = next
+	}
+	return primary, nil
+}
+
+func (e Engine) reconcileOne(ctx context.Context, req bootstrap.BackendRequest, listed []listedBackend, spec bootstrap.BackendSpec, primary bool) (bootstrap.BackendResult, []listedBackend, error) {
+	wantName := spec.Name
+	if wantName == "" {
+		wantName = "userroot"
+	}
+	wantDN, err := config.ParseDN(spec.Suffix)
+	if err != nil {
+		return bootstrap.BackendResult{}, listed, bootstrap.PhaseError("backend", "conflict", "configured suffix is not a valid DN")
 	}
 	var nameHit, suffixHit *listedBackend
 	for i := range listed {
@@ -56,13 +74,18 @@ func (e Engine) Reconcile(ctx context.Context, req bootstrap.BackendRequest) (bo
 		}
 	}
 	if nameHit != nil && suffixHit != nil && nameHit.Name == suffixHit.Name {
-		return bootstrap.BackendResult{Action: "matched", Name: nameHit.Name, Suffix: nameHit.Suffix}, nil
+		return bootstrap.BackendResult{Action: "matched", Name: nameHit.Name, Suffix: nameHit.Suffix}, listed, nil
 	}
 	if nameHit != nil || suffixHit != nil {
-		return bootstrap.BackendResult{}, bootstrap.PhaseError("backend", "conflict", "existing backend name or suffix does not match the plan")
+		return bootstrap.BackendResult{}, listed, bootstrap.PhaseError("backend", "conflict", "existing backend name or suffix does not match the plan")
 	}
 	if !req.Write {
-		return bootstrap.BackendResult{}, bootstrap.PhaseError("backend", "missing", "planned backend is not present")
+		code := "missing"
+		msg := "planned backend is not present"
+		if !primary {
+			msg = "planned additional backend is not present"
+		}
+		return bootstrap.BackendResult{}, listed, bootstrap.PhaseError("backend", code, msg)
 	}
 	_, err = e.Runner.JSON(ctx, req.PasswordFile, req.Instance, []string{
 		"backend", "create",
@@ -75,9 +98,10 @@ func (e Engine) Reconcile(ctx context.Context, req bootstrap.BackendRequest) (bo
 		if isMappingConflict(err.Error()) {
 			code = "conflict"
 		}
-		return bootstrap.BackendResult{}, bootstrap.PhaseError("backend", code, "backend create failed").Wrap(err)
+		return bootstrap.BackendResult{}, listed, bootstrap.PhaseError("backend", code, "backend create failed").Wrap(err)
 	}
-	return bootstrap.BackendResult{Action: "created", Name: wantName, Suffix: wantDN.String()}, nil
+	listed = append(listed, listedBackend{Name: wantName, Suffix: wantDN.String()})
+	return bootstrap.BackendResult{Action: "created", Name: wantName, Suffix: wantDN.String()}, listed, nil
 }
 
 func (e Engine) list(ctx context.Context, req bootstrap.BackendRequest) ([]listedBackend, error) {

@@ -114,8 +114,10 @@ type Identity struct {
 // Options configure a Server. All dependencies are injected; there are no
 // package-level globals.
 type Options struct {
-	// Suffix is the managed naming context, for example "dc=example,dc=test".
+	// Suffix is the primary managed naming context, for example "dc=example,dc=test".
 	Suffix string
+	// AdditionalSuffixes are extra managed naming contexts (ADR-0011).
+	AdditionalSuffixes []string
 	// LDAPAddress is the cleartext/StartTLS listener ("host:port"); empty
 	// disables it. An empty host defaults to loopback (ADR-0009 decision 4).
 	LDAPAddress string
@@ -171,10 +173,11 @@ type Options struct {
 // Server is the native directory engine. The constructor validates and
 // normalizes Options; Serve binds the listeners (T-125).
 type Server struct {
-	opts   Options
-	suffix config.DN
-	dmDN   config.DN
-	hasDM  bool
+	opts     Options
+	suffix   config.DN
+	suffixes []config.DN
+	dmDN     config.DN
+	hasDM    bool
 
 	// passwords is the T-134 policy engine, consulted by the bind path
 	// through the passwordGate seam; nil without Options.PasswordPolicy.
@@ -229,11 +232,20 @@ func New(opts Options) (*Server, error) {
 	if err != nil {
 		return nil, fieldErr("suffix", "invalid_dn", "suffix is not a valid DN")
 	}
+	suffixes := []config.DN{suffix}
+	for i, raw := range opts.AdditionalSuffixes {
+		d, err := config.ParseDN(raw)
+		if err != nil {
+			return nil, fieldErr("additionalSuffixes", "invalid_dn", "additional suffix is not a valid DN")
+		}
+		suffixes = append(suffixes, d)
+		_ = i
+	}
 	pageKey := make([]byte, 32)
 	if _, err := rand.Read(pageKey); err != nil {
 		return nil, fmt.Errorf("ldapserver: paged results cookie key: %w", err)
 	}
-	s := &Server{opts: opts, suffix: suffix, pageKey: pageKey, conns: map[*conn]struct{}{}}
+	s := &Server{opts: opts, suffix: suffix, suffixes: suffixes, pageKey: pageKey, conns: map[*conn]struct{}{}}
 	if opts.DirectoryManager.DN != "" {
 		dm, err := config.ParseDN(opts.DirectoryManager.DN)
 		if err != nil {
@@ -287,8 +299,11 @@ func loopbackDefault(addr string) (string, error) {
 	return net.JoinHostPort(host, port), nil
 }
 
-// Suffix returns the parsed managed naming context.
+// Suffix returns the parsed primary managed naming context.
 func (s *Server) Suffix() config.DN { return s.suffix }
+
+// Suffixes returns every managed naming context (primary first).
+func (s *Server) Suffixes() []config.DN { return append([]config.DN(nil), s.suffixes...) }
 
 // Limits returns the effective ceilings after defaults.
 func (s *Server) Limits() Limits { return s.opts.Limits }

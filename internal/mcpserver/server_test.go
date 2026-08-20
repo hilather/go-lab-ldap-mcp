@@ -124,6 +124,7 @@ func (f fakeSchema) Schema(context.Context) (directory.Schema, error)   { return
 func testServices(search directory.SearchRepository, caps directory.CapabilityInspector, marker directory.MarkerReader, schema directory.SchemaRepository) *app.Services {
 	return app.New(app.Deps{
 		Search:           search,
+		Entries:          newFakeEntries(),
 		Caps:             caps,
 		Marker:           marker,
 		Schema:           schema,

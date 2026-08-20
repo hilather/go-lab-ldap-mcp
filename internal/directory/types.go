@@ -27,9 +27,13 @@ type User struct {
 }
 
 // UserSpec is a create request. Password is required and never appears on User.
+// DN and ParentDN are optional placement (ADR-0011). Empty keeps
+// uid=<uid>,<peopleDN>.
 type UserSpec struct {
 	ID         string               `json:"id"`
 	UID        string               `json:"uid,omitempty"`
+	DN         string               `json:"dn,omitempty"`
+	ParentDN   string               `json:"parentDN,omitempty"`
 	Enabled    *bool                `json:"enabled,omitempty"`
 	Password   observability.Secret `json:"password"`
 	Attributes map[string]string    `json:"attributes,omitempty"`
@@ -66,9 +70,13 @@ type Group struct {
 }
 
 // GroupSpec requires at least one member. Empty members is empty_group.
+// DN and ParentDN are optional placement (ADR-0011). Empty keeps
+// cn=<id>,<groupsDN>.
 type GroupSpec struct {
-	ID      string      `json:"id"`
-	Members []MemberRef `json:"members"`
+	ID       string      `json:"id"`
+	DN       string      `json:"dn,omitempty"`
+	ParentDN string      `json:"parentDN,omitempty"`
+	Members  []MemberRef `json:"members"`
 }
 
 type GroupListQuery struct {

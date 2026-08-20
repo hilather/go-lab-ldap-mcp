@@ -40,6 +40,7 @@ import (
 // MemberOfPlugin maintains memberOf for members of changed groups.
 type MemberOfPlugin struct {
 	suffix config.DN
+	extra  []config.DN
 	nested bool
 }
 
@@ -47,20 +48,34 @@ var _ Plugin = (*MemberOfPlugin)(nil)
 
 // NewMemberOfPlugin returns the plugin scoped to suffix. nestedGroups must
 // match compiled spec.directory.nestedGroups.
-func NewMemberOfPlugin(suffix string, nestedGroups bool) (*MemberOfPlugin, error) {
+func NewMemberOfPlugin(suffix string, nestedGroups bool, additional ...string) (*MemberOfPlugin, error) {
 	d, err := config.ParseDN(suffix)
 	if err != nil {
 		return nil, fmt.Errorf("ldapserver: memberof: invalid suffix: %w", err)
 	}
-	return &MemberOfPlugin{suffix: d, nested: nestedGroups}, nil
+	p := &MemberOfPlugin{suffix: d, nested: nestedGroups, extra: nil}
+	for _, raw := range additional {
+		got, err := config.ParseDN(raw)
+		if err != nil {
+			return nil, fmt.Errorf("ldapserver: memberof: invalid additional suffix: %w", err)
+		}
+		p.extra = append(p.extra, got)
+	}
+	return p, nil
 }
 
 // Name implements Plugin.
 func (p *MemberOfPlugin) Name() string { return "memberof" }
 
-// inScope reports whether d is the managed suffix or beneath it.
+// inScope reports whether d is a managed suffix or beneath one.
 func (p *MemberOfPlugin) inScope(d config.DN) bool {
-	return d.Equal(p.suffix) || d.IsDescendantOf(p.suffix)
+	return config.UnderAny(d, p.scopes())
+}
+
+func (p *MemberOfPlugin) scopes() []config.DN {
+	out := make([]config.DN, 0, 1+len(p.extra))
+	out = append(out, p.suffix)
+	return append(out, p.extra...)
 }
 
 // AfterWrite implements Plugin. It runs inside the write's Update
@@ -143,20 +158,22 @@ func (p *MemberOfPlugin) Fixup(ctx context.Context, store Store) error {
 		if err != nil {
 			return err
 		}
-		entries, err := tx.Subtree(ctx, p.suffix)
-		if errors.Is(err, ErrNoSuchObject) {
-			return nil
-		}
-		if err != nil {
-			return fmt.Errorf("ldapserver: memberof: fixup scan: %w", err)
-		}
-		for _, e := range entries {
-			d, err := config.ParseDN(e.DN)
-			if err != nil {
-				continue // store invariant violation; skip rather than abort the sweep
+		for _, suf := range p.scopes() {
+			entries, err := tx.Subtree(ctx, suf)
+			if errors.Is(err, ErrNoSuchObject) {
+				continue
 			}
-			if err := p.recompute(ctx, tx, idx, d); err != nil {
-				return err
+			if err != nil {
+				return fmt.Errorf("ldapserver: memberof: fixup scan: %w", err)
+			}
+			for _, e := range entries {
+				d, err := config.ParseDN(e.DN)
+				if err != nil {
+					continue // store invariant violation; skip rather than abort the sweep
+				}
+				if err := p.recompute(ctx, tx, idx, d); err != nil {
+					return err
+				}
 			}
 		}
 		return nil
@@ -175,24 +192,26 @@ type groupIndex struct {
 // graph. A missing suffix yields an empty index (nothing to maintain).
 func (p *MemberOfPlugin) indexGroups(ctx context.Context, tx ReadTx) (*groupIndex, error) {
 	idx := &groupIndex{groups: map[string]*Entry{}, byMember: map[string][]*Entry{}}
-	entries, err := tx.Subtree(ctx, p.suffix)
-	if errors.Is(err, ErrNoSuchObject) {
-		return idx, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("ldapserver: memberof: list suffix: %w", err)
-	}
-	for _, e := range entries {
-		if !isGroupEntry(e) {
+	for _, suf := range p.scopes() {
+		entries, err := tx.Subtree(ctx, suf)
+		if errors.Is(err, ErrNoSuchObject) {
 			continue
 		}
-		d, err := config.ParseDN(e.DN)
 		if err != nil {
-			continue
+			return nil, fmt.Errorf("ldapserver: memberof: list suffix: %w", err)
 		}
-		idx.groups[d.FoldedKey()] = e
-		for _, m := range memberDNs(e) {
-			idx.byMember[m.FoldedKey()] = append(idx.byMember[m.FoldedKey()], e)
+		for _, e := range entries {
+			if !isGroupEntry(e) {
+				continue
+			}
+			d, err := config.ParseDN(e.DN)
+			if err != nil {
+				continue
+			}
+			idx.groups[d.FoldedKey()] = e
+			for _, m := range memberDNs(e) {
+				idx.byMember[m.FoldedKey()] = append(idx.byMember[m.FoldedKey()], e)
+			}
 		}
 	}
 	return idx, nil

@@ -434,6 +434,95 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/suffixes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List compiled managed suffixes
+         * @description Primary plus additionalSuffixes (ADR-0011). Sibling of ldap_list_suffixes.
+         */
+        get: operations["listSuffixes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tree": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * List one level of a managed suffix tree
+         * @description Sibling of ldap_list_tree. Base must be a managed suffix or a descendant.
+         */
+        post: operations["listTree"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/entries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read one structured entry by DN */
+        get: operations["getEntry"];
+        put?: never;
+        /**
+         * Create an allowlisted structured entry
+         * @description Sibling of ldap_create_entry. No raw LDAP modify. DN must be under a managed suffix.
+         */
+        post: operations["createEntry"];
+        /**
+         * Delete an entry by DN
+         * @description Sibling of ldap_delete_entry. Requires If-Match and confirm=true. Non-empty containers need recursive=true.
+         */
+        delete: operations["deleteEntry"];
+        options?: never;
+        head?: never;
+        /**
+         * Update allowlisted attributes by DN
+         * @description Sibling of ldap_update_entry. Requires If-Match.
+         */
+        patch: operations["updateEntry"];
+        trace?: never;
+    };
+    "/api/v1/entries/move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rename or re-parent an entry
+         * @description Sibling of ldap_move_entry. New DN must stay under a managed suffix.
+         */
+        post: operations["moveEntry"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth-tests": {
         parameters: {
             query?: never;
@@ -614,6 +703,7 @@ export interface components {
             passwordScheme: string;
             controls: string[];
             requiredOK: boolean;
+            managedSuffixes?: string[];
         };
         Baseline: {
             expectedRevision: string;
@@ -662,6 +752,10 @@ export interface components {
         UserSpec: {
             id: string;
             uid?: string;
+            /** @description Optional exact DN under a managed suffix (ADR-0011) */
+            dn?: string;
+            /** @description Optional parent DN under a managed suffix (ADR-0011) */
+            parentDN?: string;
             enabled?: boolean;
             /** Format: password */
             password: string;
@@ -696,6 +790,10 @@ export interface components {
         };
         GroupSpec: {
             id: string;
+            /** @description Optional exact DN under a managed suffix (ADR-0011) */
+            dn?: string;
+            /** @description Optional parent DN under a managed suffix (ADR-0011) */
+            parentDN?: string;
             members: components["schemas"]["MemberRef"][];
         };
         GroupPage: {
@@ -725,6 +823,55 @@ export interface components {
         SearchPage: {
             entries: components["schemas"]["SearchEntry"][];
             nextCursor?: string;
+        };
+        SuffixList: {
+            primary: string;
+            additional: string[];
+            all: string[];
+        };
+        TreeQuery: {
+            base?: string;
+            pageSize?: number;
+            cursor?: string;
+        };
+        TreeNode: {
+            dn: string;
+            rdn: string;
+            objectClasses: string[];
+            hasChildren: boolean;
+            revision?: string;
+        };
+        TreePage: {
+            base: string;
+            nodes: components["schemas"]["TreeNode"][];
+            nextCursor?: string;
+        };
+        EntrySpec: {
+            dn: string;
+            objectClasses: string[];
+            attributes?: {
+                [key: string]: string;
+            };
+        };
+        EntryChange: {
+            /** @enum {string} */
+            op: "replace" | "add" | "delete";
+            name: string;
+            values?: string[];
+        };
+        EntryPatch: {
+            changes: components["schemas"]["EntryChange"][];
+        };
+        EntryMove: {
+            dn: string;
+            newDN: string;
+            deleteOldRdn?: boolean;
+        };
+        DirectoryEntry: {
+            dn: string;
+            objectClasses: string[];
+            attributes: components["schemas"]["AttrKV"][];
+            revision: string;
         };
         PasswordBody: {
             /** Format: password */
@@ -1921,6 +2068,231 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+        };
+    };
+    listSuffixes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Managed suffix set */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuffixList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    listTree: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required for cookie-authenticated unsafe methods */
+                "X-CSRF-Token"?: components["parameters"]["CSRFToken"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TreeQuery"];
+            };
+        };
+        responses: {
+            /** @description Tree page */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TreePage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getEntry: {
+        parameters: {
+            query: {
+                dn: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Directory entry */
+            200: {
+                headers: {
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DirectoryEntry"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    createEntry: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required for cookie-authenticated unsafe methods */
+                "X-CSRF-Token"?: components["parameters"]["CSRFToken"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "dn": "ou=ServiceUsers,ou=people,dc=example,dc=test",
+                 *       "objectClasses": [
+                 *         "organizationalUnit"
+                 *       ]
+                 *     }
+                 */
+                "application/json": components["schemas"]["EntrySpec"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    Location?: string;
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DirectoryEntry"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    deleteEntry: {
+        parameters: {
+            query: {
+                dn: string;
+                confirm: boolean;
+                recursive?: boolean;
+            };
+            header: {
+                /** @description Required for cookie-authenticated unsafe methods */
+                "X-CSRF-Token"?: components["parameters"]["CSRFToken"];
+                /** @description Quoted revision hex */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            412: components["responses"]["PreconditionFailed"];
+        };
+    };
+    updateEntry: {
+        parameters: {
+            query: {
+                dn: string;
+            };
+            header: {
+                /** @description Required for cookie-authenticated unsafe methods */
+                "X-CSRF-Token"?: components["parameters"]["CSRFToken"];
+                /** @description Quoted revision hex */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EntryPatch"];
+            };
+        };
+        responses: {
+            /** @description Updated entry */
+            200: {
+                headers: {
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DirectoryEntry"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            412: components["responses"]["PreconditionFailed"];
+        };
+    };
+    moveEntry: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Required for cookie-authenticated unsafe methods */
+                "X-CSRF-Token"?: components["parameters"]["CSRFToken"];
+                /** @description Quoted revision hex */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EntryMove"];
+            };
+        };
+        responses: {
+            /** @description Moved entry */
+            200: {
+                headers: {
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DirectoryEntry"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            412: components["responses"]["PreconditionFailed"];
         };
     };
     createAuthTest: {

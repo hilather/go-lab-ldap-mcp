@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/hilather/go-lab-ldap-mcp/internal/apperr"
@@ -105,6 +106,7 @@ func validateSettings(f *v1alpha1.File) error {
 	} else if _, err := ParseDN(f.Spec.Directory.Suffix); err != nil {
 		acc = append(acc, fieldErr("spec.directory.suffix", "invalid_dn", "suffix is not a valid DN"))
 	}
+	acc = append(acc, checkAdditionalSuffixes(f.Spec.Directory.Suffix, f.Spec.Directory.AdditionalSuffixes)...)
 	if !contains(v1alpha1.StorageModes(), f.Spec.Lifecycle.StorageMode) {
 		acc = append(acc, fieldErr("spec.lifecycle.storageMode", "invalid_enum", "unknown storageMode"))
 	}
@@ -181,6 +183,61 @@ func checkPositive(path string, n int) []*apperr.Error {
 		return []*apperr.Error{fieldErr(path, "invalid_limit", "must not be negative")}
 	}
 	return nil
+}
+
+const maxAdditionalSuffixes = 16
+
+func checkAdditionalSuffixes(primary string, extra []string) []*apperr.Error {
+	if len(extra) == 0 {
+		return nil
+	}
+	if len(extra) > maxAdditionalSuffixes {
+		return []*apperr.Error{fieldErr("spec.directory.additionalSuffixes", "invalid_limit", "too many additional suffixes")}
+	}
+	var acc []*apperr.Error
+	var parsed []DN
+	if primary != "" {
+		if p, err := ParseDN(primary); err == nil {
+			parsed = append(parsed, p)
+		}
+	}
+	seen := map[string]struct{}{}
+	for i, raw := range extra {
+		path := "spec.directory.additionalSuffixes"
+		if strings.TrimSpace(raw) == "" {
+			acc = append(acc, fieldErr(path, "invalid_dn", "additional suffix is empty"))
+			continue
+		}
+		d, err := ParseDN(raw)
+		if err != nil {
+			acc = append(acc, fieldErr(path, "invalid_dn", "additional suffix is not a valid DN"))
+			continue
+		}
+		key := d.FoldedKey()
+		if _, ok := seen[key]; ok {
+			acc = append(acc, fieldErr(path, "duplicate", "additional suffix is duplicated"))
+			continue
+		}
+		seen[key] = struct{}{}
+		nested := false
+		for _, other := range parsed {
+			if d.EqualFold(other) {
+				acc = append(acc, fieldErr(path, "duplicate", "additional suffix equals another managed suffix"))
+				nested = true
+				break
+			}
+			if d.IsDescendantOf(other) || other.IsDescendantOf(d) {
+				acc = append(acc, fieldErr(path, "nested_suffix", "additional suffixes must be sibling naming contexts, not nested"))
+				nested = true
+				break
+			}
+		}
+		if !nested {
+			parsed = append(parsed, d)
+		}
+		_ = i
+	}
+	return acc
 }
 
 func contains(xs []string, v string) bool {

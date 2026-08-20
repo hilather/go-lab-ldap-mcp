@@ -100,13 +100,13 @@ func startNative(t *testing.T, yaml string) *nativeInstance {
 	for _, name := range compiled.Engine.Plugins {
 		switch name {
 		case "memberof":
-			p, err := ldapserver.NewMemberOfPlugin(compiled.Engine.Suffix, n.NestedGroups)
+			p, err := ldapserver.NewMemberOfPlugin(compiled.Engine.Suffix, n.NestedGroups, n.AdditionalSuffixStrings()...)
 			if err != nil {
 				t.Fatalf("native memberof: %v", err)
 			}
 			plugins = append(plugins, p)
 		case "referint":
-			p, err := ldapserver.NewRefIntPlugin(compiled.Engine.Suffix)
+			p, err := ldapserver.NewRefIntPlugin(compiled.Engine.Suffix, n.AdditionalSuffixStrings()...)
 			if err != nil {
 				t.Fatalf("native referint: %v", err)
 			}
@@ -139,6 +139,7 @@ func startNative(t *testing.T, yaml string) *nativeInstance {
 	transport := compiled.Public.Spec.Transport
 	srv, err := ldapserver.New(ldapserver.Options{
 		Suffix:             compiled.Engine.Suffix,
+		AdditionalSuffixes: n.AdditionalSuffixStrings(),
 		LDAPAddress:        "127.0.0.1:0",
 		LDAPSAddress:       "127.0.0.1:0",
 		TLSConfig:          &tls.Config{Certificates: []tls.Certificate{cert}},
@@ -217,16 +218,17 @@ func (n *nativeInstance) seed(t *testing.T, compiled *config.Compiled) {
 	t.Helper()
 	nrm := compiled.Normalized
 	treq := bootstrap.TreeRequest{
-		Suffix:          compiled.Engine.Suffix,
-		PeopleDN:        nrm.PeopleDN.String(),
-		GroupsDN:        nrm.GroupsDN.String(),
-		RuntimeDN:       nrm.Runtime.DN,
-		RuntimePassword: nrm.Runtime.Password.Value,
-		DMPassword:      n.Password(),
-		LDAPURL:         "ldaps://" + n.LDAPSAddr,
-		CAFile:          n.CAFile,
-		Host:            n.ServerName,
-		Write:           true,
+		Suffix:             compiled.Engine.Suffix,
+		AdditionalSuffixes: nrm.AdditionalSuffixStrings(),
+		PeopleDN:           nrm.PeopleDN.String(),
+		GroupsDN:           nrm.GroupsDN.String(),
+		RuntimeDN:          nrm.Runtime.DN,
+		RuntimePassword:    nrm.Runtime.Password.Value,
+		DMPassword:         n.Password(),
+		LDAPURL:            "ldaps://" + n.LDAPSAddr,
+		CAFile:             n.CAFile,
+		Host:               n.ServerName,
+		Write:              true,
 	}
 	eng := ds389.Engine{}
 	if _, err := eng.ReconcileTree(t.Context(), treq); err != nil {

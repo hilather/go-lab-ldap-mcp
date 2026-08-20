@@ -9,22 +9,23 @@ import (
 
 // TreeRequest is the suffix / OU / runtime-account reconcile input.
 type TreeRequest struct {
-	Suffix          string
-	PeopleDN        string
-	GroupsDN        string
-	RuntimeDN       string
-	RuntimePassword observability.Secret
-	DMPassword      observability.Secret
-	LDAPURL         string
-	LDAPAddr        string
-	LDAPSAddr       string
-	CAFile          string
-	Host            string
-	UseLDAPS        bool
-	StartTLS        bool
-	Insecure        bool
-	Write           bool
-	DialTimeout     time.Duration
+	Suffix             string
+	AdditionalSuffixes []string
+	PeopleDN           string
+	GroupsDN           string
+	RuntimeDN          string
+	RuntimePassword    observability.Secret
+	DMPassword         observability.Secret
+	LDAPURL            string
+	LDAPAddr           string
+	LDAPSAddr          string
+	CAFile             string
+	Host               string
+	UseLDAPS           bool
+	StartTLS           bool
+	Insecure           bool
+	Write              bool
+	DialTimeout        time.Duration
 }
 
 // TreeResult is secret-free.

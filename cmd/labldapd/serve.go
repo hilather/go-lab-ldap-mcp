@@ -387,13 +387,13 @@ func enginePlugins(c *config.Compiled) ([]ldapserver.Plugin, error) {
 	for _, name := range c.Engine.Plugins {
 		switch name {
 		case "memberof":
-			p, err := ldapserver.NewMemberOfPlugin(c.Engine.Suffix, c.Normalized.NestedGroups)
+			p, err := ldapserver.NewMemberOfPlugin(c.Engine.Suffix, c.Normalized.NestedGroups, c.Normalized.AdditionalSuffixStrings()...)
 			if err != nil {
 				return nil, fmt.Errorf("labldapd: memberof plugin: %w", err)
 			}
 			out = append(out, p)
 		case "referint":
-			p, err := ldapserver.NewRefIntPlugin(c.Engine.Suffix)
+			p, err := ldapserver.NewRefIntPlugin(c.Engine.Suffix, c.Normalized.AdditionalSuffixStrings()...)
 			if err != nil {
 				return nil, fmt.Errorf("labldapd: referint plugin: %w", err)
 			}
@@ -467,6 +467,7 @@ func serverOptions(c *config.Compiled, f serveFlags, tlsCfg *tls.Config, dm ldap
 	transport := c.Public.Spec.Transport
 	return ldapserver.Options{
 		Suffix:             c.Engine.Suffix,
+		AdditionalSuffixes: c.Normalized.AdditionalSuffixStrings(),
 		LDAPAddress:        f.listen,
 		LDAPSAddress:       f.ldapsListen,
 		TLSConfig:          tlsCfg,

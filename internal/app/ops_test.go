@@ -17,9 +17,11 @@ func TestEveryOperationCoverage(t *testing.T) {
 	users := newFakeUsers()
 	groups := newFakeGroups()
 	sink := &audit.Memory{}
+	entries := newFakeEntries()
 	svc := New(Deps{
 		Users:            users,
 		Groups:           groups,
+		Entries:          entries,
 		Search:           fakeSearch{page: directory.SearchPage{Entries: []directory.SearchEntry{{DN: "uid=a,dc=x", Attributes: []directory.AttrKV{{Name: "cn", Value: "A"}}}}}},
 		Bind:             fakeBind{res: directory.BindTestResult{Outcome: directory.BindOutcomeSuccess}},
 		Schema:           fakeSchema{dse: directory.RootDSE{VendorName: "389"}},
@@ -86,6 +88,28 @@ func TestEveryOperationCoverage(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := svc.Groups.Delete(ctx, w, "staff", sum.Revision); err != nil {
+		t.Fatal(err)
+	}
+
+	ou, err := svc.Entries.Create(ctx, w, directory.EntrySpec{
+		DN: "ou=lab,ou=people,dc=example,dc=test", ObjectClasses: []string{"organizationalUnit"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Entries.Get(ctx, w, ou.DN); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Entries.ListTree(ctx, w, directory.TreeQuery{Base: "dc=example,dc=test"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Entries.Suffixes(ctx, w); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.Entries.Delete(ctx, none, directory.EntryDelete{DN: ou.DN, Revision: ou.Revision, Confirm: true}); err == nil {
+		t.Fatal("forbidden entry delete")
+	}
+	if err := svc.Entries.Delete(ctx, w, directory.EntryDelete{DN: ou.DN, Revision: ou.Revision, Confirm: true}); err != nil {
 		t.Fatal(err)
 	}
 

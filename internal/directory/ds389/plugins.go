@@ -71,19 +71,18 @@ func (e Engine) applyPlugin(ctx context.Context, req bootstrap.PluginRequest, na
 		}); err != nil {
 			return bootstrap.PhaseError("plugins", "plugin_missing", "could not enable MemberOf").Wrap(err)
 		}
-		if err := e.pluginSet(ctx, req, []string{
-			"plugin", "memberof", "set",
-			"--attr", "memberOf",
-			"--groupattr", "member",
-			"--scope", req.Suffix,
-			"--autoaddoc", "nsmemberof",
-		}); err != nil {
+		// One --scope followed by every compiled suffix. 389 argparse is
+		// nargs='+' with action=store: --scope A --scope B last-wins to B
+		// and drops the primary (CI readback then fails).
+		if err := e.pluginSet(ctx, req, memberOfSetArgs(req)); err != nil {
 			return bootstrap.PhaseError("plugins", "plugin_missing", "could not configure MemberOf").Wrap(err)
 		}
-		if _, err := e.Runner.JSON(ctx, req.PasswordFile, req.Instance, []string{
-			"plugin", "memberof", "fixup", "--wait", "--timeout", "60", req.Suffix,
-		}); err != nil {
-			return bootstrap.PhaseError("plugins", "fixup_failed", "MemberOf fix-up failed").Wrap(err)
+		for _, s := range pluginScopes(req) {
+			if _, err := e.Runner.JSON(ctx, req.PasswordFile, req.Instance, []string{
+				"plugin", "memberof", "fixup", "--wait", "--timeout", "60", s,
+			}); err != nil {
+				return bootstrap.PhaseError("plugins", "fixup_failed", "MemberOf fix-up failed").Wrap(err)
+			}
 		}
 	case pluginReferint:
 		if _, err := e.Runner.JSON(ctx, req.PasswordFile, req.Instance, []string{
@@ -91,13 +90,7 @@ func (e Engine) applyPlugin(ctx context.Context, req bootstrap.PluginRequest, na
 		}); err != nil {
 			return bootstrap.PhaseError("plugins", "plugin_missing", "could not enable referential integrity").Wrap(err)
 		}
-		if err := e.pluginSet(ctx, req, []string{
-			"plugin", "referential-integrity", "set",
-			"--update-delay", "0",
-			"--membership-attr", "member",
-			"--entry-scope", req.Suffix,
-			"--container-scope", req.Suffix,
-		}); err != nil {
+		if err := e.pluginSet(ctx, req, referintSetArgs(req)); err != nil {
 			return bootstrap.PhaseError("plugins", "plugin_missing", "could not configure referential integrity").Wrap(err)
 		}
 	case pluginDisable:
@@ -146,8 +139,10 @@ func (e Engine) readbackMemberOf(ctx context.Context, req bootstrap.PluginReques
 	if !attrHas(attrs, "memberofgroupattr", "member") {
 		return bootstrap.PhaseError("plugins", "plugin_missing", "MemberOf group attribute does not include member")
 	}
-	if req.Suffix != "" && !sameDN(first(attrs, "memberofentryscope"), req.Suffix) {
-		return bootstrap.PhaseError("plugins", "plugin_missing", "MemberOf scope does not match the planned suffix")
+	for _, s := range pluginScopes(req) {
+		if !attrHasDN(attrs, "memberofentryscope", s) {
+			return bootstrap.PhaseError("plugins", "plugin_missing", "MemberOf scope does not match the planned suffix")
+		}
 	}
 	return nil
 }
@@ -200,6 +195,81 @@ func attrHas(attrs map[string][]string, key, want string) bool {
 		}
 	}
 	return false
+}
+
+func attrHasDN(attrs map[string][]string, key, want string) bool {
+	for _, v := range attrs[strings.ToLower(key)] {
+		if sameDN(v, want) {
+			return true
+		}
+	}
+	return false
+}
+
+// memberOfSetArgs is one memberof set with every compiled suffix after a
+// single --scope (dsconf nargs='+'). Do not emit repeated --scope flags.
+func memberOfSetArgs(req bootstrap.PluginRequest) []string {
+	args := []string{
+		"plugin", "memberof", "set",
+		"--attr", "memberOf",
+		"--groupattr", "member",
+	}
+	if scopes := pluginScopes(req); len(scopes) > 0 {
+		args = append(args, "--scope")
+		args = append(args, scopes...)
+	}
+	return append(args, "--autoaddoc", "nsmemberof")
+}
+
+// pluginScopes is the compiled MemberOf/referint suffix list: primary
+// first, then additional, de-duplicated. Empty strings are skipped.
+func pluginScopes(req bootstrap.PluginRequest) []string {
+	seen := map[string]struct{}{}
+	var out []string
+	add := func(raw string) {
+		raw = strings.TrimSpace(raw)
+		if raw == "" {
+			return
+		}
+		key := dnKey(raw)
+		if _, ok := seen[key]; ok {
+			return
+		}
+		seen[key] = struct{}{}
+		out = append(out, raw)
+	}
+	add(req.Suffix)
+	for _, s := range req.AdditionalSuffixes {
+		add(s)
+	}
+	return out
+}
+
+// referintSetArgs configures referint for every compiled suffix.
+//
+// dsconf --entry-scope and --container-scope are single-valued. 389
+// nsslapd-pluginEntryScope is multi-valued, but nsslapd-pluginContainerScope
+// is single-valued, so extra backends cannot share one container-scope with
+// the primary. Pinning the primary would leave additional suffixes outside
+// referint. When extras exist, clear both scopes so the plugin covers every
+// backend (including labldapN) rather than the primary only.
+func referintSetArgs(req bootstrap.PluginRequest) []string {
+	args := []string{
+		"plugin", "referential-integrity", "set",
+		"--update-delay", "0",
+		"--membership-attr", "member",
+	}
+	scopes := pluginScopes(req)
+	switch {
+	case len(scopes) == 0:
+		// Keep today's argv shape when the request has no suffix.
+		args = append(args, "--entry-scope", req.Suffix, "--container-scope", req.Suffix)
+	case len(scopes) == 1:
+		args = append(args, "--entry-scope", scopes[0], "--container-scope", scopes[0])
+	default:
+		args = append(args, "--entry-scope", "delete", "--container-scope", "delete")
+	}
+	return args
 }
 
 func sameDN(a, b string) bool {

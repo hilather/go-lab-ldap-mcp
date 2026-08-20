@@ -66,28 +66,55 @@ type NormalizedRuntime struct {
 }
 
 type Normalized struct {
-	frozen       bool
-	Engine       string
-	Suffix       DN
-	PeopleDN     DN
-	GroupsDN     DN
-	NestedGroups bool
-	AllowRawACI  bool
-	SoftReset    bool
-	StorageMode  string
-	StartupMode  string
-	Name         string
-	Runtime      NormalizedRuntime
-	Users        []NormalizedUser
-	Groups       []NormalizedGroup
-	Policy       NormalizedPolicy
-	Tokens       []NormalizedToken
-	OperatorACLs []v1alpha1.ACL
-	Warnings     []string
+	frozen bool
+	Engine string
+	Suffix DN
+	// AdditionalSuffixes are extra managed naming contexts (ADR-0011).
+	// Sorted by FoldedKey. Never nested inside Suffix or each other.
+	AdditionalSuffixes []DN
+	PeopleDN           DN
+	GroupsDN           DN
+	NestedGroups       bool
+	AllowRawACI        bool
+	SoftReset          bool
+	StorageMode        string
+	StartupMode        string
+	Name               string
+	Runtime            NormalizedRuntime
+	Users              []NormalizedUser
+	Groups             []NormalizedGroup
+	Policy             NormalizedPolicy
+	Tokens             []NormalizedToken
+	OperatorACLs       []v1alpha1.ACL
+	Warnings           []string
 }
 
 func (n *Normalized) freeze() {
 	n.frozen = true
+}
+
+// ManagedSuffixes is the primary suffix followed by additional suffixes.
+func (n *Normalized) ManagedSuffixes() []DN {
+	if n == nil {
+		return nil
+	}
+	out := make([]DN, 0, 1+len(n.AdditionalSuffixes))
+	out = append(out, n.Suffix)
+	out = append(out, n.AdditionalSuffixes...)
+	return out
+}
+
+// UnderManaged reports whether d equals or is under any compiled managed suffix.
+func (n *Normalized) UnderManaged(d DN) bool {
+	if n == nil {
+		return false
+	}
+	return UnderAny(d, n.ManagedSuffixes())
+}
+
+// AdditionalSuffixStrings is the compiled extra suffix list in string form.
+func (n *Normalized) AdditionalSuffixStrings() []string {
+	return additionalSuffixStrings(n)
 }
 
 func sortUsers(users []NormalizedUser) {

@@ -2,6 +2,7 @@ package config
 
 import (
 	"context"
+	"sort"
 
 	"github.com/hilather/go-lab-ldap-mcp/internal/config/v1alpha1"
 )
@@ -95,17 +96,22 @@ func normalizeAll(ctx context.Context, p *Parsed, opt LoadOptions) (*Normalized,
 	if err != nil {
 		return nil, err
 	}
+	additional, err := normalizeAdditionalSuffixes(f.Spec.Directory.AdditionalSuffixes, suffix)
+	if err != nil {
+		return nil, err
+	}
 	n := &Normalized{
-		Engine:       f.Spec.Directory.Engine,
-		Suffix:       suffix,
-		PeopleDN:     peopleDN,
-		GroupsDN:     groupsDN,
-		NestedGroups: f.Spec.Directory.NestedGroups,
-		AllowRawACI:  f.Spec.Directory.AllowRawACI,
-		SoftReset:    soft,
-		StorageMode:  f.Spec.Lifecycle.StorageMode,
-		StartupMode:  f.Spec.Lifecycle.StartupMode,
-		Name:         f.Metadata.Name,
+		Engine:             f.Spec.Directory.Engine,
+		Suffix:             suffix,
+		AdditionalSuffixes: additional,
+		PeopleDN:           peopleDN,
+		GroupsDN:           groupsDN,
+		NestedGroups:       f.Spec.Directory.NestedGroups,
+		AllowRawACI:        f.Spec.Directory.AllowRawACI,
+		SoftReset:          soft,
+		StorageMode:        f.Spec.Lifecycle.StorageMode,
+		StartupMode:        f.Spec.Lifecycle.StartupMode,
+		Name:               f.Metadata.Name,
 		Runtime: NormalizedRuntime{
 			ID: rtID,
 			DN: rtRDN + "," + peopleDN.String(),
@@ -125,4 +131,23 @@ func normalizeAll(ctx context.Context, p *Parsed, opt LoadOptions) (*Normalized,
 	}
 	n.freeze()
 	return n, nil
+}
+
+func normalizeAdditionalSuffixes(raw []string, primary DN) ([]DN, error) {
+	if len(raw) == 0 {
+		return nil, nil
+	}
+	out := make([]DN, 0, len(raw))
+	for _, s := range raw {
+		d, err := ParseDN(s)
+		if err != nil {
+			return nil, fieldErr("spec.directory.additionalSuffixes", "invalid_dn", "additional suffix is not a valid DN")
+		}
+		out = append(out, d)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		return out[i].FoldedKey() < out[j].FoldedKey()
+	})
+	_ = primary
+	return out, nil
 }

@@ -17,6 +17,7 @@ export async function visit(page: Page, dest: string): Promise<void> {
     "/users": "Users",
     "/groups": "Groups",
     "/search": "Search",
+    "/tree": "Tree",
     "/auth-test": "Auth test",
     "/schema": "Schema",
     "/audit": "Audit",

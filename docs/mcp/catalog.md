@@ -1,6 +1,6 @@
 # MCP catalog
 
-Recorded: 2026-08-16  
+Recorded: 2026-08-19  
 Source: `internal/mcpserver/catalog.go` (`Catalog()`, `ResourceCatalog()`).  
 Do not rename tools without an ADR if `docs/05-mcp-api.md` is recovered.
 
@@ -37,12 +37,26 @@ register only when the matching `register*` flag is true (OD-016).
 | `ldap_add_members` | proposed | T-090 | `directory:write` | `registerMutations` | |
 | `ldap_remove_members` | proposed | T-090 | `directory:write` | `registerMutations` | |
 | `ldap_replace_members` | proposed | T-090 | `directory:write` | `registerMutations` | Empty replacement is `empty_group` |
+| `ldap_list_suffixes` | proposed | #5 | `directory:read` | on | `GET /api/v1/suffixes` |
+| `ldap_list_tree` | proposed | #5 | `directory:read` | on | `POST /api/v1/tree`; base must be a managed suffix or descendant |
+| `ldap_create_entry` | proposed | #5 | `directory:write` | `registerMutations` | Allowlisted classes only; DN under a managed suffix |
+| `ldap_update_entry` | proposed | #5 | `directory:write` | `registerMutations` | Requires `revision`; no raw LDAP mods |
+| `ldap_delete_entry` | proposed | #5 | `directory:write` | `registerMutations` | Destructive; `confirm` + `revision`; recursive for non-empty |
+| `ldap_move_entry` | proposed | #5 | `directory:write` | `registerMutations` | New DN must stay under a managed suffix |
 | `ldap_bind_test` | proposed | T-091 | `directory:password` | `registerPassword` | Unknown user ≡ wrong password |
 | `ldap_reset_suffix` | proposed | T-092 | `lab:reset` | `registerReset` | Destructive; name + revision + confirm |
 | `ldap_export_ldif` | proposed | T-092 | `lab:export` | `registerExport` | Small inline; large → REST handoff |
 
 `ldap_update_group` is **omitted** in v1 (no `PATCH /api/v1/groups/{id}`;
 membership tools are the update path).
+
+`ldap_create_user` / `ldap_create_group` accept optional `dn` / `parentDN`
+so service accounts can land at exact DNs under any compiled managed
+suffix (ADR-0011). Groups still cannot be created empty (OD-018); use
+the group API, not `ldap_create_entry`, for `groupOfNames`.
+
+Multi-domain here means multiple configured suffixes in one lab
+(`spec.directory.additionalSuffixes`), not AD forests or trusts.
 
 ## Resources
 

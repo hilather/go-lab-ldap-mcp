@@ -52,6 +52,8 @@ const users = new Map([
   ],
 ]);
 
+const extraEntries = new Map();
+
 const groups = new Map([
   [
     "staff",
@@ -273,6 +275,137 @@ async function handleAPI(req, res, url) {
       return;
     }
     json(res, 200, { component: "labldap", version: "e2e", revision: "test", time: new Date().toISOString() });
+    return;
+  }
+
+  if (req.method === "GET" && path === "/api/v1/suffixes") {
+    if (requireSession(req, res, "directory:read") === undefined || directoryUnavailable(res)) {
+      return;
+    }
+    json(res, 200, {
+      primary: "dc=example,dc=test",
+      additional: [],
+      all: ["dc=example,dc=test"],
+    });
+    return;
+  }
+
+  if (req.method === "POST" && path === "/api/v1/tree") {
+    if (requireSession(req, res, "directory:read") === undefined || directoryUnavailable(res)) {
+      return;
+    }
+    const body = await readBody(req);
+    const base = String(body.base ?? "dc=example,dc=test");
+    const nodes = [];
+    if (base === "dc=example,dc=test") {
+      nodes.push(
+        { dn: "ou=people,dc=example,dc=test", rdn: "ou=people", objectClasses: ["organizationalUnit"], hasChildren: true },
+        { dn: "ou=groups,dc=example,dc=test", rdn: "ou=groups", objectClasses: ["organizationalUnit"], hasChildren: true },
+      );
+    }
+    for (const ent of extraEntries.values()) {
+      if (ent.dn.endsWith("," + base) && ent.dn.slice(0, -(base.length + 1)).indexOf(",") === -1) {
+        nodes.push({
+          dn: ent.dn,
+          rdn: ent.dn.split(",")[0],
+          objectClasses: ent.objectClasses,
+          hasChildren: false,
+          revision: ent.revision,
+        });
+      }
+    }
+    json(res, 200, { base, nodes });
+    return;
+  }
+
+  if (path === "/api/v1/entries") {
+    if (req.method === "GET") {
+      if (requireSession(req, res, "directory:read") === undefined || directoryUnavailable(res)) {
+        return;
+      }
+      const dn = url.searchParams.get("dn") ?? "";
+      const ent = extraEntries.get(dn);
+      if (ent === undefined) {
+        problem(res, 404, "not found");
+        return;
+      }
+      json(res, 200, ent);
+      return;
+    }
+    if (req.method === "POST") {
+      if (requireSession(req, res, "directory:write") === undefined || directoryUnavailable(res)) {
+        return;
+      }
+      const body = await readBody(req);
+      const dn = String(body.dn ?? "");
+      const classes = Array.isArray(body.objectClasses) ? body.objectClasses : [];
+      const stored = classes.map((c) => (String(c).toLowerCase() === "container" ? "organizationalUnit" : c));
+      const ent = {
+        dn,
+        objectClasses: stored,
+        attributes: [],
+        revision: "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      };
+      extraEntries.set(dn, ent);
+      json(res, 201, ent);
+      return;
+    }
+    if (req.method === "DELETE") {
+      if (requireSession(req, res, "directory:write") === undefined || directoryUnavailable(res)) {
+        return;
+      }
+      if (url.searchParams.get("confirm") !== "true") {
+        problem(res, 400, "confirm required", [{ path: "confirm", code: "required", message: "destructive delete requires confirm" }]);
+        return;
+      }
+      extraEntries.delete(url.searchParams.get("dn") ?? "");
+      res.writeHead(204, { "Cache-Control": "no-store" });
+      res.end();
+      return;
+    }
+  }
+
+  if (req.method === "POST" && path === "/api/v1/entries/move") {
+    if (requireSession(req, res, "directory:write") === undefined || directoryUnavailable(res)) {
+      return;
+    }
+    const body = await readBody(req);
+    const from = extraEntries.get(String(body.dn ?? ""));
+    if (from === undefined) {
+      problem(res, 404, "not found");
+      return;
+    }
+    extraEntries.delete(from.dn);
+    from.dn = String(body.newDN ?? from.dn);
+    extraEntries.set(from.dn, from);
+    json(res, 200, from);
+    return;
+  }
+
+  if (req.method === "POST" && path === "/api/v1/users") {
+    if (requireSession(req, res, "directory:write") === undefined || directoryUnavailable(res)) {
+      return;
+    }
+    const body = await readBody(req);
+    const id = String(body.id ?? "");
+    const user = {
+      id,
+      uid: body.uid ?? id,
+      dn: body.dn ?? `uid=${id},ou=people,dc=example,dc=test`,
+      enabled: true,
+      objectClasses: ["inetOrgPerson"],
+      attributes: [],
+      groups: [],
+      revision: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    };
+    users.set(id, user);
+    extraEntries.set(user.dn, {
+      dn: user.dn,
+      objectClasses: user.objectClasses,
+      attributes: [],
+      revision: user.revision,
+    });
+    json(res, 201, user);
     return;
   }
 

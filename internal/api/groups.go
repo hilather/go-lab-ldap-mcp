@@ -10,8 +10,10 @@ import (
 )
 
 type groupSpecBody struct {
-	ID      string                `json:"id"`
-	Members []directory.MemberRef `json:"members"`
+	ID       string                `json:"id"`
+	DN       string                `json:"dn,omitempty"`
+	ParentDN string                `json:"parentDN,omitempty"`
+	Members  []directory.MemberRef `json:"members"`
 }
 
 type memberListBody struct {
@@ -52,7 +54,7 @@ func (s *Server) handleCreateGroup(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, r, err)
 		return
 	}
-	g, err := s.groups.Create(r.Context(), p, directory.GroupSpec{ID: body.ID, Members: body.Members})
+	g, err := s.groups.Create(r.Context(), p, directory.GroupSpec{ID: body.ID, DN: body.DN, ParentDN: body.ParentDN, Members: body.Members})
 	if err != nil {
 		writeProblem(w, r, err)
 		return

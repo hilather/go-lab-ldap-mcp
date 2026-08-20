@@ -41,7 +41,9 @@ func (e Engine) ReconcileTree(ctx context.Context, req bootstrap.TreeRequest) (b
 	defer conn.Close()
 
 	var res bootstrap.TreeResult
-	parents := []string{req.Suffix, req.PeopleDN, req.GroupsDN}
+	parents := []string{req.Suffix}
+	parents = append(parents, req.AdditionalSuffixes...)
+	parents = append(parents, req.PeopleDN, req.GroupsDN)
 	for _, dn := range parents {
 		if dn == "" {
 			return res, bootstrap.PhaseError("tree", "parent_failed", "compiled tree DN is empty")

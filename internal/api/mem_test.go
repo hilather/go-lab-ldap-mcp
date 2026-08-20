@@ -450,3 +450,92 @@ func (m *memGroups) match(id directory.GroupID, rev directory.Revision) (directo
 	}
 	return g, nil
 }
+
+type memEntries struct {
+	mu   sync.Mutex
+	byDN map[string]directory.DirectoryEntry
+}
+
+func newMemEntries() *memEntries {
+	return &memEntries{byDN: map[string]directory.DirectoryEntry{}}
+}
+
+func (m *memEntries) CreateEntry(_ context.Context, spec directory.EntrySpec) (directory.DirectoryEntry, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, ok := m.byDN[spec.DN]; ok {
+		return directory.DirectoryEntry{}, directory.Error("dn", directory.FieldConflict, "directory entry already exists")
+	}
+	ent := directory.DirectoryEntry{DN: spec.DN, ObjectClasses: spec.ObjectClasses}
+	ent.Revision = directory.RevisionOfEntry(ent)
+	m.byDN[spec.DN] = ent
+	return ent, nil
+}
+
+func (m *memEntries) UpdateEntry(_ context.Context, patch directory.EntryPatch) (directory.DirectoryEntry, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	ent, ok := m.byDN[patch.DN]
+	if !ok {
+		return directory.DirectoryEntry{}, directory.Error("dn", directory.FieldNotFound, "directory entry not found")
+	}
+	if ent.Revision != patch.Revision {
+		return directory.DirectoryEntry{}, directory.Error("revision", directory.FieldConflict, "revision does not match")
+	}
+	ent.Revision = directory.RevisionOfEntry(ent)
+	m.byDN[patch.DN] = ent
+	return ent, nil
+}
+
+func (m *memEntries) DeleteEntry(_ context.Context, del directory.EntryDelete) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	ent, ok := m.byDN[del.DN]
+	if !ok {
+		return directory.Error("dn", directory.FieldNotFound, "directory entry not found")
+	}
+	if ent.Revision != del.Revision {
+		return directory.Error("revision", directory.FieldConflict, "revision does not match")
+	}
+	delete(m.byDN, del.DN)
+	return nil
+}
+
+func (m *memEntries) MoveEntry(_ context.Context, move directory.EntryMove) (directory.DirectoryEntry, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	ent, ok := m.byDN[move.DN]
+	if !ok {
+		return directory.DirectoryEntry{}, directory.Error("dn", directory.FieldNotFound, "directory entry not found")
+	}
+	if ent.Revision != move.Revision {
+		return directory.DirectoryEntry{}, directory.Error("revision", directory.FieldConflict, "revision does not match")
+	}
+	delete(m.byDN, move.DN)
+	ent.DN = move.NewDN
+	ent.Revision = directory.RevisionOfEntry(ent)
+	m.byDN[move.NewDN] = ent
+	return ent, nil
+}
+
+func (m *memEntries) ListTree(_ context.Context, q directory.TreeQuery) (directory.TreePage, error) {
+	return directory.TreePage{Base: q.Base, Nodes: []directory.TreeNode{}}, nil
+}
+
+func (m *memEntries) GetEntryMeta(_ context.Context, dn string) (directory.DirectoryEntry, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	ent, ok := m.byDN[dn]
+	if !ok {
+		return directory.DirectoryEntry{}, directory.Error("dn", directory.FieldNotFound, "directory entry not found")
+	}
+	return ent, nil
+}
+
+func (m *memEntries) ManagedSuffixes() directory.SuffixList {
+	return directory.SuffixList{
+		Primary:    "dc=example,dc=test",
+		Additional: []string{},
+		All:        []string{"dc=example,dc=test"},
+	}
+}

@@ -2,6 +2,7 @@ package config
 
 import (
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/hilather/go-lab-ldap-mcp/internal/apperr"
@@ -71,12 +72,22 @@ func managedRuntimeACIs(n *Normalized) []NamedACI {
 	people := n.PeopleDN.String()
 	groups := n.GroupsDN.String()
 	who := `userdn="ldap:///` + aciEscape(n.Runtime.DN) + `"`
-	return []NamedACI{
+	out := []NamedACI{
 		namedRuntime("runtime-suffix-read", suf, who, []string{"read", "search", "compare"}, "*", "userPassword"),
 		namedRuntime("runtime-people-write", people, who, []string{"add", "delete", "write", "read", "search", "compare"}, "*", "aci"),
 		namedRuntime("runtime-groups-write", groups, who, []string{"add", "delete", "write", "read", "search", "compare"}, "*", "aci"),
 		namedRuntime("runtime-password", people, who, []string{"write"}, "userPassword", ""),
 	}
+	for i, extra := range n.AdditionalSuffixes {
+		id := strconv.Itoa(i + 1)
+		dn := extra.String()
+		out = append(out,
+			namedRuntime("runtime-addsuffix-"+id+"-read", dn, who, []string{"read", "search", "compare"}, "*", "userPassword"),
+			namedRuntime("runtime-addsuffix-"+id+"-write", dn, who, []string{"add", "delete", "write", "read", "search", "compare"}, "*", "aci"),
+			namedRuntime("runtime-addsuffix-"+id+"-password", dn, who, []string{"write"}, "userPassword", ""),
+		)
+	}
+	return out
 }
 
 func namedRuntime(id, target, who string, perms []string, allow, deny string) NamedACI {
@@ -180,7 +191,7 @@ func targetDN(t v1alpha1.Target, n *Normalized) (string, error) {
 		if err != nil {
 			return "", fieldErr("spec.acls.target.dn", "invalid_dn", "target DN is invalid")
 		}
-		if !d.Equal(n.Suffix) && !d.IsDescendantOf(n.Suffix) {
+		if !n.UnderManaged(d) {
 			return "", fieldErr("spec.acls.target.dn", "outside_suffix", "target DN is outside the managed suffix")
 		}
 		return d.String(), nil

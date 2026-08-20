@@ -401,6 +401,101 @@ func (f *fakeGroups) mutate(id directory.GroupID, members []directory.MemberRef,
 	return sum, nil
 }
 
+type fakeEntries struct {
+	mu       sync.Mutex
+	suffixes directory.SuffixList
+	byDN     map[string]directory.DirectoryEntry
+	children map[string][]string
+}
+
+func newFakeEntries() *fakeEntries {
+	return &fakeEntries{
+		suffixes: directory.SuffixList{
+			Primary: "dc=example,dc=test",
+			All:     []string{"dc=example,dc=test"},
+		},
+		byDN:     map[string]directory.DirectoryEntry{},
+		children: map[string][]string{},
+	}
+}
+
+func (f *fakeEntries) CreateEntry(_ context.Context, spec directory.EntrySpec) (directory.DirectoryEntry, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if _, ok := f.byDN[spec.DN]; ok {
+		return directory.DirectoryEntry{}, directory.Error("dn", directory.FieldConflict, "directory entry already exists")
+	}
+	ent := directory.DirectoryEntry{DN: spec.DN, ObjectClasses: spec.ObjectClasses}
+	for k, v := range spec.Attributes {
+		ent.Attributes = append(ent.Attributes, directory.AttrKV{Name: k, Value: v})
+	}
+	ent.Revision = directory.RevisionOfEntry(ent)
+	f.byDN[spec.DN] = ent
+	return ent, nil
+}
+
+func (f *fakeEntries) UpdateEntry(_ context.Context, patch directory.EntryPatch) (directory.DirectoryEntry, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	ent, ok := f.byDN[patch.DN]
+	if !ok {
+		return directory.DirectoryEntry{}, directory.Error("dn", directory.FieldNotFound, "directory entry not found")
+	}
+	if ent.Revision != patch.Revision {
+		return directory.DirectoryEntry{}, directory.Error("revision", directory.FieldConflict, "revision does not match")
+	}
+	ent.Revision = directory.Revision("upd")
+	f.byDN[patch.DN] = ent
+	return ent, nil
+}
+
+func (f *fakeEntries) DeleteEntry(_ context.Context, del directory.EntryDelete) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	ent, ok := f.byDN[del.DN]
+	if !ok {
+		return directory.Error("dn", directory.FieldNotFound, "directory entry not found")
+	}
+	if ent.Revision != del.Revision {
+		return directory.Error("revision", directory.FieldConflict, "revision does not match")
+	}
+	delete(f.byDN, del.DN)
+	return nil
+}
+
+func (f *fakeEntries) MoveEntry(_ context.Context, move directory.EntryMove) (directory.DirectoryEntry, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	ent, ok := f.byDN[move.DN]
+	if !ok {
+		return directory.DirectoryEntry{}, directory.Error("dn", directory.FieldNotFound, "directory entry not found")
+	}
+	if ent.Revision != move.Revision {
+		return directory.DirectoryEntry{}, directory.Error("revision", directory.FieldConflict, "revision does not match")
+	}
+	delete(f.byDN, move.DN)
+	ent.DN = move.NewDN
+	ent.Revision = directory.Revision("moved")
+	f.byDN[move.NewDN] = ent
+	return ent, nil
+}
+
+func (f *fakeEntries) ListTree(_ context.Context, q directory.TreeQuery) (directory.TreePage, error) {
+	return directory.TreePage{Base: q.Base}, nil
+}
+
+func (f *fakeEntries) GetEntryMeta(_ context.Context, dn string) (directory.DirectoryEntry, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	ent, ok := f.byDN[dn]
+	if !ok {
+		return directory.DirectoryEntry{}, directory.Error("dn", directory.FieldNotFound, "directory entry not found")
+	}
+	return ent, nil
+}
+
+func (f *fakeEntries) ManagedSuffixes() directory.SuffixList { return f.suffixes }
+
 type fakeSearch struct {
 	page directory.SearchPage
 	err  error

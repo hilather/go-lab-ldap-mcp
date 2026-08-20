@@ -39,6 +39,13 @@
       "properties": {
         "engine": { "type": "string", "enum": ["389ds", "native"], "default": "native" },
         "suffix": { "type": "string" },
+        "additionalSuffixes": {
+          "type": "array",
+          "description": "Extra managed naming contexts (ADR-0011). Sibling DNs only; not nested in the primary or each other.",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true,
+          "maxItems": 16
+        },
         "peopleRDN": { "type": "string" },
         "groupsRDN": { "type": "string" },
         "nestedGroups": { "type": "boolean" },

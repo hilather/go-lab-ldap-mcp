@@ -55,11 +55,11 @@ func (r *Runtime) buildSearch(q directory.SearchQuery) (*ldap.SearchRequest, str
 		return nil, "", nil, false, apperr.New(apperr.CodeConfiguration, "search base is not a valid DN").
 			WithField(apperr.Field{Path: "base", Code: "invalid_dn", Message: "search base is not a valid DN"})
 	}
-	suffix, err := config.ParseDN(r.cfg.Suffix)
-	if err != nil {
+	managed := r.managedSuffixDNs()
+	if len(managed) == 0 {
 		return nil, "", nil, false, directory.Error("base", directory.FieldConstraint, "managed suffix is not a valid DN")
 	}
-	if !parsed.Equal(suffix) && !parsed.IsDescendantOf(suffix) {
+	if !config.UnderAny(parsed, managed) {
 		return nil, "", nil, false, directory.Error("base", directory.FieldForbidden, "search base is outside configured roots")
 	}
 	base = parsed.String()
@@ -81,7 +81,14 @@ func (r *Runtime) buildSearch(q directory.SearchQuery) (*ldap.SearchRequest, str
 	}
 	// children is emulated as subtree minus the base, so suffix+children+
 	// match-all is the same dump as suffix+sub and is rejected with it.
-	if config.IsOverBroad(q.Filter) && parsed.Equal(suffix) &&
+	atRoot := false
+	for _, suf := range managed {
+		if parsed.Equal(suf) {
+			atRoot = true
+			break
+		}
+	}
+	if config.IsOverBroad(q.Filter) && atRoot &&
 		(scopeName == directory.SearchScopeSub || scopeName == directory.SearchScopeChildren) {
 		return nil, "", nil, false, apperr.New(apperr.CodeConfiguration, "search too broad").
 			WithField(apperr.Field{Path: "filter", Code: "over_broad", Message: "filter is over-broad"})

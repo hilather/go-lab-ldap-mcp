@@ -30,6 +30,7 @@ tags:
   - name: Users
   - name: Groups
   - name: Search
+  - name: Directory
   - name: Schema
   - name: Audit
   - name: Reset
@@ -1000,6 +1001,266 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+  /api/v1/suffixes:
+    get:
+      operationId: listSuffixes
+      tags: [Directory]
+      summary: List compiled managed suffixes
+      description: Primary plus additionalSuffixes (ADR-0011). Sibling of ldap_list_suffixes.
+      x-labldap-contract: proposed
+      x-required-scope: directory:read
+      security:
+        - bearerAuth: [directory:read]
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Managed suffix set
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuffixList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /api/v1/tree:
+    post:
+      operationId: listTree
+      tags: [Directory]
+      summary: List one level of a managed suffix tree
+      description: Sibling of ldap_list_tree. Base must be a managed suffix or a descendant.
+      x-labldap-contract: proposed
+      x-required-scope: directory:read
+      security:
+        - bearerAuth: [directory:read]
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CSRFToken"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TreeQuery"
+      responses:
+        "200":
+          description: Tree page
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TreePage"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /api/v1/entries:
+    get:
+      operationId: getEntry
+      tags: [Directory]
+      summary: Read one structured entry by DN
+      x-labldap-contract: proposed
+      x-required-scope: directory:read
+      security:
+        - bearerAuth: [directory:read]
+        - cookieAuth: []
+      parameters:
+        - name: dn
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Directory entry
+          headers:
+            ETag:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DirectoryEntry"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      operationId: createEntry
+      tags: [Directory]
+      summary: Create an allowlisted structured entry
+      description: Sibling of ldap_create_entry. No raw LDAP modify. DN must be under a managed suffix.
+      x-labldap-contract: proposed
+      x-required-scope: directory:write
+      security:
+        - bearerAuth: [directory:write]
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CSRFToken"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EntrySpec"
+            example:
+              dn: ou=ServiceUsers,ou=people,dc=example,dc=test
+              objectClasses: [organizationalUnit]
+      responses:
+        "201":
+          description: Created
+          headers:
+            Location:
+              schema:
+                type: string
+            ETag:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DirectoryEntry"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+    patch:
+      operationId: updateEntry
+      tags: [Directory]
+      summary: Update allowlisted attributes by DN
+      description: Sibling of ldap_update_entry. Requires If-Match.
+      x-labldap-contract: proposed
+      x-required-scope: directory:write
+      security:
+        - bearerAuth: [directory:write]
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CSRFToken"
+        - $ref: "#/components/parameters/IfMatch"
+        - name: dn
+          in: query
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EntryPatch"
+      responses:
+        "200":
+          description: Updated entry
+          headers:
+            ETag:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DirectoryEntry"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "412":
+          $ref: "#/components/responses/PreconditionFailed"
+    delete:
+      operationId: deleteEntry
+      tags: [Directory]
+      summary: Delete an entry by DN
+      description: Sibling of ldap_delete_entry. Requires If-Match and confirm=true. Non-empty containers need recursive=true.
+      x-labldap-contract: proposed
+      x-required-scope: directory:write
+      security:
+        - bearerAuth: [directory:write]
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CSRFToken"
+        - $ref: "#/components/parameters/IfMatch"
+        - name: dn
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: confirm
+          in: query
+          required: true
+          schema:
+            type: boolean
+        - name: recursive
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "204":
+          description: Deleted
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "412":
+          $ref: "#/components/responses/PreconditionFailed"
+  /api/v1/entries/move:
+    post:
+      operationId: moveEntry
+      tags: [Directory]
+      summary: Rename or re-parent an entry
+      description: Sibling of ldap_move_entry. New DN must stay under a managed suffix.
+      x-labldap-contract: proposed
+      x-required-scope: directory:write
+      security:
+        - bearerAuth: [directory:write]
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CSRFToken"
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EntryMove"
+      responses:
+        "200":
+          description: Moved entry
+          headers:
+            ETag:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DirectoryEntry"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "412":
+          $ref: "#/components/responses/PreconditionFailed"
   /api/v1/auth-tests:
     post:
       operationId: createAuthTest
@@ -1457,6 +1718,10 @@ components:
             type: string
         requiredOK:
           type: boolean
+        managedSuffixes:
+          type: array
+          items:
+            type: string
     Baseline:
       type: object
       additionalProperties: false
@@ -1565,6 +1830,12 @@ components:
           type: string
         uid:
           type: string
+        dn:
+          type: string
+          description: Optional exact DN under a managed suffix (ADR-0011)
+        parentDN:
+          type: string
+          description: Optional parent DN under a managed suffix (ADR-0011)
         enabled:
           type: boolean
         password:
@@ -1638,6 +1909,12 @@ components:
       properties:
         id:
           type: string
+        dn:
+          type: string
+          description: Optional exact DN under a managed suffix (ADR-0011)
+        parentDN:
+          type: string
+          description: Optional parent DN under a managed suffix (ADR-0011)
         members:
           type: array
           items:
@@ -1716,6 +1993,127 @@ components:
           items:
             $ref: "#/components/schemas/SearchEntry"
         nextCursor:
+          type: string
+    SuffixList:
+      type: object
+      additionalProperties: false
+      required: [primary, additional, all]
+      properties:
+        primary:
+          type: string
+        additional:
+          type: array
+          items:
+            type: string
+        all:
+          type: array
+          items:
+            type: string
+    TreeQuery:
+      type: object
+      additionalProperties: false
+      properties:
+        base:
+          type: string
+        pageSize:
+          type: integer
+        cursor:
+          type: string
+    TreeNode:
+      type: object
+      additionalProperties: false
+      required: [dn, rdn, objectClasses, hasChildren]
+      properties:
+        dn:
+          type: string
+        rdn:
+          type: string
+        objectClasses:
+          type: array
+          items:
+            type: string
+        hasChildren:
+          type: boolean
+        revision:
+          type: string
+    TreePage:
+      type: object
+      additionalProperties: false
+      required: [base, nodes]
+      properties:
+        base:
+          type: string
+        nodes:
+          type: array
+          items:
+            $ref: "#/components/schemas/TreeNode"
+        nextCursor:
+          type: string
+    EntrySpec:
+      type: object
+      additionalProperties: false
+      required: [dn, objectClasses]
+      properties:
+        dn:
+          type: string
+        objectClasses:
+          type: array
+          items:
+            type: string
+        attributes:
+          type: object
+          additionalProperties:
+            type: string
+    EntryChange:
+      type: object
+      additionalProperties: false
+      required: [op, name]
+      properties:
+        op:
+          type: string
+          enum: [replace, add, delete]
+        name:
+          type: string
+        values:
+          type: array
+          items:
+            type: string
+    EntryPatch:
+      type: object
+      additionalProperties: false
+      required: [changes]
+      properties:
+        changes:
+          type: array
+          items:
+            $ref: "#/components/schemas/EntryChange"
+    EntryMove:
+      type: object
+      additionalProperties: false
+      required: [dn, newDN]
+      properties:
+        dn:
+          type: string
+        newDN:
+          type: string
+        deleteOldRdn:
+          type: boolean
+    DirectoryEntry:
+      type: object
+      additionalProperties: false
+      required: [dn, objectClasses, attributes, revision]
+      properties:
+        dn:
+          type: string
+        objectClasses:
+          type: array
+          items:
+            type: string
+        attributes:
+          type: array
+          items:
+            $ref: "#/components/schemas/AttrKV"
+        revision:
           type: string
     PasswordBody:
       type: object

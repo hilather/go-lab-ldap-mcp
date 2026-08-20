@@ -495,3 +495,54 @@ func TestInvalidFixtureFiles(t *testing.T) {
 		}
 	}
 }
+
+func TestAdditionalSuffixesCompile(t *testing.T) {
+	opt := config.LoadOptions{Caller: config.CallerCLI, Secrets: fixtureSecrets()}
+	base := exampleYAML(t)
+	a, err := config.Compile(t.Context(), base, "a.yaml", opt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(a.Normalized.AdditionalSuffixes) != 0 {
+		t.Fatal("omitted additionalSuffixes must stay empty")
+	}
+	if len(a.Engine.AdditionalBackends) != 0 {
+		t.Fatal("omitted additional backends")
+	}
+
+	with := bytes.Replace(base, []byte("    suffix: \"dc=example,dc=test\"\n"), []byte(
+		"    suffix: \"dc=example,dc=test\"\n    additionalSuffixes:\n      - \"dc=region2,dc=example,dc=net\"\n      - \"dc=region1,dc=example,dc=net\"\n",
+	), 1)
+	b, err := config.Compile(t.Context(), with, "b.yaml", opt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a.Revisions.Directory == b.Revisions.Directory {
+		t.Fatal("additional suffixes must change directory revision")
+	}
+	if a.Revisions.Control != b.Revisions.Control {
+		t.Fatal("additional suffixes must not change control revision")
+	}
+	got := b.Normalized.ManagedSuffixes()
+	if len(got) != 3 || got[0].String() != "dc=example,dc=test" {
+		t.Fatalf("managed = %v", got)
+	}
+	if got[1].String() != "dc=region1,dc=example,dc=net" || got[2].String() != "dc=region2,dc=example,dc=net" {
+		t.Fatalf("additional sort = %s %s", got[1].String(), got[2].String())
+	}
+	if len(b.Engine.AdditionalBackends) != 2 || b.Engine.AdditionalBackends[0].Name != "labldap1" {
+		t.Fatalf("backends = %+v", b.Engine.AdditionalBackends)
+	}
+	var writes int
+	for _, aci := range b.Data.ACIs {
+		if strings.Contains(aci.ID, "addsuffix") && strings.HasSuffix(aci.ID, "-write") {
+			writes++
+			if !strings.Contains(aci.Text, `targetattr!="aci"`) {
+				t.Fatalf("write ACI must deny aci: %s", aci.Text)
+			}
+		}
+	}
+	if writes != 2 {
+		t.Fatalf("additional write ACIs = %d", writes)
+	}
+}

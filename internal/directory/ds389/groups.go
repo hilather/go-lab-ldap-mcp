@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-ldap/ldap/v3"
 
+	"github.com/hilather/go-lab-ldap-mcp/internal/config"
 	"github.com/hilather/go-lab-ldap-mcp/internal/directory"
 	"github.com/hilather/go-lab-ldap-mcp/internal/directory/ldapclient"
 )
@@ -53,13 +54,13 @@ func (r *Runtime) listGroups(ctx context.Context, q directory.GroupListQuery) (d
 }
 
 func (r *Runtime) getGroup(ctx context.Context, id directory.GroupID) (directory.Group, error) {
-	dn, err := r.groupDN(string(id))
-	if err != nil {
-		return directory.Group{}, err
-	}
 	size, seconds := r.searchLimits()
 	var out directory.Group
-	err = r.pool.Do(ctx, func(c *ldapclient.Conn) error {
+	err := r.pool.Do(ctx, func(c *ldapclient.Conn) error {
+		dn, eerr := r.lookupGroupDN(ctx, c, string(id))
+		if eerr != nil {
+			return eerr
+		}
 		e, eerr := searchBaseConn(ctx, c, dn, groupReadAttrs(), size, seconds)
 		if eerr != nil {
 			return eerr
@@ -77,13 +78,22 @@ func (r *Runtime) addGroup(ctx context.Context, spec directory.GroupSpec) (direc
 	if len(spec.Members) == 0 {
 		return directory.Group{}, cfgErr("members", "empty_group", "groupOfNames cannot be empty")
 	}
-	dn, err := r.groupDN(spec.ID)
+	dn, err := r.placeGroupDN(spec)
 	if err != nil {
 		return directory.Group{}, err
 	}
 	size, seconds := r.searchLimits()
 	var out directory.Group
 	err = r.pool.Do(ctx, func(c *ldapclient.Conn) error {
+		if spec.DN != "" || spec.ParentDN != "" {
+			parsed, perr := config.ParseDN(dn)
+			if perr != nil {
+				return perr
+			}
+			if e := r.requireParent(ctx, c, parsed); e != nil {
+				return e
+			}
+		}
 		resolved, e := r.resolveMembers(ctx, c, spec.Members, true)
 		if e != nil {
 			return e
@@ -112,12 +122,12 @@ func (r *Runtime) addGroup(ctx context.Context, spec directory.GroupSpec) (direc
 }
 
 func (r *Runtime) deleteGroup(ctx context.Context, id directory.GroupID, rev directory.Revision) error {
-	dn, err := r.groupDN(string(id))
-	if err != nil {
-		return err
-	}
 	size, seconds := r.searchLimits()
 	return r.pool.Do(ctx, func(c *ldapclient.Conn) error {
+		dn, e := r.lookupGroupDN(ctx, c, string(id))
+		if e != nil {
+			return e
+		}
 		live, e := searchBaseConn(ctx, c, dn, groupReadAttrs(), size, seconds)
 		if e != nil {
 			return e
@@ -156,13 +166,13 @@ const (
 )
 
 func (r *Runtime) mutateMembers(ctx context.Context, id directory.GroupID, members []directory.MemberRef, rev directory.Revision, op memberOp) (directory.MembershipSummary, error) {
-	dn, err := r.groupDN(string(id))
-	if err != nil {
-		return directory.MembershipSummary{}, err
-	}
 	size, seconds := r.searchLimits()
 	var sum directory.MembershipSummary
-	err = r.pool.Do(ctx, func(c *ldapclient.Conn) error {
+	err := r.pool.Do(ctx, func(c *ldapclient.Conn) error {
+		dn, e := r.lookupGroupDN(ctx, c, string(id))
+		if e != nil {
+			return e
+		}
 		live, e := searchBaseConn(ctx, c, dn, groupReadAttrs(), size, seconds)
 		if e != nil {
 			return e
@@ -360,8 +370,10 @@ func (r *Runtime) resolveMember(ctx context.Context, c *ldapclient.Conn, m direc
 			kind = "user"
 		case r.underGroups(m.DN):
 			kind = "group"
+		case r.underManaged(m.DN):
+			kind = "user"
 		default:
-			return directory.MemberRef{}, cfgErr("members", "invalid_member", "member DN is outside managed containers")
+			return directory.MemberRef{}, cfgErr("members", "invalid_member", "member DN is outside managed suffixes")
 		}
 	}
 	switch kind {
@@ -371,14 +383,14 @@ func (r *Runtime) resolveMember(ctx context.Context, c *ldapclient.Conn, m direc
 			if err := parseSafeID(m.ID, "members"); err != nil {
 				return directory.MemberRef{}, err
 			}
-			dn, err := r.userDN(m.ID)
+			dn, err := r.lookupUserDN(ctx, c, m.ID)
 			if err != nil {
 				return directory.MemberRef{}, err
 			}
 			m.DN = dn
 		}
-		if !r.underPeople(m.DN) {
-			return directory.MemberRef{}, cfgErr("members", "invalid_member", "user member is outside the people container")
+		if !r.underManaged(m.DN) {
+			return directory.MemberRef{}, cfgErr("members", "invalid_member", "user member is outside managed suffixes")
 		}
 		if m.ID == "" {
 			m.ID = leafValue(m.DN)
@@ -391,14 +403,14 @@ func (r *Runtime) resolveMember(ctx context.Context, c *ldapclient.Conn, m direc
 			if err := parseSafeID(m.ID, "members"); err != nil {
 				return directory.MemberRef{}, err
 			}
-			dn, err := r.groupDN(m.ID)
+			dn, err := r.lookupGroupDN(ctx, c, m.ID)
 			if err != nil {
 				return directory.MemberRef{}, err
 			}
 			m.DN = dn
 		}
-		if !r.underGroups(m.DN) {
-			return directory.MemberRef{}, cfgErr("members", "invalid_member", "group member is outside the groups container")
+		if !r.underManaged(m.DN) {
+			return directory.MemberRef{}, cfgErr("members", "invalid_member", "group member is outside managed suffixes")
 		}
 		if m.ID == "" {
 			m.ID = leafValue(m.DN)

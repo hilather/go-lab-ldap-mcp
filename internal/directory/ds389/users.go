@@ -56,13 +56,13 @@ func (r *Runtime) List(ctx context.Context, q directory.UserListQuery) (director
 }
 
 func (r *Runtime) Get(ctx context.Context, id directory.UserID) (directory.User, error) {
-	dn, err := r.userDN(string(id))
-	if err != nil {
-		return directory.User{}, err
-	}
 	size, seconds := r.searchLimits()
 	var out directory.User
-	err = r.pool.Do(ctx, func(c *ldapclient.Conn) error {
+	err := r.pool.Do(ctx, func(c *ldapclient.Conn) error {
+		dn, eerr := r.lookupUserDN(ctx, c, string(id))
+		if eerr != nil {
+			return eerr
+		}
 		e, eerr := searchBaseConn(ctx, c, dn, runtimeUserReadAttrs(), size, seconds)
 		if eerr != nil {
 			return eerr
@@ -81,7 +81,7 @@ func (r *Runtime) Add(ctx context.Context, spec directory.UserSpec) (directory.U
 	if uid == "" {
 		uid = spec.ID
 	}
-	dn, err := r.userDN(uid)
+	dn, err := r.placeUserDN(spec)
 	if err != nil {
 		return directory.User{}, err
 	}
@@ -121,6 +121,15 @@ func (r *Runtime) Add(ctx context.Context, spec directory.UserSpec) (directory.U
 	size, seconds := r.searchLimits()
 	var out directory.User
 	err = r.pool.Do(ctx, func(c *ldapclient.Conn) error {
+		if spec.DN != "" || spec.ParentDN != "" {
+			parsed, perr := config.ParseDN(dn)
+			if perr != nil {
+				return perr
+			}
+			if e := r.requireParent(ctx, c, parsed); e != nil {
+				return e
+			}
+		}
 		if e := c.Add(ctx, add); e != nil {
 			return e
 		}
@@ -139,16 +148,16 @@ func (r *Runtime) Add(ctx context.Context, spec directory.UserSpec) (directory.U
 }
 
 func (r *Runtime) Modify(ctx context.Context, id directory.UserID, patch directory.UserPatch, rev directory.Revision) (directory.User, error) {
-	dn, err := r.userDN(string(id))
-	if err != nil {
-		return directory.User{}, err
-	}
 	if err := validateUserPatch(patch); err != nil {
 		return directory.User{}, err
 	}
 	size, seconds := r.searchLimits()
 	var out directory.User
-	err = r.pool.Do(ctx, func(c *ldapclient.Conn) error {
+	err := r.pool.Do(ctx, func(c *ldapclient.Conn) error {
+		dn, e := r.lookupUserDN(ctx, c, string(id))
+		if e != nil {
+			return e
+		}
 		live, e := searchBaseConn(ctx, c, dn, runtimeUserReadAttrs(), size, seconds)
 		if e != nil {
 			return e
@@ -204,16 +213,16 @@ func (r *Runtime) Modify(ctx context.Context, id directory.UserID, patch directo
 }
 
 func (r *Runtime) SetEnabled(ctx context.Context, id directory.UserID, enabled bool, rev directory.Revision) (directory.User, error) {
-	dn, err := r.userDN(string(id))
-	if err != nil {
-		return directory.User{}, err
-	}
-	if err := r.refuseRuntimeAccount(dn, "runtime account cannot be mutated"); err != nil {
-		return directory.User{}, err
-	}
 	size, seconds := r.searchLimits()
 	var out directory.User
-	err = r.pool.Do(ctx, func(c *ldapclient.Conn) error {
+	err := r.pool.Do(ctx, func(c *ldapclient.Conn) error {
+		dn, e := r.lookupUserDN(ctx, c, string(id))
+		if e != nil {
+			return e
+		}
+		if e := r.refuseRuntimeAccount(dn, "runtime account cannot be mutated"); e != nil {
+			return e
+		}
 		live, e := searchBaseConn(ctx, c, dn, runtimeUserReadAttrs(), size, seconds)
 		if e != nil {
 			return e
@@ -244,15 +253,15 @@ func (r *Runtime) SetEnabled(ctx context.Context, id directory.UserID, enabled b
 }
 
 func (r *Runtime) Delete(ctx context.Context, id directory.UserID, rev directory.Revision) error {
-	dn, err := r.userDN(string(id))
-	if err != nil {
-		return err
-	}
-	if err := r.refuseRuntimeAccount(dn, "runtime account cannot be deleted"); err != nil {
-		return err
-	}
 	size, seconds := r.searchLimits()
 	return r.pool.Do(ctx, func(c *ldapclient.Conn) error {
+		dn, e := r.lookupUserDN(ctx, c, string(id))
+		if e != nil {
+			return e
+		}
+		if e := r.refuseRuntimeAccount(dn, "runtime account cannot be deleted"); e != nil {
+			return e
+		}
 		live, e := searchBaseConn(ctx, c, dn, runtimeUserReadAttrs(), size, seconds)
 		if e != nil {
 			return e
@@ -269,18 +278,18 @@ func (r *Runtime) Delete(ctx context.Context, id directory.UserID, rev directory
 }
 
 func (r *Runtime) SetPassword(ctx context.Context, id directory.UserID, password observability.Secret, rev directory.Revision, mustChange bool) error {
-	dn, err := r.userDN(string(id))
-	if err != nil {
-		return err
-	}
-	if err := r.refuseRuntimeAccount(dn, "runtime account cannot be mutated"); err != nil {
-		return err
-	}
 	if password.Reveal() == "" {
 		return cfgErr("password", "required", "password is required")
 	}
 	size, seconds := r.searchLimits()
-	err = r.pool.Do(ctx, func(c *ldapclient.Conn) error {
+	err := r.pool.Do(ctx, func(c *ldapclient.Conn) error {
+		dn, e := r.lookupUserDN(ctx, c, string(id))
+		if e != nil {
+			return e
+		}
+		if e := r.refuseRuntimeAccount(dn, "runtime account cannot be mutated"); e != nil {
+			return e
+		}
 		live, e := searchBaseConn(ctx, c, dn, runtimeUserReadAttrs(), size, seconds)
 		if e != nil {
 			return e
@@ -423,9 +432,7 @@ func memberOfGroupIDs(e *ldap.Entry, groupsDN string) []directory.GroupID {
 	var out []directory.GroupID
 	seen := map[string]struct{}{}
 	for _, v := range e.GetAttributeValues("memberOf") {
-		if groupsDN != "" && !underContainer(v, groupsDN) {
-			continue
-		}
+		_ = groupsDN
 		id := leafValue(v)
 		if id == "" {
 			continue

@@ -11,14 +11,15 @@ const ControlAssertionOID = "1.3.6.1.1.12"
 // Capabilities is the T-044 measured engine report. Secret-free.
 // Bootstrap inspect returns this shape; runtime CapabilityInspector does too.
 type Capabilities struct {
-	EngineVendor   string   `json:"engineVendor"`
-	EngineVersion  string   `json:"engineVersion"`
-	AdapterVersion string   `json:"adapterVersion"`
-	Transports     []string `json:"transports"`
-	Plugins        []string `json:"plugins"`
-	PasswordScheme string   `json:"passwordScheme"`
-	Controls       []string `json:"controls"`
-	RequiredOK     bool     `json:"requiredOK"`
+	EngineVendor    string   `json:"engineVendor"`
+	EngineVersion   string   `json:"engineVersion"`
+	AdapterVersion  string   `json:"adapterVersion"`
+	Transports      []string `json:"transports"`
+	Plugins         []string `json:"plugins"`
+	PasswordScheme  string   `json:"passwordScheme"`
+	Controls        []string `json:"controls"`
+	RequiredOK      bool     `json:"requiredOK"`
+	ManagedSuffixes []string `json:"managedSuffixes,omitempty"`
 }
 
 // HasControl reports whether oid appears in Controls (case-insensitive).

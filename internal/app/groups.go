@@ -246,7 +246,8 @@ func (s *Groups) normalizeRef(m directory.MemberRef) directory.MemberRef {
 		switch {
 		case underDN(m.DN, s.groupsDN):
 			kind = "group"
-		case underDN(m.DN, s.peopleDN):
+		default:
+			// Explicit DNs under any managed suffix (ADR-0011 service users).
 			kind = "user"
 		}
 	}

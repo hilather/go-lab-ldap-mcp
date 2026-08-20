@@ -99,4 +99,17 @@ func TestDescendantIsStructural(t *testing.T) {
 	if suffix.IsDescendantOf(suffix) {
 		t.Fatal("equal is not a descendant")
 	}
+	parent, ok := child.Parent()
+	if !ok || !parent.Equal(suffix) {
+		t.Fatalf("parent = %q ok=%v", parent.String(), ok)
+	}
+	if _, ok := suffix.Parent(); ok {
+		t.Fatal("single-RDN DN has no parent")
+	}
+	if !config.UnderAny(child, []config.DN{suffix}) {
+		t.Fatal("child should be under managed suffix")
+	}
+	if config.UnderAny(contest, []config.DN{suffix}) {
+		t.Fatal("unrelated DN must not be under managed suffix")
+	}
 }

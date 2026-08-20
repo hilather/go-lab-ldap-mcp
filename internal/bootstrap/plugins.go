@@ -4,11 +4,12 @@ import "context"
 
 // PluginRequest is the engine-plugin reconcile input.
 type PluginRequest struct {
-	PasswordFile string
-	Instance     string
-	Suffix       string
-	Plugins      []string
-	Write        bool
+	PasswordFile       string
+	Instance           string
+	Suffix             string
+	AdditionalSuffixes []string
+	Plugins            []string
+	Write              bool
 }
 
 // PluginResult is secret-free.

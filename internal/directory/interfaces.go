@@ -38,6 +38,8 @@ type SearchRepository interface {
 	Search(ctx context.Context, q SearchQuery) (SearchPage, error)
 }
 
+// EntryRepository is defined in entry.go (ADR-0011 structured entries).
+
 type BindTester interface {
 	BindTest(ctx context.Context, identity string, password observability.Secret, t Transport) (BindTestResult, error)
 }
@@ -49,9 +51,11 @@ type SchemaRepository interface {
 
 type ResetSupport interface {
 	Inventory(ctx context.Context) (ManagedInventory, error)
-	// DeleteManaged removes one DN under people/groups. It must refuse
-	// the runtime account, required containers, the marker, and anything
-	// outside those containers. Missing entries are success.
+	// DeleteManaged removes one DN under people/groups, or an operator
+	// extra under an additional managed suffix. It must refuse the
+	// runtime account, required containers, the marker, additional
+	// suffix roots, and anything under the primary suffix outside
+	// people/groups. Missing entries are success.
 	DeleteManaged(ctx context.Context, dn string) error
 	Export(ctx context.Context, w io.Writer, opts ExportOptions) error
 }

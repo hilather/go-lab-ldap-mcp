@@ -26,6 +26,8 @@ const createSchema = z.object({
     .refine((value) => reservedCreateIdMessage(value) === undefined, {
       message: reservedCreateIdMessage("new") ?? 'The ID "new" is reserved.',
     }),
+  dn: z.string(),
+  parentDN: z.string(),
 });
 
 type CreateValues = z.infer<typeof createSchema>;
@@ -42,7 +44,7 @@ export function GroupCreatePage() {
   const [memberError, setMemberError] = useState<string | undefined>();
   const form = useForm<CreateValues>({
     resolver: zodResolver(createSchema),
-    defaultValues: { id: "" },
+    defaultValues: { id: "", dn: "", parentDN: "" },
   });
   const idError = form.formState.errors.id?.message;
   const memberGate = canSubmitGroupCreate(members);
@@ -67,7 +69,12 @@ export function GroupCreatePage() {
             return;
           }
           try {
-            const created = await createGroup({ id: values.id, members: toMemberRefs(members) });
+            const created = await createGroup({
+              id: values.id,
+              members: toMemberRefs(members),
+              ...(values.dn.trim() !== "" ? { dn: values.dn.trim() } : {}),
+              ...(values.parentDN.trim() !== "" ? { parentDN: values.parentDN.trim() } : {}),
+            });
             await invalidateUsersAndGroups(queryClient);
             await navigate(`/groups/${encodeURIComponent(created.id)}`);
           } catch (err) {
@@ -109,6 +116,14 @@ export function GroupCreatePage() {
             {...form.register("id")}
           />
           <FormError id="group-id-error" message={idError} />
+        </div>
+        <div className="field">
+          <label htmlFor="group-dn">Exact DN (optional)</label>
+          <input id="group-dn" autoComplete="off" spellCheck={false} {...form.register("dn")} />
+        </div>
+        <div className="field">
+          <label htmlFor="group-parent-dn">Parent DN (optional)</label>
+          <input id="group-parent-dn" autoComplete="off" spellCheck={false} {...form.register("parentDN")} />
         </div>
         <MemberSearch
           legend="Initial member (required)"

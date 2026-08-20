@@ -39,3 +39,10 @@ Compiler contract string (mixed into revisions in T-021): `labldap.config.v1alph
   `control`). Env `LABLDAP_MANAGEMENT_ALLOWED_HOSTS` and repeatable
   `--management-allowed-host` are additional sources. `*` is rejected.
   Compiler contract string and revision hashes are unchanged.
+- **2026-08-19 (ADR-0011, issue #5):** `spec.directory.additionalSuffixes`
+  added (`[]string`, default empty). Backward-compatible optional field:
+  no `apiVersion` bump, no `CompilerContract` bump. Omitted or empty
+  keeps today's single-suffix directory revision. Non-empty lists mix
+  into the directory revision. Values must be sibling naming contexts
+  (not equal to the primary, not nested). Multi-domain here means
+  multiple configured suffixes in one lab, not AD forests or trusts.

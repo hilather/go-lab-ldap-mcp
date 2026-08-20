@@ -56,6 +56,7 @@ const (
 
 	attrEngine             = "labldapEngine"
 	attrEngineSuffix       = "labldapEngineSuffix"
+	attrEngineAdditional   = "labldapEngineAdditionalSuffixes"
 	attrPasswordScheme     = "labldapPasswordStorageScheme"
 	attrPasswordMinLength  = "labldapPasswordMinLength"
 	attrPasswordHistory    = "labldapPasswordHistoryCount"

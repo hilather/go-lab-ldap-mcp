@@ -66,6 +66,21 @@ func (r *Runtime) Inventory(ctx context.Context) (directory.ManagedInventory, er
 			}
 			add(e.DN, &out.Users, &out.Groups, &out.Extra, false, isGroupEntry(e))
 		}
+		for _, extraBase := range r.cfg.AdditionalSuffixes {
+			ents, e := pageSubtree(ctx, c, extraBase, uint32(page), seconds)
+			if e != nil {
+				if fieldOf(e) == directory.FieldNotFound {
+					continue
+				}
+				return e
+			}
+			for _, ent := range ents {
+				if ent == nil || sameDN(ent.DN, extraBase) {
+					continue
+				}
+				add(ent.DN, &out.Users, &out.Groups, &out.Extra, isPersonEntry(ent), isGroupEntry(ent))
+			}
+		}
 		return nil
 	})
 	if err != nil {
@@ -94,8 +109,8 @@ func (r *Runtime) DeleteManaged(ctx context.Context, dn string) error {
 	if r.isProtectedDN(dn) {
 		return directory.Error("dn", directory.FieldForbidden, "protected directory entry cannot be deleted")
 	}
-	if !r.underPeople(dn) && !r.underGroups(dn) {
-		return directory.Error("dn", directory.FieldForbidden, "delete is outside managed containers")
+	if !r.resetDeleteAllowed(dn) {
+		return directory.Error("dn", directory.FieldForbidden, "delete is outside managed suffixes")
 	}
 	size, seconds := r.searchLimits()
 	return r.pool.Do(ctx, func(c *ldapclient.Conn) error {
@@ -132,6 +147,9 @@ func (r *Runtime) preserveDNs() map[string]string {
 		add("cn=" + markerCN + "," + r.cfg.Suffix)
 	}
 	add(r.cfg.Suffix)
+	for _, extra := range r.cfg.AdditionalSuffixes {
+		add(extra)
+	}
 	return out
 }
 
@@ -140,6 +158,35 @@ func (r *Runtime) isProtectedDN(dn string) bool {
 		return true
 	}
 	return r.cfg.RuntimeDN != "" && sameDN(dn, r.cfg.RuntimeDN)
+}
+
+// resetDeleteAllowed is the DeleteManaged write gate. Soft reset may
+// remove entries under people/groups, or operator extras under an
+// additional suffix (ADR-0011). Entries under the primary suffix that
+// are not under people/groups — such as cn=outside,<suffix> — stay
+// forbidden even though they sit inside a managed naming context.
+func (r *Runtime) resetDeleteAllowed(dn string) bool {
+	if r.underPeople(dn) || r.underGroups(dn) {
+		return true
+	}
+	return r.underAdditionalSuffix(dn)
+}
+
+func (r *Runtime) underAdditionalSuffix(dn string) bool {
+	got, err := config.ParseDN(dn)
+	if err != nil {
+		return false
+	}
+	for _, raw := range r.cfg.AdditionalSuffixes {
+		par, err := config.ParseDN(raw)
+		if err != nil {
+			continue
+		}
+		if got.IsDescendantOf(par) {
+			return true
+		}
+	}
+	return false
 }
 
 func pageSubtree(ctx context.Context, c *ldapclient.Conn, base string, page uint32, seconds int) ([]*ldap.Entry, error) {
