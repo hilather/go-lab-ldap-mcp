@@ -134,9 +134,16 @@ Never pass `--directory-manager-password` on a command line. Always a file.
 ## TLS
 
 ```bash
-go run ./tools/setuptls generate --dir secrets/tls --host directory
-go run ./tools/setuptls generate --dir secrets/tls --host management
+go run ./tools/setuptls generate --dir secrets/tls --host directory --management
+go run ./tools/setuptls generate --dir secrets/tls --host directory \
+  --dns lab.example --ip 203.0.113.10 \
+  --management --management-dns lab.example --management-ip 203.0.113.10
 ```
+
+`--host` stays the directory CN/SAN (`directory`). `--dns` / `--ip` and
+`--management-dns` / `--management-ip` are additive. Pass address literals
+to `--ip`, not `--dns` or `--host`. Extra SANs apply on first mint or
+`--force`; skip-if-exists is all-or-nothing.
 
 - Private CA key stays on the **host** (`secrets/tls/ca.key`). It is not
   mounted into containers.

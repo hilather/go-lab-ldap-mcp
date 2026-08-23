@@ -35,9 +35,16 @@ first boot.
 
 Usage:
   labldap-setup-tls generate [--dir secrets/tls] [--host directory] [--force] [--management]
+                             [--dns NAME]... [--ip ADDR]...
+                             [--management-dns NAME]... [--management-ip ADDR]...
   labldap-setup-tls import   [--dir secrets/tls] [--project labldap] [--service directory] [-f FILE]...
   labldap-setup-tls import   --container NAME [--dir secrets/tls]
   labldap-setup-tls publish  [--out secrets/tls/instance-ca.crt] [--project labldap] [--service directory] [-f FILE]...
+
+--dns/--ip and --management-dns/--management-ip are additive. --host stays the
+directory CN and SAN (default directory). Do not pass an IP as --host or --dns;
+use --ip so the address is an IP SAN. Skip-if-exists is all-or-nothing: extra
+SANs apply on first mint or --force, not on a later generate against existing PEMs.
 
 import defaults to the persistent Compose overlay. It refuses a tmpfs-backed
 /data (restart remounts empty) and checks dsctl show-server-cert after
@@ -102,9 +109,14 @@ func runGenerate(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("generate", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	dir := fs.String("dir", "secrets/tls", "output directory")
-	host := fs.String("host", "directory", "directory certificate DNS SAN")
+	host := fs.String("host", "directory", "directory certificate CN and DNS SAN")
 	force := fs.Bool("force", false, "overwrite existing PEMs")
 	mgmt := fs.Bool("management", false, "also write optional management SAN cert")
+	var extraDNS, extraIPs, extraMgmtDNS, extraMgmtIPs multiFlag
+	fs.Var(&extraDNS, "dns", "additional directory DNS SAN (repeatable; additive)")
+	fs.Var(&extraIPs, "ip", "additional directory IP SAN (repeatable; additive)")
+	fs.Var(&extraMgmtDNS, "management-dns", "additional management DNS SAN (repeatable; additive)")
+	fs.Var(&extraMgmtIPs, "management-ip", "additional management IP SAN (repeatable; additive)")
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
 			fmt.Fprint(stdout, usageText)
@@ -112,14 +124,61 @@ func runGenerate(args []string, stdout, stderr io.Writer) int {
 		}
 		return 2
 	}
-	if err := generate(*dir, *host, *force, *mgmt, stdout); err != nil {
+	dns, err := parseDNSFlags("dns", extraDNS)
+	if err != nil {
+		fmt.Fprintf(stderr, "setuptls generate: %v\n", err)
+		return 1
+	}
+	ips, err := parseIPFlags("ip", extraIPs)
+	if err != nil {
+		fmt.Fprintf(stderr, "setuptls generate: %v\n", err)
+		return 1
+	}
+	mgmtDNS, err := parseDNSFlags("management-dns", extraMgmtDNS)
+	if err != nil {
+		fmt.Fprintf(stderr, "setuptls generate: %v\n", err)
+		return 1
+	}
+	mgmtIPs, err := parseIPFlags("management-ip", extraMgmtIPs)
+	if err != nil {
+		fmt.Fprintf(stderr, "setuptls generate: %v\n", err)
+		return 1
+	}
+	if err := generate(generateOpts{
+		Dir:          *dir,
+		Host:         *host,
+		Force:        *force,
+		Management:   *mgmt,
+		ExtraDNS:     dns,
+		ExtraIPs:     ips,
+		ExtraMgmtDNS: mgmtDNS,
+		ExtraMgmtIPs: mgmtIPs,
+		Stdout:       stdout,
+	}); err != nil {
 		fmt.Fprintf(stderr, "setuptls generate: %v\n", err)
 		return 1
 	}
 	return 0
 }
 
-func generate(dir, host string, force, management bool, stdout io.Writer) error {
+type generateOpts struct {
+	Dir          string
+	Host         string
+	Force        bool
+	Management   bool
+	ExtraDNS     []string
+	ExtraIPs     []net.IP
+	ExtraMgmtDNS []string
+	ExtraMgmtIPs []net.IP
+	Stdout       io.Writer
+}
+
+func generate(opts generateOpts) error {
+	dir := opts.Dir
+	host := opts.Host
+	if host == "" {
+		host = "directory"
+	}
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
 	}
@@ -127,10 +186,10 @@ func generate(dir, host string, force, management bool, stdout io.Writer) error 
 		return err
 	}
 	p := paths(dir)
-	if !force {
+	if !opts.Force {
 		for _, f := range []string{p.CACert, p.CAKey, p.DirectoryCert, p.DirectoryKey} {
 			if fileExists(f) {
-				fmt.Fprintf(stdout, "skipped %s (exists)\n", f)
+				fmt.Fprintf(opts.Stdout, "skipped %s (exists)\n", f)
 				return nil
 			}
 		}
@@ -163,24 +222,108 @@ func generate(dir, host string, force, management bool, stdout io.Writer) error 
 	if err := writePEM(p.CAKey, "RSA PRIVATE KEY", x509.MarshalPKCS1PrivateKey(caKey), 0o600); err != nil {
 		return err
 	}
-	fmt.Fprintf(stdout, "wrote %s\n", p.CACert)
-	fmt.Fprintf(stdout, "wrote %s\n", p.CAKey)
+	fmt.Fprintf(opts.Stdout, "wrote %s\n", p.CACert)
+	fmt.Fprintf(opts.Stdout, "wrote %s\n", p.CAKey)
 
-	sans := []string{host, "localhost"}
-	if err := signServer(p.DirectoryCert, p.DirectoryKey, caTmpl, caKey, host, sans, []net.IP{net.ParseIP("127.0.0.1")}); err != nil {
+	dirDNS := mergeDNS([]string{host, "localhost"}, opts.ExtraDNS)
+	dirIPs := mergeIPs([]net.IP{net.ParseIP("127.0.0.1")}, opts.ExtraIPs)
+	if err := signServer(p.DirectoryCert, p.DirectoryKey, caTmpl, caKey, host, dirDNS, dirIPs); err != nil {
 		return err
 	}
-	fmt.Fprintf(stdout, "wrote %s\n", p.DirectoryCert)
-	fmt.Fprintf(stdout, "wrote %s\n", p.DirectoryKey)
+	fmt.Fprintf(opts.Stdout, "wrote %s\n", p.DirectoryCert)
+	fmt.Fprintf(opts.Stdout, "wrote %s\n", p.DirectoryKey)
 
-	if management {
-		if err := signServer(p.ManagementCert, p.ManagementKey, caTmpl, caKey, "control", []string{"control", "localhost"}, auth.LocalIPAddresses()); err != nil {
+	if opts.Management {
+		mgmtDNS := mergeDNS([]string{"control", "localhost"}, opts.ExtraMgmtDNS)
+		mgmtIPs := mergeIPs(auth.LocalIPAddresses(), opts.ExtraMgmtIPs)
+		if err := signServer(p.ManagementCert, p.ManagementKey, caTmpl, caKey, "control", mgmtDNS, mgmtIPs); err != nil {
 			return err
 		}
-		fmt.Fprintf(stdout, "wrote %s\n", p.ManagementCert)
-		fmt.Fprintf(stdout, "wrote %s\n", p.ManagementKey)
+		fmt.Fprintf(opts.Stdout, "wrote %s\n", p.ManagementCert)
+		fmt.Fprintf(opts.Stdout, "wrote %s\n", p.ManagementKey)
 	}
 	return nil
+}
+
+func parseDNSFlags(flagName string, vals []string) ([]string, error) {
+	var out []string
+	for _, v := range vals {
+		v = strings.TrimSpace(v)
+		if v == "" {
+			return nil, fmt.Errorf("empty --%s value", flagName)
+		}
+		if net.ParseIP(v) != nil {
+			return nil, fmt.Errorf("%q is an IP address (use --%s, not --%s)", v, ipFlagFor(flagName), flagName)
+		}
+		out = append(out, v)
+	}
+	return out, nil
+}
+
+func parseIPFlags(flagName string, vals []string) ([]net.IP, error) {
+	var out []net.IP
+	for _, v := range vals {
+		v = strings.TrimSpace(v)
+		if v == "" {
+			return nil, fmt.Errorf("empty --%s value", flagName)
+		}
+		ip := net.ParseIP(v)
+		if ip == nil {
+			return nil, fmt.Errorf("%q is not an IP address (use --%s for hostnames)", v, dnsFlagFor(flagName))
+		}
+		out = append(out, ip)
+	}
+	return out, nil
+}
+
+func ipFlagFor(dnsFlag string) string {
+	if strings.HasPrefix(dnsFlag, "management") {
+		return "management-ip"
+	}
+	return "ip"
+}
+
+func dnsFlagFor(ipFlag string) string {
+	if strings.HasPrefix(ipFlag, "management") {
+		return "management-dns"
+	}
+	return "dns"
+}
+
+func mergeDNS(base, extra []string) []string {
+	seen := map[string]struct{}{}
+	var out []string
+	for _, n := range append(append([]string{}, base...), extra...) {
+		if n == "" {
+			continue
+		}
+		if _, ok := seen[n]; ok {
+			continue
+		}
+		seen[n] = struct{}{}
+		out = append(out, n)
+	}
+	return out
+}
+
+func mergeIPs(base, extra []net.IP) []net.IP {
+	seen := map[string]struct{}{}
+	var out []net.IP
+	for _, ip := range append(append([]net.IP{}, base...), extra...) {
+		if ip == nil {
+			continue
+		}
+		if v4 := ip.To4(); v4 != nil {
+			ip = v4
+		}
+		key := ip.String()
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, ip)
+	}
+	return out
 }
 
 func signServer(certPath, keyPath string, ca *x509.Certificate, caKey *rsa.PrivateKey, cn string, dns []string, ips []net.IP) error {
