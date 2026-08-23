@@ -92,8 +92,8 @@ through REST or MCP.
 go run ./tools/setupsecrets --dir secrets
 go run ./tools/setupsecrets --dir secrets --force   # rotate
 go run ./tools/setupsecrets --dir secrets --print   # print values (off by default)
-go run ./tools/setuptls generate --dir secrets/tls --host directory
-go run ./tools/setuptls generate --dir secrets/tls --management
+go run ./tools/setuptls generate --dir secrets/tls --host directory --management
+go run ./tools/setuptls generate --dir secrets/tls --host directory --dns lab.example --ip 203.0.113.10 --management
 go run ./tools/setuptls publish --out secrets/tls/instance-ca.crt
 go run ./tools/setuptls import --dir secrets/tls --project labldap
 go run ./tools/composepreflight

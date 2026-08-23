@@ -124,7 +124,8 @@ revision) restores the compiled baseline without removing the volume.
 ```text
 go run ./tools/setupsecrets --dir secrets
 go run ./tools/setupsecrets --dir secrets --force    # rotate
-go run ./tools/setuptls generate --dir secrets/tls --host directory
+go run ./tools/setuptls generate --dir secrets/tls --host directory --management
+go run ./tools/setuptls generate --dir secrets/tls --host directory --dns lab.example --ip 203.0.113.10
 ```
 
 Existing files are not overwritten unless `--force`. Mode 0600 on the host.
