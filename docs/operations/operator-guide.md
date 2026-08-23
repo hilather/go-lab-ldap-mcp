@@ -125,7 +125,8 @@ revision) restores the compiled baseline without removing the volume.
 go run ./tools/setupsecrets --dir secrets
 go run ./tools/setupsecrets --dir secrets --force    # rotate
 go run ./tools/setuptls generate --dir secrets/tls --host directory --management
-go run ./tools/setuptls generate --dir secrets/tls --host directory --dns lab.example --ip 203.0.113.10
+# extra SANs are optional on first mint (or pass --force; skip-if-exists is all-or-nothing):
+# go run ./tools/setuptls generate --dir secrets/tls --host directory --dns lab.example --ip 203.0.113.10 --management
 ```
 
 Existing files are not overwritten unless `--force`. Mode 0600 on the host.

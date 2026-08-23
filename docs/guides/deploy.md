@@ -135,9 +135,10 @@ Never pass `--directory-manager-password` on a command line. Always a file.
 
 ```bash
 go run ./tools/setuptls generate --dir secrets/tls --host directory --management
-go run ./tools/setuptls generate --dir secrets/tls --host directory \
-  --dns lab.example --ip 203.0.113.10 \
-  --management --management-dns lab.example --management-ip 203.0.113.10
+# extra SANs on first mint or --force (skip-if-exists is all-or-nothing):
+# go run ./tools/setuptls generate --dir secrets/tls --host directory \
+#   --dns lab.example --ip 203.0.113.10 \
+#   --management --management-dns lab.example --management-ip 203.0.113.10
 ```
 
 `--host` stays the directory CN/SAN (`directory`). `--dns` / `--ip` and
