@@ -43,8 +43,9 @@ Usage:
 
 --dns/--ip and --management-dns/--management-ip are additive. --host stays the
 directory CN and SAN (default directory). Do not pass an IP as --host or --dns;
-use --ip so the address is an IP SAN. Skip-if-exists is all-or-nothing: extra
-SANs apply on first mint or --force, not on a later generate against existing PEMs.
+use --ip so the address is an IP SAN. --management-dns/--management-ip require
+--management. Skip-if-exists is all-or-nothing: extra SANs apply on first mint
+or --force, not on a later generate against existing PEMs.
 
 import defaults to the persistent Compose overlay. It refuses a tmpfs-backed
 /data (restart remounts empty) and checks dsctl show-server-cert after
@@ -178,6 +179,12 @@ func generate(opts generateOpts) error {
 	host := opts.Host
 	if host == "" {
 		host = "directory"
+	}
+	if _, err := parseDNSFlags("host", []string{host}); err != nil {
+		return err
+	}
+	if !opts.Management && (len(opts.ExtraMgmtDNS) > 0 || len(opts.ExtraMgmtIPs) > 0) {
+		return fmt.Errorf("--management-dns and --management-ip require --management")
 	}
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err

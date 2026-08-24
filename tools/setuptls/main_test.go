@@ -269,6 +269,49 @@ func TestGenerateRejectsIPInDNSFlag(t *testing.T) {
 	}
 }
 
+func TestGenerateRejectsIPInHostFlag(t *testing.T) {
+	dir := t.TempDir()
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"generate", "--dir", dir, "--host", "203.0.113.10"}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatal("expected failure")
+	}
+	if !strings.Contains(stderr.String(), "use --ip") || !strings.Contains(stderr.String(), "--host") {
+		t.Fatalf("stderr=%s", stderr.String())
+	}
+	if fileExists(paths(dir).DirectoryCert) {
+		t.Fatal("must not mint a leaf when --host is an IP literal")
+	}
+}
+
+func TestGenerateRejectsManagementSANWithoutManagement(t *testing.T) {
+	cases := [][]string{
+		{"--management-dns", "lab.example"},
+		{"--management-ip", "203.0.113.10"},
+		{"--management-dns", "lab.example", "--management-ip", "203.0.113.10"},
+	}
+	for _, extra := range cases {
+		t.Run(strings.Join(extra, " "), func(t *testing.T) {
+			dir := t.TempDir()
+			var stdout, stderr bytes.Buffer
+			args := append([]string{"generate", "--dir", dir}, extra...)
+			code := run(args, &stdout, &stderr)
+			if code == 0 {
+				t.Fatal("expected failure")
+			}
+			if !strings.Contains(stderr.String(), "require --management") {
+				t.Fatalf("stderr=%s", stderr.String())
+			}
+			if fileExists(paths(dir).ManagementCert) {
+				t.Fatal("must not write management.crt")
+			}
+			if fileExists(paths(dir).DirectoryCert) {
+				t.Fatal("must not write directory PEMs after fail-closed")
+			}
+		})
+	}
+}
+
 func TestGenerateRejectsHostnameInIPFlag(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := run([]string{"generate", "--dir", t.TempDir(), "--ip", "lab.example"}, &stdout, &stderr)
