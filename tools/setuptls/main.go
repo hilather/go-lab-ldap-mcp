@@ -252,6 +252,15 @@ func generate(opts generateOpts) error {
 	return nil
 }
 
+// parseIPLiteral accepts a bare IP or URI-form IPv6 ([::1]). net.ParseIP
+// returns nil for the bracketed form, which is still an address, not a DNS name.
+func parseIPLiteral(v string) net.IP {
+	if len(v) >= 2 && v[0] == '[' && v[len(v)-1] == ']' {
+		v = v[1 : len(v)-1]
+	}
+	return net.ParseIP(v)
+}
+
 func parseDNSFlags(flagName string, vals []string) ([]string, error) {
 	var out []string
 	for _, v := range vals {
@@ -259,7 +268,7 @@ func parseDNSFlags(flagName string, vals []string) ([]string, error) {
 		if v == "" {
 			return nil, fmt.Errorf("empty --%s value", flagName)
 		}
-		if net.ParseIP(v) != nil {
+		if parseIPLiteral(v) != nil {
 			return nil, fmt.Errorf("%q is an IP address (use --%s, not --%s)", v, ipFlagFor(flagName), flagName)
 		}
 		out = append(out, v)
@@ -274,7 +283,7 @@ func parseIPFlags(flagName string, vals []string) ([]net.IP, error) {
 		if v == "" {
 			return nil, fmt.Errorf("empty --%s value", flagName)
 		}
-		ip := net.ParseIP(v)
+		ip := parseIPLiteral(v)
 		if ip == nil {
 			return nil, fmt.Errorf("%q is not an IP address (use --%s for hostnames)", v, dnsFlagFor(flagName))
 		}
