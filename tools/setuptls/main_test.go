@@ -323,6 +323,87 @@ func TestGenerateRejectsHostnameInIPFlag(t *testing.T) {
 	}
 }
 
+func TestParseDNSFlagsRejectsIPLiterals(t *testing.T) {
+	for _, v := range []string{"203.0.113.10", "::1", "[::1]", "[2001:db8::1]"} {
+		_, err := parseDNSFlags("host", []string{v})
+		if err == nil || !strings.Contains(err.Error(), "use --ip") {
+			t.Fatalf("%q: err=%v", v, err)
+		}
+	}
+}
+
+func TestParseIPFlagsAcceptsIPLiterals(t *testing.T) {
+	cases := []struct {
+		in   string
+		want net.IP
+	}{
+		{"203.0.113.10", net.ParseIP("203.0.113.10")},
+		{"::1", net.ParseIP("::1")},
+		{"[::1]", net.ParseIP("::1")},
+		{"[2001:db8::1]", net.ParseIP("2001:db8::1")},
+	}
+	for _, tc := range cases {
+		ips, err := parseIPFlags("ip", []string{tc.in})
+		if err != nil {
+			t.Fatalf("%q: %v", tc.in, err)
+		}
+		if len(ips) != 1 || !ips[0].Equal(tc.want) {
+			t.Fatalf("%q: got %v want %v", tc.in, ips, tc.want)
+		}
+	}
+}
+
+func TestGenerateRejectsBracketedIPv6InHostFlag(t *testing.T) {
+	dir := t.TempDir()
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"generate", "--dir", dir, "--host", "[::1]"}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatal("expected failure")
+	}
+	if !strings.Contains(stderr.String(), "use --ip") || !strings.Contains(stderr.String(), "--host") {
+		t.Fatalf("stderr=%s", stderr.String())
+	}
+	if strings.Contains(stderr.String(), "use --dns") {
+		t.Fatalf("must not steer --host IPv6 toward --dns: %s", stderr.String())
+	}
+	if fileExists(paths(dir).DirectoryCert) {
+		t.Fatal("must not mint a leaf when --host is a bracketed IPv6 literal")
+	}
+}
+
+func TestGenerateRejectsBracketedIPv6InDNSFlag(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"generate", "--dir", t.TempDir(), "--dns", "[::1]"}, &stdout, &stderr)
+	if code == 0 {
+		t.Fatal("expected failure")
+	}
+	if !strings.Contains(stderr.String(), "use --ip") {
+		t.Fatalf("stderr=%s", stderr.String())
+	}
+}
+
+func TestGenerateAcceptsBracketedIPv6InIPFlag(t *testing.T) {
+	dir := t.TempDir()
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"generate", "--dir", dir, "--ip", "[::1]"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("code=%d stderr=%s", code, stderr.String())
+	}
+	if strings.Contains(stderr.String(), "use --dns") {
+		t.Fatalf("must not steer --ip '[::1]' toward --dns: %s", stderr.String())
+	}
+	cert := parseCert(t, paths(dir).DirectoryCert)
+	if containsDNS(cert.DNSNames, "[::1]") || containsDNS(cert.DNSNames, "::1") {
+		t.Fatalf("bracketed IPv6 must not be a DNS SAN: %v", cert.DNSNames)
+	}
+	if !containsIP(cert.IPAddresses, net.ParseIP("::1")) {
+		t.Fatalf("::1 missing from IPAddresses: %v", cert.IPAddresses)
+	}
+	if err := cert.VerifyHostname("::1"); err != nil {
+		t.Fatalf("IP SAN ::1: %v", err)
+	}
+}
+
 func TestRunGenerateExtraSANFlags(t *testing.T) {
 	dir := t.TempDir()
 	var stdout, stderr bytes.Buffer
