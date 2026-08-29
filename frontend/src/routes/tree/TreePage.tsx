@@ -353,7 +353,7 @@ export function TreePage() {
                 <form
                   onSubmit={async (event) => {
                     event.preventDefault();
-                    if (!canWrite || selectedDN === "") {
+                    if (!canWrite || selectedDN === "" || createRDN.trim() === "") {
                       return;
                     }
                     setFormError("");
@@ -398,7 +398,11 @@ export function TreePage() {
                       Type an RDN such as ou=labtree, or a full DN that already contains a comma.
                     </p>
                   </div>
-                  <button type="submit" className="button-primary" disabled={!canWrite || selectedDN === ""}>
+                  <button
+                    type="submit"
+                    className="button-primary"
+                    disabled={!canWrite || selectedDN === "" || createRDN.trim() === ""}
+                  >
                     Create child
                   </button>
                 </form>
@@ -424,6 +428,13 @@ export function TreePage() {
                       setStatus(`Moved to ${moved.dn}`);
                       setSelectedDN(moved.dn);
                       setMoveTo(moved.dn);
+                      setExpanded((prev) => {
+                        const next = prev.filter((item) => item !== selectedDN);
+                        if (!next.includes(newParent)) {
+                          next.push(newParent);
+                        }
+                        return next;
+                      });
                       await refresh([oldParent, newParent]);
                     } catch (err) {
                       setFormError(isApiError(err) ? err.message : "Move failed.");
@@ -471,6 +482,7 @@ export function TreePage() {
                       setSelectedDN(next === selectedDN ? effectiveBase : next);
                       setDeleteConfirm("");
                       setDeleteRecursive(false);
+                      setExpanded((prev) => prev.filter((item) => item !== selectedDN));
                       await refresh([next]);
                     } catch (err) {
                       setFormError(isApiError(err) ? err.message : "Delete failed.");
@@ -643,7 +655,7 @@ function TreeBranch({
     hasChildren: node.hasChildren,
     loaded: childrenByBase.has(node.dn),
     childCount: kids.length,
-    kind,
+    isExpanded,
   });
   const err = treeError(node.dn);
   const more = nextCursorFor(node.dn);

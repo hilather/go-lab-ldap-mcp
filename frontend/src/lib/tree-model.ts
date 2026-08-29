@@ -82,15 +82,12 @@ export function canExpandTreeNode(input: {
   hasChildren: boolean;
   loaded: boolean;
   childCount: number;
-  kind?: EntryKind;
+  isExpanded?: boolean;
 }): boolean {
-  if (input.hasChildren || input.childCount > 0) {
+  if (input.isExpanded === true || input.hasChildren || input.childCount > 0) {
     return true;
   }
-  if (input.loaded) {
-    return false;
-  }
-  return input.kind !== "user" && input.kind !== "group";
+  return !input.loaded;
 }
 
 export function shouldShowNode(

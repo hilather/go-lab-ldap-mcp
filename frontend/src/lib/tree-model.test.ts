@@ -26,11 +26,11 @@ test("entry kind maps object classes used by the inspector", () => {
 });
 
 test("expand is offered when subordinates are unknown, as on native", () => {
-  assert.equal(canExpandTreeNode({ hasChildren: false, loaded: false, childCount: 0, kind: "ou" }), true);
-  assert.equal(canExpandTreeNode({ hasChildren: false, loaded: true, childCount: 0, kind: "ou" }), false);
-  assert.equal(canExpandTreeNode({ hasChildren: true, loaded: false, childCount: 0, kind: "user" }), true);
-  assert.equal(canExpandTreeNode({ hasChildren: false, loaded: false, childCount: 0, kind: "user" }), false);
-  assert.equal(canExpandTreeNode({ hasChildren: false, loaded: true, childCount: 2, kind: "ou" }), true);
+  assert.equal(canExpandTreeNode({ hasChildren: false, loaded: false, childCount: 0 }), true);
+  assert.equal(canExpandTreeNode({ hasChildren: false, loaded: true, childCount: 0 }), false);
+  assert.equal(canExpandTreeNode({ hasChildren: false, loaded: true, childCount: 0, isExpanded: true }), true);
+  assert.equal(canExpandTreeNode({ hasChildren: true, loaded: false, childCount: 0 }), true);
+  assert.equal(canExpandTreeNode({ hasChildren: false, loaded: true, childCount: 2 }), true);
 });
 
 test("filter matches RDN or DN and keeps ancestors of matches", () => {

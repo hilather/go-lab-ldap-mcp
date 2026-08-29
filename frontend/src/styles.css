@@ -445,9 +445,9 @@ button:disabled {
 }
 
 .button-danger {
-  background: transparent;
-  border-color: var(--danger);
-  color: var(--danger);
+  background: #3a1c1c;
+  border-color: #e89a9a;
+  color: #f0c4c4;
 }
 
 .action-disabled,
