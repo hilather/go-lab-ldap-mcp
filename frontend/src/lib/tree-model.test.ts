@@ -53,6 +53,7 @@ test("child DN is built under the selected parent unless a full DN is typed", ()
     childDN("ou=labtree,ou=groups,dc=example,dc=test", "ou=people,dc=example,dc=test"),
     "ou=labtree,ou=groups,dc=example,dc=test",
   );
+  assert.equal(childDN("", "ou=people,dc=example,dc=test"), "");
   assert.equal(rdnOf("uid=alice,ou=people,dc=example,dc=test"), "uid=alice");
   assert.equal(parentDN("uid=alice,ou=people,dc=example,dc=test"), "ou=people,dc=example,dc=test");
 });

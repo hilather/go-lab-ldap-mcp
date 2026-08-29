@@ -105,7 +105,7 @@ export function shouldShowNode(
 export function childDN(rdnOrDn: string, parent: string): string {
   const typed = rdnOrDn.trim();
   if (typed === "") {
-    return parent.trim();
+    return "";
   }
   if (indexOfUnescapedComma(typed) !== -1) {
     return typed;
