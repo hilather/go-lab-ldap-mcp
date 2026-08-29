@@ -641,7 +641,7 @@ code,
 .tree-kind {
   font-family: "IBM Plex Sans", system-ui, sans-serif;
   font-size: 0.75rem;
-  color: var(--muted);
+  color: #c4c5c1;
   font-weight: 400;
 }
 

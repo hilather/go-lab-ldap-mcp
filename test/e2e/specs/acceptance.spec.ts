@@ -44,7 +44,7 @@ test("admin session completes the product acceptance scenario", async ({ page })
   await expect(page.getByText("STRUCTURAL")).toBeVisible();
 
   await visit(page, "/audit");
-  await expect(page.getByText(/in-memory audit ring/i)).toBeVisible();
+  await expect(page.getByText(/The in-memory audit ring is/i)).toBeVisible();
   await expect(page.getByRole("cell", { name: "session.create" }).first()).toBeVisible();
 
   await visit(page, "/export");
