@@ -307,7 +307,7 @@ function QueryNote({
   if (result.error !== null && result.error !== undefined) {
     return <p>Could not load {missing}.</p>;
   }
-  return <p>No {missing} yet.</p>;
+  return <p className="muted">No {missing} yet.</p>;
 }
 
 function isUnavailable(error: unknown): boolean {

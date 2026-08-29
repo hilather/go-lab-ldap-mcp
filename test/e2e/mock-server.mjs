@@ -580,7 +580,12 @@ async function handleAPI(req, res, url) {
     if (requireSession(req, res, "directory:read") === undefined || directoryUnavailable(res)) {
       return;
     }
-    const id = decodeURIComponent(path.slice("/api/v1/groups/".length).split("/")[0] ?? "");
+    const rest = path.slice("/api/v1/groups/".length);
+    if (rest.includes("/")) {
+      problem(res, 404, "not found");
+      return;
+    }
+    const id = decodeURIComponent(rest);
     const group = groups.get(id);
     if (group === undefined) {
       problem(res, 404, "not found");

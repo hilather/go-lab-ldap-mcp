@@ -395,8 +395,7 @@ input[type="checkbox"] {
 }
 
 .resource-page section,
-.resource-page > form,
-.resource-page > dl {
+.resource-page > form {
   margin-top: 1.25rem;
   padding: 0.9rem 1rem;
   background: var(--panel);
@@ -576,7 +575,8 @@ th {
 }
 
 th button {
-  padding: 0;
+  min-height: 1.75rem;
+  padding: 0 0.15rem;
   border: none;
   background: transparent;
   color: inherit;

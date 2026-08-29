@@ -5,19 +5,23 @@ test.afterEach(async ({ page }) => {
   await clearPasswordFields(page);
 });
 
-const TOKEN_SURFACES = new Set([
-  "rgb(11, 12, 14)",
-  "rgb(18, 19, 23)",
-  "rgb(24, 26, 31)",
-]);
+const BG = "rgb(11, 12, 14)";
+const ELEVATED = "rgb(18, 19, 23)";
+const PANEL = "rgb(24, 26, 31)";
 
 async function paintedBackground(locator: Locator): Promise<string> {
   return locator.evaluate((el) => getComputedStyle(el).backgroundColor);
 }
 
-async function expectPaintedDark(locator: Locator): Promise<void> {
+async function expectSurface(locator: Locator, rgb: string): Promise<void> {
   const bg = await paintedBackground(locator);
-  expect(TOKEN_SURFACES.has(bg), `expected a Directory token surface, got ${bg}`).toBe(true);
+  expect(bg, `expected ${rgb}`).toBe(rgb);
+}
+
+async function expectMutedCopy(locator: Locator): Promise<void> {
+  await expect(locator).toBeVisible();
+  const color = await locator.evaluate((el) => getComputedStyle(el).color);
+  expect(color).toBe("rgb(154, 155, 151)");
 }
 
 async function expectPlex(locator: Locator): Promise<void> {
@@ -27,7 +31,7 @@ async function expectPlex(locator: Locator): Promise<void> {
 
 async function expectLeftoverChrome(page: Page, surface: Locator): Promise<void> {
   await expect(surface).toBeVisible();
-  await expectPaintedDark(surface);
+  await expectSurface(surface, PANEL);
   await expectPlex(surface);
 }
 
@@ -37,7 +41,7 @@ test("leftover operator pages use Directory chrome", async ({ page }) => {
   await expect(page.locator("main.login img.brand-mark")).toBeVisible();
   await expect(page.locator(".login-card")).toBeVisible();
   await expect(page.getByRole("button", { name: "Sign in" })).toHaveClass(/button-primary/);
-  await expectPaintedDark(page.locator("main.login"));
+  await expectSurface(page.locator("main.login"), BG);
   await expectLeftoverChrome(page, page.locator(".login-card"));
 
   await login(page);
@@ -63,7 +67,7 @@ test("leftover operator pages use Directory chrome", async ({ page }) => {
   await deleteUser.click();
   const dialog = page.getByRole("dialog", { name: "Delete user" });
   await expect(dialog.getByRole("heading", { name: /Delete user/ })).toBeVisible();
-  await expectPaintedDark(dialog);
+  await expectSurface(dialog, PANEL);
   const backdrop = await page.evaluate(() => {
     const node = document.querySelector("dialog.confirm-dialog[open]");
     return node === null ? "" : getComputedStyle(node, "::backdrop").backgroundColor;
@@ -88,10 +92,10 @@ test("leftover operator pages use Directory chrome", async ({ page }) => {
   await visit(page, "/search");
   await expectLeftoverChrome(page, page.locator("#main > form"));
   await expect(page.getByRole("button", { name: "Search" })).toHaveClass(/button-primary/);
-  await expectPaintedDark(page.locator("#search-page-size"));
+  await expectSurface(page.locator("#search-page-size"), ELEVATED);
   await page.getByLabel("Filter").fill("(uid=nosuch)");
   await page.getByRole("button", { name: "Search" }).click();
-  await expect(page.getByText("No entries matched this search.")).toBeVisible();
+  await expectMutedCopy(page.getByText("No entries matched this search."));
 
   await visit(page, "/auth-test");
   await expectLeftoverChrome(page, page.locator("#main > form"));
@@ -100,14 +104,14 @@ test("leftover operator pages use Directory chrome", async ({ page }) => {
   await visit(page, "/schema");
   await expectLeftoverChrome(page, page.locator("#main section").first());
   await page.getByLabel("Filter object classes").fill("zzzz");
-  await expect(page.getByText("No object classes match this search.")).toBeVisible();
+  await expectMutedCopy(page.getByText("No object classes match this search."));
 
   await visit(page, "/audit");
   await expectLeftoverChrome(page, page.locator("#main > form"));
   await expect(page.getByRole("button", { name: "Apply filters" })).toHaveClass(/button-primary/);
   await page.getByLabel("Action").fill("no.such.action");
   await page.getByRole("button", { name: "Apply filters" }).click();
-  await expect(page.getByText("No audit events match these filters.")).toBeVisible();
+  await expectMutedCopy(page.getByText("No audit events match these filters."));
 
   await visit(page, "/reset");
   await expectLeftoverChrome(page, page.locator("#main > form"));
