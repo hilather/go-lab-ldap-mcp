@@ -80,7 +80,7 @@ export function ExportPage() {
           </div>
         ) : null}
         <div className="form-actions">
-          <button type="submit" disabled={!canDownload}>
+          <button type="submit" className="button-primary" disabled={!canDownload}>
             {busy ? "Exporting…" : "Download LDIF"}
           </button>
         </div>

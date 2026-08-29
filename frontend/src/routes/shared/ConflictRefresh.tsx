@@ -33,7 +33,7 @@ export function ConflictRefresh({
         revision. Your pending change was not applied.
       </p>
       <div className="form-actions">
-        <button type="button" onClick={onRefresh}>
+        <button type="button" className="button-primary" onClick={onRefresh}>
           Refresh
         </button>
         <button type="button" onClick={onDismiss}>

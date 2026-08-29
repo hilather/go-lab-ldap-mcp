@@ -62,6 +62,8 @@ acts on the selected DN (create allowlisted child OU/domain/container,
 revision-checked move, exact-DN delete). User and group create stay on
 `/users/new` and `/groups/new`. IBM Plex Sans/Mono are self-hosted
 under `src/fonts/` so production CSP (`font-src 'self'`) can load them.
+Leftover operator pages — including sign-in — share that same dark / teal
+/ IBM Plex chrome.
 
 ## Search, bind test, schema, audit, reset, export
 

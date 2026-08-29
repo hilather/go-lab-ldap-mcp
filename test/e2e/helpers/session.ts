@@ -41,6 +41,17 @@ export async function visit(page: Page, dest: string): Promise<void> {
     await page.getByRole("link", { name: id, exact: true }).click();
     return;
   }
+  if (dest === "/groups/new") {
+    await nav.getByRole("link", { name: "Groups", exact: true }).click();
+    await page.getByRole("link", { name: "Create group" }).click();
+    return;
+  }
+  if (dest.startsWith("/groups/")) {
+    const id = decodeURIComponent(dest.slice("/groups/".length));
+    await nav.getByRole("link", { name: "Groups", exact: true }).click();
+    await page.getByRole("link", { name: id, exact: true }).click();
+    return;
+  }
   throw new Error(`no in-app route helper for ${dest}`);
 }
 

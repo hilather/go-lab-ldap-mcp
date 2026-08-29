@@ -576,6 +576,20 @@ async function handleAPI(req, res, url) {
     return;
   }
 
+  if (req.method === "GET" && path.startsWith("/api/v1/groups/")) {
+    if (requireSession(req, res, "directory:read") === undefined || directoryUnavailable(res)) {
+      return;
+    }
+    const id = decodeURIComponent(path.slice("/api/v1/groups/".length).split("/")[0] ?? "");
+    const group = groups.get(id);
+    if (group === undefined) {
+      problem(res, 404, "not found");
+      return;
+    }
+    json(res, 200, group);
+    return;
+  }
+
   if (req.method === "POST" && path === "/api/v1/search") {
     if (requireSession(req, res, "directory:read") === undefined || directoryUnavailable(res)) {
       return;

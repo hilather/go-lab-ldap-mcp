@@ -77,7 +77,7 @@ export function AuditPage() {
                 Non-secret token or session identifier. Filters apply when you submit.
               </p>
             </div>
-            <button type="submit">Apply filters</button>
+            <button type="submit" className="button-primary">Apply filters</button>
             <button
               type="button"
               onClick={() => {
@@ -90,7 +90,7 @@ export function AuditPage() {
           {audit.data === undefined ? (
             <QueryStatus result={audit} missing="audit events" />
           ) : audit.data.items.length === 0 ? (
-            <p>No audit events match these filters.</p>
+            <p className="muted">No audit events match these filters.</p>
           ) : (
             <table>
               <caption>Bounded in-memory audit ring. Expand a row for request ID and revisions.</caption>

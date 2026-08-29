@@ -68,7 +68,8 @@ a {
 a:focus-visible,
 button:focus-visible,
 input:focus-visible,
-select:focus-visible {
+select:focus-visible,
+textarea:focus-visible {
   outline: 3px solid var(--accent);
   outline-offset: 2px;
 }
@@ -87,11 +88,34 @@ select:focus-visible {
   top: 0.75rem;
 }
 
-.login,
 .app-shell main {
   max-width: 52rem;
   margin: 0 auto;
   padding: 1.25rem 1rem 2rem;
+}
+
+.login {
+  box-sizing: border-box;
+  min-height: 100vh;
+  margin: 0;
+  padding: 1.5rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.login-card {
+  width: min(28rem, 100%);
+  padding: 1.25rem 1.15rem 1.4rem;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.login-card .brand-mark {
+  margin-bottom: 0.75rem;
 }
 
 .app-shell main.directory-workspace {
@@ -187,8 +211,7 @@ select:focus-visible {
 }
 
 .scope-list ul,
-.app-nav ul,
-.action-list {
+.app-nav ul {
   margin: 0;
   padding-left: 1.2rem;
 }
@@ -274,8 +297,26 @@ select:focus-visible {
 .dashboard section {
   margin-top: 1.25rem;
   padding: 0.9rem 1rem;
-  background: var(--elevated);
+  background: var(--panel);
   border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.action-list {
+  list-style: none;
+  margin: 0;
+  padding-left: 0;
+}
+
+.action-list a {
+  display: inline-block;
+  font-weight: 600;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--elevated);
+  color: var(--fg);
+  text-decoration: none;
 }
 
 .status-line {
@@ -325,8 +366,10 @@ h2 {
 
 input[type="password"],
 input[type="text"],
+input[type="number"],
 input:not([type]),
-select {
+select,
+textarea {
   width: min(28rem, 100%);
   padding: 0.45rem 0.55rem;
   font: inherit;
@@ -335,15 +378,37 @@ select {
   border: 1px solid var(--border);
 }
 
+fieldset {
+  min-inline-size: 0;
+  margin: 1rem 0;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+}
+
+legend {
+  padding: 0 0.35rem;
+  color: var(--muted);
+}
+
 input[type="checkbox"] {
   width: auto;
 }
 
-.resource-page section {
+.resource-page section,
+.resource-page > form,
+.resource-page > dl {
   margin-top: 1.25rem;
   padding: 0.9rem 1rem;
-  background: var(--elevated);
+  background: var(--panel);
   border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.resource-page > table {
+  margin-top: 1.25rem;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
 }
 
 .toolbar {
@@ -376,6 +441,12 @@ input[type="checkbox"] {
   text-decoration: none;
 }
 
+.button-link.button-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #0b0c0e;
+}
+
 .field-hint,
 .hint-list {
   margin: 0.25rem 0 0;
@@ -396,8 +467,7 @@ input[type="checkbox"] {
   width: min(16rem, 100%);
 }
 
-.member-search,
-.confirm-dialog {
+.member-search {
   margin: 1rem 0;
   padding: 0.9rem 1rem;
   background: var(--elevated);
@@ -419,8 +489,19 @@ input[type="checkbox"] {
   margin: 0.3rem 0;
 }
 
-.confirm-dialog {
+dialog.confirm-dialog {
   max-width: 32rem;
+  margin: auto;
+  padding: 0.9rem 1rem;
+  color: var(--fg);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color-scheme: dark;
+}
+
+dialog.confirm-dialog::backdrop {
+  background: rgb(11 12 14 / 72%);
 }
 
 button {
@@ -487,6 +568,20 @@ td {
   padding: 0.35rem 0.5rem;
   border-bottom: 1px solid var(--border);
   vertical-align: top;
+}
+
+th {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+th button {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
 }
 
 caption {

@@ -69,9 +69,9 @@ export function UserListPage() {
                 onChange={(event) => setQInput(event.target.value)}
               />
             </div>
-            <button type="submit">Search</button>
+            <button type="submit" className="button-primary">Search</button>
             {createGate.ok ? (
-              <Link className="button-link" to="/users/new">
+              <Link className="button-link button-primary" to="/users/new">
                 Create user
               </Link>
             ) : (
@@ -84,7 +84,7 @@ export function UserListPage() {
           {usersQuery.data === undefined ? (
             <QueryStatus result={usersQuery} missing="users" />
           ) : items.length === 0 ? (
-            <p>{emptyListMessage("users", searching)}</p>
+            <p className="muted">{emptyListMessage("users", searching)}</p>
           ) : (
             <table>
               <caption>

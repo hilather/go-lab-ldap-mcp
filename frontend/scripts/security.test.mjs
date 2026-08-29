@@ -37,6 +37,8 @@ test("UI never assigns innerHTML and renders LDAP strings as text", async () => 
   const confirm = await readFile(join(srcRoot, "routes/shared/ConfirmDelete.tsx"), "utf8");
   assert.match(confirm, /aria-labelledby/);
   assert.match(confirm, /firstFocusable/);
+  assert.match(confirm, /confirm-dialog/);
+  assert.match(confirm, /button-danger/);
   const conflict = await readFile(join(srcRoot, "routes/shared/ConflictRefresh.tsx"), "utf8");
   assert.match(conflict, /firstFocusable/);
 });
@@ -75,6 +77,8 @@ test("login form posts the token and clears retained field state", async () => {
   assert.match(login, /loginFailureKind/);
   assert.match(login, /role=\{notice\.role\}/);
   assert.match(login, /aria-live="assertive"/);
+  assert.match(login, /brand-mark/);
+  assert.match(login, /button-primary/);
   assert.doesNotMatch(login, /localStorage|sessionStorage|indexedDB/i);
 });
 

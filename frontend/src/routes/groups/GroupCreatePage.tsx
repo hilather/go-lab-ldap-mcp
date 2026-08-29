@@ -54,7 +54,7 @@ export function GroupCreatePage() {
       <p>
         <Link to="/groups">Back to groups</Link>
       </p>
-      <p>{emptyGroupExplanation()}</p>
+      <p className="muted">{emptyGroupExplanation()}</p>
       {!writeGate.ok ? <p>{writeGate.reason}</p> : null}
       <form
         method="post"
@@ -133,7 +133,7 @@ export function GroupCreatePage() {
           error={memberError ?? (memberGate.ok ? undefined : memberGate.reason)}
         />
         <div className="form-actions">
-          <button type="submit" disabled={!writeGate.ok || !memberGate.ok || form.formState.isSubmitting}>
+          <button type="submit" className="button-primary" disabled={!writeGate.ok || !memberGate.ok || form.formState.isSubmitting}>
             {form.formState.isSubmitting ? "Creating…" : "Create group"}
           </button>
         </div>

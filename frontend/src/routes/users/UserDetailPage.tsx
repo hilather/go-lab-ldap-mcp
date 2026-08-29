@@ -173,7 +173,7 @@ export function UserDetailPage() {
           <section aria-labelledby="user-attrs-heading">
             <h2 id="user-attrs-heading">Attributes</h2>
             {user.attributes.length === 0 ? (
-              <p>No allowlisted attributes are present.</p>
+              <p className="muted">No allowlisted attributes are present.</p>
             ) : (
               <table>
                 <caption>API-exposed attributes. Passwords and operational attributes are omitted.</caption>
@@ -200,11 +200,11 @@ export function UserDetailPage() {
             {groupsQuery.data === undefined ? (
               <QueryStatus result={groupsQuery} missing="user groups" />
             ) : groupsQuery.data.items.length === 0 ? (
-              <p>This user is not a direct member of any group.</p>
+              <p className="muted">This user is not a direct member of any group.</p>
             ) : (
-              <ul>
+              <ul className="membership-list">
                 {groupsQuery.data.items.map((group) => (
-                  <li key={group.id}>
+                  <li key={group.id} className="membership-pill">
                     <Link to={`/groups/${encodeURIComponent(group.id)}`}>{group.id}</Link>
                   </li>
                 ))}
@@ -239,7 +239,7 @@ export function UserDetailPage() {
               <button type="button" disabled={!passwordGate.ok} onClick={() => setPasswordOpen(true)}>
                 Set password
               </button>
-              <button type="button" disabled={!writeGate.ok} onClick={() => setDeleteOpen(true)}>
+              <button type="button" className="button-danger" disabled={!writeGate.ok} onClick={() => setDeleteOpen(true)}>
                 Delete
               </button>
             </div>
@@ -412,7 +412,7 @@ function UserEditForm({
           <FormError id="edit-attr-error" message={attrError} />
         </fieldset>
         <div className="form-actions">
-          <button type="submit" disabled={!gate.ok || form.formState.isSubmitting}>
+          <button type="submit" className="button-primary" disabled={!gate.ok || form.formState.isSubmitting}>
             {form.formState.isSubmitting ? "Saving…" : "Save changes"}
           </button>
         </div>
@@ -510,7 +510,7 @@ function PasswordDialog({
         </div>
         <FormError id="set-password-form-error" message={formError} />
         <div className="form-actions">
-          <button type="submit" disabled={disabled || form.formState.isSubmitting}>
+          <button type="submit" className="button-primary" disabled={disabled || form.formState.isSubmitting}>
             {form.formState.isSubmitting ? "Saving…" : "Update password"}
           </button>
           <button type="button" onClick={onDismiss}>

@@ -55,7 +55,7 @@ export function GroupListPage() {
       <ScopeNote scopes={session.scopes} required={SCOPE_DIRECTORY_READ} error={groupsQuery.error} />
       {!canRead ? null : (
         <>
-          <p>{emptyGroupExplanation()}</p>
+          <p className="muted">{emptyGroupExplanation()}</p>
           <form
             className="toolbar"
             onSubmit={(event) => {
@@ -75,9 +75,9 @@ export function GroupListPage() {
                 onChange={(event) => setQInput(event.target.value)}
               />
             </div>
-            <button type="submit">Search</button>
+            <button type="submit" className="button-primary">Search</button>
             {createGate.ok ? (
-              <Link className="button-link" to="/groups/new">
+              <Link className="button-link button-primary" to="/groups/new">
                 Create group
               </Link>
             ) : (
@@ -90,7 +90,7 @@ export function GroupListPage() {
           {groupsQuery.data === undefined ? (
             <QueryStatus result={groupsQuery} missing="groups" />
           ) : items.length === 0 ? (
-            <p>{emptyListMessage("groups", searching)}</p>
+            <p className="muted">{emptyListMessage("groups", searching)}</p>
           ) : (
             <table>
               <caption>
