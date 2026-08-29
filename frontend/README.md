@@ -54,6 +54,15 @@ detail supports add, remove, and replace membership with added / removed
 / unchanged / rejected summaries. Cycle errors leave the group unchanged.
 There is no group-attribute edit form (no `PATCH /groups/{id}`).
 
+## Directory
+
+`/tree` is the directory workspace (nav label **Directory**). The left
+pane is a lazy-expanding DIT of already-loaded nodes; the inspector
+acts on the selected DN (create allowlisted child OU/domain/container,
+revision-checked move, exact-DN delete). User and group create stay on
+`/users/new` and `/groups/new`. IBM Plex Sans/Mono are self-hosted
+under `src/fonts/` so production CSP (`font-src 'self'`) can load them.
+
 ## Search, bind test, schema, audit, reset, export
 
 `/search` is an explicit-submit console (base, scope, filter, attributes, page

@@ -9,8 +9,11 @@ import {
   insecureReasons,
   loginNotice,
   missingScopeReason,
+  formatRelativeExpiry,
   navRestriction,
+  navigationGroups,
   navigationItems,
+  primaryWriteScopeChip,
   quickActions,
   scenarioStatus,
   SCOPE_DIRECTORY_READ,
@@ -84,6 +87,44 @@ test("navigation explains missing scopes without relying on color", () => {
   assert.ok(users);
   assert.equal(navRestriction(users, []), "Requires scope directory:read.");
   assert.equal(navRestriction(users, [SCOPE_DIRECTORY_READ]), "");
+});
+
+test("directory nav stays on /tree and bind test is labeled Bind test", () => {
+  const items = navigationItems();
+  const directory = items.find((item) => item.href === "/tree");
+  assert.ok(directory);
+  assert.equal(directory.label, "Directory");
+  const bind = items.find((item) => item.href === "/auth-test");
+  assert.ok(bind);
+  assert.equal(bind.label, "Bind test");
+  const groups = navigationGroups();
+  assert.equal(groups[0]?.items[1]?.label, "Directory");
+  const lab = groups.find((group) => group.id === "lab");
+  assert.ok(lab);
+  assert.equal(lab.label, "Lab");
+  assert.deepEqual(
+    lab.items.map((item) => item.href),
+    ["/schema", "/audit", "/export", "/reset", "/diagnostics"],
+  );
+});
+
+test("relative expiry is human and never ISO", () => {
+  const now = Date.parse("2026-08-29T15:00:00.000Z");
+  assert.equal(formatRelativeExpiry("2026-08-29T15:46:00.000Z", now), "expires in 46m");
+  assert.equal(formatRelativeExpiry("2026-08-29T17:00:00.000Z", now), "expires in 2h");
+  assert.equal(formatRelativeExpiry("2026-09-01T15:00:00.000Z", now), "expires in 3d");
+  assert.equal(formatRelativeExpiry("2026-08-29T14:00:00.000Z", now), "expired");
+  assert.equal(formatRelativeExpiry("not-a-date", now), "expired");
+  assert.doesNotMatch(formatRelativeExpiry("2026-08-29T15:46:00.000Z", now), /T/);
+});
+
+test("write-scope chip is a single preferred write scope", () => {
+  assert.equal(
+    primaryWriteScopeChip(["directory:read", "directory:write", "audit:read"]),
+    "directory:write",
+  );
+  assert.equal(primaryWriteScopeChip(["directory:read", "schema:read"]), undefined);
+  assert.equal(primaryWriteScopeChip(["lab:export", "directory:password"]), "directory:password");
 });
 
 test("insecurity banner reasons are textual", () => {

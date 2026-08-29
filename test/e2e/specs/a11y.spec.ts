@@ -37,4 +37,8 @@ test("core forms pass automated accessibility checks", async ({ page }) => {
   await visit(page, "/schema");
   await expect(page.getByRole("heading", { name: "Schema" })).toBeVisible();
   await expectNoSeriousViolations(page);
+
+  await visit(page, "/tree");
+  await expect(page.locator("#main")).toBeVisible();
+  await expectNoSeriousViolations(page);
 });

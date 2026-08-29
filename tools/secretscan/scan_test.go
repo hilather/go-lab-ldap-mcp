@@ -47,6 +47,21 @@ func TestScanDoesNotPrintSecretValue(t *testing.T) {
 	}
 }
 
+func TestScanSkipsWoff2(t *testing.T) {
+	dir := t.TempDir()
+	body := "AWS_ACCESS_KEY_ID=" + "AKIA" + "IOSFODNN7EXAMPLE" + "\n"
+	if err := os.WriteFile(filepath.Join(dir, "mark.woff2"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	findings, err := scan(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(findings) != 0 {
+		t.Fatalf("woff2 should be skipped: %#v", findings)
+	}
+}
+
 func TestScanCleanTree(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "ok.go"), []byte("package ok\n"), 0o644); err != nil {

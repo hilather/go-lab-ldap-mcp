@@ -70,7 +70,7 @@ lab CA or accept the browser warning.
 | `/users` | List, create, edit, enable/disable, set password, delete |
 | `/groups` | List, create (needs an initial member), membership add/remove/replace |
 | `/search` | Explicit-submit LDAP search. Typing does not fire a query. |
-| `/tree` | Browse managed suffixes; create OU/domain/container; create user/group at an exact DN; move; delete with confirm |
+| `/tree` | Directory browser: expand the DIT, inspect a selected DN, create an allowlisted child OU/domain/container, move or delete that DN |
 | `/auth-test` | Bind diagnostic. Password field clears after the attempt. |
 | `/schema` | Read-only Root DSE and schema browser |
 | `/audit` | In-memory audit ring, filterable, with request-id copy |
@@ -96,13 +96,15 @@ A membership cycle is rejected and the group is left unchanged.
 
 ### Directory tree
 
-`/tree` lists compiled managed suffixes (primary plus
-`additionalSuffixes`). From a chosen base you can create allowlisted
-entries (`organizationalUnit`, `domain`, or `container` stored as
-`organizationalUnit`), place a user or group at an exact DN, move or
-rename, and delete with a typed-DN confirm. Writes outside the
-configured suffixes are rejected. Multi-domain here means multiple
-suffixes in one lab, not an AD forest.
+`/tree` (Directory in the nav) browses compiled managed suffixes
+(primary plus `additionalSuffixes`). Expand the tree, select a DN, and
+inspect its attributes. Create allowlisted child entries
+(`organizationalUnit`, `domain`, or `container` stored as
+`organizationalUnit`) under the selected DN. Move or rename and delete
+with a typed-DN confirm still apply to that selected DN. Create users
+and groups on `/users/new` and `/groups/new` — the tree does not host
+those forms. Writes outside the configured suffixes are rejected.
+Multi-domain here means multiple suffixes in one lab, not an AD forest.
 
 ### Search
 
