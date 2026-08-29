@@ -5,13 +5,11 @@ test.afterEach(async ({ page }) => {
   await clearPasswordFields(page);
 });
 
-function isWhite(color: string): boolean {
-  return color === "rgb(255, 255, 255)" || color === "rgba(255, 255, 255, 1)";
-}
-
-function isTransparent(color: string): boolean {
-  return color === "rgba(0, 0, 0, 0)" || color === "transparent";
-}
+const TOKEN_SURFACES = new Set([
+  "rgb(11, 12, 14)",
+  "rgb(18, 19, 23)",
+  "rgb(24, 26, 31)",
+]);
 
 async function paintedBackground(locator: Locator): Promise<string> {
   return locator.evaluate((el) => getComputedStyle(el).backgroundColor);
@@ -19,8 +17,7 @@ async function paintedBackground(locator: Locator): Promise<string> {
 
 async function expectPaintedDark(locator: Locator): Promise<void> {
   const bg = await paintedBackground(locator);
-  expect(isWhite(bg), `expected a dark painted surface, got ${bg}`).toBe(false);
-  expect(isTransparent(bg), `expected a dark painted surface, got ${bg}`).toBe(false);
+  expect(TOKEN_SURFACES.has(bg), `expected a Directory token surface, got ${bg}`).toBe(true);
 }
 
 async function expectPlex(locator: Locator): Promise<void> {
@@ -64,15 +61,14 @@ test("leftover operator pages use Directory chrome", async ({ page }) => {
   const deleteUser = page.getByRole("button", { name: /^Delete$/ });
   await expect(deleteUser).toHaveClass(/button-danger/);
   await deleteUser.click();
-  const dialog = page.locator("dialog.confirm-dialog");
+  const dialog = page.getByRole("dialog", { name: "Delete user" });
   await expect(dialog.getByRole("heading", { name: /Delete user/ })).toBeVisible();
   await expectPaintedDark(dialog);
   const backdrop = await page.evaluate(() => {
-    const node = document.querySelector("dialog.confirm-dialog");
+    const node = document.querySelector("dialog.confirm-dialog[open]");
     return node === null ? "" : getComputedStyle(node, "::backdrop").backgroundColor;
   });
-  expect(isWhite(backdrop), `dialog backdrop was ${backdrop}`).toBe(false);
-  expect(isTransparent(backdrop), `dialog backdrop was ${backdrop}`).toBe(false);
+  expect(backdrop).toBe("rgba(11, 12, 14, 0.72)");
   await page.keyboard.press("Escape");
 
   await visit(page, "/groups");
@@ -95,7 +91,7 @@ test("leftover operator pages use Directory chrome", async ({ page }) => {
   await expectPaintedDark(page.locator("#search-page-size"));
   await page.getByLabel("Filter").fill("(uid=nosuch)");
   await page.getByRole("button", { name: "Search" }).click();
-  await expect(page.locator("#main .muted")).toContainText("No entries matched this search.");
+  await expect(page.getByText("No entries matched this search.")).toBeVisible();
 
   await visit(page, "/auth-test");
   await expectLeftoverChrome(page, page.locator("#main > form"));
@@ -104,14 +100,14 @@ test("leftover operator pages use Directory chrome", async ({ page }) => {
   await visit(page, "/schema");
   await expectLeftoverChrome(page, page.locator("#main section").first());
   await page.getByLabel("Filter object classes").fill("zzzz");
-  await expect(page.locator("#main .muted")).toContainText("No object classes match this search.");
+  await expect(page.getByText("No object classes match this search.")).toBeVisible();
 
   await visit(page, "/audit");
   await expectLeftoverChrome(page, page.locator("#main > form"));
   await expect(page.getByRole("button", { name: "Apply filters" })).toHaveClass(/button-primary/);
   await page.getByLabel("Action").fill("no.such.action");
   await page.getByRole("button", { name: "Apply filters" }).click();
-  await expect(page.locator("#main .muted")).toContainText("No audit events match these filters.");
+  await expect(page.getByText("No audit events match these filters.")).toBeVisible();
 
   await visit(page, "/reset");
   await expectLeftoverChrome(page, page.locator("#main > form"));

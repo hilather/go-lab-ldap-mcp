@@ -181,7 +181,7 @@ export function GroupDetailPage() {
           <section aria-labelledby="group-membership-heading">
             <h2 id="group-membership-heading">Membership changes</h2>
             {!writeGate.ok ? <p>{writeGate.reason}</p> : null}
-            <p>{emptyGroupExplanation()}</p>
+            <p className="muted">{emptyGroupExplanation()}</p>
             <MemberSearch
               legend="Members to add or use as a replacement set"
               selected={selected}
@@ -284,7 +284,7 @@ function MembershipResult({ summary }: { summary: MembershipSummary }) {
 function MemberBucket({ title, members }: { title: string; members: MemberRef[] }) {
   if (members.length === 0) {
     return (
-      <p>
+      <p className="muted">
         {title}: none
       </p>
     );
