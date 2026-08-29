@@ -85,7 +85,11 @@ export function MemberSearch({
           {searching ? "Searching…" : "Search"}
         </button>
       </div>
-      {status !== undefined ? <p role="status" className="muted">{status}</p> : null}
+      {status !== undefined ? (
+        <p role="status" className={status === "No matching directory members." ? "muted" : undefined}>
+          {status}
+        </p>
+      ) : null}
       {results.length > 0 ? (
         <ul className="member-results">
           {results.map((item) => (
