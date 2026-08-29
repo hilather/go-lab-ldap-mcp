@@ -78,6 +78,21 @@ export function nodeMatchesFilter(node: FilterableNode, q: string): boolean {
   return node.rdn.toLowerCase().includes(needle) || node.dn.toLowerCase().includes(needle);
 }
 
+export function canExpandTreeNode(input: {
+  hasChildren: boolean;
+  loaded: boolean;
+  childCount: number;
+  kind?: EntryKind;
+}): boolean {
+  if (input.hasChildren || input.childCount > 0) {
+    return true;
+  }
+  if (input.loaded) {
+    return false;
+  }
+  return input.kind !== "user" && input.kind !== "group";
+}
+
 export function shouldShowNode(
   node: FilterableNode,
   filter: string,

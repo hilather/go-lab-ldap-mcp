@@ -261,13 +261,13 @@ function treeNodesFor(base) {
       dn: "ou=people,dc=example,dc=test",
       rdn: "ou=people",
       objectClasses: ["organizationalUnit"],
-      hasChildren: true,
+      hasChildren: false,
     });
     push({
       dn: "ou=groups,dc=example,dc=test",
       rdn: "ou=groups",
       objectClasses: ["organizationalUnit"],
-      hasChildren: true,
+      hasChildren: false,
     });
   }
   for (const user of users.values()) {

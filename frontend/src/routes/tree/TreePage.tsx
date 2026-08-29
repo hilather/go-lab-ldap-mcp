@@ -9,6 +9,7 @@ import { canSubmitMutation, exactIdConfirmed } from "../../lib/directory-model";
 import { queryKeys } from "../../lib/query";
 import { hasScope, SCOPE_DIRECTORY_READ, SCOPE_DIRECTORY_WRITE } from "../../lib/session-model";
 import {
+  canExpandTreeNode,
   childDN,
   displayMembershipLabel,
   entryKind,
@@ -64,7 +65,6 @@ export function TreePage() {
   const [moveTo, setMoveTo] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const [deleteRecursive, setDeleteRecursive] = useState(false);
-  const [moveDirty, setMoveDirty] = useState(false);
 
   const suffixList = suffixes.data?.all ?? [];
   const effectiveBase = base || suffixes.data?.primary || "";
@@ -78,12 +78,10 @@ export function TreePage() {
   }, [effectiveBase]);
 
   useEffect(() => {
-    if (!moveDirty) {
-      setMoveTo(selectedDN);
-    }
+    setMoveTo(selectedDN);
     setDeleteConfirm("");
     setDeleteRecursive(false);
-  }, [selectedDN, moveDirty]);
+  }, [selectedDN]);
 
   const treeQueries = useQueries({
     queries: expanded.map((dn) => ({
@@ -167,7 +165,6 @@ export function TreePage() {
     setExtraCursor({});
     setStatus("");
     setFormError("");
-    setMoveDirty(false);
   };
 
   const toggleExpanded = (dn: string): void => {
@@ -344,6 +341,7 @@ export function TreePage() {
                       groupDNs={kind === "group" ? membershipFromGroupEntry(entry.data) : []}
                       userGroups={userGroups.data?.items ?? []}
                       groupsPending={userGroups.isPending}
+                      groupsError={userGroups.error}
                     />
                   </section>
                 </>
@@ -426,7 +424,6 @@ export function TreePage() {
                       setStatus(`Moved to ${moved.dn}`);
                       setSelectedDN(moved.dn);
                       setMoveTo(moved.dn);
-                      setMoveDirty(false);
                       await refresh([oldParent, newParent]);
                     } catch (err) {
                       setFormError(isApiError(err) ? err.message : "Move failed.");
@@ -441,13 +438,13 @@ export function TreePage() {
                       spellCheck={false}
                       value={moveTo}
                       disabled={!canWrite || protectedDN}
-                      onChange={(event) => {
-                        setMoveDirty(true);
-                        setMoveTo(event.target.value);
-                      }}
+                      onChange={(event) => setMoveTo(event.target.value)}
                     />
                   </div>
-                  <button type="submit" disabled={!canWrite || protectedDN || selectedDN === ""}>
+                  <button
+                    type="submit"
+                    disabled={!canWrite || protectedDN || selectedDN === "" || moveTo.trim() === "" || moveTo.trim() === selectedDN}
+                  >
                     Move entry
                   </button>
                 </form>
@@ -556,15 +553,20 @@ function MembershipList({
   groupDNs,
   userGroups,
   groupsPending,
+  groupsError,
 }: {
   kind: EntryKind;
   groupDNs: readonly string[];
   userGroups: readonly { id: string; dn?: string }[];
   groupsPending: boolean;
+  groupsError: unknown;
 }) {
   if (kind === "user") {
     if (groupsPending) {
       return <p>Loading membership…</p>;
+    }
+    if (groupsError !== null && groupsError !== undefined) {
+      return <p>Could not load membership.</p>;
     }
     if (userGroups.length === 0) {
       return <p className="muted">None</p>;
@@ -637,7 +639,12 @@ function TreeBranch({
   }
   const kids = childrenByBase.get(node.dn) ?? [];
   const isExpanded = expanded.includes(node.dn);
-  const canExpand = node.hasChildren || kids.length > 0;
+  const canExpand = canExpandTreeNode({
+    hasChildren: node.hasChildren,
+    loaded: childrenByBase.has(node.dn),
+    childCount: kids.length,
+    kind,
+  });
   const err = treeError(node.dn);
   const more = nextCursorFor(node.dn);
   return (

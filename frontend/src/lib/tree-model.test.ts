@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { exactIdConfirmed } from "./directory-model.ts";
 import {
+  canExpandTreeNode,
   childDN,
   displayMembershipLabel,
   entryKind,
@@ -22,6 +23,14 @@ test("entry kind maps object classes used by the inspector", () => {
   assert.equal(entryKind(["inetOrgPerson", "person"]), "user");
   assert.equal(entryKind(["groupOfNames"]), "group");
   assert.equal(entryKind(["domain"]), "domain");
+});
+
+test("expand is offered when subordinates are unknown, as on native", () => {
+  assert.equal(canExpandTreeNode({ hasChildren: false, loaded: false, childCount: 0, kind: "ou" }), true);
+  assert.equal(canExpandTreeNode({ hasChildren: false, loaded: true, childCount: 0, kind: "ou" }), false);
+  assert.equal(canExpandTreeNode({ hasChildren: true, loaded: false, childCount: 0, kind: "user" }), true);
+  assert.equal(canExpandTreeNode({ hasChildren: false, loaded: false, childCount: 0, kind: "user" }), false);
+  assert.equal(canExpandTreeNode({ hasChildren: false, loaded: true, childCount: 2, kind: "ou" }), true);
 });
 
 test("filter matches RDN or DN and keeps ancestors of matches", () => {
