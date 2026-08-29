@@ -70,7 +70,7 @@ export function ConfirmDelete({
           ) : null}
         </div>
         <div className="form-actions">
-          <button type="submit" disabled={!matches || disabled}>
+          <button type="submit" className="button-danger" disabled={!matches || disabled}>
             Delete
           </button>
           <button type="button" onClick={onDismiss}>

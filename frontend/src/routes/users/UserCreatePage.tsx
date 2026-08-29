@@ -220,7 +220,7 @@ export function UserCreatePage() {
           <FormError id="user-attr-error" message={attrError} />
         </fieldset>
         <div className="form-actions">
-          <button type="submit" disabled={!gate.ok || form.formState.isSubmitting}>
+          <button type="submit" className="button-primary" disabled={!gate.ok || form.formState.isSubmitting}>
             {form.formState.isSubmitting ? "Creating…" : "Create user"}
           </button>
         </div>

@@ -174,7 +174,7 @@ export function SearchPage() {
               <FormError id="search-attr-error" message={errors.attributes} />
             </fieldset>
             <div className="form-actions">
-              <button type="submit" disabled={busy}>
+              <button type="submit" className="button-primary" disabled={busy}>
                 {busy ? "Searching…" : "Search"}
               </button>
             </div>
@@ -251,7 +251,7 @@ function SearchResults({
         <p>Not returned (redacted or absent): {missing.join(", ")}.</p>
       ) : null}
       {page.entries.length === 0 ? (
-        <p>No entries matched this search.</p>
+        <p className="muted">No entries matched this search.</p>
       ) : (
         <table>
           <caption>Expand a row for attributes and a redacted LDIF snippet.</caption>
@@ -294,7 +294,7 @@ function SearchResults({
 
 function AttrTable({ attributes }: { attributes: SearchEntry["attributes"] }) {
   if (attributes.length === 0) {
-    return <p>No allowlisted attributes were returned for this entry.</p>;
+    return <p className="muted">No allowlisted attributes were returned for this entry.</p>;
   }
   return (
     <table>

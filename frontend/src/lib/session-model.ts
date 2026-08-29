@@ -149,7 +149,7 @@ const ACTION_DEFS: readonly {
   { id: "create-user", href: "/users/new", label: "Create user", requiredScope: SCOPE_DIRECTORY_WRITE },
   { id: "groups", href: "/groups", label: "Groups", requiredScope: SCOPE_DIRECTORY_READ },
   { id: "search", href: "/search", label: "Search", requiredScope: SCOPE_DIRECTORY_READ },
-  { id: "tree", href: "/tree", label: "Tree", requiredScope: SCOPE_DIRECTORY_READ },
+  { id: "tree", href: "/tree", label: "Directory", requiredScope: SCOPE_DIRECTORY_READ },
   { id: "auth-test", href: "/auth-test", label: "Bind test", requiredScope: SCOPE_DIRECTORY_PASSWORD },
   { id: "schema", href: "/schema", label: "Schema", requiredScope: SCOPE_SCHEMA_READ },
   { id: "audit", href: "/audit", label: "Audit", requiredScope: SCOPE_AUDIT_READ },
@@ -191,20 +191,73 @@ export type NavItem = {
   requiredScope?: string;
 };
 
-export function navigationItems(): NavItem[] {
+export type NavGroup = {
+  id: "primary" | "lab";
+  label?: string;
+  items: readonly NavItem[];
+};
+
+export function navigationGroups(): readonly NavGroup[] {
   return [
-    { href: "/", label: "Dashboard" },
-    { href: "/users", label: "Users", requiredScope: SCOPE_DIRECTORY_READ },
-    { href: "/groups", label: "Groups", requiredScope: SCOPE_DIRECTORY_READ },
-    { href: "/search", label: "Search", requiredScope: SCOPE_DIRECTORY_READ },
-    { href: "/tree", label: "Tree", requiredScope: SCOPE_DIRECTORY_READ },
-    { href: "/auth-test", label: "Auth test", requiredScope: SCOPE_DIRECTORY_PASSWORD },
-    { href: "/schema", label: "Schema", requiredScope: SCOPE_SCHEMA_READ },
-    { href: "/audit", label: "Audit", requiredScope: SCOPE_AUDIT_READ },
-    { href: "/reset", label: "Reset", requiredScope: SCOPE_LAB_RESET },
-    { href: "/export", label: "Export", requiredScope: SCOPE_LAB_EXPORT },
-    { href: "/diagnostics", label: "Diagnostics" },
+    {
+      id: "primary",
+      items: [
+        { href: "/", label: "Dashboard" },
+        { href: "/tree", label: "Directory", requiredScope: SCOPE_DIRECTORY_READ },
+        { href: "/users", label: "Users", requiredScope: SCOPE_DIRECTORY_READ },
+        { href: "/groups", label: "Groups", requiredScope: SCOPE_DIRECTORY_READ },
+        { href: "/search", label: "Search", requiredScope: SCOPE_DIRECTORY_READ },
+        { href: "/auth-test", label: "Bind test", requiredScope: SCOPE_DIRECTORY_PASSWORD },
+      ],
+    },
+    {
+      id: "lab",
+      label: "Lab",
+      items: [
+        { href: "/schema", label: "Schema", requiredScope: SCOPE_SCHEMA_READ },
+        { href: "/audit", label: "Audit", requiredScope: SCOPE_AUDIT_READ },
+        { href: "/export", label: "Export", requiredScope: SCOPE_LAB_EXPORT },
+        { href: "/reset", label: "Reset", requiredScope: SCOPE_LAB_RESET },
+        { href: "/diagnostics", label: "Diagnostics" },
+      ],
+    },
   ];
+}
+
+export function navigationItems(): NavItem[] {
+  return navigationGroups().flatMap((group) => [...group.items]);
+}
+
+const WRITE_SCOPE_CHIP_ORDER = [
+  SCOPE_DIRECTORY_WRITE,
+  SCOPE_DIRECTORY_PASSWORD,
+  SCOPE_LAB_RESET,
+  SCOPE_LAB_EXPORT,
+] as const;
+
+export function primaryWriteScopeChip(scopes: readonly string[]): string | undefined {
+  return WRITE_SCOPE_CHIP_ORDER.find((scope) => hasScope(scopes, scope));
+}
+
+export function formatRelativeExpiry(expiresAt: string, nowMs: number): string {
+  const ms = Date.parse(expiresAt);
+  if (!Number.isFinite(ms)) {
+    return "expired";
+  }
+  const delta = ms - nowMs;
+  if (delta <= 0) {
+    return "expired";
+  }
+  const minutes = Math.round(delta / 60_000);
+  if (minutes < 90) {
+    return `expires in ${String(minutes)}m`;
+  }
+  const hours = Math.round(delta / 3_600_000);
+  if (hours < 36) {
+    return `expires in ${String(hours)}h`;
+  }
+  const days = Math.round(delta / 86_400_000);
+  return `expires in ${String(days)}d`;
 }
 
 export function navRestriction(item: NavItem, scopes: readonly string[]): string {

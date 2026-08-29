@@ -44,7 +44,7 @@ test("admin session completes the product acceptance scenario", async ({ page })
   await expect(page.getByText("STRUCTURAL")).toBeVisible();
 
   await visit(page, "/audit");
-  await expect(page.getByText(/in-memory audit ring/i)).toBeVisible();
+  await expect(page.getByText(/The in-memory audit ring is/i)).toBeVisible();
   await expect(page.getByRole("cell", { name: "session.create" }).first()).toBeVisible();
 
   await visit(page, "/export");
@@ -58,7 +58,7 @@ test("admin session completes the product acceptance scenario", async ({ page })
   await page.getByLabel("Scenario name").fill(scenarioName);
   await page.getByLabel("Expected revision").fill(compiledRevision);
   await page.getByRole("button", { name: "Start soft reset" }).click();
-  await expect(page.getByRole("status")).toContainText(/Reset completed/, { timeout: 10_000 });
+  await expect(page.locator("#main").getByRole("status")).toContainText(/Reset completed/, { timeout: 10_000 });
 
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page.getByRole("heading", { name: "LabLDAP sign in" })).toBeVisible();

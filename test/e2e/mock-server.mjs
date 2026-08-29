@@ -155,6 +155,157 @@ function requireSession(req, res, scope) {
   return sess;
 }
 
+function isDirectChild(dn, base) {
+  return typeof dn === "string" && dn.endsWith("," + base) && !dn.slice(0, -(base.length + 1)).includes(",");
+}
+
+function hasDirectChildren(base) {
+  for (const user of users.values()) {
+    if (isDirectChild(user.dn, base)) {
+      return true;
+    }
+  }
+  for (const group of groups.values()) {
+    if (isDirectChild(group.dn, base)) {
+      return true;
+    }
+  }
+  for (const ent of extraEntries.values()) {
+    if (isDirectChild(ent.dn, base)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function groupToEntry(group) {
+  const attributes = [{ name: "cn", value: group.id }];
+  for (const member of group.members ?? []) {
+    if (member.kind === "user") {
+      const user = users.get(member.id);
+      attributes.push({
+        name: "member",
+        value: user?.dn ?? `uid=${member.id},ou=people,dc=example,dc=test`,
+      });
+    } else {
+      const nested = groups.get(member.id);
+      attributes.push({
+        name: "member",
+        value: nested?.dn ?? `cn=${member.id},ou=groups,dc=example,dc=test`,
+      });
+    }
+  }
+  return {
+    dn: group.dn,
+    objectClasses: ["groupOfNames"],
+    attributes,
+    revision: group.revision,
+  };
+}
+
+function directoryEntryFor(dn) {
+  if (dn === "dc=example,dc=test") {
+    return {
+      dn,
+      objectClasses: ["domain"],
+      attributes: [{ name: "dc", value: "example" }],
+      revision: "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    };
+  }
+  if (dn === "ou=people,dc=example,dc=test") {
+    return {
+      dn,
+      objectClasses: ["organizationalUnit"],
+      attributes: [{ name: "ou", value: "people" }],
+      revision: "1111111111111111111111111111111111111111111111111111111111111111",
+    };
+  }
+  if (dn === "ou=groups,dc=example,dc=test") {
+    return {
+      dn,
+      objectClasses: ["organizationalUnit"],
+      attributes: [{ name: "ou", value: "groups" }],
+      revision: "2222222222222222222222222222222222222222222222222222222222222222",
+    };
+  }
+  for (const user of users.values()) {
+    if (user.dn === dn) {
+      return {
+        dn: user.dn,
+        objectClasses: user.objectClasses,
+        attributes: user.attributes,
+        revision: user.revision,
+      };
+    }
+  }
+  for (const group of groups.values()) {
+    if (group.dn === dn) {
+      return groupToEntry(group);
+    }
+  }
+  return extraEntries.get(dn);
+}
+
+function treeNodesFor(base) {
+  const nodes = [];
+  const seen = new Set();
+  const push = (node) => {
+    if (seen.has(node.dn)) {
+      return;
+    }
+    seen.add(node.dn);
+    nodes.push(node);
+  };
+  if (base === "dc=example,dc=test") {
+    push({
+      dn: "ou=people,dc=example,dc=test",
+      rdn: "ou=people",
+      objectClasses: ["organizationalUnit"],
+      hasChildren: false,
+    });
+    push({
+      dn: "ou=groups,dc=example,dc=test",
+      rdn: "ou=groups",
+      objectClasses: ["organizationalUnit"],
+      hasChildren: false,
+    });
+  }
+  for (const user of users.values()) {
+    if (isDirectChild(user.dn, base)) {
+      push({
+        dn: user.dn,
+        rdn: user.dn.split(",")[0],
+        objectClasses: user.objectClasses,
+        hasChildren: hasDirectChildren(user.dn),
+        revision: user.revision,
+      });
+    }
+  }
+  for (const group of groups.values()) {
+    if (isDirectChild(group.dn, base)) {
+      push({
+        dn: group.dn,
+        rdn: group.dn.split(",")[0],
+        objectClasses: ["groupOfNames"],
+        hasChildren: hasDirectChildren(group.dn),
+        revision: group.revision,
+      });
+    }
+  }
+  for (const ent of extraEntries.values()) {
+    if (isDirectChild(ent.dn, base)) {
+      push({
+        dn: ent.dn,
+        rdn: ent.dn.split(",")[0],
+        objectClasses: ent.objectClasses,
+        hasChildren: hasDirectChildren(ent.dn),
+        revision: ent.revision,
+      });
+    }
+  }
+  return nodes;
+}
+
 function directoryUnavailable(res) {
   if (!outage) {
     return false;
@@ -296,25 +447,7 @@ async function handleAPI(req, res, url) {
     }
     const body = await readBody(req);
     const base = String(body.base ?? "dc=example,dc=test");
-    const nodes = [];
-    if (base === "dc=example,dc=test") {
-      nodes.push(
-        { dn: "ou=people,dc=example,dc=test", rdn: "ou=people", objectClasses: ["organizationalUnit"], hasChildren: true },
-        { dn: "ou=groups,dc=example,dc=test", rdn: "ou=groups", objectClasses: ["organizationalUnit"], hasChildren: true },
-      );
-    }
-    for (const ent of extraEntries.values()) {
-      if (ent.dn.endsWith("," + base) && ent.dn.slice(0, -(base.length + 1)).indexOf(",") === -1) {
-        nodes.push({
-          dn: ent.dn,
-          rdn: ent.dn.split(",")[0],
-          objectClasses: ent.objectClasses,
-          hasChildren: false,
-          revision: ent.revision,
-        });
-      }
-    }
-    json(res, 200, { base, nodes });
+    json(res, 200, { base, nodes: treeNodesFor(base) });
     return;
   }
 
@@ -324,7 +457,7 @@ async function handleAPI(req, res, url) {
         return;
       }
       const dn = url.searchParams.get("dn") ?? "";
-      const ent = extraEntries.get(dn);
+      const ent = directoryEntryFor(dn);
       if (ent === undefined) {
         problem(res, 404, "not found");
         return;
@@ -440,6 +573,25 @@ async function handleAPI(req, res, url) {
       return;
     }
     json(res, 200, { items: [...groups.values()] });
+    return;
+  }
+
+  if (req.method === "GET" && path.startsWith("/api/v1/groups/")) {
+    if (requireSession(req, res, "directory:read") === undefined || directoryUnavailable(res)) {
+      return;
+    }
+    const rest = path.slice("/api/v1/groups/".length);
+    if (rest.includes("/")) {
+      problem(res, 404, "not found");
+      return;
+    }
+    const id = decodeURIComponent(rest);
+    const group = groups.get(id);
+    if (group === undefined) {
+      problem(res, 404, "not found");
+      return;
+    }
+    json(res, 200, group);
     return;
   }
 
@@ -595,7 +747,7 @@ function serveStatic(req, res, urlPath) {
   res.writeHead(200, {
     "Content-Type": ctype,
     "Cache-Control": extname(file) === ".html" ? "no-cache" : "public, max-age=31536000, immutable",
-    "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self'",
+    "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'",
   });
   createReadStream(file).pipe(res);
 }

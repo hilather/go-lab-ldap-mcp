@@ -126,7 +126,7 @@ export function AuthTestPage() {
           </select>
         </div>
         <div className="form-actions">
-          <button type="submit" disabled={!gate.ok || form.formState.isSubmitting}>
+          <button type="submit" className="button-primary" disabled={!gate.ok || form.formState.isSubmitting}>
             {form.formState.isSubmitting ? "Testing…" : "Test bind"}
           </button>
         </div>

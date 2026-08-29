@@ -201,7 +201,7 @@ export function DashboardPage() {
         {permissionOrError(canReadDirectory, SCOPE_DIRECTORY_READ, capabilitiesQuery.error) ??
           (transports !== undefined ? (
             transports.length === 0 ? (
-              <p>No directory transports were advertised.</p>
+              <p className="muted">No directory transports were advertised.</p>
             ) : (
               <ul>
                 {transports.map((item) => (
@@ -247,7 +247,7 @@ export function DashboardPage() {
 
 function AuditList({ events }: { events: AuditEvent[] }) {
   if (events.length === 0) {
-    return <p>No audit events are in the in-memory ring yet.</p>;
+    return <p className="muted">No audit events are in the in-memory ring yet.</p>;
   }
   return (
     <table>
@@ -307,7 +307,7 @@ function QueryNote({
   if (result.error !== null && result.error !== undefined) {
     return <p>Could not load {missing}.</p>;
   }
-  return <p>No {missing} yet.</p>;
+  return <p className="muted">No {missing} yet.</p>;
 }
 
 function isUnavailable(error: unknown): boolean {

@@ -128,7 +128,7 @@ export function GroupDetailPage() {
           <section aria-labelledby="group-members-heading">
             <h2 id="group-members-heading">Direct members</h2>
             {group.members.length === 0 ? (
-              <p>{emptyGroupExplanation()}</p>
+              <p className="muted">{emptyGroupExplanation()}</p>
             ) : (
               <table>
                 <caption>Direct members. Nested members are labeled by kind.</caption>
@@ -181,7 +181,7 @@ export function GroupDetailPage() {
           <section aria-labelledby="group-membership-heading">
             <h2 id="group-membership-heading">Membership changes</h2>
             {!writeGate.ok ? <p>{writeGate.reason}</p> : null}
-            <p>{emptyGroupExplanation()}</p>
+            <p className="muted">{emptyGroupExplanation()}</p>
             <MemberSearch
               legend="Members to add or use as a replacement set"
               selected={selected}
@@ -221,7 +221,7 @@ export function GroupDetailPage() {
               >
                 Replace members
               </button>
-              <button type="button" disabled={!writeGate.ok} onClick={() => setDeleteOpen(true)}>
+              <button type="button" className="button-danger" disabled={!writeGate.ok} onClick={() => setDeleteOpen(true)}>
                 Delete group
               </button>
             </div>
@@ -284,7 +284,7 @@ function MembershipResult({ summary }: { summary: MembershipSummary }) {
 function MemberBucket({ title, members }: { title: string; members: MemberRef[] }) {
   if (members.length === 0) {
     return (
-      <p>
+      <p className="muted">
         {title}: none
       </p>
     );
@@ -292,9 +292,9 @@ function MemberBucket({ title, members }: { title: string; members: MemberRef[] 
   return (
     <div>
       <h3>{title}</h3>
-      <ul>
+      <ul className="membership-list">
         {uniqueMembers(members.map(asChoice)).map((member) => (
-          <li key={memberKey(member)}>
+          <li key={memberKey(member)} className="membership-pill">
             {member.kind} <MemberLink member={member} />
           </li>
         ))}

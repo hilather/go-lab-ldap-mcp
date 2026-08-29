@@ -17,8 +17,8 @@ export async function visit(page: Page, dest: string): Promise<void> {
     "/users": "Users",
     "/groups": "Groups",
     "/search": "Search",
-    "/tree": "Tree",
-    "/auth-test": "Auth test",
+    "/tree": "Directory",
+    "/auth-test": "Bind test",
     "/schema": "Schema",
     "/audit": "Audit",
     "/reset": "Reset",
@@ -38,6 +38,17 @@ export async function visit(page: Page, dest: string): Promise<void> {
   if (dest.startsWith("/users/")) {
     const id = decodeURIComponent(dest.slice("/users/".length));
     await nav.getByRole("link", { name: "Users", exact: true }).click();
+    await page.getByRole("link", { name: id, exact: true }).click();
+    return;
+  }
+  if (dest === "/groups/new") {
+    await nav.getByRole("link", { name: "Groups", exact: true }).click();
+    await page.getByRole("link", { name: "Create group" }).click();
+    return;
+  }
+  if (dest.startsWith("/groups/")) {
+    const id = decodeURIComponent(dest.slice("/groups/".length));
+    await nav.getByRole("link", { name: "Groups", exact: true }).click();
     await page.getByRole("link", { name: id, exact: true }).click();
     return;
   }

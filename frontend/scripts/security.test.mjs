@@ -7,15 +7,15 @@ import { test } from "node:test";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const srcRoot = join(root, "src");
 
-async function walkFiles(dir) {
+async function walkFiles(dir, re = /\.(ts|tsx|js|mjs)$/) {
   const out = [];
   for (const ent of await readdir(dir, { withFileTypes: true })) {
     const p = join(dir, ent.name);
     if (ent.isDirectory()) {
-      out.push(...(await walkFiles(p)));
+      out.push(...(await walkFiles(p, re)));
       continue;
     }
-    if (/\.(ts|tsx|js|mjs)$/.test(ent.name) && !ent.name.endsWith(".test.ts")) {
+    if (re.test(ent.name) && !ent.name.endsWith(".test.ts")) {
       out.push(p);
     }
   }
@@ -37,6 +37,8 @@ test("UI never assigns innerHTML and renders LDAP strings as text", async () => 
   const confirm = await readFile(join(srcRoot, "routes/shared/ConfirmDelete.tsx"), "utf8");
   assert.match(confirm, /aria-labelledby/);
   assert.match(confirm, /firstFocusable/);
+  assert.match(confirm, /confirm-dialog/);
+  assert.match(confirm, /button-danger/);
   const conflict = await readFile(join(srcRoot, "routes/shared/ConflictRefresh.tsx"), "utf8");
   assert.match(conflict, /firstFocusable/);
 });
@@ -75,6 +77,8 @@ test("login form posts the token and clears retained field state", async () => {
   assert.match(login, /loginFailureKind/);
   assert.match(login, /role=\{notice\.role\}/);
   assert.match(login, /aria-live="assertive"/);
+  assert.match(login, /brand-mark/);
+  assert.match(login, /button-primary/);
   assert.doesNotMatch(login, /localStorage|sessionStorage|indexedDB/i);
 });
 
@@ -103,6 +107,26 @@ test("logout and expiry invalidate the server session then clear directory data"
   const shell = await readFile(join(srcRoot, "shell/AppShell.tsx"), "utf8");
   assert.match(shell, /disabled=\{!canLogout\}/);
   assert.match(shell, /to="\/login"/);
+  assert.match(shell, /formatRelativeExpiry/);
+  assert.doesNotMatch(shell, /Granted scopes/);
+  assert.doesNotMatch(shell, /scopes\.map/);
+  const nav = await readFile(join(srcRoot, "lib/session-model.ts"), "utf8");
+  assert.match(nav, /label: "Directory"/);
+});
+
+test("UI does not load remote fonts or use inline style props", async () => {
+  const files = [...(await walkFiles(srcRoot, /\.(ts|tsx|js|mjs|css)$/)), join(root, "index.html")];
+  for (const file of files) {
+    const text = await readFile(file, "utf8");
+    assert.doesNotMatch(
+      text,
+      /fonts\.googleapis\.com|fonts\.gstatic\.com/i,
+      `${file} must not load Google Fonts`,
+    );
+    if (/\.(ts|tsx)$/.test(file)) {
+      assert.doesNotMatch(text, /style=\{\{/, `${file} must not use inline style props`);
+    }
+  }
 });
 
 test("dashboard covers ready, degraded, outage, and missing scopes", async () => {

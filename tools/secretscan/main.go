@@ -69,7 +69,7 @@ func scan(root string) ([]finding, error) {
 			return nil
 		}
 		name := d.Name()
-		if strings.HasSuffix(name, ".png") || strings.HasSuffix(name, ".jpg") || strings.HasSuffix(name, ".woff") {
+		if strings.HasSuffix(name, ".png") || strings.HasSuffix(name, ".jpg") || strings.HasSuffix(name, ".woff") || strings.HasSuffix(name, ".woff2") {
 			return nil
 		}
 		data, err := os.ReadFile(path)

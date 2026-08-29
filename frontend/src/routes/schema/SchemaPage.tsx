@@ -102,7 +102,7 @@ export function SchemaPage() {
             ) : selectedAttr !== undefined ? (
               <AttributeView attr={selectedAttr} />
             ) : (
-              <p>Select an object class or attribute from the lists.</p>
+              <p className="muted">Select an object class or attribute from the lists.</p>
             )}
           </section>
         </>
@@ -218,7 +218,7 @@ function SchemaList<T extends { name: string }>({
         />
       </div>
       {items.length === 0 ? (
-        <p>{empty}</p>
+        <p className="muted">{empty}</p>
       ) : (
         <ul
           id={listId}

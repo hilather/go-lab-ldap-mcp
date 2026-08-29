@@ -81,11 +81,15 @@ export function MemberSearch({
             }}
           />
         </div>
-        <button type="button" disabled={searching} onClick={() => void runSearch()}>
+        <button type="button" className="button-primary" disabled={searching} onClick={() => void runSearch()}>
           {searching ? "Searching…" : "Search"}
         </button>
       </div>
-      {status !== undefined ? <p role="status">{status}</p> : null}
+      {status !== undefined ? (
+        <p role="status" className={status === "No matching directory members." ? "muted" : undefined}>
+          {status}
+        </p>
+      ) : null}
       {results.length > 0 ? (
         <ul className="member-results">
           {results.map((item) => (
@@ -106,7 +110,7 @@ export function MemberSearch({
       ) : null}
       <h3>Selected members</h3>
       {selected.length === 0 ? (
-        <p>None selected.</p>
+        <p className="muted">None selected.</p>
       ) : (
         <ul className="member-selected">
           {selected.map((item) => (

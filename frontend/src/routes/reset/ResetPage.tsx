@@ -142,7 +142,7 @@ export function ResetPage() {
         </div>
         {!gate.ok ? <p>{gate.reason}</p> : null}
         <div className="form-actions">
-          <button type="submit" disabled={!gate.ok || submitting}>
+          <button type="submit" className="button-primary" disabled={!gate.ok || submitting}>
             {submitting || inProgress ? "Reset in progress…" : "Start soft reset"}
           </button>
         </div>
