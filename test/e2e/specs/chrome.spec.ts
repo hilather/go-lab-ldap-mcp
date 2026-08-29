@@ -24,15 +24,15 @@ async function expectMutedCopy(locator: Locator): Promise<void> {
   expect(color).toBe("rgb(154, 155, 151)");
 }
 
-async function expectPlex(locator: Locator): Promise<void> {
-  const family = await locator.evaluate((el) => getComputedStyle(el).fontFamily);
+async function expectPlex(page: Page): Promise<void> {
+  const family = await page.locator("body").evaluate((el) => getComputedStyle(el).fontFamily);
   expect(family).toMatch(/IBM Plex/);
 }
 
 async function expectLeftoverChrome(page: Page, surface: Locator): Promise<void> {
   await expect(surface).toBeVisible();
   await expectSurface(surface, PANEL);
-  await expectPlex(surface);
+  await expectPlex(page);
 }
 
 test("leftover operator pages use Directory chrome", async ({ page }) => {

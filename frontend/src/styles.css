@@ -100,7 +100,7 @@ textarea:focus-visible {
   margin: 0;
   padding: 1.5rem 1rem;
   display: flex;
-  align-items: safe center;
+  align-items: center;
   justify-content: center;
   overflow-y: auto;
   background: var(--bg);
