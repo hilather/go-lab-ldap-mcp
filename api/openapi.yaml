@@ -15,8 +15,8 @@ info:
 
     Examples use lab placeholders only. They are not usable credentials.
   license:
-    name: UNLICENSED
-    url: https://github.com/hilather/go-lab-ldap-mcp
+    name: MIT
+    url: https://github.com/hilather/go-lab-ldap-mcp/blob/main/LICENSE
 x-labldap-openapi-subset: "3.0.3"
 x-labldap-generator: oapi-codegen@v2.8.0
 servers:

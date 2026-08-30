@@ -217,7 +217,7 @@ or address can verify without dropping the `directory` SAN. Native
 `labldapd` remains the default engine; 389 DS is `engine: 389ds` /
 `make compose-up-389ds`. See [release notes](docs/release/notes.md).
 
-No project license file yet; treat it as source-available until one is added.
+Licensed under the [MIT License](LICENSE).
 
 ```
 github.com/hilather/go-lab-ldap-mcp

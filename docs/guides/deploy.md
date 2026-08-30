@@ -243,7 +243,6 @@ Liveness never queries LDAP. Readiness does. The image HEALTHCHECK hits
 - No image push, no Helm, no cloud module
 - No multi-suffix, no multi-instance 389 DS
 - No Active Directory emulation
-- No project `LICENSE` file yet
 - Signing (`cosign`) is optional and not performed
 - `linux/arm64` is not an advertised platform
 

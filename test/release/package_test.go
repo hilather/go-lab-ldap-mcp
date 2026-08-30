@@ -10,6 +10,31 @@ import (
 	"github.com/hilather/go-lab-ldap-mcp/internal/mcpserver"
 )
 
+func TestProjectLicenseIsMIT(t *testing.T) {
+	root := repoRoot(t)
+	text := read(t, filepath.Join(root, "LICENSE"))
+	for _, want := range []string{
+		"MIT License",
+		"Copyright (c) 2026 hilather",
+		"Permission is hereby granted, free of charge",
+		`THE SOFTWARE IS PROVIDED "AS IS"`,
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("LICENSE missing %q", want)
+		}
+	}
+	if strings.Contains(text, "Apache License") {
+		t.Fatal("LICENSE must be MIT, not Apache")
+	}
+	readme := read(t, filepath.Join(root, "README.md"))
+	if strings.Contains(readme, "source-available") {
+		t.Fatal("README still says source-available")
+	}
+	if !strings.Contains(readme, "MIT License") {
+		t.Fatal("README must state MIT License")
+	}
+}
+
 func TestExamplesValidateAndHaveNoRealSecrets(t *testing.T) {
 	root := repoRoot(t)
 	examples := []struct {
