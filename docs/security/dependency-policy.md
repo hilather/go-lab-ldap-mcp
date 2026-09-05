@@ -20,7 +20,7 @@ Do not commit Directory Manager passwords, API tokens, or session material. Lab 
 
 ## License denylist
 
-The first release is privately owned (OD-003). Do not add dependencies whose license is AGPL-3.0, SSPL, or another copyleft network-use license. Allowed: MIT, BSD, Apache-2.0, ISC, MPL-2.0, Unlicense, and the Go standard library.
+The project is MIT-licensed (OD-003 resolved). Do not add dependencies whose license is AGPL-3.0, SSPL, or another copyleft network-use license. Allowed: MIT, BSD, Apache-2.0, ISC, MPL-2.0, Unlicense, and the Go standard library.
 
 ## Container scanning and SBOM (T-118)
 

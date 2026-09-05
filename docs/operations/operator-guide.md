@@ -9,7 +9,7 @@ these files plus the Make targets. Bootstrap (`labldap-bootstrap apply`)
 is the only supported engine configuration path. Do not run extra
 directory-engine CLI by hand.
 
-Local images only. No distribution LICENSE file yet.
+Local images only. Distributed under the MIT License.
 
 ## What you get
 

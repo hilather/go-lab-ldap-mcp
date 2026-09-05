@@ -1,6 +1,6 @@
 # Tag checklist (T-120)
 
-Do not invent a LICENSE. Do not push images (OD-004).
+Confirm the root `LICENSE` is MIT. Do not push images (OD-004).
 
 1. Clean checkout of the tag candidate (`git status` empty).
 2. `make verify` passes.
@@ -19,4 +19,4 @@ Do not invent a LICENSE. Do not push images (OD-004).
 14. Examples still compile and contain only `lab-fixture-*` placeholders.
 15. Advertised architectures still match `deploy/docker/architectures.md`.
 16. Tag annotated: `git tag -a vX.Y.Z -m "LabLDAP vX.Y.Z"`.
-17. Do **not** `docker push`. Do **not** add a LICENSE file.
+17. Do **not** `docker push`. Confirm `LICENSE` remains the MIT text.

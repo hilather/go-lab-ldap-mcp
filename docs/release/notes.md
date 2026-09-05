@@ -66,7 +66,7 @@ Build application images with the same `VERSION` so
   can add a public name or LAN IP SAN; extra SANs are not the same as
   `allowedHosts`.
 - Example secret files are `lab-fixture-*` placeholders.
-- No public registry push (OD-004). No project LICENSE (OD-003).
+- No public registry push (OD-004). Project license is MIT (OD-003 resolved).
 - Signing (`cosign`) is optional and not performed.
 
 ## Migration guidance

@@ -43,4 +43,4 @@ the Pages site.
 - Node: keep `engines.node` at `>=22.12.0`. Change `.node-version` only to another supported 22.x release and record it here.
 - pnpm: change `packageManager` and regenerate `pnpm-lock.yaml` together.
 - Application dependencies (when added) require `go.sum` / `pnpm-lock.yaml` in the same commit. Critical vulnerabilities fail CI (see `docs/security/dependency-policy.md`).
-- Do not invent a distribution LICENSE (OD-003). Dependency license notices still apply.
+- Project license is MIT (`LICENSE`). Dependency license notices still apply.
