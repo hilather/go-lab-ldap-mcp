@@ -60,7 +60,7 @@ func govulnIDs(text string) []string {
 func runGovulncheck(root string, exceptions map[string]bool, stdout, stderr *os.File) error {
 	cmd := exec.Command("go", "run", govulncheckMod, "./...")
 	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "GOTOOLCHAIN=go1.26.5")
+	cmd.Env = append(os.Environ(), "GOTOOLCHAIN=go1.26.8")
 	out, err := cmd.CombinedOutput()
 	_, _ = stdout.Write(out)
 	if err == nil {
