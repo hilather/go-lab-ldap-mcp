@@ -45,8 +45,7 @@ image IDs + workflow path) and `dist/release/SHA256SUMS`. Signing
 
 | ID | Reason | Expires |
 | --- | --- | --- |
-| GO-2026-6090 | Pinned toolchain `go1.26.5` (`crypto/tls` handshake limit). Fixed in `go1.26.6`. Do not bump the builder digest in this PR without a new pin. | 2026-09-14 |
-| GO-2026-6089 | Pinned toolchain `go1.26.5` (`net/http` ReadHeaderTimeout on h2c). Fixed in `go1.26.6`. | 2026-09-14 |
-| GO-2026-5972 | Pinned toolchain `go1.26.5` (`encoding/asn1` recursion). Fixed in `go1.26.6`. | 2026-09-14 |
-| GO-2026-6218 | Pinned toolchain `go1.26.5` (`net/url` quadratic `..` resolution). Fixed in `go1.26.6`. | 2026-09-14 |
-| GO-2026-5026 | Pinned toolchain `go1.26.5` (`net/http` IDNA Punycode). Fixed in `go1.26.6`. Module `golang.org/x/net` is already `v0.57.0` (≥ `v0.55.0`). | 2026-09-14 |
+
+None. The go1.26.8 toolchain fixes the go1.26.5 standard-library findings
+(GO-2026-6090, GO-2026-6089, GO-2026-5972, GO-2026-6218, GO-2026-5026) that
+were listed here until they expired on 2026-09-14.

@@ -2,7 +2,7 @@
 
 GO               ?= go
 PNPM             ?= pnpm
-export GOTOOLCHAIN ?= go1.26.5
+export GOTOOLCHAIN ?= go1.26.8
 export GOPROXY    ?= https://proxy.golang.org,direct
 
 GOVULNCHECK_MOD  := golang.org/x/vuln/cmd/govulncheck@v1.1.4

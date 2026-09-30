@@ -2,7 +2,7 @@ module github.com/hilather/go-lab-ldap-mcp
 
 go 1.26
 
-toolchain go1.26.5
+toolchain go1.26.8
 
 require (
 	github.com/go-asn1-ber/asn1-ber v1.5.8

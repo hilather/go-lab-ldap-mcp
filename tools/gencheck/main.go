@@ -21,8 +21,8 @@ func check() error {
 		return err
 	}
 	text := string(mod)
-	if !strings.Contains(text, "toolchain go1.26.5") {
-		return fmt.Errorf("go.mod missing pinned toolchain go1.26.5")
+	if !strings.Contains(text, "toolchain go1.26.8") {
+		return fmt.Errorf("go.mod missing pinned toolchain go1.26.8")
 	}
 	if !strings.Contains(text, "go 1.26\n") {
 		return fmt.Errorf("go.mod missing language version go 1.26")

@@ -8,7 +8,7 @@ Image: `labldapd:dev` (OD-004; do not push)
 
 Multi-stage, mirroring `Dockerfile.control` / `Dockerfile.bootstrap`:
 
-1. Pinned `golang:1.26.5` (`deploy/docker/golang.digest`) links a static
+1. Pinned `golang:1.26.8` (`deploy/docker/golang.digest`) links a static
    `CGO_ENABLED=0` `labldapd` from `./cmd/labldapd` with the shared
    `internal/observability` version/revision/builtAt ldflags.
 2. Pinned `alpine:3.21` runtime from **`deploy/docker/labldapd.digest`** (the
