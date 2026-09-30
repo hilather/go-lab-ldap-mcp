@@ -21,7 +21,7 @@ func main() {
 
 func run() error {
 	cmd := exec.Command("go", "list", "-m", "-f", "{{.Path}} {{.Version}}", "all")
-	cmd.Env = append(os.Environ(), "GOTOOLCHAIN=go1.26.5")
+	cmd.Env = append(os.Environ(), "GOTOOLCHAIN=go1.26.8")
 	out, err := cmd.Output()
 	if err != nil {
 		return fmt.Errorf("go list: %w", err)

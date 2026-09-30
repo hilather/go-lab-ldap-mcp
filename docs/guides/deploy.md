@@ -27,7 +27,7 @@ A published or LAN **IP** Host is accepted without extra config. An extra
 The default still rejects `Host: evil.test`. To bind the UI on the host's
 addresses, set `LABLDAP_CONTROL_PUBLISH=0.0.0.0`.
 
-Optional for from-source work: Go 1.26 (toolchain `go1.26.5`), Node 22.12+,
+Optional for from-source work: Go 1.26 (toolchain `go1.26.8`), Node 22.12+,
 pnpm. Pins live in [docs/toolchain.md](../toolchain.md).
 
 ## Topology

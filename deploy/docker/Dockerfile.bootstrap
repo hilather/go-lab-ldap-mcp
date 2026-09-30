@@ -3,12 +3,12 @@
 # available. Secrets are never baked; pass them as mounts only.
 
 # FROM-time ARGs must be declared before the first FROM (legacy builder).
-ARG GO_IMAGE=docker.io/library/golang:1.26.5@sha256:705e964a93a2fd2e75c7d59bb7d781b57e30f12293ffde5175c69229e18fb678
+ARG GO_IMAGE=docker.io/library/golang:1.26.8@sha256:0f063af2d465d8dcae54cce04278ada488b96f77b42449c8d071e47d016cc65a
 ARG DIRSRV_IMAGE=quay.io/389ds/dirsrv@sha256:f2851654c5df545cd893d84bea8d08c28dc25f0930493fbfed1d8a6eacf657f7
 FROM ${GO_IMAGE} AS build
 WORKDIR /src
 ENV CGO_ENABLED=0
-ENV GOTOOLCHAIN=go1.26.5
+ENV GOTOOLCHAIN=go1.26.8
 ARG VERSION=dev
 ARG REVISION=unknown
 ARG BUILT_AT=unknown
