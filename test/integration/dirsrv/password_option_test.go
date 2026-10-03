@@ -110,8 +110,9 @@ func TestPasswordOptionSpellingsAreRejectedAndRedacted(t *testing.T) {
 	if strings.Contains(body, optionPasswordCanary) || strings.Contains(strings.ToLower(body), "userpassword") {
 		t.Fatalf("entry read returned a userPassword spelling: %s", strings.ReplaceAll(body, optionPasswordCanary, "<canary>"))
 	}
-	// Explicitly asking search for the optioned name must be refused or
-	// return nothing for it.
+	// Defence in depth (the search allow-list already dropped this name
+	// before the fix): explicitly asking search for the optioned name must
+	// be refused or return nothing for it.
 	code, body, _ = do(http.MethodPost, "/api/v1/search", "", `{"base":"`+dn+`","scope":"base","filter":"(uid=pwopt)","attributes":["userPassword;lang-en"],"pageSize":10}`)
 	if strings.Contains(body, optionPasswordCanary) || (code == http.StatusOK && strings.Contains(strings.ToLower(body), "userpassword")) {
 		t.Fatalf("search for userPassword;lang-en: status %d leaked the attribute", code)

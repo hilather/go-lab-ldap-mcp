@@ -124,7 +124,9 @@ are never returned by entry reads or search, or by export with
 `omitSecrets` (the default). Writes that name an attribute by numeric OID
 are rejected too. If a Directory Manager writes an option spelling such as
 `userPassword;lang-en` directly over LDAP, the native engine stores it
-hashed; 389 stores it as written (Delta D31). Bind with that value fails on
+hashed; 389 stores it as written (Delta D31). The same applies to any
+principal with direct LDAP write access (the runtime account or an operator
+ACI). Bind with that value fails on
 both engines.
 
 ### Reset and export

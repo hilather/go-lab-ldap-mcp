@@ -318,8 +318,10 @@ func (e *passwordEngine) AfterWrite(ctx context.Context, tx UpdateTx, ev WriteEv
 
 // isVariantPasswordAttr reports a userPassword spelling other than the exact
 // descriptor: an attribute option (userPassword;lang-en) or the 2.5.4.35 OID.
-// Bind and policy only ever read the exact attribute, so these values never
-// authenticate, but they are still credential material.
+// Native bind and policy only ever read the exact attribute, so on native
+// these values never authenticate (native does not map the OID to the
+// descriptor; on 389 the OID spelling is userPassword itself), but they are
+// still credential material.
 func isVariantPasswordAttr(name string) bool {
 	return config.CanonicalAttrType(name) == "userpassword" && !strings.EqualFold(strings.TrimSpace(name), attrUserPassword)
 }
