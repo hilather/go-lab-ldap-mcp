@@ -8,8 +8,9 @@ Date: 2026-10-03
 
 Deciders: repository owner
 
-Related tasks: none yet. An implementation task is opened in `TASKS.md` when
-this ADR is accepted.
+Related tasks: none yet (deliberately). An implementation task is opened in
+`TASKS.md` when this ADR is accepted, so no task id is reserved ahead of the
+decision.
 
 Related ADRs: ADR-0008, ADR-0009, and ADR-0014 (proposed in PR #24, not yet
 on main). Related contract clauses: native-engine parity contract C1/C3/C8, and
@@ -38,9 +39,11 @@ On LDAP, a runtime account holding the compiled people-write ACI can modify
 - Native stores the value under that exact name (`op_write.go:323-329`). The
   canonical `modifyTimestamp` stays server-owned (`op_attrs.go:94-96`).
 
-Until options are resolved, native's acceptance of this write falls under D17,
-"Schema MAY / unknown-attribute enforcement on writes". In that ledger row 389
-rejects unknown attributes and native accepts them.
+Until options are resolved, native's acceptance of this write is D17
+behaviour ("Schema MAY / unknown-attribute enforcement on writes"): native
+accepts the option spelling as an unknown name. 389 also accepts it, but for a
+different reason: it treats `;lang-en` as an option on a known type. So there
+is no client-visible split on this case today.
 
 The bare OID `2.5.18.2` is a separate case. Native rejects it with
 `constraintViolation(19)` (`op_write.go:153-162`); 389 returns
@@ -61,11 +64,13 @@ return different results depending on the engine.
 
 Read redaction has the same exact-name gap. REST and MCP read output is
 filtered through `redactAttrs` / `secretOrDeniedAttr`
-(`internal/app/directory.go:184`, `:225-228`), which match names exactly. An
-option spelling such as `userPassword;lang-en` or `nsslapd-rootpw;x` is
-therefore not redacted. On the 389 engine, REST can already write
-`userPassword;lang-en` today and read it back unredacted. That gap exists on
-main now and is tracked separately from D31.
+(`internal/app/directory.go:184`, `:225-228`), which match canonical names
+only. An option spelling such as `userPassword;lang-en` would therefore not be
+redacted. From the code and the compiled people-write ACI, REST on the 389
+engine can plausibly write `userPassword;lang-en` and read it back
+unredacted on main today. This was found by code reading and has not been
+probed. D31 below owns the fix. There is no separate tracker; the owner can
+split it out if it should land before D31.
 
 ### 2. Bind identity after a failed critical-control Bind
 
@@ -83,8 +88,11 @@ failed Bind leaves it anonymous.
 
 Native already has a related exposure on main. `serve()` runs Bind inline with
 no outstanding-operation barrier (`conn.go:109-115`), and `handleCompare` reads
-`c.subject()` inside the worker (`op_write.go:446`). So operations dispatched
-before a Bind can already see the identity that Bind sets. D32 does not create
+`c.subject()` inside the worker (`op_write.go:446`). Every handler started
+via `spawnOp` does the same, including Search (`op_search.go:29`), Add,
+Modify, Delete, ModifyDN and WhoAmI. Only Bind and StartTLS run inline. So
+operations dispatched before a Bind can already see the identity that Bind
+sets. D32 does not create
 this race. However, under D32 a Bind that fails a critical control would also
 change the identity, so more Binds would change the identity that in-flight
 workers can observe. That is why the order of steps inside Bind matters.
