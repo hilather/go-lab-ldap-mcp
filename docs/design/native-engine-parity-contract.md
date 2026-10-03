@@ -239,6 +239,7 @@ is `docs/design/parity-delta-log.md` (T-150).
 | 2026-08-15 | Initial contract (`labldap.parity.v1`) accepted with ADR-0008 / ADR-0009. |
 | 2026-08-15 | Wave 1 (T-125–T-128) recorded Delta **candidates** below; none are promoted to section 3 until adjudicated against the 389 oracle in T-147/T-150. |
 | 2026-08-15 | T-150 differential harness (`internal/ldapserver/differential_test.go`) adjudicated CAND-1, CAND-3, CAND-4, CAND-5, CAND-18, CAND-20 against the pinned 389 oracle: CAND-3 resolved as Contract; the rest promoted to section 3 as D8–D14 (with newly observed D10). Record: `docs/design/parity-delta-log.md`. |
+| 2026-10-03 | CAND-29 (ModifyDN deleteoldrdn equality) resolved as Contract against the pinned 389 image; CAND-30 (case-only rename 68 vs 0) recorded as open. |
 
 ### Delta candidates observed in Wave 1 (pending adjudication, T-147/T-150)
 
@@ -253,6 +254,8 @@ is `docs/design/parity-delta-log.md` (T-150).
 When adjudicated, each moves into section 3 (accepted Delta) with the test name that proves the difference, or is fixed to match the oracle (Contract).
 
 | ~~CAND-6~~ → Contract | ModifyDN rename into own subtree | rejects with `unwillingToPerform(53)` without changing the tree, including case variants | 389 also rejects with 53 | resolved 2026-10-03; `TestDualEngineParity`, `TestNativeReviewDirectoryRegressions` |
+| ~~CAND-29~~ → Contract | ModifyDN `deleteoldrdn` with a rule-equal old/new RDN value | removes old RDN value(s) by the equality rule, then appends the new RDN value unless an equal value remains (a respelled or differently cased RDN no longer empties the naming attribute; a pure move with deleteoldrdn stores the request spelling last) | 389 observed identical value lists for respell, pure move, multi-valued equal and keep-old cases | resolved 2026-10-03; `TestModifyDNDeleteOldRDNEquality`, `TestNativeReviewDirectoryRegressions/rename-deleteoldrdn-equality` |
+| CAND-30 | Case-only ModifyDN (`uid=keeper` → `uid=Keeper`) | `entryAlreadyExists(68)` (DN identity folds case) | 389 observed `success(0)` | open; observed 2026-10-03 during CAND-29 probing, owner adjudication pending |
 | CAND-17 | groupdn membership scope | direct `member`/`uniqueMember` only, no nesting; group objectClass not required | confirm vs 389 | T-139 `aci_eval.go` |
 | ~~CAND-18~~ → D12 | Paged-cookie tamper result code | `unwillingToPerform(53)`; cookie is HMAC-SHA256 (offset + base DN + scope + filter), per-server random secret | Oracle 2026-08-15: 389 accepts a tampered cookie (`success`); accepted as D12 | T-140 `ctrl_paged.go` |
 | CAND-19 | Assertion control scope | Modify-only; critical assertion on non-Modify → `unavailableCriticalExtension`; `assertionFailed(122)` on mismatch | 389 assertion-on-Add / non-critical behavior unverified | T-141 `ctrl_assert.go`; adjudicate in T-147 |

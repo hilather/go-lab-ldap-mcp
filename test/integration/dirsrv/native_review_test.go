@@ -68,6 +68,75 @@ func TestNativeReviewDirectoryRegressions(t *testing.T) {
 			t.Fatalf("failed rename changed original: %v", err)
 		}
 	})
+	t.Run("rename-deleteoldrdn-equality", func(t *testing.T) {
+		// Exact values observed on the pinned 389 image: old RDN values
+		// are removed by the equality rule, then the new RDN value is
+		// appended unless an equal value remains. DN strings are not
+		// compared (389 normalises internal spaces in returned DNs).
+		add := func(dn string, attrs map[string][]string) {
+			t.Helper()
+			req := ldap.NewAddRequest(dn, nil)
+			for _, k := range []string{"objectClass", "uid", "ou", "cn", "sn"} {
+				if v, ok := attrs[k]; ok {
+					req.Attribute(k, v)
+				}
+			}
+			if err := dm.Add(req); err != nil {
+				t.Fatalf("add %s: %v", dn, err)
+			}
+		}
+		person := func(uids ...string) map[string][]string {
+			return map[string][]string{"objectClass": {"top", "person", "organizationalPerson", "inetOrgPerson"}, "uid": uids, "cn": {"probe"}, "sn": {"probe"}}
+		}
+		rename := func(dn, rdn string, del bool, sup string) {
+			t.Helper()
+			if err := dm.ModifyDN(ldap.NewModifyDNRequest(dn, rdn, del, sup)); err != nil {
+				t.Fatalf("moddn %s -> %s: %v", dn, rdn, err)
+			}
+		}
+		uidsUnder := func(base, filter string) []string {
+			t.Helper()
+			res, err := dm.Search(ldap.NewSearchRequest(base, ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false, filter, []string{"uid"}, nil))
+			if err != nil || len(res.Entries) != 1 {
+				t.Fatalf("search %s under %s: %v", filter, base, err)
+			}
+			return res.Entries[0].GetAttributeValues("uid")
+		}
+		const dest = "ou=rdn-dest,dc=example,dc=test"
+		add(dest, map[string][]string{"objectClass": {"top", "organizationalUnit"}, "ou": {"rdn-dest"}})
+		add("uid=renamer,"+people, person("renamer"))
+		add("uid=mover,"+people, person("Mover", "m2"))
+		add("uid=dx,"+people, person("dx", "d  y"))
+		add("uid=keeper,"+people, person("keeper"))
+		t.Cleanup(func() {
+			for _, filter := range []string{"(uid=ren amer)", "(uid=mover)", "(uid=d y)", "(uid=kee per)"} {
+				if res, err := dm.Search(ldap.NewSearchRequest("dc=example,dc=test", ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false, filter, nil, nil)); err == nil {
+					for _, e := range res.Entries {
+						_ = dm.Del(ldap.NewDelRequest(e.DN, nil))
+					}
+				}
+			}
+			_ = dm.Del(ldap.NewDelRequest(dest, nil))
+		})
+		rename("uid=renamer,"+people, "uid=ren amer", true, "")
+		rename("uid=ren amer,"+people, "uid=ren  amer", true, "")
+		if got := uidsUnder(people, "(uid=ren amer)"); len(got) != 1 || got[0] != "ren  amer" {
+			t.Fatalf("respell uid = %q, want [ren  amer]", got)
+		}
+		rename("uid=mover,"+people, "uid=mover", true, dest)
+		if got := uidsUnder(dest, "(uid=mover)"); len(got) != 2 || got[0] != "m2" || got[1] != "mover" {
+			t.Fatalf("pure move uid = %q, want [m2 mover]", got)
+		}
+		rename("uid=dx,"+people, "uid=d y", true, "")
+		if got := uidsUnder(people, "(uid=d y)"); len(got) != 1 || got[0] != "d  y" {
+			t.Fatalf("equal remaining uid = %q, want [d  y]", got)
+		}
+		rename("uid=keeper,"+people, "uid=kee per", false, "")
+		rename("uid=kee per,"+people, "uid=kee  per", false, "")
+		if got := uidsUnder(people, "(uid=kee per)"); len(got) != 2 || got[0] != "keeper" || got[1] != "kee per" {
+			t.Fatalf("keep-old respell uid = %q, want [keeper kee per]", got)
+		}
+	})
 	t.Run("rename-restricted-rdn", func(t *testing.T) {
 		runtime := dial("uid=rt,"+people, "runtime-secret")
 		err := runtime.ModifyDN(ldap.NewModifyDNRequest(alice, "aci=policy", false, ""))
