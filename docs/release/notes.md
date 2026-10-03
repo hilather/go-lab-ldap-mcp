@@ -88,8 +88,15 @@ v0.4.0 → v0.4.1 is **additive**. `apiVersion` stays `labldap.dev/v1alpha1`.
 
 ## Acceptance
 
-`make verify` is the local release gate. CI heavy jobs run 389
-integration and native integration. Product acceptance:
+`make verify` is the local release gate. With Docker it also runs 389
+integration, dual-engine parity and the isolated live browser smoke
+(`make test-e2e-live`, which needs host `ldapsearch`, Compose 2.24.4+ and
+free ports 18443/13636). CI heavy jobs run 389 integration, native
+integration, the live browser smoke (`e2e-live`), and `native-checks` with
+the 389 differential oracle required (`LABLDAP_REQUIRE_389=1`). A local
+`make verify` still skips that oracle with a message when the pinned 389
+image is not present; set `LABLDAP_REQUIRE_389=1` to pull and require it.
+Product acceptance:
 
 - REST account-workflow battery + host LDAP tools on both engines.
 - Native engine unit/integration and `verify-native`.

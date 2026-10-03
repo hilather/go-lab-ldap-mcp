@@ -14,8 +14,23 @@ function searchLDAP(dn: string): string {
   return execFileSync("ldapsearch", [
     "-x", "-H", process.env.LABLDAP_E2E_LDAP_URL!, "-D", "cn=Directory Manager",
     "-y", process.env.LABLDAP_E2E_DM_PASSWORD_FILE!, "-b", dn, "-s", "base", "(objectClass=*)", "description",
-   ], { timeout: 10_000, encoding: "utf8", env: { ...process.env, LDAPTLS_CACERT: process.env.LABLDAP_E2E_CA_FILE, LDAPTLS_REQCERT: "demand" } });
+   ], { timeout: 10_000, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, LDAPTLS_CACERT: process.env.LABLDAP_E2E_CA_FILE, LDAPTLS_REQCERT: "demand" } });
 }
+
+// searchLDAPStatus returns ldapsearch's exit status for a base search. It
+// must have thrown with a numeric status; success or a missing status is
+// reported as -1 so only an exact LDAP result code can satisfy a caller.
+function searchLDAPStatus(dn: string): number {
+  try {
+    searchLDAP(dn);
+  } catch (err) {
+    const status = (err as { status?: unknown }).status;
+    return typeof status === "number" ? status : -1;
+  }
+  return 0;
+}
+
+const LDAP_NO_SUCH_OBJECT = 32;
 
 test("live native console account and structured-entry workflows affect the real directory", async ({ page }) => {
   await login(page);
@@ -59,4 +74,7 @@ test("live native console account and structured-entry workflows affect the real
   await page.getByLabel("Type the exact DN to confirm").fill("ou=browser-moved,ou=people,dc=example,dc=test");
   await page.getByRole("button", { name: "Delete entry", exact: true }).click();
   await expect(page.locator("#main").getByRole("status")).toContainText("Deleted entry.");
+  // The real directory must no longer hold the entry: exactly noSuchObject,
+  // not a bind, TLS, or timeout failure.
+  expect(searchLDAPStatus("ou=browser-moved,ou=people,dc=example,dc=test")).toBe(LDAP_NO_SUCH_OBJECT);
 });

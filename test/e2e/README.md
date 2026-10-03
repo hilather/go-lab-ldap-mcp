@@ -29,7 +29,8 @@ mode requires matching fixture data and trusted management TLS; mock-specific
 assertions and outage injection (`POST /__e2e/outage`) need a corresponding
 live fixture strategy. Real-engine integration and dual-engine parity remain
 separate release gates. The complete acceptance/outage suite still needs a live CI fixture strategy;
-the focused native Compose smoke below is automated and independently runnable.
+the focused native Compose smoke below is automated: `make verify` runs it when
+Docker is available, and CI runs it in the `e2e-live` job.
 
 ## Secrets in artifacts
 
@@ -50,7 +51,11 @@ that failed before teardown finished.
 credentials and TLS files, starts a unique native Compose project, and exercises
 account lock/unlock, password expiry, password setting with must-change, and
 structured entry create/edit/move/delete through the UI. Independent `ldapsearch`
-checks prove the edited and moved entries exist in the actual directory. It
+checks prove the edited and moved entries exist in the actual directory, and that
+the deleted entry is gone (exit status 32, `noSuchObject`). `make verify` runs it
+when Docker is available and CI runs it in the `e2e-live` job; on failure CI
+uploads the Compose service logs (set `LABLDAP_E2E_LIVE_LOG_FILE` locally for the
+same). It
 requires Docker, Compose 2.24.4+, host `ldapsearch`, Go, pnpm, and Playwright
 Chromium (`pnpm exec playwright install chromium` from this directory).
 

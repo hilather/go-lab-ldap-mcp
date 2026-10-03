@@ -1,7 +1,10 @@
 # LabLDAP continuous integration (T-004, T-007 wiring).
 #
 # Required PR gate: static, unit, frontend, security, integration (389),
-# integration-native. image-bootstrap and make image are required.
+# integration-native, native-checks (389 differential oracle required),
+# e2e-live (isolated native Compose browser smoke). image-bootstrap and
+# make image are required. Required-check status itself is a branch
+# protection setting: add e2e-live there for it to block merges.
 # SBOM/provenance is the sbom job.
 #
 # Caches are only the Go module/build cache and the pnpm store.
@@ -218,12 +221,59 @@ jobs:
       - name: Browser workflows
         run: make test-e2e
 
+  e2e-live:
+    name: e2e-live
+    needs: [changes]
+    if: needs.changes.outputs.heavy == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+          cache-dependency-path: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - name: Activate pinned pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.14.0 --activate
+      - name: Install host LDAP tools
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ldap-utils
+          command -v ldapsearch
+      - name: Install Chromium and system dependencies
+        run: cd test/e2e && pnpm install --frozen-lockfile && pnpm exec playwright install --with-deps chromium
+      - name: Live native browser smoke
+        env:
+          LABLDAP_E2E_LIVE_LOG_FILE: ${{ runner.temp }}/e2e-live-compose.log
+        run: make test-e2e-live
+      # Compose service logs only (written on failure). Never upload the
+      # temporary secrets directory, /secrets, .env, or credential files.
+      - name: Upload compose logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-live-compose-log
+          path: ${{ runner.temp }}/e2e-live-compose.log
+          if-no-files-found: ignore
+          retention-days: 30
+          include-hidden-files: false
+
   native-checks:
     name: native-checks
     needs: [changes]
     if: needs.changes.outputs.native == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Fuzz + soak + image pull + the 10m oracle leg.
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
         with:
@@ -233,6 +283,10 @@ jobs:
           go-version-file: go.mod
           cache: true
       - name: Native fuzz, soak, differential, and parity checks
+        env:
+          # The 389 differential oracle is required here: test-diff pulls
+          # the pinned image and fails instead of skipping.
+          LABLDAP_REQUIRE_389: "1"
         run: make verify-native
 
   security:
@@ -278,8 +332,10 @@ jobs:
     needs: [changes]
     if: needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-latest
-    # Includes the dual-engine parity oracle, host setup, and 45m integration budget.
-    timeout-minutes: 60
+    # 30m parity + 45m integration (go test -timeout is per test binary;
+    # the integration packages run in parallel) + ~15m host setup and log
+    # upload. TestCIIntegrationTimeoutCoversBudget keeps this in step.
+    timeout-minutes: 90
     steps:
       - name: Checkout
         uses: actions/checkout@v4

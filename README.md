@@ -200,7 +200,9 @@ Architecture and design live under [`docs/`](docs/). Contributing:
 ## Develop
 
 ```text
-make verify              # format, lint, generate, unit, security, SBOM, arch
+make verify              # format, lint, generate, unit, security, SBOM, arch, native checks;
+                         # with Docker also 389 integration, parity, and the live browser
+                         # smoke (needs ldapsearch, Compose, ports 18443/13636)
 make test-integration    # real 389 DS (Docker)
 make test-integration-native  # same suite against in-process labldapd
 make image               # labldap-control:dev
