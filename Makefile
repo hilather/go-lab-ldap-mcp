@@ -438,7 +438,8 @@ dataset:
 	$(GO) run ./tools/dataset --users 50 --groups 5 --out dist/dataset/small.yaml
 
 # Docker-less verification runs every native check. When Docker is available,
-# failures in the 389 integration or parity legs must propagate to make.
+# failures in the 389 integration, parity, or live browser smoke legs must
+# propagate to make.
 verify: format lint generate generate-drift test-unit test-security sbom checksums archcheck test-e2e test-integration-native
 	$(MAKE) verify-native
 	@set -e; if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then \

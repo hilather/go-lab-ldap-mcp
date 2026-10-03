@@ -187,15 +187,22 @@ func TestDiffOracleCannotSoftSkip(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			// PATH holds only the stub dir plus the system tool dirs that make
-			// and sh need; a real docker elsewhere on PATH must not be found.
-			path := dir + ":/usr/bin:/bin"
-			if tc.docker == "" {
-				if _, err := os.Stat("/usr/bin/docker"); err == nil {
-					t.Skip("host has /usr/bin/docker; cannot simulate a docker-less PATH")
+			// PATH is only the stub dir: the tools make and the recipes need
+			// are symlinked in, so a real docker on the host is never found.
+			for _, tool := range []string{"sh", "bash", "make", "cat", "git", "date", "uname", "grep", "sed", "tr", "head", "awk", "env"} {
+				if p, err := exec.LookPath(tool); err == nil {
+					if err := os.Symlink(p, filepath.Join(dir, tool)); err != nil {
+						t.Fatal(err)
+					}
 				}
 			}
-			cmd := exec.CommandContext(t.Context(), "make", "test-diff", "GO="+goStub, "DIRSRV_IMAGE=example.invalid/dirsrv@sha256:0")
+			path := dir
+			if tc.docker == "" {
+				if _, err := os.Stat(filepath.Join(dir, "docker")); err == nil {
+					t.Fatal("docker unexpectedly present in the stub PATH")
+				}
+			}
+			cmd := exec.CommandContext(t.Context(), filepath.Join(dir, "make"), "test-diff", "GO="+goStub, "DIRSRV_IMAGE=example.invalid/dirsrv@sha256:0")
 			cmd.Dir = root
 			for _, env := range os.Environ() {
 				if !strings.HasPrefix(env, "PATH=") && !strings.HasPrefix(env, "LABLDAP_REQUIRE_389=") &&
@@ -278,5 +285,17 @@ func TestCIIntegrationTimeoutCoversBudget(t *testing.T) {
 	}
 	if job < parity+integration+10 {
 		t.Fatalf("CI integration timeout %dm < parity %dm + integration %dm + 10m setup", job, parity, integration)
+	}
+}
+
+// A renamed oracle test would make `-run=TestDifferential389Oracle` match
+// nothing and pass; keep the Makefile target and the test name in step.
+func TestDiffOracleTestNameExists(t *testing.T) {
+	root := repoRoot(t)
+	if !strings.Contains(read(t, filepath.Join(root, "Makefile")), "-run=TestDifferential389Oracle ") {
+		t.Fatal("Makefile test-diff no longer runs TestDifferential389Oracle")
+	}
+	if !strings.Contains(read(t, filepath.Join(root, "internal/ldapserver/differential_test.go")), "func TestDifferential389Oracle(t *testing.T)") {
+		t.Fatal("TestDifferential389Oracle was renamed; update the Makefile test-diff target")
 	}
 }
