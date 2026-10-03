@@ -8,13 +8,15 @@ Date: 2026-10-03
 
 Deciders: repository owner
 
-Related tasks: none yet (deliberately). An implementation task is opened in
-`TASKS.md` when this ADR is accepted, so no task id is reserved ahead of the
-decision.
+Related tasks: none yet (deliberately). Unlike ADR-0014, which reserves
+T-151, this ADR reserves no task id: both decisions change accepted parity
+(two new Deltas), so the implementation task is opened in `TASKS.md` only
+if the owner accepts them.
 
 Related ADRs: ADR-0008, ADR-0009, and ADR-0014 (proposed in PR #24, not yet
 on main). Related contract clauses: native-engine parity contract C1/C3/C8, and
-the proposed deltas D31/D32.
+the proposed deltas D32/D33. Related fix: PR #25 (control-plane option and
+OID handling for protected attributes; adds accepted Delta D31).
 
 ## Context
 
@@ -48,29 +50,21 @@ is no client-visible split on this case today.
 The bare OID `2.5.18.2` is a separate case. Native rejects it with
 `constraintViolation(19)` (`op_write.go:153-162`); 389 returns
 `unwillingToPerform(53)`. That 19-vs-53 split is the existing unadjudicated
-note at `op_write.go:153-156`. D31 does not decide it, and it remains open.
+note at `op_write.go:153-156`. D32 does not decide it, and it remains open.
 
-The control plane can reach this case too. REST entry update and MCP
-`ldap_update_entry` forward the attribute name
-(`internal/directory/ds389/entries.go:325-331`). `ForbiddenEntryAttr`
-(`internal/directory/classes.go:103-113`) and `ForbiddenUserAttr` both
-compare against `config.CanonicalAttr`, which only lowercases and trims
-(`internal/config/attr.go:26-32`). That means option spellings of every name
-on those deny lists get through, not just `modifyTimestamp`: `userPassword;…`,
-`memberOf;…`, `nsAccountLock;…`, `aci;…`, `entryUUID;…` and the other
-`operationalDeny` names. The `nsslapd-` prefix check still catches option
-suffixes. If native alone started rejecting these writes, REST and MCP would
-return different results depending on the engine.
-
-Read redaction has the same exact-name gap. REST and MCP read output is
-filtered through `redactAttrs` / `secretOrDeniedAttr`
-(`internal/app/directory.go:184`, `:225-228`), which match canonical names
-only. An option spelling such as `userPassword;lang-en` would therefore not be
-redacted. From the code and the compiled people-write ACI, REST on the 389
-engine can plausibly write `userPassword;lang-en` and read it back
-unredacted on main today. This was found by code reading and has not been
-probed. D31 below owns the fix. There is no separate tracker; the owner can
-split it out if it should land before D31.
+The control plane could reach this case too, and on `main` at `4f05463` it
+had an exact-name gap: `ForbiddenEntryAttr`, `ForbiddenUserAttr` and read
+redaction compared lowercased full names, so option spellings of protected
+names passed REST/MCP writes and came back unredacted on reads, on both
+engines (both control planes use the `ds389` runtime). That was a bug
+against the existing contract, not a parity question, and it is fixed
+separately in PR #25: the control plane now resolves attribute options
+and a static table of protected OIDs before the deny checks and read
+redaction, and the native engine hashes plaintext values of any variant
+`userPassword` spelling (accepted Delta D31, because 389 stores them as
+written). This ADR depends on that fix and does not own it. What remains
+here is the native LDAP floor: whether native itself rejects option
+spellings of server-owned operational attributes on direct LDAP writes.
 
 ### 2. Bind identity after a failed critical-control Bind
 
@@ -92,8 +86,8 @@ no outstanding-operation barrier (`conn.go:109-115`), and `handleCompare` reads
 via `spawnOp` does the same, including Search (`op_search.go:29`), Add,
 Modify, Delete, ModifyDN and WhoAmI. Only Bind and StartTLS run inline. So
 operations dispatched before a Bind can already see the identity that Bind
-sets. D32 does not create
-this race. However, under D32 a Bind that fails a critical control would also
+sets. D33 does not create
+this race. However, under D33 a Bind that fails a critical control would also
 change the identity, so more Binds would change the identity that in-flight
 workers can observe. That is why the order of steps inside Bind matters.
 
@@ -103,14 +97,14 @@ behaviour do not ship in the regression suite.
 ### Existing implementation context
 
 The companion implementation PR (#19) adds matched hardening. It is separate
-from D31 and D32:
+from D32 and D33:
 
 - Native operations capture their subject on the connection read loop when
   they are dispatched, so a later Bind cannot give earlier requests a new
   identity part-way through.
 - Attribute-target ACI protections for options and OIDs (`aci;lang-en` and the
   `aci` OID both return `insufficientAccessRights(50)`) have shared 389/native
-  denial tests. That is matched Contract behaviour, separate from D31.
+  denial tests. That is matched Contract behaviour, separate from D32.
   `clientModifiable` on that branch still does not strip options.
 - Nothing here weakens 389-mode access controls or claims that the pinned 389
   implementation changes. Mode-specific security floors must be documented and
@@ -120,36 +114,39 @@ from D31 and D32:
 
 Proposed:
 
-1. **D31: option and OID resolution for client-modifiability.** Native
+1. **D32: option and OID resolution for client-modifiability.** Native
    security checks resolve schema OID aliases and attribute options to the
    underlying type. An option cannot make a server-owned operational attribute
    client-modifiable. Native rejects the write where the pinned 389 build
    accepts it, and the delta records that split.
    - Acceptance needs a direct LDAP assertion on both engines: native rejects,
      389 records success as the delta.
-   - Acceptance also needs a control-plane assertion on both engines, using
-     REST entry update and MCP `ldap_update_entry` with
-     `modifyTimestamp;lang-en` and at least one credential-class spelling
-     (`userPassword;lang-en`).
-   - **Proposed REST/MCP behaviour change.** Entry and user updates reject
-     option and OID spellings of every `ForbiddenEntryAttr` and
-     `ForbiddenUserAttr` name. They return the existing `changes.name` /
-     `forbidden_attribute` error on both engines. This adds no new operation,
-     OpenAPI shape or console workflow. On the 389 engine these writes return
-     success today.
-   - The control plane uses one option-stripping resolver for both the write
-     deny check and read redaction. OID spellings are resolved through a
-     static table of deny-list OIDs in `internal/config`, because the control
-     plane has no schema registry. That table is tested against the subschema
-     of both engines so the two lists cannot drift apart.
+   - The control plane already rejects option and OID spellings of
+     protected names on both engines after PR #25, so REST/MCP results
+     stay engine-neutral whatever is decided here. D32 changes only direct
+     LDAP results: option spellings of server-owned operational attributes
+     return success on 389 today, while OID spellings vary (for example
+     `unwillingToPerform(53)` for `2.5.18.2`).
+   - Acceptance also needs a control-plane regression on both engines
+     (`modifyTimestamp;lang-en` through REST entry update and MCP
+     `ldap_update_entry`), extending the PR #25 tests rather than adding
+     a second resolver.
    - Rejected alternative: the control plane forwards the write and REST/MCP
      results differ by engine.
-2. **D32: native resets; 389 retains; the delta records the split.** Every
+2. **D33: native resets; 389 retains; the delta records the split.** Every
    native Bind attempt resets the connection identity to anonymous before it
    validates controls or credentials. A failed Bind leaves the connection
    anonymous. The pinned 389 build keeps the prior identity after a
    critical-control failure, and the delta records that split. It does not
    adopt 389's retention.
+   - **Why RFC 4513 §4 wins over RFC 4511 §4.1.11.** §4.1.11 says an
+     operation with an unrecognised critical control must not be performed,
+     which can be read as supporting 389: resetting the identity is part of
+     performing the Bind. This ADR reads RFC 4513 §4 as moving the
+     association to anonymous on receipt of the Bind request, before any
+     processing, so the reset is not part of the refused operation. That
+     reading also fails closed: a refused Bind never leaves elevated
+     privileges in place.
    - **Order inside Bind processing:**
      1. ADR-0014's barrier completes or abandons every earlier operation.
      2. Reset to anonymous.
@@ -158,7 +155,7 @@ Proposed:
 
      Operations dispatched before the Bind keep the subject captured on the
      read loop, and no handler can observe the reset or the new identity.
-   - **Implementation precondition.** Do not implement D32 before both of these
+   - **Implementation precondition.** Do not implement D33 before both of these
      are on main: #19's per-operation subject capture on the read loop, and
      ADR-0014's outstanding-operation barrier.
 
@@ -177,30 +174,35 @@ Proposed:
 
 - Native becomes stricter than the pinned 389 oracle on two observed cases.
   That adds two accepted Deltas, each with per-engine controlling tests.
-- REST and MCP on the 389 engine start rejecting option spellings that 389
-  itself accepts.
-- Config validation of `users[].attributes` (`internal/config/user.go:54`)
-  uses the same deny check, so it becomes stricter. That is a security
-  tightening allowed in a minor release, and it needs a compatibility note.
-- D32 cannot ship until #19 and ADR-0014 are implemented.
+- The control-plane tightening this ADR relies on (PR #25) already
+  changes every caller of the deny checks: user create and update
+  (`app/users.go:245`, `ds389/runtime.go:297`), entry create and update
+  (`ds389/entries.go:423`, `:330`), the seed (`ds389/seed.go:335`), and
+  config validation of `users[].attributes` (`internal/config/user.go:54`).
+  REST and MCP on the 389 engine reject option spellings that 389 itself
+  accepts, and scenarios or imports that used them fail validation. That
+  compatibility note ships with PR #25; D32 adds only the direct LDAP
+  rejection on native.
+- D33 cannot ship until #19 and ADR-0014 are implemented.
 
 ### Neutral / follow-up
 
-- When implemented, add D31 and D32 rows to `docs/design/parity-delta-log.md`
-  (D-numbers on main end at D30) and regenerate the ledger with
-  `PARITY_UPDATE_LEDGER=1`.
-- The control-plane resolution overlaps with the option and alias handling
-  under review for the user-write paths (PR #18). Implement them together so
-  there is one write rule.
+- When implemented, add D32 and D33 rows to `docs/design/parity-delta-log.md`
+  (D31 is taken by PR #25) and regenerate the ledger with
+  `PARITY_UPDATE_LEDGER=1`. If numbering moves before then, the recording
+  rule (next free number) wins over the names used here.
+- The control-plane resolver is PR #25's; PR #18 extends it for
+  user-write alias spellings. D32's native floor should reuse the same OID
+  table rather than add a second one.
 - No new listener, endpoint, schema field or credential distribution is added.
 
 ## Alternatives considered
 
 | Option | Why not chosen |
 | --- | --- |
-| Adopt 389 retention after a failed critical-control Bind | Conflicts with RFC 4513 §4 and keeps privileges after a failed Bind. |
+| Adopt 389 retention after a failed critical-control Bind | Arguably supported by RFC 4511 §4.1.11, but conflicts with RFC 4513 §4 (identity moves to anonymous on receipt) and keeps privileges after a failed Bind; see D33. |
 | Leave operational-attribute option spellings under D17 permanently | D17 covers unknown-attribute acceptance. It should not let a server-owned attribute become writable through an option. |
-| Reject option spellings only in the control plane | Leaves direct LDAP writes on native open. |
+| Reject option spellings only in the control plane (the state after PR #25) | Leaves direct LDAP writes on native open. |
 | Reject on native LDAP only and let REST/MCP forward | REST/MCP results would differ by engine. |
 
 ## Notes
