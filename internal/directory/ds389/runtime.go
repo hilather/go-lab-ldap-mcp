@@ -298,7 +298,10 @@ func forbiddenWriteAttr(name string) bool {
 }
 
 func skipReturnedAttr(name string) bool {
-	switch config.CanonicalAttr(name) {
+	if directory.SecretAttr(name) {
+		return true
+	}
+	switch config.CanonicalAttrType(name) {
 	case "userpassword", "aci", "nsslapd-rootpw", "nsslapd-rootpwstoragescheme",
 		"nsmultiplexorbindcred", "nsmultiplexorcredentials",
 		"entrycsn", "modifytimestamp", "entryuuid", "nsuniqueid",

@@ -327,7 +327,7 @@ func applyEntryChange(mod *ldap.ModifyRequest, ch directory.EntryChange) error {
 	if name == "" {
 		return cfgErr("changes.name", "required", "attribute name is required")
 	}
-	if directory.ForbiddenEntryAttr(name) || config.CanonicalAttr(name) == "objectclass" {
+	if directory.ForbiddenEntryAttr(name) || config.CanonicalAttrType(name) == "objectclass" {
 		return cfgErr("changes.name", "forbidden_attribute", "attribute is not allowed")
 	}
 	switch strings.ToLower(strings.TrimSpace(ch.Op)) {

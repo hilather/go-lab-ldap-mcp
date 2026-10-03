@@ -231,12 +231,15 @@ func secretOrDeniedAttr(name string) bool {
 }
 
 func secretSchemaAttr(name string) bool {
-	switch config.CanonicalAttr(name) {
+	if directory.SecretAttr(name) {
+		return true
+	}
+	switch config.CanonicalAttrType(name) {
 	case "nsslapd-rootpw", "nsslapd-rootpwstoragescheme",
 		"nsmultiplexorbindcred", "nsmultiplexorcredentials",
 		"nsds5replicacredentials", "userpassword":
 		return true
 	default:
-		return strings.HasPrefix(config.CanonicalAttr(name), "nsslapd-rootpw")
+		return strings.HasPrefix(config.CanonicalAttrType(name), "nsslapd-rootpw")
 	}
 }

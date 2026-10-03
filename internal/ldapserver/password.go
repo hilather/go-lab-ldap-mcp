@@ -293,6 +293,13 @@ func (e *passwordEngine) writeLockAttr(ctx context.Context, store Store, dn conf
 // (pwpolicy is registered last by New; every plugin must re-read before
 // Replace to avoid clobbering).
 func (e *passwordEngine) AfterWrite(ctx context.Context, tx UpdateTx, ev WriteEvent) error {
+	if (ev.Op == WriteAdd || ev.Op == WriteModify) && ev.After != nil {
+		// Runs before the canonical pass so its early returns (no or
+		// unchanged userPassword) cannot skip it.
+		if err := e.hashVariantPasswords(ctx, tx, ev.After); err != nil {
+			return err
+		}
+	}
 	switch ev.Op {
 	case WriteAdd:
 		if ev.After == nil {
@@ -307,6 +314,63 @@ func (e *passwordEngine) AfterWrite(ctx context.Context, tx UpdateTx, ev WriteEv
 	default:
 		return nil
 	}
+}
+
+// isVariantPasswordAttr reports a userPassword spelling other than the exact
+// descriptor: an attribute option (userPassword;lang-en) or the 2.5.4.35 OID.
+// Bind and policy only ever read the exact attribute, so these values never
+// authenticate, but they are still credential material.
+func isVariantPasswordAttr(name string) bool {
+	return config.CanonicalAttrType(name) == "userpassword" && !strings.EqualFold(strings.TrimSpace(name), attrUserPassword)
+}
+
+// hashVariantPasswords stores every plaintext value of a variant userPassword
+// spelling as a hash, so native never keeps credential material in plaintext
+// (Delta D31). Pre-hashed values pass through as for the canonical attribute
+// (D3). No length, history, pwdChangedTime or reset effects: those belong to
+// the exact userPassword attribute.
+func (e *passwordEngine) hashVariantPasswords(ctx context.Context, tx UpdateTx, after *Entry) error {
+	plain := false
+	for _, a := range after.Attributes {
+		if !isVariantPasswordAttr(a.Name) {
+			continue
+		}
+		for _, v := range a.Values {
+			if !isPreHashed(v) {
+				plain = true
+			}
+		}
+	}
+	if !plain {
+		return nil
+	}
+	dn, err := config.ParseDN(after.DN)
+	if err != nil {
+		return fmt.Errorf("ldapserver: pwpolicy variant: %w", err)
+	}
+	cur, err := tx.Entry(ctx, dn)
+	if err != nil {
+		return fmt.Errorf("ldapserver: pwpolicy variant re-read: %w", err)
+	}
+	for i, a := range cur.Attributes {
+		if !isVariantPasswordAttr(a.Name) {
+			continue
+		}
+		out := make([][]byte, 0, len(a.Values))
+		for _, v := range a.Values {
+			if isPreHashed(v) {
+				out = append(out, v)
+				continue
+			}
+			hashed, err := e.hasher.Hash(v)
+			if err != nil {
+				return fmt.Errorf("ldapserver: pwpolicy variant hash: %w", err)
+			}
+			out = append(out, hashed)
+		}
+		cur.Attributes[i].Values = out
+	}
+	return tx.Replace(ctx, cur)
 }
 
 // applyAdd hashes plaintext userPassword values and stamps pwdChangedTime.
