@@ -546,3 +546,47 @@ func TestAdditionalSuffixesCompile(t *testing.T) {
 		t.Fatalf("additional write ACIs = %d", writes)
 	}
 }
+
+func TestYAMLUserAttrsUseTheSingleWriteRule(t *testing.T) {
+	src := []byte(`
+apiVersion: labldap.dev/v1alpha1
+kind: LabScenario
+metadata: { name: x }
+spec:
+  directory: { suffix: "dc=example,dc=test" }
+  transport: { ldaps: { enabled: true, port: 3636 } }
+  runtimeAccount: { id: rt, passwordFile: secrets/runtime-ldap }
+  users:
+    - id: alice
+      passwordFile: secrets/user-alice
+      attributes:
+        objectClass: extensibleObject
+        commonName: Alias
+        "cn;lang-en": Optioned
+        mail: a@example.test
+        Mail: b@example.test
+        ou: Eng
+        organizationalUnitName: Ops
+`)
+	_, err := config.Compile(t.Context(), src, "aliases.yaml", config.LoadOptions{Secrets: fixtureSecrets(), Caller: config.CallerCLI})
+	if err == nil {
+		t.Fatal("expected forbidden/duplicate attribute errors")
+	}
+	fs := mustFields(t, err)
+	want := map[string]string{
+		"spec.users[0].attributes.objectClass": "forbidden_attribute",
+		"spec.users[0].attributes.commonName":  "forbidden_attribute",
+		"spec.users[0].attributes.cn;lang-en":  "forbidden_attribute",
+		"spec.users[0].attributes.mail":        "duplicate_attribute",
+		"spec.users[0].attributes.ou":          "duplicate_attribute",
+	}
+	got := map[string]string{}
+	for _, f := range fs {
+		got[f.Path] = f.Code
+	}
+	for path, code := range want {
+		if got[path] != code {
+			t.Fatalf("%s: got %q want %q; fields = %#v", path, got[path], code, fs)
+		}
+	}
+}

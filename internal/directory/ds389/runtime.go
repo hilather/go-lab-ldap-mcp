@@ -285,16 +285,17 @@ func leafValue(dn string) string {
 
 func attrMapValue(m map[string]string, name string) string {
 	want := config.CanonicalAttr(name)
-	for k, v := range m {
+	// Sorted so case-variant keys pick the same value every time.
+	for _, k := range sortedNames(m) {
 		if config.CanonicalAttr(k) == want {
-			return v
+			return m[k]
 		}
 	}
 	return ""
 }
 
 func forbiddenWriteAttr(name string) bool {
-	return config.ForbiddenUserAttr(name)
+	return config.ForbiddenUserWriteAttr(name)
 }
 
 func skipReturnedAttr(name string) bool {
