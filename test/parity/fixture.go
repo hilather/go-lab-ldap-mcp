@@ -457,6 +457,41 @@ func readOutcome(conn *ldap.Conn, dn string, attrs ...string) opOutcome {
 	return searchOutcome(conn, dn, ldap.ScopeBaseObject, 0, "(objectClass=*)", attrs)
 }
 
+// valuesOutcome captures the result code, entry count, and the sorted
+// values of one attribute across the matching entries. DNs are not
+// captured (used where DN spelling is an open candidate).
+func valuesOutcome(conn *ldap.Conn, base string, scope int, filter, attr string) opOutcome {
+	req := ldap.NewSearchRequest(base, scope, ldap.NeverDerefAliases, 0, 0, false, filter, []string{attr}, nil)
+	res, err := conn.Search(req)
+	out := opOutcome{Code: ldapCode(err)}
+	if res != nil {
+		var vals []string
+		for _, e := range res.Entries {
+			vals = append(vals, e.GetAttributeValues(attr)...)
+		}
+		sort.Strings(vals)
+		out.Value = fmt.Sprintf("%d:%s", len(res.Entries), strings.Join(vals, "|"))
+	}
+	return out
+}
+
+// deleteMatching deletes every entry matching filter one level under base
+// by the DN the engine returns, recording the search code, the number of
+// matches, and the delete codes (an empty match is "0:").
+func deleteMatching(conn *ldap.Conn, base, filter string) opOutcome {
+	req := ldap.NewSearchRequest(base, ldap.ScopeSingleLevel, ldap.NeverDerefAliases, 0, 0, false, filter, []string{"1.1"}, nil)
+	res, err := conn.Search(req)
+	out := opOutcome{Code: ldapCode(err)}
+	if res != nil {
+		codes := make([]string, 0, len(res.Entries))
+		for _, e := range res.Entries {
+			codes = append(codes, fmt.Sprintf("%d", ldapCode(conn.Del(ldap.NewDelRequest(e.DN, nil)))))
+		}
+		out.Value = fmt.Sprintf("%d:%s", len(res.Entries), strings.Join(codes, "|"))
+	}
+	return out
+}
+
 // countOutcome captures only the result code and entry count — used where
 // the *set* returned under a size limit is engine-order-dependent.
 func countOutcome(conn *ldap.Conn, base string, scope, sizeLimit int, filter string, attrs []string, controls ...ldap.Control) opOutcome {
