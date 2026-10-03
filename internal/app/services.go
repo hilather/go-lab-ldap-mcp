@@ -179,17 +179,26 @@ func (h hooks) authorize(ctx context.Context, p Principal, op Operation) error {
 // Admission leases cover the entire repository operation, including waits
 // for keyed locks, so reset can drain in-flight operations before inventory.
 func (h hooks) acquireWrite(ctx context.Context) (func(), error) {
+	releaseAdmission := func() {}
 	if g, ok := h.gate.(interface {
 		AcquireWrite(context.Context) (func(), error)
 	}); ok {
-		return g.AcquireWrite(ctx)
-	}
-	if h.gate != nil {
+		release, err := g.AcquireWrite(ctx)
+		if err != nil {
+			return nil, err
+		}
+		releaseAdmission = release
+	} else if h.gate != nil {
 		if err := h.gate.Allow(ctx); err != nil {
 			return nil, err
 		}
 	}
-	return func() {}, nil
+	releaseMutation, err := h.locks.AcquireMutation(ctx)
+	if err != nil {
+		releaseAdmission()
+		return nil, err
+	}
+	return func() { releaseMutation(); releaseAdmission() }, nil
 }
 func (h hooks) acquireRead(ctx context.Context) (func(), error) {
 	if g, ok := h.gate.(interface {

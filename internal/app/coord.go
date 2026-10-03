@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"strings"
 	"sync"
 )
@@ -11,10 +12,12 @@ type keyedLock struct {
 }
 
 // Coordinator is a process-local keyed lock (KD-R24). Callers still check
-// revision / If-Match; the lock only serializes same-DN mutations.
+// revision / If-Match. A shared mutation lease additionally serializes writes
+// across user/group/entry surfaces whose identifiers can name the same entry.
 type Coordinator struct {
-	mu    sync.Mutex
-	locks map[string]*keyedLock
+	mu       sync.Mutex
+	locks    map[string]*keyedLock
+	mutation chan struct{}
 }
 
 func NewCoordinator() *Coordinator {
@@ -51,3 +54,31 @@ func (c *Coordinator) Lock(key string) func() {
 
 func userLockKey(id string) string  { return "user:" + id }
 func groupLockKey(id string) string { return "group:" + id }
+
+// AcquireMutation serializes application writes before their live revision
+// reads. Waiting remains cancellable, including while reset drains admissions.
+func (c *Coordinator) AcquireMutation(ctx context.Context) (func(), error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if c == nil {
+		return func() {}, nil
+	}
+	c.mu.Lock()
+	if c.mutation == nil {
+		c.mutation = make(chan struct{}, 1)
+	}
+	semaphore := c.mutation
+	c.mu.Unlock()
+	select {
+	case semaphore <- struct{}{}:
+		if err := ctx.Err(); err != nil {
+			<-semaphore
+			return nil, err
+		}
+		var once sync.Once
+		return func() { once.Do(func() { <-semaphore }) }, nil
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+}
