@@ -14,7 +14,8 @@ import (
 
 func TestControlMutationsSerializeAliasesAndServiceSurfaces(t *testing.T) {
 	rt := startControlReviewRuntime(t)
-	svc := app.New(app.Deps{Users: rt.Users(), Entries: rt})
+	locks := app.NewCoordinator()
+	svc := app.New(app.Deps{Users: rt.Users(), Entries: rt, Locks: locks})
 	principal := app.Principal{Kind: app.KindToken, ID: "writer", Scopes: directory.ScopeSet{"directory:write"}}
 	for _, mixed := range []bool{false, true} {
 		name := "DN-alias"
@@ -65,12 +66,27 @@ func TestControlMutationsSerializeAliasesAndServiceSurfaces(t *testing.T) {
 				second <- err
 			}()
 			<-started
+			// Positive proof, not a timing window: the first caller holds the
+			// shared mutation lease while parked at the revision boundary, so
+			// the second caller is observed waiting on that lease.
+			deadline := time.After(10 * time.Second)
+			for locks.MutationWaiters() != 1 {
+				select {
+				case <-entered:
+					t.Fatal("second mutation passed stale check before first committed")
+				case err := <-second:
+					t.Fatalf("second mutation completed before first: %v", err)
+				case <-deadline:
+					t.Fatalf("second mutation never blocked on the mutation lease (waiters=%d)", locks.MutationWaiters())
+				case <-time.After(time.Millisecond):
+				}
+			}
 			select {
 			case <-entered:
 				t.Fatal("second mutation passed stale check before first committed")
 			case err := <-second:
 				t.Fatalf("second mutation completed before first: %v", err)
-			case <-time.After(150 * time.Millisecond):
+			default:
 			}
 			close(resume)
 			if err := <-first; err != nil {

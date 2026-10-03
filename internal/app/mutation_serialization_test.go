@@ -90,3 +90,62 @@ func TestEntryLockKeyCanonicalizesEscapedAliases(t *testing.T) {
 		t.Fatal("distinct DN keys collide")
 	}
 }
+
+func TestCoordinatorReportsMutationWaiters(t *testing.T) {
+	c := NewCoordinator()
+	release, err := c.AcquireMutation(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := c.MutationWaiters(); n != 0 {
+		t.Fatalf("waiters with uncontended holder = %d", n)
+	}
+	waitFor := func(want int) {
+		t.Helper()
+		deadline := time.Now().Add(10 * time.Second)
+		for c.MutationWaiters() != want {
+			if time.Now().After(deadline) {
+				t.Fatalf("waiters = %d, want %d", c.MutationWaiters(), want)
+			}
+			time.Sleep(time.Millisecond)
+		}
+	}
+	got := make(chan func(), 1)
+	go func() {
+		r, err := c.AcquireMutation(t.Context())
+		if err != nil {
+			t.Error(err)
+			got <- nil
+			return
+		}
+		got <- r
+	}()
+	waitFor(1)
+	release()
+	r := <-got
+	if r == nil {
+		t.FailNow()
+	}
+	if n := c.MutationWaiters(); n != 0 {
+		t.Fatalf("waiters after hand-off = %d", n)
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan error, 1)
+	go func() {
+		_, err := c.AcquireMutation(ctx)
+		done <- err
+	}()
+	waitFor(1)
+	cancel()
+	if err := <-done; !errors.Is(err, context.Canceled) {
+		t.Fatalf("cancelled waiter: %v", err)
+	}
+	if n := c.MutationWaiters(); n != 0 {
+		t.Fatalf("waiters after cancel = %d", n)
+	}
+	r()
+	var nilCoord *Coordinator
+	if nilCoord.MutationWaiters() != 0 {
+		t.Fatal("nil coordinator waiters")
+	}
+}
