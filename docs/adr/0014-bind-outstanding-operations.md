@@ -2,13 +2,7 @@
 
 ## Status
 
-Proposed. This was found during final oracle validation on 2026-10-03. The
-proposal does not authorize any behaviour change or accepted parity Delta.
-
-This is a newly found scheduling gap. It is separate from the two proposals in
-ADR-0013 (operational attributes and the failed critical Bind). The earlier
-owner decision covered only ADR-0013's two findings. The owner has not decided
-on this third finding.
+Proposed
 
 Date: 2026-10-03
 
@@ -20,6 +14,12 @@ Related ADRs: ADR-0008, ADR-0009. ADR-0013 is a separate Proposed ADR in PR #23
 and is not on main.
 
 ## Context
+
+This scheduling gap was found during final oracle validation on 2026-10-03.
+This proposal does not authorize any behaviour change or accepted parity Delta.
+The gap is separate from the two proposals in ADR-0013 (operational attributes
+and the failed critical Bind). The earlier owner decision covered only
+ADR-0013's two findings. The owner has not decided on this third finding.
 
 ### Evidence
 
@@ -151,7 +151,8 @@ only after earlier operations completed or were abandoned.
   result reflects the identity from before the Bind.
 - **Abandon:** no CompareResponse ID 1 arrives after BindResponse ID 2. A
   deterministic native scheduling hook confirms the worker exited before
-  `setSubject`. A CompareResponse sent before the BindResponse is allowed.
+  `setSubject`. A CompareResponse sent before the BindResponse is allowed,
+  provided its result reflects the identity from before the Bind.
   This criterion assumes abandoned operations get no response, by analogy to
   RFC 4511 §4.11 and OpenLDAP's behaviour. RFC 4511 does not define
   responses for operations abandoned by a Bind.
@@ -164,8 +165,8 @@ only after earlier operations completed or were abandoned.
 
 ### Positive
 
-- The native Bind path gets an explicit barrier for prior operations, and it
-  keeps the separately implemented subject-capture defence.
+- The native Bind path gets an explicit barrier for prior operations, which
+  complements the subject capture proposed in PR #19.
 - Ordering becomes a tested property, not something inferred from result
   codes.
 - The parity question for overlapping operations is recorded explicitly

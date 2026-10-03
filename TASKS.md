@@ -1765,13 +1765,13 @@ Acceptance:
 
 ## [ ] T-151 Bind handling of outstanding operations (ADR-0014)
 
-Priority: P1 | Size: M | Depends on: ADR-0014 owner decision | Wave: post-M9 (outside the M9 T-121 to T-150 range)
+Priority: P1 | Size: M | Depends on: ADR-0014 owner decision | Wave: unscheduled (post-M9; outside the M9 T-121 to T-150 range) | Cloud fit: low (needs local 389 oracle)
 
 Deliverables: owner-selected drain or abandon barrier before native Bind processing; 389 delayed-operation and concurrent-load probe; ADR-0014 accepted, plus a named Delta if native differs.
 
 Acceptance:
 - [ ] Pinned 389 delayed-operation and concurrent-load probe recorded before exact assertions are chosen.
-- [ ] Native ordering is asserted with deterministic scheduling hooks (drain: CompareResponse before BindResponse with the pre-Bind identity; abandon: no earlier-operation response after BindResponse, worker exits before `setSubject`).
+- [ ] Native ordering is asserted with deterministic scheduling hooks (drain: CompareResponse before BindResponse with the pre-Bind identity; abandon: no earlier-operation response after BindResponse, any earlier response reflects the pre-Bind identity, worker exits before `setSubject`).
 - [ ] A parametrized integration test asserts the same ordering on both engines, or a named accepted Delta.
 - [ ] 48 and 50 are never normalized silently.
 
