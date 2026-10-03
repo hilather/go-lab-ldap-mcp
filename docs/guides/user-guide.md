@@ -131,9 +131,11 @@ and operational names in any spelling (attribute options, numeric OIDs),
 every `objectClass` spelling, and any non-bare spelling of `uid`, `cn` or
 `sn` are rejected with `forbidden_attribute`; bare `cn`, `sn` and `uid` stay
 writable through their normal fields. Names that address the same attribute
-(case variants, or a second descriptor such as `organizationalUnitName` for
-`ou`) are a `duplicate_attribute` error; `rfc822Mailbox` is not resolved to
-`mail`, so avoid sending both. The user view shows only spellings this rule
+(case variants, option order, or one of the resolved second descriptors
+`userid`, `commonName`, `surname`, `organizationalUnitName`,
+`domainComponent`, `organizationName`) are a `duplicate_attribute` error.
+Other second descriptors (`gn`, `rfc822Mailbox`, `localityName`, …) are not
+resolved, so do not send both spellings of one attribute. The user view shows only spellings this rule
 accepts: optioned values such as `cn;lang-en` are hidden there and managed
 through the entry API, and an engine-returned alias such as `commonName` is
 shown as `cn`. Because optioned values are not part of the user view, they

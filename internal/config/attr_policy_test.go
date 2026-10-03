@@ -47,7 +47,7 @@ func TestCanonicalAttrTypeResolvesAliases(t *testing.T) {
 }
 
 func TestAttrDuplicateKey(t *testing.T) {
-	same := [][2]string{{"ou", "organizationalUnitName"}, {"mail", " MAIL "}, {"ou;lang-en", "organizationalUnitName;LANG-EN"}}
+	same := [][2]string{{"ou", "organizationalUnitName"}, {"mail", " MAIL "}, {"ou;lang-en", "organizationalUnitName;LANG-EN"}, {"ou;lang-en;x-a", "ou;x-a;lang-en"}}
 	for _, p := range same {
 		if config.AttrDuplicateKey(p[0]) != config.AttrDuplicateKey(p[1]) {
 			t.Fatalf("%q and %q must collide", p[0], p[1])

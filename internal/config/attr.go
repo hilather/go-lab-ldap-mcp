@@ -1,6 +1,9 @@
 package config
 
-import "strings"
+import (
+	"sort"
+	"strings"
+)
 
 // Operational and managed attributes that operators may not set on users.
 var operationalDeny = map[string]struct{}{
@@ -95,7 +98,10 @@ func AttrDuplicateKey(name string) string {
 	if !ok {
 		return CanonicalAttrType(name)
 	}
-	return CanonicalAttrType(name) + ";" + opts
+	// Options are unordered (RFC 4512 section 2.5).
+	list := strings.Split(opts, ";")
+	sort.Strings(list)
+	return CanonicalAttrType(name) + ";" + strings.Join(list, ";")
 }
 
 var protectedAttributeOIDs = map[string]string{
