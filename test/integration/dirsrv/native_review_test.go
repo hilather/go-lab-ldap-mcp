@@ -103,13 +103,10 @@ func TestNativeReviewDirectoryRegressions(t *testing.T) {
 			return res.Entries[0].GetAttributeValues("uid")
 		}
 		const dest = "ou=rdn-dest,dc=example,dc=test"
-		add(dest, map[string][]string{"objectClass": {"top", "organizationalUnit"}, "ou": {"rdn-dest"}})
-		add("uid=renamer,"+people, person("renamer"))
-		add("uid=mover,"+people, person("Mover", "m2"))
-		add("uid=dx,"+people, person("dx", "d  y"))
-		add("uid=keeper,"+people, person("keeper"))
+		// Registered before the adds so a failed step still removes
+		// whatever was created, under original or renamed names.
 		t.Cleanup(func() {
-			for _, filter := range []string{"(uid=ren amer)", "(uid=mover)", "(uid=d y)", "(uid=kee per)"} {
+			for _, filter := range []string{"(uid=renamer)", "(uid=ren amer)", "(uid=mover)", "(uid=caser)", "(uid=dx)", "(uid=d y)", "(uid=keeper)", "(uid=kee per)"} {
 				if res, err := dm.Search(ldap.NewSearchRequest("dc=example,dc=test", ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false, filter, nil, nil)); err == nil {
 					for _, e := range res.Entries {
 						_ = dm.Del(ldap.NewDelRequest(e.DN, nil))
@@ -118,6 +115,12 @@ func TestNativeReviewDirectoryRegressions(t *testing.T) {
 			}
 			_ = dm.Del(ldap.NewDelRequest(dest, nil))
 		})
+		add(dest, map[string][]string{"objectClass": {"top", "organizationalUnit"}, "ou": {"rdn-dest"}})
+		add("uid=renamer,"+people, person("renamer"))
+		add("uid=mover,"+people, person("Mover", "m2"))
+		add("uid=caser,"+people, person("caser"))
+		add("uid=dx,"+people, person("dx", "d  y"))
+		add("uid=keeper,"+people, person("keeper"))
 		rename("uid=renamer,"+people, "uid=ren amer", true, "")
 		rename("uid=ren amer,"+people, "uid=ren  amer", true, "")
 		if got := uidsUnder(people, "(uid=ren amer)"); len(got) != 1 || got[0] != "ren  amer" {
@@ -126,6 +129,11 @@ func TestNativeReviewDirectoryRegressions(t *testing.T) {
 		rename("uid=mover,"+people, "uid=mover", true, dest)
 		if got := uidsUnder(dest, "(uid=mover)"); len(got) != 2 || got[0] != "m2" || got[1] != "mover" {
 			t.Fatalf("pure move uid = %q, want [m2 mover]", got)
+		}
+		// Request DN cased differently from the new RDN.
+		rename("uid=CASER,"+people, "uid=caser", true, dest)
+		if got := uidsUnder(dest, "(uid=caser)"); len(got) != 1 || got[0] != "caser" {
+			t.Fatalf("request-DN spelling uid = %q, want [caser]", got)
 		}
 		rename("uid=dx,"+people, "uid=d y", true, "")
 		if got := uidsUnder(people, "(uid=d y)"); len(got) != 1 || got[0] != "d  y" {
