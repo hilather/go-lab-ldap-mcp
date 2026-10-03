@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/hilather/go-lab-ldap-mcp/internal/apperr"
+	"github.com/hilather/go-lab-ldap-mcp/internal/config"
 	"github.com/hilather/go-lab-ldap-mcp/internal/directory"
 )
 
@@ -18,9 +19,11 @@ func (s *Entries) Suffixes(ctx context.Context, p Principal) (directory.SuffixLi
 	if err := s.hooks.authorize(ctx, p, OpSuffixes); err != nil {
 		return directory.SuffixList{}, err
 	}
-	if err := s.hooks.allowRead(ctx); err != nil {
+	release, err := s.hooks.acquireRead(ctx)
+	if err != nil {
 		return directory.SuffixList{}, err
 	}
+	defer release()
 	if s.repo == nil {
 		return directory.SuffixList{}, directoryUnavailable()
 	}
@@ -31,9 +34,11 @@ func (s *Entries) Get(ctx context.Context, p Principal, dn string) (directory.Di
 	if err := s.hooks.authorize(ctx, p, OpEntryGet); err != nil {
 		return directory.DirectoryEntry{}, err
 	}
-	if err := s.hooks.allowRead(ctx); err != nil {
+	release, err := s.hooks.acquireRead(ctx)
+	if err != nil {
 		return directory.DirectoryEntry{}, err
 	}
+	defer release()
 	if s.repo == nil {
 		return directory.DirectoryEntry{}, directoryUnavailable()
 	}
@@ -48,9 +53,11 @@ func (s *Entries) ListTree(ctx context.Context, p Principal, q directory.TreeQue
 	if err := s.hooks.authorize(ctx, p, OpEntryTree); err != nil {
 		return directory.TreePage{}, err
 	}
-	if err := s.hooks.allowRead(ctx); err != nil {
+	release, err := s.hooks.acquireRead(ctx)
+	if err != nil {
 		return directory.TreePage{}, err
 	}
+	defer release()
 	if s.repo == nil {
 		return directory.TreePage{}, directoryUnavailable()
 	}
@@ -61,12 +68,21 @@ func (s *Entries) Create(ctx context.Context, p Principal, spec directory.EntryS
 	if err := s.hooks.authorize(ctx, p, OpEntryCreate); err != nil {
 		return directory.DirectoryEntry{}, err
 	}
-	if err := s.hooks.allowWrite(ctx); err != nil {
+	release, err := s.hooks.acquireWrite(ctx)
+	if err != nil {
 		return directory.DirectoryEntry{}, err
 	}
+	defer release()
 	if s.repo == nil {
 		return directory.DirectoryEntry{}, directoryUnavailable()
 	}
+	for name := range spec.Attributes {
+		if directory.ForbiddenEntryAttr(name) {
+			s.hooks.record(ctx, p, OpEntryCreate.Name, "entry", AuditFailure, "", "")
+			return directory.DirectoryEntry{}, entryAttributeError("attributes." + name)
+		}
+	}
+
 	unlock := s.hooks.lock(entryLockKey(spec.DN))
 	defer unlock()
 	ent, err := s.repo.CreateEntry(ctx, spec)
@@ -82,12 +98,21 @@ func (s *Entries) Update(ctx context.Context, p Principal, patch directory.Entry
 	if err := s.hooks.authorize(ctx, p, OpEntryUpdate); err != nil {
 		return directory.DirectoryEntry{}, err
 	}
-	if err := s.hooks.allowWrite(ctx); err != nil {
+	release, err := s.hooks.acquireWrite(ctx)
+	if err != nil {
 		return directory.DirectoryEntry{}, err
 	}
+	defer release()
 	if s.repo == nil {
 		return directory.DirectoryEntry{}, directoryUnavailable()
 	}
+	for _, ch := range patch.Changes {
+		if directory.ForbiddenEntryAttr(ch.Name) || config.CanonicalAttrType(ch.Name) == "objectclass" {
+			s.hooks.record(ctx, p, OpEntryUpdate.Name, "entry", AuditFailure, string(patch.Revision), "")
+			return directory.DirectoryEntry{}, entryAttributeError("changes.name")
+		}
+	}
+
 	unlock := s.hooks.lock(entryLockKey(patch.DN))
 	defer unlock()
 	if err := requireRevision(patch.Revision); err != nil {
@@ -107,9 +132,11 @@ func (s *Entries) Delete(ctx context.Context, p Principal, del directory.EntryDe
 	if err := s.hooks.authorize(ctx, p, OpEntryDelete); err != nil {
 		return err
 	}
-	if err := s.hooks.allowWrite(ctx); err != nil {
+	release, err := s.hooks.acquireWrite(ctx)
+	if err != nil {
 		return err
 	}
+	defer release()
 	if s.repo == nil {
 		return directoryUnavailable()
 	}
@@ -137,9 +164,11 @@ func (s *Entries) Move(ctx context.Context, p Principal, move directory.EntryMov
 	if err := s.hooks.authorize(ctx, p, OpEntryMove); err != nil {
 		return directory.DirectoryEntry{}, err
 	}
-	if err := s.hooks.allowWrite(ctx); err != nil {
+	release, err := s.hooks.acquireWrite(ctx)
+	if err != nil {
 		return directory.DirectoryEntry{}, err
 	}
+	defer release()
 	if s.repo == nil {
 		return directory.DirectoryEntry{}, directoryUnavailable()
 	}
@@ -169,4 +198,8 @@ func directoryUnavailable() error {
 func redactDirectoryEntry(in directory.DirectoryEntry) directory.DirectoryEntry {
 	in.Attributes = redactAttrs(in.Attributes)
 	return in
+}
+
+func entryAttributeError(path string) error {
+	return apperr.New(apperr.CodeConfiguration, "attribute is not allowed").WithField(apperr.Field{Path: path, Code: "forbidden_attribute", Message: "attribute is not allowed"})
 }

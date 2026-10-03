@@ -421,7 +421,11 @@ func userFromEntry(e *ldap.Entry, groupsDN string) directory.User {
 		Attributes:    sortAttrKV(attrs),
 		Groups:        memberOfGroupIDs(e, groupsDN),
 	}
-	u.Revision = directory.RevisionOfUser(u)
+	u.Revision = directory.RevisionHash(struct {
+		User       directory.Revision
+		Locked     bool
+		MustChange bool
+	}{directory.RevisionOfUser(u), accountLockStamped(e), accountMustChange(e)})
 	return u
 }
 

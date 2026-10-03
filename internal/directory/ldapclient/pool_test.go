@@ -156,7 +156,7 @@ func TestPoolDoReturnsAcquireErrorOnRetry(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = p.Close() })
 
-	err = p.Do(t.Context(), func(*Conn) error {
+	err = p.DoRead(t.Context(), func(*Conn) error {
 		return directory.Error("connection", directory.FieldUnavailable, "directory unavailable")
 	})
 	if err == nil {
@@ -181,7 +181,7 @@ func TestPoolDoRetriesBroken(t *testing.T) {
 	t.Cleanup(func() { _ = p.Close() })
 
 	var calls atomic.Int32
-	err = p.Do(t.Context(), func(*Conn) error {
+	err = p.DoRead(t.Context(), func(*Conn) error {
 		if calls.Add(1) == 1 {
 			return directory.Error("connection", directory.FieldUnavailable, "directory unavailable")
 		}

@@ -108,40 +108,35 @@ func (p *Pool) Acquire(ctx context.Context) (*Conn, error) {
 	}
 }
 
-// Do runs fn on a pooled connection and retries once after a broken session.
+// Do runs fn once. A failed response may follow a committed LDAP mutation,
+// so retrying an arbitrary callback would replay writes with uncertain results.
 func (p *Pool) Do(ctx context.Context, fn func(*Conn) error) error {
 	c, err := p.Acquire(ctx)
 	if err != nil {
 		return err
 	}
-	err = fn(c)
-	if err == nil {
-		c.Release()
-		return nil
-	}
-	if !c.isBroken() && !isBroken(err) {
-		c.Release()
-		return err
-	}
-	c.Invalidate()
-	if ctx.Err() != nil {
-		return err
-	}
-	c2, err2 := p.Acquire(ctx)
-	if err2 != nil {
-		return err2
-	}
-	err2 = fn(c2)
-	if err2 != nil {
-		if c2.isBroken() || isBroken(err2) {
-			c2.Invalidate()
+	defer func() {
+		if c.isBroken() {
+			c.Invalidate()
 		} else {
-			c2.Release()
+			c.Release()
 		}
-		return err2
+	}()
+	err = fn(c)
+	if isBroken(err) {
+		c.broken.Store(true)
 	}
-	c2.Release()
-	return nil
+	return err
+}
+
+// DoRead retries a read-only callback once after a broken connection. Callers
+// must replace, rather than append to, any output on every attempt.
+func (p *Pool) DoRead(ctx context.Context, fn func(*Conn) error) error {
+	err := p.Do(ctx, fn)
+	if err == nil || !isBroken(err) || ctx.Err() != nil {
+		return err
+	}
+	return p.Do(ctx, fn)
 }
 
 // DialDisposable opens a connection that is never returned to the pool (bind-test).

@@ -111,13 +111,25 @@ Multi-domain here means multiple suffixes in one lab, not an AD forest.
 Submit a base, scope, filter, attribute list, and page size. The search
 base may be any managed suffix or a DN under one. Attribute names
 are allow-listed. `userPassword` and other forbidden names cannot be
-requested. Results expand to a redacted LDIF snippet.
+requested. Filters also reject secret attributes, including nested assertions,
+attribute options, and known OID aliases. Attribute-less extensible matches
+and unknown numeric OIDs are rejected. Results expand to a redacted LDIF snippet.
+
+Profile and structured attribute writes use attribute names. Numeric OIDs
+cannot bypass password, account-state, or ACI restrictions. Use the dedicated
+password and account actions for protected fields. User and account actions
+share an opaque revision that changes when lock or password-expiry state
+changes; refresh existing revisions after upgrading.
 
 ### Reset and export
 
 Soft reset requires the `lab:reset` scope, the **exact** compiled scenario
-name, and the current revision. It restores the baseline suffix. It does
-**not** remove the Docker volume.
+name, and the current revision. Reset drains admitted directory operations,
+restores primary users and groups, and removes runtime entries beneath all
+configured additional suffixes while preserving suffix roots. Changed seed
+password files require recompilation and bootstrap before reset; reset refuses
+to apply a different password under the old baseline revision. It does not
+remove the Docker volume.
 
 Export requires `lab:export`. Passwords are omitted. Size is bounded by
 `exportMaxEntries` / `exportMaxBytes`.
@@ -274,6 +286,14 @@ go run ./tools/setupsecrets --dir secrets --force
 
 Then recreate the secret-prep service / stack so the control volume picks
 up the new files.
+
+### Bootstrap LDAP timeout
+
+`spec.limits.ldapDialTimeout` defaults to `5s`. Bootstrap honors this existing
+setting during readiness checks and all subsequent LDAP phases, including tree,
+seed, and verification. The adapters use the configured budget for connection
+establishment and LDAP requests. Set a positive duration appropriate to the
+directory environment; changing this budget does not add automatic write retries.
 
 ## What not to do
 

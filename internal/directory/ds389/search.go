@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	ber "github.com/go-asn1-ber/asn1-ber"
 	"github.com/go-ldap/ldap/v3"
 
 	"github.com/hilather/go-lab-ldap-mcp/internal/apperr"
@@ -20,7 +21,8 @@ func (r *Runtime) Search(ctx context.Context, q directory.SearchQuery) (director
 	}
 	page := r.pageSize(q.PageSize)
 	var out directory.SearchPage
-	err = r.pool.Do(ctx, func(c *ldapclient.Conn) error {
+	err = r.pool.DoRead(ctx, func(c *ldapclient.Conn) error {
+		out = directory.SearchPage{}
 		res, next, e := c.SearchPage(ctx, req, uint32(page), cookie)
 		if e != nil {
 			return e
@@ -79,6 +81,10 @@ func (r *Runtime) buildSearch(q directory.SearchQuery) (*ldap.SearchRequest, str
 	if _, err := config.ParseFilterLimits(q.Filter, r.cfg.MaxFilterDepth, r.cfg.MaxFilterLength); err != nil {
 		return nil, "", nil, false, err
 	}
+	if err := validateSearchFilter(q.Filter); err != nil {
+		return nil, "", nil, false, err
+	}
+
 	// children is emulated as subtree minus the base, so suffix+children+
 	// match-all is the same dump as suffix+sub and is rejected with it.
 	atRoot := false
@@ -132,4 +138,47 @@ func ldapScope(scope string) (int, bool, error) {
 
 func searchCursorKey(base, scope, filter string, attrs []string, page int) string {
 	return strings.Join([]string{base, scope, filter, strings.Join(attrs, ","), strconv.Itoa(page)}, "|")
+}
+
+// Returned-value redaction cannot protect secrets used as search predicates.
+// Inspect the compiled filter so nested and extensible assertions cannot turn
+// the restricted runtime account into a credential inference oracle.
+func validateSearchFilter(raw string) error {
+	root, err := ldap.CompileFilter(raw)
+	if err != nil {
+		return cfgErr("filter", "invalid", "filter is not valid LDAP syntax")
+	}
+	var inspect func(*ber.Packet) error
+	inspect = func(p *ber.Packet) error {
+		var attr string
+		switch p.Tag {
+		case ldap.FilterAnd, ldap.FilterOr, ldap.FilterNot:
+			for _, child := range p.Children {
+				if err := inspect(child); err != nil {
+					return err
+				}
+			}
+			return nil
+		case ldap.FilterPresent:
+			attr, _ = p.Value.(string)
+		case ldap.FilterExtensibleMatch:
+			for _, child := range p.Children {
+				if child.Tag == ldap.MatchingRuleAssertionType {
+					attr, _ = child.Value.(string)
+				}
+			}
+		default:
+			if len(p.Children) > 0 {
+				attr, _ = p.Children[0].Value.(string)
+			}
+		}
+		// Attribute-less extensible matches may examine every attribute. Unknown
+		// OIDs are rejected because the directory's alias schema can differ.
+		base := config.CanonicalAttrType(attr)
+		if base == "" || directory.SecretAttr(attr) || (base[0] >= '0' && base[0] <= '9') {
+			return cfgErr("filter", "forbidden_attribute", "filter attribute is not allowed")
+		}
+		return nil
+	}
+	return inspect(root)
 }

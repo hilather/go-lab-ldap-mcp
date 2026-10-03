@@ -121,7 +121,7 @@ func (r *Runtime) readAccountState(ctx context.Context, id directory.UserID) (di
 }
 
 func accountStateReadAttrs() []string {
-	return append(runtimeUserReadAttrs(), attrPwdReset, attrPasswordExpirationTime, attrAccountUnlockTime, "pwdAccountLockedTime")
+	return runtimeUserReadAttrs()
 }
 
 func accountStateFromEntry(id string, e *ldap.Entry, groupsDN string) directory.AccountState {
