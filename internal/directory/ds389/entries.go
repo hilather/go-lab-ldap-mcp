@@ -417,7 +417,9 @@ func entryAddAttrs(dn config.DN, class string, extra map[string]string) ([]ldap.
 	}
 	// Planned names are dropped in every spelling (option, OID, descriptor
 	// alias); the forbidden check runs first so a protected alias is still an
-	// error, and extras de-duplicate on the exact (option-preserving) name.
+	// error. Extras de-duplicate on AttrDuplicateKey, keeping the first name
+	// in sorted order (entry create drops duplicates; the user API rejects
+	// them with duplicate_attribute).
 	planned := map[string]struct{}{"objectclass": {}, strings.ToLower(attr): {}, "uid": {}, "cn": {}, "sn": {}, "dc": {}, "ou": {}}
 	seen := map[string]struct{}{}
 	for _, name := range sortedNames(extra) {
@@ -428,7 +430,7 @@ func entryAddAttrs(dn config.DN, class string, extra map[string]string) ([]ldap.
 		if _, ok := planned[config.CanonicalAttrType(name)]; ok {
 			continue
 		}
-		key := config.CanonicalAttr(name)
+		key := config.AttrDuplicateKey(name)
 		if _, ok := seen[key]; ok {
 			continue
 		}

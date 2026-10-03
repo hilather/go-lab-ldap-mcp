@@ -116,7 +116,7 @@ func (r *Runtime) Add(ctx context.Context, spec directory.UserSpec) (directory.U
 		if forbiddenWriteAttr(name) {
 			return directory.User{}, cfgErr("attributes."+name, "forbidden_attribute", "attribute is not allowed on users")
 		}
-		add.Attribute(name, []string{val})
+		add.Attribute(strings.TrimSpace(name), []string{val})
 	}
 	size, seconds := r.searchLimits()
 	var out directory.User
@@ -188,14 +188,15 @@ func (r *Runtime) Modify(ctx context.Context, id directory.UserID, patch directo
 			if (key == "cn" || key == "sn") && strings.TrimSpace(val) == "" {
 				return cfgErr("attributes."+name, "required", "schema-required attribute cannot be empty")
 			}
+			attr := strings.TrimSpace(name)
 			if strings.TrimSpace(val) == "" {
 				// Empty value is the UserPatch delete signal (omit = leave).
-				if live.GetAttributeValue(name) != "" {
-					mod.Delete(name, nil)
+				if live.GetAttributeValue(attr) != "" {
+					mod.Delete(attr, nil)
 				}
 				continue
 			}
-			mod.Replace(name, []string{val})
+			mod.Replace(attr, []string{val})
 		}
 		if len(mod.Changes) > 0 {
 			if e := c.Modify(ctx, mod); e != nil {

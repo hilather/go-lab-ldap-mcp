@@ -272,7 +272,7 @@ func validateAttrMap(attrs map[string]string) error {
 				Path: "attributes." + name, Code: "forbidden_attribute", Message: "attribute is not allowed on users",
 			})
 		}
-		key := config.CanonicalAttr(name)
+		key := config.AttrDuplicateKey(name)
 		if prev, dup := seen[key]; dup {
 			return apperr.New(apperr.CodeConfiguration, "attribute is listed more than once").WithField(apperr.Field{
 				Path: "attributes." + name, Code: "duplicate_attribute", Message: "attribute duplicates " + prev,

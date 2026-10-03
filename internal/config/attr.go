@@ -86,6 +86,18 @@ var attributeNameAliases = map[string]string{
 	"organizationname":       "o",
 }
 
+// AttrDuplicateKey identifies attribute names that address the same values:
+// the resolved type (options stripped, OIDs and descriptor aliases resolved)
+// plus the lowercased option list, so ou and organizationalUnitName collide
+// while cn and cn;lang-en stay distinct.
+func AttrDuplicateKey(name string) string {
+	_, opts, ok := strings.Cut(CanonicalAttr(name), ";")
+	if !ok {
+		return CanonicalAttrType(name)
+	}
+	return CanonicalAttrType(name) + ";" + opts
+}
+
 var protectedAttributeOIDs = map[string]string{
 	"2.5.4.35":                   "userpassword",
 	"1.3.6.1.4.1.4203.1.3.4":     "authpassword", // RFC 3112 section 2.2

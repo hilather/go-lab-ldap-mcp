@@ -45,3 +45,18 @@ func TestCanonicalAttrTypeResolvesAliases(t *testing.T) {
 		}
 	}
 }
+
+func TestAttrDuplicateKey(t *testing.T) {
+	same := [][2]string{{"ou", "organizationalUnitName"}, {"mail", " MAIL "}, {"ou;lang-en", "organizationalUnitName;LANG-EN"}}
+	for _, p := range same {
+		if config.AttrDuplicateKey(p[0]) != config.AttrDuplicateKey(p[1]) {
+			t.Fatalf("%q and %q must collide", p[0], p[1])
+		}
+	}
+	diff := [][2]string{{"cn", "cn;lang-en"}, {"mail", "rfc822Mailbox"}, {"ou;lang-en", "ou;lang-fr"}}
+	for _, p := range diff {
+		if config.AttrDuplicateKey(p[0]) == config.AttrDuplicateKey(p[1]) {
+			t.Fatalf("%q and %q must stay distinct", p[0], p[1])
+		}
+	}
+}

@@ -565,6 +565,8 @@ spec:
         "cn;lang-en": Optioned
         mail: a@example.test
         Mail: b@example.test
+        ou: Eng
+        organizationalUnitName: Ops
 `)
 	_, err := config.Compile(t.Context(), src, "aliases.yaml", config.LoadOptions{Secrets: fixtureSecrets(), Caller: config.CallerCLI})
 	if err == nil {
@@ -576,6 +578,7 @@ spec:
 		"spec.users[0].attributes.commonName":  "forbidden_attribute",
 		"spec.users[0].attributes.cn;lang-en":  "forbidden_attribute",
 		"spec.users[0].attributes.mail":        "duplicate_attribute",
+		"spec.users[0].attributes.ou":          "duplicate_attribute",
 	}
 	got := map[string]string{}
 	for _, f := range fs {

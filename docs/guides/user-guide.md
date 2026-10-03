@@ -49,7 +49,8 @@ No inline passwords. Groups cannot be empty. User `attributes` follow the
 same write rule as the user API (below): `objectClass`, option or alias
 spellings of `uid`/`cn`/`sn` (`cn;lang-en`, `commonName`, `surname`,
 `userid`), numeric OIDs and protected names are rejected, and two keys that
-differ only in case (`mail` and `Mail`) are a `duplicate_attribute` error.
+address the same attribute (`mail` and `Mail`, `ou` and
+`organizationalUnitName`) are a `duplicate_attribute` error.
 Earlier releases silently dropped some of these spellings during seeding; a
 scenario that used them now fails to compile until they are removed. YAML is the compiled baseline
 (`startupMode: merge`); UI / REST / MCP mutations are live until soft reset
@@ -129,13 +130,17 @@ User writes (REST, MCP, console, and scenario YAML) share one rule: protected
 and operational names in any spelling (attribute options, numeric OIDs),
 every `objectClass` spelling, and any non-bare spelling of `uid`, `cn` or
 `sn` are rejected with `forbidden_attribute`; bare `cn`, `sn` and `uid` stay
-writable through their normal fields. Names that differ only in case are a
-`duplicate_attribute` error. The user view shows only spellings this rule
+writable through their normal fields. Names that address the same attribute
+(case variants, or a second descriptor such as `organizationalUnitName` for
+`ou`) are a `duplicate_attribute` error; `rfc822Mailbox` is not resolved to
+`mail`, so avoid sending both. The user view shows only spellings this rule
 accepts: optioned values such as `cn;lang-en` are hidden there and managed
 through the entry API, and an engine-returned alias such as `commonName` is
-shown as `cn`. Entry create with `inetOrgPerson` differs: it does not reject
+shown as `cn`. Because optioned values are not part of the user view, they
+do not contribute to the user revision. Entry create with `inetOrgPerson` differs: it does not reject
 option or alias spellings of the planned names, it drops them and writes the
-planned `uid`/`cn`/`sn` values (protected names are still rejected). User and account actions
+planned `uid`/`cn`/`sn` values, and it keeps only the first of two names
+that address the same attribute (protected names are still rejected). User and account actions
 share an opaque revision that changes when lock or password-expiry state
 changes; refresh existing revisions after upgrading.
 

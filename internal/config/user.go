@@ -58,11 +58,11 @@ func normalizeUsers(ctx context.Context, in *Input, peopleDN DN, resolver Secret
 				acc = append(acc, fieldErr(path+".attributes."+name, "forbidden_attribute", "attribute is not allowed on users"))
 				continue
 			}
-			if prev, dup := seenAttr[CanonicalAttr(name)]; dup {
+			if prev, dup := seenAttr[AttrDuplicateKey(name)]; dup {
 				acc = append(acc, fieldErr(path+".attributes."+name, "duplicate_attribute", "attribute duplicates "+prev))
 				continue
 			}
-			seenAttr[CanonicalAttr(name)] = name
+			seenAttr[AttrDuplicateKey(name)] = name
 			attrs = append(attrs, AttrKV{Name: CanonicalAttr(name), Value: val})
 		}
 		enabled := true
