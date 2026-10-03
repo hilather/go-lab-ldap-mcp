@@ -2,6 +2,8 @@
 
 GO               ?= go
 PNPM             ?= pnpm
+# Full oracle suite starts a pinned directory for each case; budget is cumulative.
+INTEGRATION_TIMEOUT ?= 45m
 export GOTOOLCHAIN ?= go1.26.8
 export GOPROXY    ?= https://proxy.golang.org,direct
 
@@ -38,14 +40,14 @@ IMAGE_LDFLAGS    := -s -w -X github.com/hilather/go-lab-ldap-mcp/internal/observ
 IMAGE_BUILD_ARGS := --build-arg VERSION=$(VERSION) --build-arg REVISION=$(REVISION) --build-arg BUILT_AT=$(BUILT_AT)
 
 .PHONY: help format lint generate generate-drift test test-unit \
-	test-integration test-integration-native test-e2e test-security compose-up compose-down \
+	test-integration test-integration-native test-e2e test-e2e-live test-security compose-up compose-down \
 	compose-up-persistent compose-reset compose-secrets compose-preflight \
 	compose-up-native compose-up-native-persistent compose-down-native \
 	compose-reset-native \
 	compose-up-389ds compose-up-389ds-persistent compose-down-389ds \
 	compose-reset-389ds \
-	test-fuzz-short test-native-soak test-diff test-parity verify-native \
-	setup-tls image image-bootstrap image-multiarch image-native \
+	test-fuzz-short test-native-soak test-diff test-parity test-parity-native verify-native \
+	setup-tls image image-bootstrap image-pair-check image-multiarch image-native \
 	image-control-placeholder verify frontend-install frontend-build \
 	sbom scan checksums archcheck dataset
 
@@ -64,7 +66,8 @@ help:
 		'  test-fuzz-short    T-149: every fuzz target, CI-short fuzztime' \
 		'  test-native-soak   T-150: goroutine/FD churn + bbolt growth gates' \
 		'  test-diff          T-149 differential: native always; 389 oracle when Docker+image' \
-		'  test-parity        T-147 parity harness, hermetic native leg' \
+		'  test-parity        T-147 dual-engine parity harness (needs Docker)' \
+		'  test-parity-native hermetic native parity leg (no Docker)' \
 		'  verify-native      aggregate native lane (fuzz + soak + diff + parity)' \
 		'  test-e2e           Playwright UI suite (mock control plane; optional live URL)' \
 		'  test-security      secret scan, govulncheck, license denylist' \
@@ -82,13 +85,14 @@ help:
 		'  compose-reset-389ds   operator hard reset of the 389 stack' \
 		'  image-native       build labldapd:dev (native engine; pinned bases)' \
 		'  image-bootstrap    build labldap-bootstrap:dev (pinned 389 DS)' \
-		'  image              build labldap-control:dev (hardened; matching version)' \
+		'  image              build labldap-control:dev (hardened)' \
+		'  image-pair-check   build control/bootstrap then verify matching versions' \
 		'  image-multiarch    build advertised platforms only (see deploy/docker/architectures.md)' \
 		'  sbom               write source CycloneDX SBOM to dist/sbom/' \
 		'  scan               govulncheck + optional grype; fail on unapproved criticals' \
 		'  checksums          provenance.json + SHA256SUMS in dist/release/' \
 		'  archcheck          compare advertised arches to the pinned dirsrv digest' \
-		'  verify             format lint generate generate-drift test-unit test-security sbom checksums archcheck'
+		'  verify             release gate: static, unit, security, browser, native, and available 389 checks'
 
 format:
 	$(GO) fmt ./...
@@ -108,18 +112,18 @@ generate-drift: generate
 test: test-unit
 
 test-unit: frontend-install
-	$(GO) test $$(go list ./... | grep -v '/test/parity')
+	$(GO) test ./...
 	cd frontend && $(PNPM) test
 
 test-integration:
-	$(GO) test -tags=integration ./test/integration/... -count=1 -timeout 30m
+	$(GO) test -tags=integration ./test/integration/... -count=1 -timeout $(INTEGRATION_TIMEOUT)
 
 # T-148: same integration suite against the native engine. The T-115 client
 # matrix runs against an in-process labldapd-equivalent fixture (no Docker
 # needed); 389-only tests skip with their parity-contract Delta/Excluded ID
 # (skip ledger: test/integration/dirsrv/engine.go).
 test-integration-native:
-	LABLDAP_IT_ENGINE=native $(GO) test -tags=integration ./test/integration/... -count=1 -timeout 30m
+	LABLDAP_IT_ENGINE=native $(GO) test -tags=integration ./test/integration/... -count=1 -timeout $(INTEGRATION_TIMEOUT)
 
 # REST account-workflow battery + host ldapwhoami/ldapsearch, both engines.
 test-integration-workflow:
@@ -167,24 +171,28 @@ test-diff:
 		printf '%s\n' 'test-diff: docker or pinned 389 image unavailable; oracle leg skipped (native leg ran)'; \
 	fi
 
-# T-147 parity harness: hermetic native leg always. The dual-engine
-# (oracle) leg is the integration build tag and runs as part of the
-# Docker-gated lane in verify.
+# T-147: the public parity target compares both engines. Native-only checks
+# have a separate target so verify-native remains hermetic.
 test-parity:
+	$(GO) test -tags=integration ./test/parity/ -count=1 -timeout 30m
+
+test-parity-native:
 	$(GO) test ./test/parity/ -count=1
 
-# T-150 native lane aggregate: fuzz-short + soak + differential. The parity
-# leg runs via verify's tolerant wrapper (test-parity is T-147's in-flight
-# package; see verify). Redaction and native unit tests ride inside the
-# verify unit leg.
-verify-native: test-fuzz-short test-native-soak test-diff
+# Native checks fail the gate on any failure.
+verify-native: test-fuzz-short test-native-soak test-diff test-parity-native
 	@printf '%s\n' 'verify-native: ok'
 
 test-e2e: frontend-build
 	cd test/e2e && $(PNPM) install --frozen-lockfile
 	cd test/e2e && $(PNPM) exec playwright install chromium
 	cd test/e2e && $(PNPM) test
-	@printf '%s\n' 'test-e2e: default target is the contract mock. Set LABLDAP_E2E_BASE_URL for a live Compose/389 DS stack (T-042 residual).'
+	@printf '%s\n' 'test-e2e: default target is the contract mock. External Compose URL support and live-coverage limits are documented in test/e2e/README.md.'
+
+# Opt-in isolated native Compose browser smoke; preserves LDAP TLS verification.
+# Images match the checked-out candidate. State and credentials are temporary.
+test-e2e-live: frontend-build image-native image-pair-check
+	node tools/live-e2e.mjs
 
 test-security:
 	$(GO) run ./tools/secretscan .
@@ -203,7 +211,7 @@ setup-tls:
 # Default engine is native labldapd (v0.3.0). labldapd self-applies the
 # engine plan and serves the lab CA certificate directly, so there is no
 # setuptls publish/import (dsctl) step. LABLDAP_TLS_CA is the lab CA itself.
-compose-up: image-native image image-bootstrap compose-preflight compose-secrets setup-tls
+compose-up: image-native image-pair-check compose-preflight compose-secrets setup-tls
 	# Recreate native-secret-prep so rotated DM/TLS files reach directory-secrets.
 	LABLDAP_SCENARIO_FILE=$(COMPOSE_NATIVE_SCENARIO) LABLDAP_TLS_CA=$(COMPOSE_TLS)/ca.crt \
 		$(COMPOSE) up -d --no-deps --force-recreate native-secret-prep
@@ -219,7 +227,7 @@ compose-up: image-native image image-bootstrap compose-preflight compose-secrets
 	LABLDAP_SCENARIO_FILE=$(COMPOSE_NATIVE_SCENARIO) LABLDAP_TLS_CA=$(COMPOSE_TLS)/ca.crt \
 		$(COMPOSE) up -d --wait --remove-orphans --force-recreate control
 
-compose-up-persistent: image-native image image-bootstrap compose-preflight compose-secrets setup-tls
+compose-up-persistent: image-native image-pair-check compose-preflight compose-secrets setup-tls
 	LABLDAP_SCENARIO_FILE=$(COMPOSE_NATIVE_PERSISTENT_SCENARIO) LABLDAP_TLS_CA=$(COMPOSE_TLS)/ca.crt \
 		$(COMPOSE_PERSISTENT) up -d --no-deps --force-recreate native-secret-prep
 	LABLDAP_SCENARIO_FILE=$(COMPOSE_NATIVE_PERSISTENT_SCENARIO) LABLDAP_TLS_CA=$(COMPOSE_TLS)/ca.crt \
@@ -252,7 +260,7 @@ compose-down-native: compose-down
 compose-reset-native: compose-reset
 
 # 389 DS oracle / rollback (explicit engine: 389ds).
-compose-up-389ds: image image-bootstrap compose-preflight compose-secrets setup-tls
+compose-up-389ds: image-pair-check compose-preflight compose-secrets setup-tls
 	LABLDAP_SCENARIO_FILE=$(COMPOSE_389_SCENARIO) \
 	LABLDAP_TLS_CA=$(COMPOSE_TLS)/instance-ca.crt $(COMPOSE_389) up -d --wait --remove-orphans directory
 	$(GO) run ./tools/setuptls publish --out $(COMPOSE_TLS)/instance-ca.crt --project labldap \
@@ -264,7 +272,7 @@ compose-up-389ds: image image-bootstrap compose-preflight compose-secrets setup-
 	LABLDAP_SCENARIO_FILE=$(COMPOSE_389_SCENARIO) \
 	LABLDAP_TLS_CA=$(COMPOSE_TLS)/instance-ca.crt $(COMPOSE_389) up -d --wait --remove-orphans --force-recreate control
 
-compose-up-389ds-persistent: image image-bootstrap compose-preflight compose-secrets setup-tls
+compose-up-389ds-persistent: image-pair-check compose-preflight compose-secrets setup-tls
 	LABLDAP_SCENARIO_FILE=$(COMPOSE_389_PERSISTENT_SCENARIO) \
 	LABLDAP_TLS_CA=$(COMPOSE_TLS)/ca.crt \
 		$(COMPOSE_389_PERSISTENT) up -d --wait --remove-orphans directory
@@ -330,17 +338,7 @@ image:
 		$(IMAGE_BUILD_ARGS) \
 		-t labldap-control:dev \
 		.
-	@cver=$$(docker run --rm labldap-control:dev version); \
-	printf '%s\n' "$$cver"; \
-	if docker image inspect labldap-bootstrap:dev >/dev/null 2>&1; then \
-		bver=$$(docker run --rm labldap-bootstrap:dev version); \
-		cfield=$$(printf '%s\n' "$$cver" | sed -n 's/.*version=//p' | awk '{print $$1}'); \
-		bfield=$$(printf '%s\n' "$$bver" | sed -n 's/.*version=//p' | awk '{print $$1}'); \
-		if [ "$$cfield" != "$$bfield" ]; then \
-			printf '%s\n' "image: version mismatch control=$$cfield bootstrap=$$bfield"; \
-			exit 1; \
-		fi; \
-	fi
+	@docker run --rm labldap-control:dev version
 	@cid=$$(docker run -d --read-only --cap-drop=ALL --security-opt no-new-privileges:true \
 		--tmpfs /tmp:uid=65532,gid=65532,mode=1777,size=16m \
 		-e LABLDAP_LISTEN=127.0.0.1:8443 \
@@ -353,6 +351,17 @@ image:
 	docker rm -f "$$cid" >/dev/null; \
 	if [ "$$ok" != 1 ]; then printf '%s\n' 'image: hardened /health smoke failed'; exit 1; fi
 	@printf '%s\n' 'image: labldap-control:dev version=$(VERSION)'
+
+# Compare only after both candidate builds finish, including parallel make.
+image-pair-check: image image-bootstrap
+	@set -e; cver=$$(docker run --rm labldap-control:dev version); \
+	bver=$$(docker run --rm labldap-bootstrap:dev version); \
+	cfield=$$(printf '%s\n' "$$cver" | sed -n 's/.*version=//p' | awk '{print $$1}'); \
+	bfield=$$(printf '%s\n' "$$bver" | sed -n 's/.*version=//p' | awk '{print $$1}'); \
+	if [ -z "$$cfield" ] || [ "$$cfield" != "$$bfield" ]; then \
+		printf '%s\n' "image-pair-check: version mismatch control=$$cfield bootstrap=$$bfield"; \
+		exit 1; \
+	fi
 
 frontend-install:
 	cd frontend && $(PNPM) install --frozen-lockfile
@@ -408,34 +417,13 @@ archcheck:
 dataset:
 	$(GO) run ./tools/dataset --users 50 --groups 5 --out dist/dataset/small.yaml
 
-# T-150: verify = control-plane gate + native lane + (Docker-gated) 389
-# lanes. The prerequisite list keeps the exact release-gate shape asserted
-# by test/release; the native lane runs as the first recipe line. On
-# Docker-less machines the 389 integration and dual-engine parity legs
-# skip with a note; every in-process/native check still runs.
-#
-# test/parity is T-147's concurrently-developed package and is not yet
-# self-consistent in the shared tree (its golden delta-ledger.json is
-# ungenerated and its fixture/dsconf legs fail). The release gate must not
-# hard-fail on a sibling's in-flight package, so the unit and parity legs
-# below scope around test/parity while it is incomplete; every leg this
-# task owns (fuzz-short, soak, differential, security, sbom, checksums,
-# archcheck, 389 integration) stays hard-gating. Once T-147 lands green,
-# go test ./... passes and the scoping is a harmless no-op.
-verify: format lint generate generate-drift test-unit test-security sbom checksums archcheck
+# Docker-less verification runs every native check. When Docker is available,
+# failures in the 389 integration or parity legs must propagate to make.
+verify: format lint generate generate-drift test-unit test-security sbom checksums archcheck test-e2e test-integration-native
 	$(MAKE) verify-native
-	@if $(GO) test ./test/parity/ -count=1; then \
-		printf '%s\n' 'verify: parity (native leg) ok'; \
-	else \
-		printf '%s\n' 'verify: WARNING test/parity (T-147, in flight) native leg failed; not gating' >&2; \
-	fi
-	@if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then \
+	@set -e; if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then \
 		$(MAKE) test-integration; \
-		if $(GO) test -tags=integration ./test/parity/ -count=1 -timeout 30m; then \
-			printf '%s\n' 'verify: parity (dual-engine leg) ok'; \
-		else \
-			printf '%s\n' 'verify: WARNING test/parity (T-147, in flight) dual-engine leg failed; not gating' >&2; \
-		fi; \
+		$(MAKE) test-parity; \
 	else \
 		printf '%s\n' 'verify: docker unavailable; skipped 389 integration + dual-engine parity legs'; \
 	fi

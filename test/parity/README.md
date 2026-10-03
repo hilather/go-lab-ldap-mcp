@@ -24,10 +24,10 @@ and the native engine (`internal/ldapserver`, run in-process), per
 
 ```bash
 # Hermetic (native only, no Docker):
-go test ./test/parity/
+make test-parity-native
 
 # Dual-engine (requires Docker; skips cleanly without it):
-go test -tags integration ./test/parity/
+make test-parity
 
 # Re-adjudicate and rewrite the ledger after an intentional engine change:
 PARITY_UPDATE_LEDGER=1 go test -tags integration ./test/parity/ -run TestDualEngineParity

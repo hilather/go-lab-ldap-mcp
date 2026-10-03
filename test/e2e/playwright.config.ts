@@ -15,6 +15,9 @@ export default defineConfig({
   outputDir: "test-results",
   use: {
     baseURL,
+    launchOptions: process.env.LABLDAP_E2E_BROWSER_SPKI === undefined ? {} : {
+      args: [`--ignore-certificate-errors-spki-list=${process.env.LABLDAP_E2E_BROWSER_SPKI}`],
+    },
     screenshot: "only-on-failure",
     // Action log is retained for failures; page snapshots/screenshots inside
     // the zip are off so filled password fields are not stored as pixels.

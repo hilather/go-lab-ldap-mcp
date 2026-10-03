@@ -3,7 +3,9 @@
 package dirsrv
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -170,9 +172,8 @@ func execApply(t *testing.T, inst *Instance, g applyGuest, extra []string) (stri
 		"--dsconf-instance", "localhost",
 	}
 	args = append(args, extra...)
-	cmd := exec.Command("docker", args...)
-	out, err := cmd.CombinedOutput()
-	return string(out), err
+	cmd := exec.CommandContext(t.Context(), "docker", args...)
+	return applyCommandOutput(cmd)
 }
 
 func assertBackendPhaseOK(t *testing.T, out string) {
@@ -252,4 +253,25 @@ func createBackend(t *testing.T, inst *Instance, name, suffix string) {
 	if err != nil {
 		t.Fatalf("precreate: %v\n%s", err, out)
 	}
+}
+
+// Keep diagnostic stderr separate while reading the machine-readable stdout.
+// The returned transcript retains both streams for canary checks and failures,
+// with the independently validated JSON last for existing summary assertions.
+func applyCommandOutput(cmd *exec.Cmd) (string, error) {
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	stdout, err := cmd.Output()
+	transcript := stderr.String() + string(stdout)
+	if err != nil {
+		return transcript, err
+	}
+	var summary json.RawMessage
+	if err := json.Unmarshal(stdout, &summary); err != nil {
+		return transcript, fmt.Errorf("apply stdout JSON: %w", err)
+	}
+	if len(bytes.TrimSpace(summary)) == 0 || bytes.TrimSpace(summary)[0] != '{' {
+		return transcript, fmt.Errorf("apply stdout must be a JSON object")
+	}
+	return transcript, nil
 }

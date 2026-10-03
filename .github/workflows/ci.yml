@@ -78,7 +78,7 @@ jobs:
               *) heavy=true ;;
             esac
             case "${f}" in
-              internal/ldapserver/*|cmd/labldapd/*|internal/directory/native/*|test/integration/dirsrv/*|test/compatibility/*|test/parity/*|deploy/compose/compose.native*|deploy/docker/labldapd*|deploy/docker/*native*|.github/workflows/ci.yml)
+              Makefile|go.mod|go.sum|deploy/compose/*|deploy/docker/Dockerfile.labldapd|internal/config/*|internal/ldapserver/*|cmd/labldapd/*|internal/directory/native/*|test/integration/dirsrv/*|test/compatibility/*|test/parity/*|deploy/compose/compose.native*|deploy/docker/labldapd*|deploy/docker/*native*|.github/workflows/ci.yml)
                 native=true
                 ;;
             esac
@@ -198,6 +198,43 @@ jobs:
       - name: Frontend production build
         run: make frontend-build
 
+  e2e:
+    name: e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - name: Activate pinned pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.14.0 --activate
+      - name: Install Chromium system dependencies
+        run: cd test/e2e && pnpm install --frozen-lockfile && pnpm exec playwright install --with-deps chromium
+      - name: Browser workflows
+        run: make test-e2e
+
+  native-checks:
+    name: native-checks
+    needs: [changes]
+    if: needs.changes.outputs.native == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Native fuzz, soak, differential, and parity checks
+        run: make verify-native
+
   security:
     name: security
     runs-on: ubuntu-latest
@@ -241,7 +278,8 @@ jobs:
     needs: [changes]
     if: needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    # Includes the dual-engine parity oracle, host setup, and 45m integration budget.
+    timeout-minutes: 60
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -267,6 +305,9 @@ jobs:
           command -v ldapmodify
           command -v ldapwhoami
           python3 --version
+
+      - name: Dual-engine parity oracle
+        run: make test-parity
 
       - name: Integration tests (389 DS)
         run: |
@@ -340,11 +381,11 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Bootstrap image
-        run: make image-bootstrap
+      - name: Native directory image
+        run: make image-native
 
-      - name: Control image
-        run: make image
+      - name: Bootstrap and control images with matching versions
+        run: make image-pair-check
 
   sbom:
     name: sbom

@@ -72,8 +72,9 @@ expected. Host swap can still hold pages — ephemeral is not a wipe.
 
 ## Image version mismatch
 
-`make image` compares `labldap-control:dev` and `labldap-bootstrap:dev`
-`version=` fields. Rebuild both with the same `VERSION`.
+`make image-pair-check` rebuilds `labldap-control:dev` and
+`labldap-bootstrap:dev` before comparing their `version=` fields. Compose targets
+use this check, so an older local bootstrap image cannot block a candidate rebuild.
 
 ## Need a clean lab
 
