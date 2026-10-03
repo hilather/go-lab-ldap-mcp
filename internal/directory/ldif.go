@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/hilather/go-lab-ldap-mcp/internal/apperr"
+	"github.com/hilather/go-lab-ldap-mcp/internal/config"
 )
 
 // RFC 2849 line width excluding the CRLF/LF terminator.
@@ -126,17 +127,26 @@ func (e *Encoder) ensureHeader() error {
 }
 
 func (e *Encoder) writeRaw(s string) error {
+	if e.w == nil {
+		return ExportError("export", FieldUnavailable, "export writer is not configured")
+	}
+	if e.maxBytes > 0 && e.wrote+int64(len(s)) > e.maxBytes {
+		return ExportLimit("export.bytes", "export byte limit exceeded")
+	}
 	n, err := io.WriteString(e.w, s)
 	e.wrote += int64(n)
 	if err != nil {
 		return err
+	}
+	if n != len(s) {
+		return io.ErrShortWrite
 	}
 	return nil
 }
 
 // SecretAttr reports password and other secret attributes omitted by default.
 func SecretAttr(name string) bool {
-	n := strings.ToLower(strings.TrimSpace(name))
+	n := config.CanonicalAttrType(name)
 	switch n {
 	case "userpassword", "authpassword",
 		"nsmultiplexorbindcred", "nsmultiplexorcredentials",

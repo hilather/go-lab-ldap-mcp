@@ -116,7 +116,7 @@ func (r *Runtime) Add(ctx context.Context, spec directory.UserSpec) (directory.U
 		if forbiddenWriteAttr(name) {
 			return directory.User{}, cfgErr("attributes."+name, "forbidden_attribute", "attribute is not allowed on users")
 		}
-		add.Attribute(name, []string{val})
+		add.Attribute(strings.TrimSpace(name), []string{val})
 	}
 	size, seconds := r.searchLimits()
 	var out directory.User
@@ -188,14 +188,15 @@ func (r *Runtime) Modify(ctx context.Context, id directory.UserID, patch directo
 			if (key == "cn" || key == "sn") && strings.TrimSpace(val) == "" {
 				return cfgErr("attributes."+name, "required", "schema-required attribute cannot be empty")
 			}
+			attr := strings.TrimSpace(name)
 			if strings.TrimSpace(val) == "" {
 				// Empty value is the UserPatch delete signal (omit = leave).
-				if live.GetAttributeValue(name) != "" {
-					mod.Delete(name, nil)
+				if live.GetAttributeValue(attr) != "" {
+					mod.Delete(attr, nil)
 				}
 				continue
 			}
-			mod.Replace(name, []string{val})
+			mod.Replace(attr, []string{val})
 		}
 		if len(mod.Changes) > 0 {
 			if e := c.Modify(ctx, mod); e != nil {
@@ -408,6 +409,19 @@ func userFromEntry(e *ldap.Entry, groupsDN string) directory.User {
 		case "objectclass", "uid", "nsaccountlock", "memberof":
 			continue
 		}
+		// The user view only carries spellings the user write rule accepts:
+		// optioned planned names (cn;lang-en) are managed through the entry
+		// API, and a descriptor alias an engine might return is shown under
+		// the primary name, so console/REST round-trips never send them back.
+		if t := config.CanonicalAttrType(name); t == "cn" || t == "sn" || t == "uid" {
+			if strings.Contains(name, ";") {
+				continue
+			}
+			name = t
+		}
+		if name == "uid" {
+			continue
+		}
 		for _, v := range a.Values {
 			attrs = append(attrs, directory.AttrKV{Name: name, Value: v})
 		}
@@ -421,7 +435,11 @@ func userFromEntry(e *ldap.Entry, groupsDN string) directory.User {
 		Attributes:    sortAttrKV(attrs),
 		Groups:        memberOfGroupIDs(e, groupsDN),
 	}
-	u.Revision = directory.RevisionOfUser(u)
+	u.Revision = directory.RevisionHash(struct {
+		User       directory.Revision
+		Locked     bool
+		MustChange bool
+	}{directory.RevisionOfUser(u), accountLockStamped(e), accountMustChange(e)})
 	return u
 }
 

@@ -24,6 +24,13 @@ export const ALLOWED_USER_ATTRS = [
 
 const FORBIDDEN_USER_ATTRS = new Set([
   "userpassword",
+  "authpassword",
+  "userpkcs12",
+  "pwdreset",
+  "passwordexpirationtime",
+  "accountunlocktime",
+  "passwordretrycount",
+  "objectclass",
   "memberof",
   "modifiersname",
   "modifytimestamp",
@@ -133,8 +140,43 @@ export function passwordsMatch(password: string, confirmPassword: string): boole
   return password === confirmPassword;
 }
 
+// Mirrors internal/config ForbiddenUserWriteAttr: the server is the
+// authority; this only keeps the form from submitting names it will reject.
+const PROTECTED_ATTRIBUTE_OIDS: Record<string, string> = {
+  "2.5.4.35": "userpassword",
+  "2.5.4.0": "objectclass",
+};
+
+const ATTRIBUTE_NAME_ALIASES: Record<string, string> = {
+  userid: "uid",
+  commonname: "cn",
+  surname: "sn",
+  organizationalunitname: "ou",
+  domaincomponent: "dc",
+  organizationname: "o",
+};
+
+// canonicalAttrType strips attribute options (";lang-en") and resolves known
+// OIDs and second descriptors to the primary lowercase name.
+export function canonicalAttrType(name: string): string {
+  let base = name.trim().toLowerCase();
+  const semi = base.indexOf(";");
+  if (semi >= 0) {
+    base = base.slice(0, semi);
+  }
+  return PROTECTED_ATTRIBUTE_OIDS[base] ?? ATTRIBUTE_NAME_ALIASES[base] ?? base;
+}
+
 export function isForbiddenUserAttr(name: string): boolean {
-  return FORBIDDEN_USER_ATTRS.has(name.trim().toLowerCase());
+  const type = canonicalAttrType(name);
+  if (/^[0-9]/.test(type) || FORBIDDEN_USER_ATTRS.has(type)) {
+    return true;
+  }
+  if (type === "uid" || type === "cn" || type === "sn") {
+    // Only the bare planned spelling is writable.
+    return name.trim().toLowerCase() !== type;
+  }
+  return false;
 }
 
 export function isAllowlistedUserAttr(name: string): boolean {

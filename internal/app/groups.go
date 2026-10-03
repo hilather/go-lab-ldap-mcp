@@ -20,9 +20,11 @@ func (s *Groups) List(ctx context.Context, p Principal, q directory.GroupListQue
 	if err := s.hooks.authorize(ctx, p, OpGroupList); err != nil {
 		return directory.GroupPage{}, err
 	}
-	if err := s.hooks.allowRead(ctx); err != nil {
+	release, err := s.hooks.acquireRead(ctx)
+	if err != nil {
 		return directory.GroupPage{}, err
 	}
+	defer release()
 	return s.repo.List(ctx, q)
 }
 
@@ -30,9 +32,11 @@ func (s *Groups) Get(ctx context.Context, p Principal, id directory.GroupID) (di
 	if err := s.hooks.authorize(ctx, p, OpGroupGet); err != nil {
 		return directory.Group{}, err
 	}
-	if err := s.hooks.allowRead(ctx); err != nil {
+	release, err := s.hooks.acquireRead(ctx)
+	if err != nil {
 		return directory.Group{}, err
 	}
+	defer release()
 	return s.repo.Get(ctx, id)
 }
 
@@ -40,9 +44,11 @@ func (s *Groups) Create(ctx context.Context, p Principal, spec directory.GroupSp
 	if err := s.hooks.authorize(ctx, p, OpGroupCreate); err != nil {
 		return directory.Group{}, err
 	}
-	if err := s.hooks.allowWrite(ctx); err != nil {
+	release, err := s.hooks.acquireWrite(ctx)
+	if err != nil {
 		return directory.Group{}, err
 	}
+	defer release()
 	unlock := s.hooks.lock(groupLockKey(spec.ID))
 	defer unlock()
 	if spec.ID == "" {
@@ -74,16 +80,18 @@ func (s *Groups) Delete(ctx context.Context, p Principal, id directory.GroupID, 
 	if err := s.hooks.authorize(ctx, p, OpGroupDelete); err != nil {
 		return err
 	}
-	if err := s.hooks.allowWrite(ctx); err != nil {
+	release, err := s.hooks.acquireWrite(ctx)
+	if err != nil {
 		return err
 	}
+	defer release()
 	unlock := s.hooks.lock(groupLockKey(string(id)))
 	defer unlock()
 	if err := requireRevision(rev); err != nil {
 		s.hooks.record(ctx, p, OpGroupDelete.Name, string(id), AuditFailure, string(rev), "")
 		return err
 	}
-	err := s.repo.Delete(ctx, id, rev)
+	err = s.repo.Delete(ctx, id, rev)
 	if err != nil {
 		s.hooks.record(ctx, p, OpGroupDelete.Name, string(id), AuditFailure, string(rev), "")
 		return err
@@ -124,9 +132,11 @@ func (s *Groups) mutateMembers(ctx context.Context, p Principal, id directory.Gr
 	if err := s.hooks.authorize(ctx, p, OpGroupMembers); err != nil {
 		return directory.MembershipSummary{}, err
 	}
-	if err := s.hooks.allowWrite(ctx); err != nil {
+	release, err := s.hooks.acquireWrite(ctx)
+	if err != nil {
 		return directory.MembershipSummary{}, err
 	}
+	defer release()
 	unlock := s.hooks.lock(groupLockKey(string(id)))
 	defer unlock()
 	if err := requireRevision(rev); err != nil {

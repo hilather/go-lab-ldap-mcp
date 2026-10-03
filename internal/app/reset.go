@@ -2,6 +2,8 @@ package app
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"strings"
 
 	"github.com/hilather/go-lab-ldap-mcp/internal/apperr"
@@ -150,14 +152,18 @@ func (s *Reset) Start(ctx context.Context, p Principal, req ResetRequest) (Reset
 		return s.Status(), err
 	}
 
+	if err := s.gate.WaitIdle(ctx, tok); err != nil {
+		s.gate.Abort(tok)
+		s.hooks.record(ctx, p, OpReset.Name, "reset", AuditFailure, s.expected, "")
+		return s.Status(), err
+	}
+
 	st, err := s.run(context.WithoutCancel(ctx), tok, seeds)
 	if err != nil {
 		// Pre-mutation failures release the lock. After delete/reapply
 		// starts, Failed keeps readiness false (T-080).
 		if !resetMutated(s.gate.State()) {
-			if s.gate.State() == reset.PreparingReset {
-				_ = s.gate.Advance(tok, reset.Ready)
-			}
+			s.gate.Abort(tok)
 			s.hooks.record(ctx, p, OpReset.Name, "reset", AuditFailure, s.expected, "")
 			return s.Status(), err
 		}
@@ -299,21 +305,21 @@ func (s *Reset) upsertUser(ctx context.Context, u config.NormalizedUser) error {
 	} else if fieldCode(err) != directory.FieldConflict {
 		return err
 	}
-	got, gerr := s.users.Get(ctx, directory.UserID(u.ID))
+	got, gerr := s.users.Get(ctx, seedUserID(u))
 	if gerr != nil {
 		return gerr
 	}
-	if _, merr := s.users.Modify(ctx, directory.UserID(u.ID), directory.UserPatch{
+	if _, merr := s.users.Modify(ctx, seedUserID(u), directory.UserPatch{
 		Enabled:    spec.Enabled,
 		Attributes: spec.Attributes,
 	}, got.Revision); merr != nil {
 		return merr
 	}
-	fresh, ferr := s.users.Get(ctx, directory.UserID(u.ID))
+	fresh, ferr := s.users.Get(ctx, seedUserID(u))
 	if ferr != nil {
 		return ferr
 	}
-	return s.users.SetPassword(ctx, directory.UserID(u.ID), pw, fresh.Revision, false)
+	return s.users.SetPassword(ctx, seedUserID(u), pw, fresh.Revision, false)
 }
 
 func (s *Reset) upsertGroup(ctx context.Context, g config.NormalizedGroup) error {
@@ -400,7 +406,7 @@ func (s *Reset) liveSnaps(ctx context.Context) ([]reset.ObjectSnap, int) {
 	var out []reset.ObjectSnap
 	missing := 0
 	for _, u := range s.seedU {
-		got, err := s.users.Get(ctx, directory.UserID(u.ID))
+		got, err := s.users.Get(ctx, seedUserID(u))
 		if err != nil {
 			missing++
 			continue
@@ -474,6 +480,14 @@ func (s *Reset) reloadSeeds(ctx context.Context) ([]config.NormalizedUser, error
 			if err != nil {
 				return nil, err
 			}
+			want := u.Password.Digest
+			if want == "" {
+				sum := sha256.Sum256([]byte(u.Password.Value.Reveal()))
+				want = hex.EncodeToString(sum[:])
+			}
+			if sec.Digest != want {
+				return nil, apperr.New(apperr.CodeReset, "seed password changed since configuration was compiled").WithField(apperr.Field{Path: owner, Code: "conflict", Message: "restart with the updated baseline before resetting"})
+			}
 			cp := sec
 			u.Password = &cp
 			continue
@@ -505,7 +519,7 @@ func (s *Reset) compiledPresent(ctx context.Context) (bool, error) {
 			return false, apperr.New(apperr.CodeReset, "reset repositories are not configured").
 				WithField(apperr.Field{Path: "reset", Code: "unavailable", Message: "reset repositories are not configured"})
 		}
-		if _, err := s.users.Get(ctx, directory.UserID(u.ID)); err != nil {
+		if _, err := s.users.Get(ctx, seedUserID(u)); err != nil {
 			if fieldCode(err) == directory.FieldNotFound {
 				return false, nil
 			}
@@ -603,4 +617,12 @@ func attrMap(in []config.AttrKV) map[string]string {
 		out[a.Name] = a.Value
 	}
 	return out
+}
+
+// Configuration IDs are logical references; runtime user lookup is by UID.
+func seedUserID(u config.NormalizedUser) directory.UserID {
+	if u.UID != "" {
+		return directory.UserID(u.UID)
+	}
+	return directory.UserID(u.ID)
 }
