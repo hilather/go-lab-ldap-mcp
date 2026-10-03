@@ -82,3 +82,21 @@ make compose-reset
 ```
 
 That is the operator hard reset. It is not exposed over REST or MCP.
+
+## Strict TLS client reports Missing Authority Key Identifier
+
+Python 3.14 and other strict TLS clients can reject certificates minted by older
+LabLDAP TLS setup code with `Missing Authority Key Identifier`. Updating the
+binary does not repair existing PEM files. Regenerate the lab certificates with
+current tooling, retaining your password and token files:
+
+```text
+go run ./tools/setuptls generate --dir secrets/tls --host directory --force
+```
+
+Include `--management` and the same custom `--dns`, `--ip`, `--management-dns`, and
+`--management-ip` options if you previously generated management or extra SANs.
+This rotates the lab CA and TLS keys; distribute the new `secrets/tls/ca.crt` to
+clients and recreate/reimport the selected Compose stack's TLS files. Keep CA and
+server private keys restricted and out of source control. You can also supply
+valid certificates from your own issuer. Do not disable certificate verification.
