@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed. On 2026-10-03 the owner asked for a proposal-only review; current parity is unchanged.
+Proposed
 
 Date: 2026-10-03
 
@@ -59,6 +59,14 @@ on those deny lists get through, not just `modifyTimestamp`: `userPassword;…`,
 suffixes. If native alone started rejecting these writes, REST and MCP would
 return different results depending on the engine.
 
+Read redaction has the same exact-name gap. REST and MCP read output is
+filtered through `redactAttrs` / `secretOrDeniedAttr`
+(`internal/app/directory.go:184`, `:225-228`), which match names exactly. An
+option spelling such as `userPassword;lang-en` or `nsslapd-rootpw;x` is
+therefore not redacted. On the 389 engine, REST can already write
+`userPassword;lang-en` today and read it back unredacted. That gap exists on
+main now and is tracked separately from D31.
+
 ### 2. Bind identity after a failed critical-control Bind
 
 After a successful Directory Manager bind, a Bind that carries an unknown
@@ -77,7 +85,9 @@ Native already has a related exposure on main. `serve()` runs Bind inline with
 no outstanding-operation barrier (`conn.go:109-115`), and `handleCompare` reads
 `c.subject()` inside the worker (`op_write.go:446`). So operations dispatched
 before a Bind can already see the identity that Bind sets. D32 does not create
-this race, but an earlier reset would widen it.
+this race. However, under D32 a Bind that fails a critical control would also
+change the identity, so more Binds would change the identity that in-flight
+workers can observe. That is why the order of steps inside Bind matters.
 
 These probes are recorded in the review evidence. Assertions for proposal-only
 behaviour do not ship in the regression suite.
@@ -119,6 +129,11 @@ Proposed:
      `forbidden_attribute` error on both engines. This adds no new operation,
      OpenAPI shape or console workflow. On the 389 engine these writes return
      success today.
+   - The control plane uses one option-stripping resolver for both the write
+     deny check and read redaction. OID spellings are resolved through a
+     static table of deny-list OIDs in `internal/config`, because the control
+     plane has no schema registry. That table is tested against the subschema
+     of both engines so the two lists cannot drift apart.
    - Rejected alternative: the control plane forwards the write and REST/MCP
      results differ by engine.
 2. **D32: native resets; 389 retains; the delta records the split.** Every
@@ -127,10 +142,17 @@ Proposed:
    anonymous. The pinned 389 build keeps the prior identity after a
    critical-control failure, and the delta records that split. It does not
    adopt 389's retention.
+   - **Order inside Bind processing:**
+     1. ADR-0014's barrier completes or abandons every earlier operation.
+     2. Reset to anonymous.
+     3. `checkControls`.
+     4. `authenticate`.
+
+     Operations dispatched before the Bind keep the subject captured on the
+     read loop, and no handler can observe the reset or the new identity.
    - **Implementation precondition.** Do not implement D32 before both of these
      are on main: #19's per-operation subject capture on the read loop, and
-     ADR-0014's outstanding-operation barrier. Then workers dispatched before
-     the Bind cannot observe the reset or the new identity.
+     ADR-0014's outstanding-operation barrier.
 
 ## Consequences
 
@@ -149,6 +171,9 @@ Proposed:
   That adds two accepted Deltas, each with per-engine controlling tests.
 - REST and MCP on the 389 engine start rejecting option spellings that 389
   itself accepts.
+- Config validation of `users[].attributes` (`internal/config/user.go:54`)
+  uses the same deny check, so it becomes stricter. That is a security
+  tightening allowed in a minor release, and it needs a compatibility note.
 - D32 cannot ship until #19 and ADR-0014 are implemented.
 
 ### Neutral / follow-up
@@ -172,5 +197,7 @@ Proposed:
 
 ## Notes
 
+- On 2026-10-03 the owner asked for a proposal-only review. Current parity is
+  unchanged.
 - The 19-vs-53 code split for `2.5.18.2` is not decided here.
 - Code line references are to `main` at `4f05463`.
