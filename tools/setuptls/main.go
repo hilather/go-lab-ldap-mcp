@@ -223,6 +223,12 @@ func generate(opts generateOpts) error {
 	if err != nil {
 		return err
 	}
+	// CreateCertificate generates the CA SubjectKeyId in the encoded cert.
+	// Sign using that issued cert so leaves carry its AuthorityKeyId.
+	caCert, err := x509.ParseCertificate(caDER)
+	if err != nil {
+		return err
+	}
 	if err := writePEM(p.CACert, "CERTIFICATE", caDER, 0o644); err != nil {
 		return err
 	}
@@ -234,7 +240,7 @@ func generate(opts generateOpts) error {
 
 	dirDNS := mergeDNS([]string{host, "localhost"}, opts.ExtraDNS)
 	dirIPs := mergeIPs([]net.IP{net.ParseIP("127.0.0.1")}, opts.ExtraIPs)
-	if err := signServer(p.DirectoryCert, p.DirectoryKey, caTmpl, caKey, host, dirDNS, dirIPs); err != nil {
+	if err := signServer(p.DirectoryCert, p.DirectoryKey, caCert, caKey, host, dirDNS, dirIPs); err != nil {
 		return err
 	}
 	fmt.Fprintf(opts.Stdout, "wrote %s\n", p.DirectoryCert)
@@ -243,7 +249,7 @@ func generate(opts generateOpts) error {
 	if opts.Management {
 		mgmtDNS := mergeDNS([]string{"control", "localhost"}, opts.ExtraMgmtDNS)
 		mgmtIPs := mergeIPs(auth.LocalIPAddresses(), opts.ExtraMgmtIPs)
-		if err := signServer(p.ManagementCert, p.ManagementKey, caTmpl, caKey, "control", mgmtDNS, mgmtIPs); err != nil {
+		if err := signServer(p.ManagementCert, p.ManagementKey, caCert, caKey, "control", mgmtDNS, mgmtIPs); err != nil {
 			return err
 		}
 		fmt.Fprintf(opts.Stdout, "wrote %s\n", p.ManagementCert)
