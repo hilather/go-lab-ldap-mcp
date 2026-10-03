@@ -2,68 +2,175 @@
 
 ## Status
 
-Proposed — owner directed proposal-only review on 2026-10-03; current parity remains unchanged.
+Proposed. On 2026-10-03 the owner asked for a proposal-only review; current parity is unchanged.
 
 Date: 2026-10-03
 
-Related: ADR-0008, ADR-0009; native-engine parity contract C1/C3/C8 and proposed
-D31/D32. This proposal changes the native safety floor, not the public REST,
-MCP or configuration contract.
+Deciders: repository owner
 
-## Evidence
+Related tasks: none yet. An implementation task is opened in `TASKS.md` when
+this ADR is accepted.
 
-The direct LDAP regression suite against the pinned 389 DS 2.4.6 oracle found:
+Related ADRs: ADR-0008, ADR-0009, and ADR-0014 (proposed in PR #24, not yet
+on main). Related contract clauses: native-engine parity contract C1/C3/C8, and
+the proposed deltas D31/D32.
 
-1. A runtime account with the compiled people-write ACI can modify
-   `modifyTimestamp;lang-en`. Native already protects server-owned operational
-   attributes, but exact-name checks let options bypass this protection.
-2. After a successful Directory Manager bind, a Bind carrying an unknown
-   critical control returns `unavailableCriticalExtension(12)` on both engines.
-   The pinned 389 instance retains the Directory Manager identity after this
-   failure. Native currently does the same because its identity reset occurs
-   after control validation.
+## Context
 
-Evidence: direct LDAP review probes against `LABLDAP_IT_ENGINE=389ds` and
-`=native` on 2026-10-03. The oracle accepted `modifyTimestamp;lang-en`
-(`success(0)`) and rejected the operational OID `2.5.18.2` with
-`unwillingToPerform(53)`; current native accepts the option spelling and rejects
-the OID with `constraintViolation(19)`. Both engines retained Directory Manager
-after an unknown-critical-control Bind returned 12. These probes are recorded
-in the review evidence; proposal-only behavior assertions do not ship in the
-regression suite.
+AGENTS requires the same client-visible results from both engines. ADR-0008
+makes the pinned 389 build the oracle unless a reviewed Delta is recorded. The
+direct LDAP regression suite against the pinned 389 DS 2.4.6 oracle found two
+differences that need an owner decision.
 
-The existing AGENTS rule requires the same client-visible results in both
-engines; ADR-0008 makes 389 the oracle unless a reviewed Delta is recorded.
-An owner decision is therefore required before accepting these differences.
+### 1. Attribute options on server-owned operational attributes
 
-## Proposed decision
+Evidence comes from direct LDAP review probes against `LABLDAP_IT_ENGINE=389ds`
+and `=native` on 2026-10-03.
 
-1. Native security checks resolve schema OID aliases and attribute options to
-   their underlying type. An option cannot turn a server-owned operational
-   attribute into a client-modifiable attribute. Proposed D31 records native
-   rejection where the pinned 389 build accepts the operational option write.
-2. Every native Bind attempt resets the connection identity before validating
-   controls or credentials. A failed Bind must leave the anonymous identity.
-   Proposed D32 records the pinned 389 critical-control failure behavior.
-## Existing implementation context
+On LDAP, a runtime account holding the compiled people-write ACI can modify
+`modifyTimestamp;lang-en`:
 
-Matched hardening in the companion implementation PR, separate from proposed decisions 1–2:
+- 389 returns `success(0)`.
+- Current native also accepts it. `clientModifiable` and `AttributeType` do
+  not strip options (`internal/ldapserver/op_attrs.go:103-111`,
+  `schema_registry.go:83-86`), and the schema check does not reject the
+  unknown name (`schema_registry.go:305-340`).
+- Native stores the value under that exact name (`op_write.go:323-329`). The
+  canonical `modifyTimestamp` stays server-owned (`op_attrs.go:94-96`).
 
-3. Previously dispatched native
-   operations capture their original subject on
-   the connection read loop. A later Bind cannot grant earlier requests a new
-   identity or change the authorization used halfway through an operation.
-4. Attribute-target ACI protections for options/OIDs retain shared 389/native
-   denial tests. They are matched Contract behavior, separate from D31.
-5. This does not weaken 389-mode access controls or claim that the underlying
-   pinned 389 implementation has been changed. Mode-specific security floors
-   must be documented and tested explicitly.
+Until options are resolved, native's acceptance of this write falls under D17,
+"Schema MAY / unknown-attribute enforcement on writes". In that ledger row 389
+rejects unknown attributes and native accepts them.
+
+The bare OID `2.5.18.2` is a separate case. Native rejects it with
+`constraintViolation(19)` (`op_write.go:153-162`); 389 returns
+`unwillingToPerform(53)`. That 19-vs-53 split is the existing unadjudicated
+note at `op_write.go:153-156`. D31 does not decide it, and it remains open.
+
+The control plane can reach this case too. REST entry update and MCP
+`ldap_update_entry` forward the attribute name
+(`internal/directory/ds389/entries.go:325-331`). `ForbiddenEntryAttr`
+(`internal/directory/classes.go:103-113`) and `ForbiddenUserAttr` both
+compare against `config.CanonicalAttr`, which only lowercases and trims
+(`internal/config/attr.go:26-32`). That means option spellings of every name
+on those deny lists get through, not just `modifyTimestamp`: `userPassword;…`,
+`memberOf;…`, `nsAccountLock;…`, `aci;…`, `entryUUID;…` and the other
+`operationalDeny` names. The `nsslapd-` prefix check still catches option
+suffixes. If native alone started rejecting these writes, REST and MCP would
+return different results depending on the engine.
+
+### 2. Bind identity after a failed critical-control Bind
+
+After a successful Directory Manager bind, a Bind that carries an unknown
+critical control returns `unavailableCriticalExtension(12)` on both engines.
+Both engines then keep the Directory Manager identity:
+
+- The pinned 389 instance retains it.
+- Native retains it because `handleBind` validates controls before
+  `authenticate` (`internal/ldapserver/op_bind.go:47-50`). The reset to
+  anonymous happens only inside `authenticate` (`op_bind.go:70-71`).
+
+RFC 4513 §4 says receiving a Bind moves the association to anonymous, and a
+failed Bind leaves it anonymous.
+
+Native already has a related exposure on main. `serve()` runs Bind inline with
+no outstanding-operation barrier (`conn.go:109-115`), and `handleCompare` reads
+`c.subject()` inside the worker (`op_write.go:446`). So operations dispatched
+before a Bind can already see the identity that Bind sets. D32 does not create
+this race, but an earlier reset would widen it.
+
+These probes are recorded in the review evidence. Assertions for proposal-only
+behaviour do not ship in the regression suite.
+
+### Existing implementation context
+
+The companion implementation PR (#19) adds matched hardening. It is separate
+from D31 and D32:
+
+- Native operations capture their subject on the connection read loop when
+  they are dispatched, so a later Bind cannot give earlier requests a new
+  identity part-way through.
+- Attribute-target ACI protections for options and OIDs (`aci;lang-en` and the
+  `aci` OID both return `insufficientAccessRights(50)`) have shared 389/native
+  denial tests. That is matched Contract behaviour, separate from D31.
+  `clientModifiable` on that branch still does not strip options.
+- Nothing here weakens 389-mode access controls or claims that the pinned 389
+  implementation changes. Mode-specific security floors must be documented and
+  tested explicitly.
+
+## Decision
+
+Proposed:
+
+1. **D31: option and OID resolution for client-modifiability.** Native
+   security checks resolve schema OID aliases and attribute options to the
+   underlying type. An option cannot make a server-owned operational attribute
+   client-modifiable. Native rejects the write where the pinned 389 build
+   accepts it, and the delta records that split.
+   - Acceptance needs a direct LDAP assertion on both engines: native rejects,
+     389 records success as the delta.
+   - Acceptance also needs a control-plane assertion on both engines, using
+     REST entry update and MCP `ldap_update_entry` with
+     `modifyTimestamp;lang-en` and at least one credential-class spelling
+     (`userPassword;lang-en`).
+   - **Proposed REST/MCP behaviour change.** Entry and user updates reject
+     option and OID spellings of every `ForbiddenEntryAttr` and
+     `ForbiddenUserAttr` name. They return the existing `changes.name` /
+     `forbidden_attribute` error on both engines. This adds no new operation,
+     OpenAPI shape or console workflow. On the 389 engine these writes return
+     success today.
+   - Rejected alternative: the control plane forwards the write and REST/MCP
+     results differ by engine.
+2. **D32: native resets; 389 retains; the delta records the split.** Every
+   native Bind attempt resets the connection identity to anonymous before it
+   validates controls or credentials. A failed Bind leaves the connection
+   anonymous. The pinned 389 build keeps the prior identity after a
+   critical-control failure, and the delta records that split. It does not
+   adopt 389's retention.
+   - **Implementation precondition.** Do not implement D32 before both of these
+     are on main: #19's per-operation subject capture on the read loop, and
+     ADR-0014's outstanding-operation barrier. Then workers dispatched before
+     the Bind cannot observe the reset or the new identity.
 
 ## Consequences
 
-If accepted, native would become stricter on the two observed cases. Existing
-native operational attribute protections would apply consistently across
-attribute spellings, and failed native Bind attempts would not retain
-authenticated privileges. Both engines would remain available, with explicit
-tests recording the differences.
-No new listener, endpoint, schema field or credential distribution is added.
+### Positive
+
+- Native operational-attribute protections apply the same way to every
+  attribute spelling.
+- A failed native Bind no longer retains authenticated privileges, which
+  matches RFC 4513 §4.
+- Control-plane rejection keeps REST and MCP results engine-neutral for
+  forbidden attributes.
+
+### Negative
+
+- Native becomes stricter than the pinned 389 oracle on two observed cases.
+  That adds two accepted Deltas, each with per-engine controlling tests.
+- REST and MCP on the 389 engine start rejecting option spellings that 389
+  itself accepts.
+- D32 cannot ship until #19 and ADR-0014 are implemented.
+
+### Neutral / follow-up
+
+- When implemented, add D31 and D32 rows to `docs/design/parity-delta-log.md`
+  (D-numbers on main end at D30) and regenerate the ledger with
+  `PARITY_UPDATE_LEDGER=1`.
+- The control-plane resolution overlaps with the option and alias handling
+  under review for the user-write paths (PR #18). Implement them together so
+  there is one write rule.
+- No new listener, endpoint, schema field or credential distribution is added.
+
+## Alternatives considered
+
+| Option | Why not chosen |
+| --- | --- |
+| Adopt 389 retention after a failed critical-control Bind | Conflicts with RFC 4513 §4 and keeps privileges after a failed Bind. |
+| Leave operational-attribute option spellings under D17 permanently | D17 covers unknown-attribute acceptance. It should not let a server-owned attribute become writable through an option. |
+| Reject option spellings only in the control plane | Leaves direct LDAP writes on native open. |
+| Reject on native LDAP only and let REST/MCP forward | REST/MCP results would differ by engine. |
+
+## Notes
+
+- The 19-vs-53 code split for `2.5.18.2` is not decided here.
+- Code line references are to `main` at `4f05463`.
