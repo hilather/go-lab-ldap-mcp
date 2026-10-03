@@ -45,7 +45,14 @@ spec:
         - user: alice
 ```
 
-No inline passwords. Groups cannot be empty. YAML is the compiled baseline
+No inline passwords. Groups cannot be empty. User `attributes` follow the
+same write rule as the user API (below): `objectClass`, option or alias
+spellings of `uid`/`cn`/`sn` (`cn;lang-en`, `commonName`, `surname`,
+`userid`), numeric OIDs and protected names are rejected, and two keys that
+address the same attribute (`mail` and `Mail`, `ou` and
+`organizationalUnitName`) are a `duplicate_attribute` error.
+Earlier releases silently dropped some of these spellings during seeding; a
+scenario that used them now fails to compile until they are removed. YAML is the compiled baseline
 (`startupMode: merge`); UI / REST / MCP mutations are live until soft reset
 or `make compose-reset`. Changing the file requires a re-bootstrap.
 
@@ -111,7 +118,33 @@ Multi-domain here means multiple suffixes in one lab, not an AD forest.
 Submit a base, scope, filter, attribute list, and page size. The search
 base may be any managed suffix or a DN under one. Attribute names
 are allow-listed. `userPassword` and other forbidden names cannot be
-requested. Results expand to a redacted LDIF snippet.
+requested. Filters also reject secret attributes, including nested assertions,
+attribute options, and known OID aliases. Attribute-less extensible matches
+and unknown numeric OIDs are rejected. Results expand to a redacted LDIF snippet.
+
+Profile and structured attribute writes use attribute names. Numeric OIDs
+cannot bypass password, account-state, or ACI restrictions. Use the dedicated
+password and account actions for protected fields.
+
+User writes (REST, MCP, console, and scenario YAML) share one rule: protected
+and operational names in any spelling (attribute options, numeric OIDs),
+every `objectClass` spelling, and any non-bare spelling of `uid`, `cn` or
+`sn` are rejected with `forbidden_attribute`; bare `cn`, `sn` and `uid` stay
+writable through their normal fields. Names that address the same attribute
+(case variants, option order, or one of the resolved second descriptors
+`userid`, `commonName`, `surname`, `organizationalUnitName`,
+`domainComponent`, `organizationName`) are a `duplicate_attribute` error.
+Other second descriptors (`gn`, `rfc822Mailbox`, `localityName`, …) are not
+resolved, so do not send both spellings of one attribute. The user view shows only spellings this rule
+accepts: optioned values such as `cn;lang-en` are hidden there and managed
+through the entry API, and an engine-returned alias such as `commonName` is
+shown as `cn`. Because optioned values are not part of the user view, they
+do not contribute to the user revision. Entry create with `inetOrgPerson` differs: it does not reject
+option or alias spellings of the planned names, it drops them and writes the
+planned `uid`/`cn`/`sn` values, and it keeps only the first of two names
+that address the same attribute (protected names are still rejected). User and account actions
+share an opaque revision that changes when lock or password-expiry state
+changes; refresh existing revisions after upgrading.
 
 ### Protected attribute spellings
 
@@ -132,8 +165,12 @@ both engines.
 ### Reset and export
 
 Soft reset requires the `lab:reset` scope, the **exact** compiled scenario
-name, and the current revision. It restores the baseline suffix. It does
-**not** remove the Docker volume.
+name, and the current revision. Reset drains admitted directory operations,
+restores primary users and groups, and removes runtime entries beneath all
+configured additional suffixes while preserving suffix roots. Changed seed
+password files require recompilation and bootstrap before reset; reset refuses
+to apply a different password under the old baseline revision. It does not
+remove the Docker volume.
 
 Export requires `lab:export`. Passwords are omitted. Size is bounded by
 `exportMaxEntries` / `exportMaxBytes`.
@@ -290,6 +327,14 @@ go run ./tools/setupsecrets --dir secrets --force
 
 Then recreate the secret-prep service / stack so the control volume picks
 up the new files.
+
+### Bootstrap LDAP timeout
+
+`spec.limits.ldapDialTimeout` defaults to `5s`. Bootstrap honors this existing
+setting during readiness checks and all subsequent LDAP phases, including tree,
+seed, and verification. The adapters use the configured budget for connection
+establishment and LDAP requests. Set a positive duration appropriate to the
+directory environment; changing this budget does not add automatic write retries.
 
 ## What not to do
 

@@ -499,6 +499,15 @@ func readPasswordFile(path string) (observability.Secret, error) {
 	return res.Value, nil
 }
 
+// bootstrapDialTimeout keeps every bootstrap LDAP phase on the configured
+// connection/request budget. The default remains five seconds.
+func bootstrapDialTimeout(c *config.Compiled) time.Duration {
+	if d, err := time.ParseDuration(c.Public.Spec.Limits.LDAPDialTimeout); err == nil && d > 0 {
+		return d
+	}
+	return 5 * time.Second
+}
+
 func waitRequestFrom(c *config.Compiled, opt Options, pw observability.Secret) WaitRequest {
 	pub := c.Public
 	req := WaitRequest{
@@ -511,11 +520,8 @@ func waitRequestFrom(c *config.Compiled, opt Options, pw observability.Secret) W
 		CAFile:      opt.CAFile,
 		BindDN:      defaultBindDN,
 		Password:    pw,
-		DialTimeout: 5 * time.Second,
+		DialTimeout: bootstrapDialTimeout(c),
 		Deadline:    opt.Deadline,
-	}
-	if d, err := time.ParseDuration(pub.Spec.Limits.LDAPDialTimeout); err == nil && d > 0 {
-		req.DialTimeout = d
 	}
 	req.LDAPURL = opt.LDAPURL
 	return req
@@ -555,7 +561,7 @@ func tlsRequestFrom(c *config.Compiled, opt Options, pw observability.Secret, wr
 		BindDN:         defaultBindDN,
 		Password:       pw,
 		Write:          write,
-		DialTimeout:    5 * time.Second,
+		DialTimeout:    bootstrapDialTimeout(c),
 	}
 }
 

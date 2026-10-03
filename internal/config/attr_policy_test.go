@@ -16,3 +16,47 @@ func TestProtectedAttrOptionsAndOIDs(t *testing.T) {
 		t.Fatal("safe option rejected")
 	}
 }
+
+func TestForbiddenUserWriteAttrSingleRule(t *testing.T) {
+	for _, name := range []string{
+		"objectClass", "OBJECTCLASS;x-a", "2.5.4.0",
+		"cn;lang-en", "commonName", "surname", "userid", "uid;x-a", "2.5.4.3", "0.9.2342.19200300.100.1.1",
+		"userPassword;lang-en", "authPassword",
+	} {
+		if !config.ForbiddenUserWriteAttr(name) {
+			t.Fatalf("%s must be rejected on user writes", name)
+		}
+	}
+	for _, name := range []string{"cn", " CN ", "sn", "uid", "mail", "mail;lang-en", "ou", "organizationalUnitName"} {
+		if config.ForbiddenUserWriteAttr(name) {
+			t.Fatalf("%s must stay writable", name)
+		}
+	}
+}
+
+func TestCanonicalAttrTypeResolvesAliases(t *testing.T) {
+	cases := map[string]string{
+		"commonName;lang-en": "cn", "SURNAME": "sn", "userID": "uid", "organizationalUnitName": "ou",
+		"domainComponent": "dc", "organizationName": "o", "2.5.4.0": "objectclass", "mail;x-a": "mail",
+	}
+	for in, want := range cases {
+		if got := config.CanonicalAttrType(in); got != want {
+			t.Fatalf("CanonicalAttrType(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestAttrDuplicateKey(t *testing.T) {
+	same := [][2]string{{"ou", "organizationalUnitName"}, {"mail", " MAIL "}, {"ou;lang-en", "organizationalUnitName;LANG-EN"}, {"ou;lang-en;x-a", "ou;x-a;lang-en"}}
+	for _, p := range same {
+		if config.AttrDuplicateKey(p[0]) != config.AttrDuplicateKey(p[1]) {
+			t.Fatalf("%q and %q must collide", p[0], p[1])
+		}
+	}
+	diff := [][2]string{{"cn", "cn;lang-en"}, {"mail", "rfc822Mailbox"}, {"ou;lang-en", "ou;lang-fr"}}
+	for _, p := range diff {
+		if config.AttrDuplicateKey(p[0]) == config.AttrDuplicateKey(p[1]) {
+			t.Fatalf("%q and %q must stay distinct", p[0], p[1])
+		}
+	}
+}

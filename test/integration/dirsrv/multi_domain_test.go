@@ -16,6 +16,7 @@ import (
 	"github.com/hilather/go-lab-ldap-mcp/internal/api"
 	"github.com/hilather/go-lab-ldap-mcp/internal/app"
 	"github.com/hilather/go-lab-ldap-mcp/internal/auth"
+	"github.com/hilather/go-lab-ldap-mcp/internal/config"
 	"github.com/hilather/go-lab-ldap-mcp/internal/directory"
 	"github.com/hilather/go-lab-ldap-mcp/internal/directory/ds389"
 	"github.com/hilather/go-lab-ldap-mcp/internal/directory/ldapclient"
@@ -42,7 +43,7 @@ spec:
   transport: { ldaps: { enabled: true, port: 3636 } }
   runtimeAccount: { id: rt, passwordFile: secrets/runtime-ldap }
   users:
-    - id: alice
+    - id: baseline-alice
       uid: alice
       passwordFile: secrets/user-alice
       enabled: true
@@ -50,7 +51,7 @@ spec:
   groups:
     - id: staff
       members:
-        - user: alice
+        - user: baseline-alice
   passwordPolicy:
     minLength: 12
     historyCount: 0
@@ -99,22 +100,41 @@ func startMultiDomainEnv(t *testing.T) (compatEnv, http.Handler) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	marker, err := rt.ReadMarker(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
 	svc := app.New(app.Deps{
-		Users:         rt.Users(),
-		Groups:        rt.Groups(),
-		Entries:       rt,
-		Search:        rt,
-		Bind:          rt,
-		Schema:        rt,
-		Caps:          rt,
-		Marker:        rt,
-		PeopleDN:      "ou=people,dc=example,dc=test",
-		GroupsDN:      "ou=groups,dc=example,dc=test",
-		BindTransport: directory.TransportLDAPS,
+		AdditionalSuffixes: extras,
+		Suffix:             "dc=example,dc=test",
+		RuntimeDN:          "uid=rt,ou=people,dc=example,dc=test",
+		MarkerDN:           "cn=labldap-baseline,dc=example,dc=test",
+		ResetDir:           rt,
+		SoftReset:          true,
+		ScenarioName:       "multidomain",
+		ExpectedRevision:   marker.AppliedRevision,
+		Secrets:            config.MapResolver{"alice.pw": seedCanary},
+		ResetUsers:         []config.NormalizedUser{{ID: "baseline-alice", UID: "alice", DN: "uid=alice,ou=people,dc=example,dc=test", Enabled: true, Password: &config.ResolvedSecret{Path: "alice.pw", Value: observability.Secret(seedCanary)}, Attributes: []config.AttrKV{{Name: "sn", Value: "Seed"}}}},
+		ResetGroups:        []config.NormalizedGroup{{ID: "staff", DN: "cn=staff,ou=groups,dc=example,dc=test", Members: []config.MemberRef{{Kind: "user", ID: "baseline-alice", DN: "uid=alice,ou=people,dc=example,dc=test"}}}},
+		Users:              rt.Users(),
+		Groups:             rt.Groups(),
+		Entries:            rt,
+		Search:             rt,
+		Bind:               rt,
+		Schema:             rt,
+		Caps:               rt,
+		Marker:             rt,
+		PeopleDN:           "ou=people,dc=example,dc=test",
+		GroupsDN:           "ou=groups,dc=example,dc=test",
+		BindTransport:      directory.TransportLDAPS,
 	})
+	if !svc.Reset.BaselinePresent(t.Context()) {
+		t.Fatal("logical seed ID differing from UID failed baseline readiness")
+	}
+
 	reg, err := auth.NewRegistry([]auth.Token{
 		{ID: "admin", Scopes: []string{
-			auth.ScopeDirectoryRead, auth.ScopeDirectoryWrite, auth.ScopeDirectoryPassword,
+			auth.ScopeDirectoryRead, auth.ScopeDirectoryWrite, auth.ScopeDirectoryPassword, auth.ScopeLabReset,
 		}, Secret: observability.Secret(mdAdminToken)},
 	})
 	if err != nil {
@@ -126,6 +146,8 @@ func startMultiDomainEnv(t *testing.T) (compatEnv, http.Handler) {
 		Users:    svc.Users,
 		Groups:   svc.Groups,
 		Query:    svc.Query,
+		System:   svc.Query,
+		Reset:    svc.Reset,
 		Entries:  svc.Entries,
 	})
 	if err != nil {

@@ -9,10 +9,13 @@ import (
 	"github.com/hilather/go-lab-ldap-mcp/internal/apperr"
 )
 
+const maxRateLimitKeys = 4096
+
 // Window is a process-local sliding-window limiter. Keys use prefixes
 // password:, bind:, and reset: to select compiled rates. Other keys use
 // the general requests-per-minute budget.
 type Window struct {
+	nextSweep      time.Time
 	mu             sync.Mutex
 	hits           map[string][]time.Time
 	now            func() time.Time
@@ -48,6 +51,18 @@ func (w *Window) Allow(_ context.Context, key string) error {
 	t := now()
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	if !t.Before(w.nextSweep) || len(w.hits) >= maxRateLimitKeys {
+		for old, hits := range w.hits {
+			_, duration := w.budget(old)
+			if len(hits) == 0 || !hits[len(hits)-1].After(t.Add(-duration)) {
+				delete(w.hits, old)
+			}
+		}
+		w.nextSweep = t.Add(time.Minute)
+	}
+	if _, exists := w.hits[key]; !exists && len(w.hits) >= maxRateLimitKeys {
+		return rateLimited()
+	}
 	cutoff := t.Add(-window)
 	q := w.hits[key]
 	i := 0
@@ -57,9 +72,7 @@ func (w *Window) Allow(_ context.Context, key string) error {
 	q = q[i:]
 	if len(q) >= limit {
 		w.hits[key] = q
-		return apperr.New(apperr.CodeAuth, "rate limit exceeded").
-			WithField(apperr.Field{Path: "rateLimit", Code: "rate_limited", Message: "rate limit exceeded"}).
-			Retry()
+		return rateLimited()
 	}
 	w.hits[key] = append(q, t)
 	return nil
@@ -81,4 +94,8 @@ func (w *Window) budget(key string) (int, time.Duration) {
 	default:
 		return w.requestPerMin, time.Minute
 	}
+}
+
+func rateLimited() error {
+	return apperr.New(apperr.CodeAuth, "rate limit exceeded").WithField(apperr.Field{Path: "rateLimit", Code: "rate_limited", Message: "rate limit exceeded"}).Retry()
 }

@@ -249,4 +249,16 @@ func (n *nativeInstance) seed(t *testing.T, compiled *config.Compiled) {
 	if len(res.Created) == 0 {
 		t.Fatalf("native seed created nothing: %+v", res)
 	}
+	// Match the shipped bootstrap completion barrier: reset confirmation and
+	// baseline inspection require the applied marker, written after seed.
+	if err := eng.WriteMarker(t.Context(), bootstrap.MarkerRequest{
+		TreeRequest:      treq,
+		DN:               compiled.Data.Marker,
+		AppliedRevision:  compiled.Revisions.Directory,
+		ExpectedRevision: compiled.Revisions.Directory,
+		ApplyVersion:     "labldap-bootstrap/integration",
+		AppliedAt:        "2026-10-03T00:00:00Z",
+	}); err != nil {
+		t.Fatalf("native marker apply: %v", err)
+	}
 }

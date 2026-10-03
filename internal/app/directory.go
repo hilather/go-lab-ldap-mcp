@@ -26,9 +26,11 @@ func (s *Query) Search(ctx context.Context, p Principal, q directory.SearchQuery
 	if err := s.hooks.authorize(ctx, p, OpSearch); err != nil {
 		return directory.SearchPage{}, err
 	}
-	if err := s.hooks.allowRead(ctx); err != nil {
+	release, err := s.hooks.acquireRead(ctx)
+	if err != nil {
 		return directory.SearchPage{}, err
 	}
+	defer release()
 	page, err := s.search.Search(ctx, q)
 	if err != nil {
 		return directory.SearchPage{}, err
@@ -65,6 +67,11 @@ func (s *Query) BindTest(ctx context.Context, p Principal, identity string, pass
 	if err := s.hooks.authorize(ctx, p, OpBindTest); err != nil {
 		return directory.BindTestResult{}, err
 	}
+	release, err := s.hooks.acquireRead(ctx)
+	if err != nil {
+		return directory.BindTestResult{}, err
+	}
+	defer release()
 	if err := s.hooks.rateLimit(ctx, "bind:"+p.ID); err != nil {
 		return directory.BindTestResult{}, err
 	}
@@ -88,6 +95,11 @@ func (s *Query) RootDSE(ctx context.Context, p Principal) (directory.RootDSE, er
 	if err := s.hooks.authorize(ctx, p, OpSchemaRead); err != nil {
 		return directory.RootDSE{}, err
 	}
+	release, err := s.hooks.acquireRead(ctx)
+	if err != nil {
+		return directory.RootDSE{}, err
+	}
+	defer release()
 	return s.schema.RootDSE(ctx)
 }
 
@@ -95,6 +107,11 @@ func (s *Query) Schema(ctx context.Context, p Principal) (directory.Schema, erro
 	if err := s.hooks.authorize(ctx, p, OpSchemaRead); err != nil {
 		return directory.Schema{}, err
 	}
+	release, err := s.hooks.acquireRead(ctx)
+	if err != nil {
+		return directory.Schema{}, err
+	}
+	defer release()
 	sch, err := s.schema.Schema(ctx)
 	if err != nil {
 		return directory.Schema{}, err

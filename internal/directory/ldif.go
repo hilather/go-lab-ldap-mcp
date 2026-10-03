@@ -127,10 +127,19 @@ func (e *Encoder) ensureHeader() error {
 }
 
 func (e *Encoder) writeRaw(s string) error {
+	if e.w == nil {
+		return ExportError("export", FieldUnavailable, "export writer is not configured")
+	}
+	if e.maxBytes > 0 && e.wrote+int64(len(s)) > e.maxBytes {
+		return ExportLimit("export.bytes", "export byte limit exceeded")
+	}
 	n, err := io.WriteString(e.w, s)
 	e.wrote += int64(n)
 	if err != nil {
 		return err
+	}
+	if n != len(s) {
+		return io.ErrShortWrite
 	}
 	return nil
 }
