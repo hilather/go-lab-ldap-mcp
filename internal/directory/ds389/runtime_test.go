@@ -1,7 +1,9 @@
 package ds389
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -409,8 +411,20 @@ func TestProtectedCursorQueryAndTamper(t *testing.T) {
 	if _, err := rt.decodePageCursor(tok, "users|other|2"); err == nil || !hasField(err, "cursor", "invalid") {
 		t.Fatalf("query mismatch: %v", err)
 	}
-	if _, err := rt.decodePageCursor(tok[:len(tok)-1]+"B", "users||2"); err == nil || !hasField(err, "cursor", "invalid") {
-		t.Fatalf("tamper: %v", err)
+	// Editing the final base64 character can change only unused padding
+	// bits and leave the authenticated bytes intact. Alter decoded bytes
+	// instead, covering both the signed payload and the MAC.
+	raw, err := base64.RawURLEncoding.DecodeString(tok)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, index := range map[string]int{"payload": len(raw) / 2, "MAC": len(raw) - 1} {
+		altered := bytes.Clone(raw)
+		altered[index] ^= 1
+		tampered := base64.RawURLEncoding.EncodeToString(altered)
+		if _, err := rt.decodePageCursor(tampered, "users||2"); err == nil || !hasField(err, "cursor", "invalid") {
+			t.Fatalf("%s tamper: %v", name, err)
+		}
 	}
 	inner, err := config.EncodeCursor(config.Cursor{Query: "users||2", Page: "0102"})
 	if err != nil {

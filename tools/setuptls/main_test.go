@@ -481,3 +481,30 @@ func TestLeafLoadsAsTLSCert(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestIssuedCertificatesIdentifyAuthority(t *testing.T) {
+	dir := t.TempDir()
+	if err := generate(generateOpts{Dir: dir, Host: "directory", Management: true, Stdout: &bytes.Buffer{}}); err != nil {
+		t.Fatal(err)
+	}
+	p := paths(dir)
+	ca := parseCert(t, p.CACert)
+	if len(ca.SubjectKeyId) == 0 {
+		t.Fatal("CA lacks subject key identifier")
+	}
+	for _, path := range []string{p.DirectoryCert, p.ManagementCert} {
+		leaf := parseCert(t, path)
+		if !bytes.Equal(leaf.AuthorityKeyId, ca.SubjectKeyId) {
+			t.Fatalf("%s authority key identifier does not identify issuing CA", filepath.Base(path))
+		}
+		if leaf.KeyUsage&x509.KeyUsageDigitalSignature == 0 || leaf.KeyUsage&x509.KeyUsageCertSign != 0 {
+			t.Fatal("leaf must sign TLS handshakes and cannot sign certificates")
+		}
+		if len(leaf.ExtKeyUsage) != 1 || leaf.ExtKeyUsage[0] != x509.ExtKeyUsageServerAuth {
+			t.Fatal("leaf must be a TLS server certificate")
+		}
+		if err := leaf.CheckSignatureFrom(ca); err != nil {
+			t.Fatal(err)
+		}
+	}
+}

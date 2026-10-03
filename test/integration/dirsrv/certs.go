@@ -40,6 +40,12 @@ func generateTLS(t testing.TB, serverName string) *TLSMaterial {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Parse the issued CA so its generated SubjectKeyId is present when
+	// x509 derives the leaf AuthorityKeyId (required by strict TLS clients).
+	caCert, err := x509.ParseCertificate(caDER)
+	if err != nil {
+		t.Fatal(err)
+	}
 	caPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: caDER})
 
 	srvKey := mustRSA(t)
@@ -53,7 +59,7 @@ func generateTLS(t testing.TB, serverName string) *TLSMaterial {
 		DNSNames:     []string{serverName, "localhost"},
 		IPAddresses:  []net.IP{net.ParseIP("127.0.0.1")},
 	}
-	srvDER, err := x509.CreateCertificate(rand.Reader, srvTmpl, caTmpl, &srvKey.PublicKey, caKey)
+	srvDER, err := x509.CreateCertificate(rand.Reader, srvTmpl, caCert, &srvKey.PublicKey, caKey)
 	if err != nil {
 		t.Fatal(err)
 	}
