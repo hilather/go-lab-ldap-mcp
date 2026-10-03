@@ -75,7 +75,7 @@ func mustDial(t *testing.T, e engine, spec dialSpec) *ldap.Conn {
 	t.Helper()
 	conn, err := e.dial(t, spec)
 	if err != nil {
-		t.Fatalf("parity: %s dial %+v: %v", e.name(), spec, err)
+		t.Fatalf("parity: %s dial %s: %v", e.name(), dialSummary(spec), err)
 	}
 	t.Cleanup(func() { conn.Close() })
 	return conn
@@ -266,4 +266,9 @@ func rawSASLBind(t *testing.T, addr string) opOutcome {
 		_ = pkt
 		return opOutcome{Code: 2, Note: "notice-of-disconnection"}
 	}
+}
+
+// dialSummary deliberately excludes authentication secret material.
+func dialSummary(spec dialSpec) string {
+	return fmt.Sprintf("ldaps=%t startTLS=%t badCA=%t badName=%t noBind=%t bindDN=%q", spec.ldaps, spec.startTLS, spec.badCA, spec.badName, spec.noBind, spec.bindDN)
 }

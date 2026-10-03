@@ -252,7 +252,7 @@ is `docs/design/parity-delta-log.md` (T-150).
 
 When adjudicated, each moves into section 3 (accepted Delta) with the test name that proves the difference, or is fixed to match the oracle (Contract).
 
-| CAND-6 | ModifyDN rename into own subtree | bbolt store allows it; index-based Subtree walks can detach the subtree (no store sentinel exists) — needs a dispatch guard | 389 rejects (LDAP-illegal) | T-129 `store.go`; guard belongs in ModifyDN dispatch (T-143/T-144 hardening) |
+| ~~CAND-6~~ → Contract | ModifyDN rename into own subtree | rejects with `unwillingToPerform(53)` without changing the tree, including case variants | 389 also rejects with 53 | resolved 2026-10-03; `TestDualEngineParity`, `TestNativeReviewDirectoryRegressions` |
 | CAND-17 | groupdn membership scope | direct `member`/`uniqueMember` only, no nesting; group objectClass not required | confirm vs 389 | T-139 `aci_eval.go` |
 | ~~CAND-18~~ → D12 | Paged-cookie tamper result code | `unwillingToPerform(53)`; cookie is HMAC-SHA256 (offset + base DN + scope + filter), per-server random secret | Oracle 2026-08-15: 389 accepts a tampered cookie (`success`); accepted as D12 | T-140 `ctrl_paged.go` |
 | CAND-19 | Assertion control scope | Modify-only; critical assertion on non-Modify → `unavailableCriticalExtension`; `assertionFailed(122)` on mismatch | 389 assertion-on-Add / non-critical behavior unverified | T-141 `ctrl_assert.go`; adjudicate in T-147 |

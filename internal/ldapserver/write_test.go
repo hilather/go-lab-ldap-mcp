@@ -3,6 +3,7 @@ package ldapserver
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/hilather/go-lab-ldap-mcp/internal/config"
@@ -596,6 +597,86 @@ func TestWriteOpsOverTCPEndToEnd(t *testing.T) {
 	for _, step := range steps {
 		if res := roundTrip(t, cl, step.op); res.Code != step.want {
 			t.Fatalf("%s = %v, want %v", step.name, res, step.want)
+		}
+	}
+}
+
+func TestModifyDNRejectsOwnSubtree(t *testing.T) {
+	t.Parallel()
+	opts := writeOptions(t, nil)
+	_, addr := serveTestServerFrom(t, opts, nil)
+	cl := dialTestClient(t, addr)
+	for _, superior := range []string{"ou=people,dc=example,dc=test", "uid=alice,ou=people,dc=example,dc=test", "OU=PEOPLE,dc=example,dc=test", "UID=ALICE,OU=PEOPLE,dc=example,dc=test"} {
+		res := roundTrip(t, cl, &ModifyDNRequest{DN: "ou=people,dc=example,dc=test", NewRDN: "ou=moved", NewSuperior: superior})
+		if res.Code != ResultUnwillingToPerform {
+			t.Fatalf("self-subtree move = %v", res)
+		}
+		if _, err := fetchEntry(t, opts, "uid=alice,ou=people,dc=example,dc=test"); err != nil {
+			t.Fatalf("child disappeared: %v", err)
+		}
+	}
+}
+
+func TestModifyDNEnforcesSchemaAndRDNPermissions(t *testing.T) {
+	t.Parallel()
+	t.Run("schema", func(t *testing.T) {
+		opts := writeOptions(t, nil)
+		schema, err := StandardSchema()
+		if err != nil {
+			t.Fatal(err)
+		}
+		opts.Schema = schema
+		_, addr := serveTestServerFrom(t, opts, nil)
+		cl := dialTestClient(t, addr)
+		res := roundTrip(t, cl, &ModifyDNRequest{DN: "cn=admins,ou=groups,dc=example,dc=test", NewRDN: "description=renamed", DeleteOldRDN: true})
+		if res.Code != ResultObjectClassViolation {
+			t.Fatalf("rename removed MUST cn: %v", res)
+		}
+		if _, err := fetchEntry(t, opts, "cn=admins,ou=groups,dc=example,dc=test"); err != nil {
+			t.Fatalf("failed rename changed tree: %v", err)
+		}
+	})
+	t.Run("restricted-attribute", func(t *testing.T) {
+		opts := writeOptions(t, func(o *Options) {
+			o.ACI = &FakeACI{Decide: func(ctx context.Context, tx ReadTx, check ACICheck) (bool, error) {
+				return check.Attribute != "aci", nil
+			}}
+		})
+		_, addr := serveTestServerFrom(t, opts, nil)
+		cl := dialTestClient(t, addr)
+		res := roundTrip(t, cl, &ModifyDNRequest{DN: "uid=alice,ou=people,dc=example,dc=test", NewRDN: "aci=policy", DeleteOldRDN: false})
+		if res.Code != ResultInsufficientAccessRights {
+			t.Fatalf("restricted RDN bypass: %v", res)
+		}
+	})
+	t.Run("operational-attribute", func(t *testing.T) {
+		opts := writeOptions(t, nil)
+		_, addr := serveTestServerFrom(t, opts, nil)
+		cl := dialTestClient(t, addr)
+		res := roundTrip(t, cl, &ModifyDNRequest{DN: "uid=alice,ou=people,dc=example,dc=test", NewRDN: "entryUUID=client", DeleteOldRDN: false})
+		if res.Code != ResultConstraintViolation {
+			t.Fatalf("operational RDN bypass: %v", res)
+		}
+	})
+}
+
+func TestModifyProtectsAttributeOptionsAndOIDs(t *testing.T) {
+	t.Parallel()
+	opts := writeOptions(t, nil)
+	schema, err := StandardSchema()
+	if err != nil {
+		t.Fatal(err)
+	}
+	opts.Schema = schema
+	opts.ACI = &FakeACI{Decide: func(ctx context.Context, tx ReadTx, check ACICheck) (bool, error) {
+		return !strings.EqualFold(check.Attribute, "aci"), nil
+	}}
+	_, addr := serveTestServerFrom(t, opts, nil)
+	cl := dialTestClient(t, addr)
+	for _, attr := range []string{"aci;lang-en", "2.16.840.1.113730.3.1.55"} {
+		res := roundTrip(t, cl, &ModifyRequest{DN: "uid=alice,ou=people,dc=example,dc=test", Changes: []ModifyChange{{Op: ModifyReplace, Attr: StringAttribute(attr, "policy")}}})
+		if res.Code != ResultInsufficientAccessRights {
+			t.Fatalf("ACI alias %s: %v", attr, res)
 		}
 	}
 }

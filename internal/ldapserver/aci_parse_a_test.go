@@ -241,7 +241,7 @@ func TestParseACITextAInjectionIsData(t *testing.T) {
 	}{
 		{"parens", `cn=a\28b\29,c=see,dc=example,dc=test`, "cn=a(b),c=see,dc=example,dc=test"},
 		{"quote", `cn=a\"b,dc=example,dc=test`, `cn=a"b,dc=example,dc=test`},
-		{"backslash", `cn=a\\b,dc=example,dc=test`, `cn=a\b,dc=example,dc=test`},
+		{"backslash", `cn=a\\\\b,dc=example,dc=test`, `cn=a\\b,dc=example,dc=test`},
 		// ACI-level \\ collapses to the DN-level \, which ParseDN then
 		// resolves to a literal comma inside the RDN value.
 		{"semicolon comma star", `cn=a;b*c,ou=peo\\,ple,dc=example,dc=test`, `cn=a;b*c,ou=peo\,ple,dc=example,dc=test`},
@@ -481,4 +481,14 @@ func FuzzParseACITextA(f *testing.F) {
 			t.Fatalf("error %v does not wrap ErrACIParseA", err)
 		}
 	})
+}
+
+func TestNumericTargetAttributeRuleFailsClosedOutsideCompilerGrammar(t *testing.T) {
+	// E6: compiler targetattr tokens are names/options, never numeric OIDs.
+	// An unsupported numeric rule must reject the whole policy, rather than
+	// silently missing an intended deny after request-side OID resolution.
+	text := `(target="ldap:///ou=people,dc=example,dc=test")(targetattr="2.5.4.35")(version 3.0; acl "numeric-deny"; deny (read) userdn="ldap:///all";)`
+	if _, err := NewACIEngine([]string{text}, nil); err == nil {
+		t.Fatal("unsupported numeric targetattr accepted")
+	}
 }

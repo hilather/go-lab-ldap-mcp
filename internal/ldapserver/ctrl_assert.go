@@ -29,14 +29,11 @@ import (
 //     protocolError (the control value is a BER-encoded SearchFilter, RFC
 //     4528 section 2).
 //
-// The filter is evaluated against the stored entry as the server sees it,
-// after the entry-level write-ACI check. A subject holding write but not
-// read on an attribute can therefore probe that attribute's values through
-// crafted assertions — the runtime ACI set grants read wherever it grants
-// write on an entry, so no additional filtering is applied; 389's exact
-// ACI interaction here is a Delta candidate for the T-147 oracle.
-// Assertion filter content is never logged and the assertionFailed
-// diagnostic is a static string.
+// Assertion evaluation uses the same per-attribute search authorization and
+// Undefined propagation as Search, inside the write transaction. A denied
+// assertion never matches, including under NOT; filter content is never logged.
+// assertionFailed diagnostics remain static. This is native-only D7
+// infrastructure: the pinned 389 build does not implement RFC 4528.
 
 // errAssertionFailed aborts the update transaction when the assertion
 // filter does not match the pre-modification entry. mapWriteError
@@ -79,10 +76,4 @@ func parseAssertionFilter(controls []Control) (Filter, bool, Result, error) {
 		return fail("malformed assertion filter", fmt.Errorf("ldapserver: assertion filter: %w", err))
 	}
 	return filter, true, Result{}, nil
-}
-
-// assertionMatches evaluates the assertion filter against the
-// pre-modification entry with the schema's matching rules (T-131).
-func (s *Server) assertionMatches(before *Entry, assertion Filter) bool {
-	return matchFilter(before, assertion, s.opts.Schema)
 }

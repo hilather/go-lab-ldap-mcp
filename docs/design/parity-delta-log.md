@@ -48,7 +48,7 @@ D8 onward are adjudicated against the running oracle.
 | D4 | On-disk format | `/data` nsslapd db | bbolt `/data/labldapd.bolt` | Storage is engine-owned | lifecycle tests |
 | D5 | Backend name | `userroot` | no backend CN | Suffix, not backend, is the contract | bootstrap tests |
 | D6 | Root DSE / entry operational extras | 389 emits `entrydn`, `dsentrydn`, `entryid`, `parentid`, `nsuniqueid` on `+` | honest advertisement; omits 389-specific attrs | Capability inspection is measured, not name-assumed | `TestDifferential389Oracle/search-base-attrs` (strips the 389 set) |
-| D7 | Assertion absence path | n/a (389 honors RFC 4528) | must advertise and honor | Safety floor | native assertion atomicity tests |
+| D7 | Assertion absence path | pinned 389 build does not advertise or implement RFC 4528; critical requests fail 12 and non-critical requests are ignored | must advertise and honor | Safety floor | native assertion atomicity tests; CAND-25/CAND-26 |
 | D8 | Bind with malformed DN | `invalidDNSyntax(34)` | `invalidCredentials(49)` | Fail-closed without revealing DN-shape validation to unauthenticated callers | `TestDifferential389Oracle/bind-malformed-dn` |
 | D9 | Anonymous bind while disabled | `inappropriateAuthentication(48)` | `unwillingToPerform(53)` | Both deny; code choice differs (CAND-1 adjudicated 2026-08-15; supersedes the earlier "389 observed 53" note) | `TestDifferential389Oracle/anon-bind-disabled` |
 | D10 | LDAPv2 bind attempt | `invalidCredentials(49)` | `protocolError(2)` | Native is strict RFC 4511 §4.2; 389 folds version rejection into credential failure | `TestDifferential389Oracle/bind-version-2` |
@@ -85,7 +85,7 @@ controlling evidence is the named probe plus the ledger's `oracle` /
 | Ref | Topic | 389 (observed) | Native (observed) | Verdict |
 | --- | --- | --- | --- | --- |
 | D15 (CAND-2) | `approxMatch` filter semantics | real approx matching, extra step returns the entry | folds to equality (one step returns nothing) | delta |
-| D16 (CAND-6) | ModifyDN rename into own subtree | rejects, `unwillingToPerform(53)`; subtree stays put | permits the rename; later subtree walks detach it (`noSuchObject(32)`) | delta |
+| ~~D16 (CAND-6)~~ | ModifyDN rename into own subtree | rejects, `unwillingToPerform(53)`; subtree stays put | now rejects, `unwillingToPerform(53)`; subtree stays put | resolved 2026-10-03; `TestDualEngineParity` regenerated ledger |
 | D17 (CAND-8) | Schema MAY / unknown-attribute enforcement on writes | rejects MAY-violation adds with `objectClassViolation(65)`; unknown attrs `noSuchObject(32)` paths | accepts marker attrs (`destinationIndicator`/`owner` on device) and unknown attrs, `success(0)` | delta |
 | D18 (CAND-9) | Password-policy-violation write code | `constraintViolation(19)` | `unwillingToPerform(53)` (plugin-abort path) | delta |
 | D19 (CAND-10) | Lockout bind failure code | 5th failure → `constraintViolation(19)`; 389 stamps `accountUnlockTime`/`nsUniqueId`/`passwordRetryCount` | 5th failure → `invalidCredentials(49)`; native stamps `pwdAccountLockedTime`/`pwdChangedTime` | delta |
@@ -116,3 +116,21 @@ The T-147 parity harness (`test/parity/compare_test.go`,
 rewrites `test/parity/delta-ledger.json` only under
 `PARITY_UPDATE_LEDGER=1`; drift in either engine's observed behavior
 fails that run.
+
+## Review hardening (2026-10-03)
+
+D16 is resolved: refusing moves beneath the source (including case variants)
+prevents detached directory trees. The compiler-subset search policy now checks
+each filter attribute. Denied assertions evaluate Undefined, including under
+NOT; an authorized OR branch can still match. The same check protects native
+RFC 4528 assertions (D7). Exact size limits succeed when no additional matching
+entry exists. Native bbolt search traverses lazily so server limits stop decoding
+before the entire subtree is materialized. Safe `uid`, `cn`, and `objectClass`
+equality terms (standalone or required AND branches) stream indexed candidates;
+DN-valued predicates retain traversal fallback pending Unicode-fold parity.
+
+DN-key format version 2 rebuilds DN, child and equality indexes atomically from
+stored entries on reopen. Invalid or duplicate stored DNs fail startup with a
+static diagnostic, without committing a partial migration. Plain DNs keep their
+keys; escaped values now retain structural boundaries. Operators should retain
+a backup before downgrading an escaped-DN database to older binaries.

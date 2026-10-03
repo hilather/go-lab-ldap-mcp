@@ -1,7 +1,9 @@
 package ldapserver
 
 import (
+	"context"
 	"fmt"
+	"strings"
 	"testing"
 )
 
@@ -185,5 +187,32 @@ func TestAssertionControlScope(t *testing.T) {
 	}, assertionControl(t, &FilterEquality{Attr: "cn", Value: []byte("nope")}, false))
 	if done.Result.Code != ResultSuccess || len(entries) != 1 {
 		t.Fatalf("non-critical assertion on search: %v, %d entries", done.Result, len(entries))
+	}
+}
+
+// Native-only D7 assertion infrastructure: 389's pinned build does not
+// implement RFC 4528. A write grant cannot disclose an unsearchable attribute.
+func TestAssertionCannotProbeDeniedAttribute(t *testing.T) {
+	t.Parallel()
+	opts := writeOptions(t, func(o *Options) {
+		o.ACI = &FakeACI{Decide: func(ctx context.Context, tx ReadTx, check ACICheck) (bool, error) {
+			return !(check.Perm == PermSearch && strings.EqualFold(check.Attribute, "sn")), nil
+		}}
+	})
+	_, addr := serveTestServerFrom(t, opts, nil)
+	cl := dialTestClient(t, addr)
+	dn := "uid=alice,ou=people,dc=example,dc=test"
+	for _, f := range []Filter{&FilterEquality{Attr: "sn", Value: []byte("Adams")}, &FilterNot{Child: &FilterEquality{Attr: "sn", Value: []byte("wrong")}}} {
+		res := modifyWithControls(t, cl, &ModifyRequest{DN: dn, Changes: []ModifyChange{{Op: ModifyReplace, Attr: StringAttribute("description", "must not commit")}}}, assertionControl(t, f, true))
+		if res.Code != ResultAssertionFailed {
+			t.Fatalf("hidden assertion: %v", res)
+		}
+	}
+	e, err := fetchEntry(t, opts, dn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(e.Values("description")) != 0 {
+		t.Fatal("denied assertion committed a write")
 	}
 }

@@ -522,3 +522,65 @@ func (t *blockingTx) Subtree(ctx context.Context, dn config.DN) ([]*Entry, error
 		return nil, ctx.Err()
 	}
 }
+
+func TestSearchExactSizeLimitWithNonmatchingCandidates(t *testing.T) {
+	t.Parallel()
+	_, addr := serveTestServerFrom(t, searchOptions(t, nil), nil)
+	cl := dialTestClient(t, addr)
+	entries, done, _ := searchFull(t, cl, &SearchRequest{BaseDN: "dc=example,dc=test", Scope: ScopeWholeSubtree, SizeLimit: 1, Filter: &FilterEquality{Attr: "uid", Value: []byte("alice")}})
+	if done.Result.Code != ResultSuccess || len(entries) != 1 {
+		t.Fatalf("exact limit = %v, entries=%d", done.Result, len(entries))
+	}
+}
+
+func TestSearchFilterRequiresAttributeSearchPermission(t *testing.T) {
+	t.Parallel()
+	opts := searchOptions(t, func(o *Options) {
+		o.ACI = &FakeACI{Decide: func(ctx context.Context, tx ReadTx, check ACICheck) (bool, error) {
+			return !strings.EqualFold(check.Attribute, "x-bin"), nil
+		}}
+	})
+	_, addr := serveTestServerFrom(t, opts, nil)
+	cl := dialTestClient(t, addr)
+	denied := &FilterEquality{Attr: "x-bin", Value: []byte("blob")}
+	for _, filter := range []Filter{denied, &FilterNot{Child: denied}, &FilterNot{Child: &FilterEquality{Attr: "x-bin", Value: []byte("wrong")}}, &FilterPresent{Attr: "x-bin"}} {
+		entries, done, _ := searchFull(t, cl, &SearchRequest{BaseDN: "uid=alice,ou=people,dc=example,dc=test", Scope: ScopeBaseObject, Filter: filter})
+		if done.Result.Code != ResultSuccess || len(entries) != 0 {
+			t.Fatalf("denied filter %T: %v, entries=%d", filter, done.Result, len(entries))
+		}
+	}
+	entries, done, _ := searchFull(t, cl, &SearchRequest{BaseDN: "uid=alice,ou=people,dc=example,dc=test", Scope: ScopeBaseObject, Filter: &FilterOr{Children: []Filter{denied, &FilterEquality{Attr: "uid", Value: []byte("alice")}}}})
+	if done.Result.Code != ResultSuccess || len(entries) != 1 {
+		t.Fatalf("allowed OR branch: %v, entries=%d", done.Result, len(entries))
+	}
+}
+
+type outsideIndexedStore struct{ Store }
+
+func (s outsideIndexedStore) View(ctx context.Context, fn func(ReadTx) error) error {
+	return s.Store.View(ctx, func(tx ReadTx) error { return fn(delayedOutsideIndex{tx}) })
+}
+
+type delayedOutsideIndex struct{ ReadTx }
+
+func (tx delayedOutsideIndex) WalkEqual(ctx context.Context, attr string, value []byte, visit func(*Entry) error) (bool, error) {
+	time.Sleep(5 * time.Millisecond)
+	return true, visit(NewEntry("uid=alice,ou=foreign,dc=other,dc=test", StringAttribute("uid", "alice")))
+}
+
+func TestIndexedSearchTimeLimitIncludesOutOfScopePostings(t *testing.T) {
+	t.Parallel()
+	opts := searchOptions(t, nil)
+	opts.Store = outsideIndexedStore{opts.Store}
+	opts.Limits.SearchTimeLimit = time.Millisecond
+	s, err := New(opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := s.newConn(t.Context(), nil, false)
+	defer c.cancel()
+	code := s.handleSearch(t.Context(), c, &Message{ID: 1}, &SearchRequest{BaseDN: "ou=people,dc=example,dc=test", Scope: ScopeWholeSubtree, Filter: &FilterEquality{Attr: "uid", Value: []byte("alice")}})
+	if code != ResultTimeLimitExceeded {
+		t.Fatalf("outside postings escaped time budget: %v", code)
+	}
+}

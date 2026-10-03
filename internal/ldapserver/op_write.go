@@ -69,7 +69,7 @@ func (s *Server) schemaCheckEntry(e *Entry) error {
 
 // handleAdd creates one leaf entry.
 func (s *Server) handleAdd(ctx context.Context, c *conn, m *Message, req *AddRequest) ResultCode {
-	subj := c.subject()
+	subj := operationSubject(ctx, c)
 	respond := func(res Result) ResultCode {
 		if ctx.Err() == nil {
 			c.sendResult(m.ID, &AddResponse{Result: res})
@@ -130,8 +130,9 @@ func (s *Server) handleAdd(ctx context.Context, c *conn, m *Message, req *AddReq
 // invalidDNSyntax. schemaViolation (schema_registry.go) wraps
 // errSchemaViolation with the client-facing reason.
 var (
-	errSchemaViolation = errors.New("ldapserver: schema violation")
-	errInvalidDN       = errors.New("ldapserver: invalid DN")
+	errSchemaViolation   = errors.New("ldapserver: schema violation")
+	errInvalidDN         = errors.New("ldapserver: invalid DN")
+	errRenameIntoSubtree = errors.New("ldapserver: rename into own subtree")
 )
 
 // mapWriteError extends resultFromError with the write-path conditions.
@@ -144,6 +145,8 @@ func mapWriteError(err error) Result {
 			msg = sv.reason
 		}
 		return Result{Code: ResultObjectClassViolation, DiagnosticMessage: msg}
+	case errors.Is(err, errRenameIntoSubtree):
+		return Result{Code: ResultUnwillingToPerform, DiagnosticMessage: "cannot move an entry beneath itself"}
 	case errors.Is(err, errInvalidDN):
 		return Result{Code: ResultInvalidDNSyntax, DiagnosticMessage: "invalid DN"}
 	case errors.Is(err, errNoSuchAttribute):
@@ -196,7 +199,7 @@ func (s *Server) runPlugins(ctx context.Context, tx UpdateTx, ev WriteEvent) err
 // inside the same Store.Update transaction as the write, so the check and
 // the change commit atomically (parity contract C9; ADR-0009 decision 7).
 func (s *Server) handleModify(ctx context.Context, c *conn, m *Message, req *ModifyRequest) ResultCode {
-	subj := c.subject()
+	subj := operationSubject(ctx, c)
 	respond := func(res Result) ResultCode {
 		if ctx.Err() == nil {
 			c.sendResult(m.ID, &ModifyResponse{Result: res})
@@ -222,7 +225,7 @@ func (s *Server) handleModify(ctx context.Context, c *conn, m *Message, req *Mod
 		// T-141: a false assertion aborts the transaction; nothing is
 		// applied. ACI denial takes precedence over the assertion outcome
 		// so a denied caller cannot probe entry state through the codes.
-		if asserted && !s.assertionMatches(before, assertion) {
+		if asserted && s.matchSearchFilter(ctx, tx, subj, dn, before, assertion) != filterTrue {
 			return errAssertionFailed
 		}
 		after := cloneEntry(before)
@@ -409,7 +412,7 @@ func checkDuplicateAttrTypes(attrs []Attribute) error {
 
 // handleDelete removes one leaf entry.
 func (s *Server) handleDelete(ctx context.Context, c *conn, m *Message, req *DeleteRequest) ResultCode {
-	subj := c.subject()
+	subj := operationSubject(ctx, c)
 	respond := func(res Result) ResultCode {
 		if ctx.Err() == nil {
 			c.sendResult(m.ID, &DeleteResponse{Result: res})
@@ -443,7 +446,7 @@ func (s *Server) handleDelete(ctx context.Context, c *conn, m *Message, req *Del
 
 // handleCompare asserts one attribute value (RFC 4511 section 4.10).
 func (s *Server) handleCompare(ctx context.Context, c *conn, m *Message, req *CompareRequest) ResultCode {
-	subj := c.subject()
+	subj := operationSubject(ctx, c)
 	respond := func(res Result) ResultCode {
 		if ctx.Err() == nil {
 			c.sendResult(m.ID, &CompareResponse{Result: res})
@@ -483,7 +486,7 @@ func (s *Server) handleCompare(ctx context.Context, c *conn, m *Message, req *Co
 // handleModifyDN renames an entry or moves it within the managed suffix
 // (RFC 4511 section 4.9). The subtree move is atomic through Store.Rename.
 func (s *Server) handleModifyDN(ctx context.Context, c *conn, m *Message, req *ModifyDNRequest) ResultCode {
-	subj := c.subject()
+	subj := operationSubject(ctx, c)
 	respond := func(res Result) ResultCode {
 		if ctx.Err() == nil {
 			c.sendResult(m.ID, &ModifyDNResponse{Result: res})
@@ -538,10 +541,26 @@ func (s *Server) handleModifyDN(ctx context.Context, c *conn, m *Message, req *M
 		if err != nil {
 			return err
 		}
+		// Moving beneath oneself makes the child index cyclic and detaches
+		// the renamed tree from its naming context. 389 rejects this with 53.
+		if aciTargetScopeA(superior, dn) {
+			return errRenameIntoSubtree
+		}
 		// RFC 4511 4.9: newSuperior must name an existing entry. Moving
 		// under a missing parent orphans the entry from Subtree/Children.
 		if _, err := tx.Entry(ctx, superior); err != nil {
 			return err
+		}
+		newAttr, _, _ := newRDN.Leaf()
+		oldAttr, _, _ := dn.Leaf()
+		if !s.clientModifiable(newAttr) {
+			return &operationalAttrError{attr: newAttr}
+		}
+		if !s.allowed(ctx, tx, subj, dn, newAttr, PermWrite) || !s.allowed(ctx, tx, subj, newDN, newAttr, PermWrite) {
+			return errDenied
+		}
+		if req.DeleteOldRDN && !s.allowed(ctx, tx, subj, dn, oldAttr, PermWrite) {
+			return errDenied
 		}
 		if err := tx.Rename(ctx, dn, newDN); err != nil {
 			return err
@@ -565,6 +584,9 @@ func (s *Server) handleModifyDN(ctx context.Context, c *conn, m *Message, req *M
 					after.Attributes = append(after.Attributes[:idx], after.Attributes[idx+1:]...)
 				}
 			}
+		}
+		if err := s.schemaCheckEntry(after); err != nil {
+			return err
 		}
 		// A rename is a modification of the entry (T-137).
 		s.applyModifyOpAttrs(after, subj)

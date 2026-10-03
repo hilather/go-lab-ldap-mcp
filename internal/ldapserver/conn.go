@@ -238,7 +238,7 @@ func (c *conn) spawnOp(msg *Message) {
 		c.srv.metrics().ObserveOperation(opName(msg.Op), ResultBusy)
 		return
 	}
-	opCtx, cancel := context.WithCancel(c.ctx)
+	opCtx, cancel := context.WithCancel(c.operationContext())
 	if !c.registerInflight(msg.ID, cancel) {
 		cancel()
 		<-c.sem
@@ -375,4 +375,19 @@ func opName(op Operation) string {
 	default:
 		return "unknown"
 	}
+}
+
+type operationSubjectKey struct{}
+
+// Capture the identity on the read loop before a later Bind can replace it.
+// Each previously dispatched request retains its original authorization.
+func (c *conn) operationContext() context.Context {
+	return context.WithValue(c.ctx, operationSubjectKey{}, c.subject())
+}
+
+func operationSubject(ctx context.Context, c *conn) Subject {
+	if subject, ok := ctx.Value(operationSubjectKey{}).(Subject); ok {
+		return subject
+	}
+	return c.subject()
 }

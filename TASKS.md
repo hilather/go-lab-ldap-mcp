@@ -1514,7 +1514,7 @@ Acceptance:
 - [x] RFC 4528-ready: a transaction can read-then-write atomically (used by T-141).
 - [x] Index updates on add/modify/delete stay consistent after simulated crash (re-open).
 
-Follow-up: `op_search.go` should type-assert `ReadTx` to `EqualCandidateResolver` when a filter has an indexed equality predicate (fold into T-140 or a T-127 refinement); index normalization must stay no finer than the `RuleMatcher`.
+Resolved (2026-10-03 review): `op_search.go` uses `SearchEqualWalker` to stream safe `uid`, `cn`, and `objectClass` equality predicates, including required AND terms, while retaining full scope, filter, and ACI checks. `test/parity/search_dispatch_test.go` verifies the production listener decodes one candidate in a 1k-entry fixture and stops a wide posting list at the size limit. DN-valued `member` / `uniqueMember` predicates retain bounded scope traversal: lowercased posting keys do not cover every Unicode `EqualFold` equivalence, so they must not narrow candidates until normalization is proven no finer than the matcher.
 
 ## [x] T-131 Matching rules and DN canonicalization
 
