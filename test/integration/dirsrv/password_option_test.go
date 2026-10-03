@@ -110,9 +110,11 @@ func TestPasswordOptionSpellingsAreRejectedAndRedacted(t *testing.T) {
 	if strings.Contains(body, optionPasswordCanary) || strings.Contains(strings.ToLower(body), "userpassword") {
 		t.Fatalf("entry read returned a userPassword spelling: %s", strings.ReplaceAll(body, optionPasswordCanary, "<canary>"))
 	}
-	code, body, _ = do(http.MethodPost, "/api/v1/search", "", `{"base":"`+dn+`","scope":"base","filter":"(uid=pwopt)","pageSize":10}`)
-	if code != http.StatusOK || strings.Contains(body, optionPasswordCanary) {
-		t.Fatalf("search: status %d, canary present %v", code, strings.Contains(body, optionPasswordCanary))
+	// Explicitly asking search for the optioned name must be refused or
+	// return nothing for it.
+	code, body, _ = do(http.MethodPost, "/api/v1/search", "", `{"base":"`+dn+`","scope":"base","filter":"(uid=pwopt)","attributes":["userPassword;lang-en"],"pageSize":10}`)
+	if strings.Contains(body, optionPasswordCanary) || (code == http.StatusOK && strings.Contains(strings.ToLower(body), "userpassword")) {
+		t.Fatalf("search for userPassword;lang-en: status %d leaked the attribute", code)
 	}
 
 	// (d) Storage differs by engine: native hashes, 389 keeps the value
@@ -140,9 +142,25 @@ func TestPasswordOptionSpellingsAreRejectedAndRedacted(t *testing.T) {
 			t.Fatal("389 optioned userPassword storage changed; update Delta D31")
 		}
 	}
+
+	// Neither engine authenticates with an optioned value.
+	bc := dialLDAPS(t, env)
+	err = bc.Bind(dn, optionPasswordCanary)
+	if !ldap.IsErrorWithCode(err, ldap.LDAPResultInvalidCredentials) {
+		t.Fatalf("bind with the optioned value: %v, want invalidCredentials", err)
+	}
 }
 
 func dialDM(t *testing.T, env compatEnv) *ldap.Conn {
+	t.Helper()
+	lc := dialLDAPS(t, env)
+	if err := lc.Bind("cn=Directory Manager", env.dmPassword); err != nil {
+		t.Fatalf("DM bind: %v", err)
+	}
+	return lc
+}
+
+func dialLDAPS(t *testing.T, env compatEnv) *ldap.Conn {
 	t.Helper()
 	pem, err := os.ReadFile(env.caFile)
 	if err != nil {
@@ -155,8 +173,5 @@ func dialDM(t *testing.T, env compatEnv) *ldap.Conn {
 		t.Fatalf("dial: %v", err)
 	}
 	t.Cleanup(func() { _ = lc.Close() })
-	if err := lc.Bind("cn=Directory Manager", env.dmPassword); err != nil {
-		t.Fatalf("DM bind: %v", err)
-	}
 	return lc
 }
