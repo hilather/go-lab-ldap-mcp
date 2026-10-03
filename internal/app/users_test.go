@@ -202,3 +202,30 @@ func TestUserAccountWorkflow(t *testing.T) {
 		t.Fatalf("set password mustChange: %+v %v", st, err)
 	}
 }
+
+func TestValidateAttrMapFieldPathsAndCodes(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		attrs      map[string]string
+		path, code string
+	}{
+		{map[string]string{"objectClass": "x"}, "attributes.objectClass", "forbidden_attribute"},
+		{map[string]string{"commonName": "x"}, "attributes.commonName", "forbidden_attribute"},
+		{map[string]string{"sn;lang-en": "x"}, "attributes.sn;lang-en", "forbidden_attribute"},
+		{map[string]string{"userid": "x"}, "attributes.userid", "forbidden_attribute"},
+		{map[string]string{"Mail": "a", "mail": "b"}, "attributes.mail", "duplicate_attribute"},
+	}
+	for _, tc := range cases {
+		err := validateAttrMap(tc.attrs)
+		var e *apperr.Error
+		if err == nil || !asError(err, &e) || len(e.Fields()) != 1 {
+			t.Fatalf("%v: err = %v", tc.attrs, err)
+		}
+		if f := e.Fields()[0]; f.Path != tc.path || f.Code != tc.code {
+			t.Fatalf("%v: field = %#v", tc.attrs, f)
+		}
+	}
+	if err := validateAttrMap(map[string]string{"cn": "x", "sn": "y", "mail;lang-en": "z", "mail": "w"}); err != nil {
+		t.Fatalf("bare planned names and distinct options must pass: %v", err)
+	}
+}

@@ -45,7 +45,13 @@ spec:
         - user: alice
 ```
 
-No inline passwords. Groups cannot be empty. YAML is the compiled baseline
+No inline passwords. Groups cannot be empty. User `attributes` follow the
+same write rule as the user API (below): `objectClass`, option or alias
+spellings of `uid`/`cn`/`sn` (`cn;lang-en`, `commonName`, `surname`,
+`userid`), numeric OIDs and protected names are rejected, and two keys that
+differ only in case (`mail` and `Mail`) are a `duplicate_attribute` error.
+Earlier releases silently dropped some of these spellings during seeding; a
+scenario that used them now fails to compile until they are removed. YAML is the compiled baseline
 (`startupMode: merge`); UI / REST / MCP mutations are live until soft reset
 or `make compose-reset`. Changing the file requires a re-bootstrap.
 
@@ -117,7 +123,19 @@ and unknown numeric OIDs are rejected. Results expand to a redacted LDIF snippet
 
 Profile and structured attribute writes use attribute names. Numeric OIDs
 cannot bypass password, account-state, or ACI restrictions. Use the dedicated
-password and account actions for protected fields. User and account actions
+password and account actions for protected fields.
+
+User writes (REST, MCP, console, and scenario YAML) share one rule: protected
+and operational names in any spelling (attribute options, numeric OIDs),
+every `objectClass` spelling, and any non-bare spelling of `uid`, `cn` or
+`sn` are rejected with `forbidden_attribute`; bare `cn`, `sn` and `uid` stay
+writable through their normal fields. Names that differ only in case are a
+`duplicate_attribute` error. The user view shows only spellings this rule
+accepts: optioned values such as `cn;lang-en` are hidden there and managed
+through the entry API, and an engine-returned alias such as `commonName` is
+shown as `cn`. Entry create with `inetOrgPerson` differs: it does not reject
+option or alias spellings of the planned names, it drops them and writes the
+planned `uid`/`cn`/`sn` values (protected names are still rejected). User and account actions
 share an opaque revision that changes when lock or password-expiry state
 changes; refresh existing revisions after upgrading.
 

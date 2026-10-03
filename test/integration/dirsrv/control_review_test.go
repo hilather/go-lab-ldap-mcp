@@ -38,6 +38,14 @@ func TestControlReviewProtectsAliasesFiltersAndExportBounds(t *testing.T) {
 			t.Fatalf("entry alias %s bypassed policy: %v", name, err)
 		}
 	}
+	// One user write rule: objectClass and non-bare planned spellings are
+	// rejected on the user path before any engine write.
+	for _, name := range []string{"objectClass", "2.5.4.0", "commonName", "cn;lang-en", "surname", "userid"} {
+		_, err := svc.Users.Update(t.Context(), writer, "alice", app.UpdateUser{Revision: user.Revision, UserPatch: directory.UserPatch{Attributes: map[string]string{name: "unplanned"}}})
+		if err == nil || apperr.CodeOf(err) != apperr.CodeConfiguration {
+			t.Fatalf("user spelling %s bypassed the write rule: %v", name, err)
+		}
+	}
 	// Ordinary profile attributes remain editable by directory:write.
 	if _, err := svc.Users.Update(t.Context(), writer, "alice", app.UpdateUser{Revision: user.Revision, UserPatch: directory.UserPatch{Attributes: map[string]string{"description": "allowed"}}}); err != nil {
 		t.Fatal(err)

@@ -294,7 +294,7 @@ func attrMapValue(m map[string]string, name string) string {
 }
 
 func forbiddenWriteAttr(name string) bool {
-	return config.ForbiddenUserAttr(name)
+	return config.ForbiddenUserWriteAttr(name)
 }
 
 func skipReturnedAttr(name string) bool {

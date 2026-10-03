@@ -39,6 +39,25 @@ func ForbiddenUserAttr(name string) bool {
 	return ok
 }
 
+// ForbiddenUserWriteAttr is the single write rule for user attributes from
+// every source (REST, MCP, YAML bootstrap/reset, adapter): the protected set,
+// every objectClass spelling (user object classes are fixed), and any
+// non-bare spelling (option, OID, descriptor alias) of the planned names
+// uid, cn and sn. Bare uid/cn/sn stay writable through their planned paths.
+func ForbiddenUserWriteAttr(name string) bool {
+	if ForbiddenUserAttr(name) {
+		return true
+	}
+	t := CanonicalAttrType(name)
+	switch t {
+	case "objectclass":
+		return true
+	case "uid", "cn", "sn":
+		return CanonicalAttr(name) != t
+	}
+	return false
+}
+
 func RequiredUserObjectClasses() []string {
 	return []string{"top", "person", "organizationalPerson", "inetOrgPerson"}
 }
@@ -50,7 +69,21 @@ func CanonicalAttrType(name string) string {
 	if resolved, ok := protectedAttributeOIDs[base]; ok {
 		return resolved
 	}
+	if resolved, ok := attributeNameAliases[base]; ok {
+		return resolved
+	}
 	return base
+}
+
+// attributeNameAliases maps second descriptors of planned attributes to their
+// primary names (RFC 4519 / pinned 389 00core.ldif NAME lists).
+var attributeNameAliases = map[string]string{
+	"userid":                 "uid",
+	"commonname":             "cn",
+	"surname":                "sn",
+	"organizationalunitname": "ou",
+	"domaincomponent":        "dc",
+	"organizationname":       "o",
 }
 
 var protectedAttributeOIDs = map[string]string{

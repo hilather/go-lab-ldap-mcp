@@ -2,6 +2,7 @@ package ds389
 
 import (
 	"context"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -414,14 +415,22 @@ func entryAddAttrs(dn config.DN, class string, extra map[string]string) ([]ldap.
 	default:
 		return nil, directory.Error("objectClasses", directory.FieldForbidden, "object class is not allowlisted")
 	}
-	seen := map[string]struct{}{"objectclass": {}, attr: {}, "uid": {}, "cn": {}, "sn": {}, "dc": {}, "ou": {}}
-	for name, val := range extra {
+	// Planned names are dropped in every spelling (option, OID, descriptor
+	// alias); the forbidden check runs first so a protected alias is still an
+	// error, and extras de-duplicate on the exact (option-preserving) name.
+	planned := map[string]struct{}{"objectclass": {}, strings.ToLower(attr): {}, "uid": {}, "cn": {}, "sn": {}, "dc": {}, "ou": {}}
+	seen := map[string]struct{}{}
+	for _, name := range sortedNames(extra) {
+		val := extra[name]
+		if directory.ForbiddenEntryAttr(name) {
+			return nil, cfgErr("attributes."+name, "forbidden_attribute", "attribute is not allowed")
+		}
+		if _, ok := planned[config.CanonicalAttrType(name)]; ok {
+			continue
+		}
 		key := config.CanonicalAttr(name)
 		if _, ok := seen[key]; ok {
 			continue
-		}
-		if directory.ForbiddenEntryAttr(name) {
-			return nil, cfgErr("attributes."+name, "forbidden_attribute", "attribute is not allowed")
 		}
 		if strings.TrimSpace(val) == "" {
 			continue
@@ -470,4 +479,13 @@ func hasChildren(e *ldap.Entry) bool {
 		return true
 	}
 	return false
+}
+
+func sortedNames(m map[string]string) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
 }

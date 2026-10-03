@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"sort"
 
 	"github.com/hilather/go-lab-ldap-mcp/internal/apperr"
 	"github.com/hilather/go-lab-ldap-mcp/internal/config"
@@ -259,12 +260,25 @@ func validateUserPatch(patch directory.UserPatch) error {
 }
 
 func validateAttrMap(attrs map[string]string) error {
+	names := make([]string, 0, len(attrs))
 	for name := range attrs {
-		if config.ForbiddenUserAttr(name) {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	seen := map[string]string{}
+	for _, name := range names {
+		if config.ForbiddenUserWriteAttr(name) {
 			return apperr.New(apperr.CodeConfiguration, "attribute is not allowed on users").WithField(apperr.Field{
 				Path: "attributes." + name, Code: "forbidden_attribute", Message: "attribute is not allowed on users",
 			})
 		}
+		key := config.CanonicalAttr(name)
+		if prev, dup := seen[key]; dup {
+			return apperr.New(apperr.CodeConfiguration, "attribute is listed more than once").WithField(apperr.Field{
+				Path: "attributes." + name, Code: "duplicate_attribute", Message: "attribute duplicates " + prev,
+			})
+		}
+		seen[key] = name
 	}
 	return nil
 }

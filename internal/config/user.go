@@ -3,6 +3,7 @@ package config
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/hilather/go-lab-ldap-mcp/internal/apperr"
@@ -50,11 +51,18 @@ func normalizeUsers(ctx context.Context, in *Input, peopleDN DN, resolver Secret
 			}
 		}
 		var attrs []AttrKV
-		for name, val := range u.Attributes {
-			if ForbiddenUserAttr(name) {
+		seenAttr := map[string]string{}
+		for _, name := range sortedKeys(u.Attributes) {
+			val := u.Attributes[name]
+			if ForbiddenUserWriteAttr(name) {
 				acc = append(acc, fieldErr(path+".attributes."+name, "forbidden_attribute", "attribute is not allowed on users"))
 				continue
 			}
+			if prev, dup := seenAttr[CanonicalAttr(name)]; dup {
+				acc = append(acc, fieldErr(path+".attributes."+name, "duplicate_attribute", "attribute duplicates "+prev))
+				continue
+			}
+			seenAttr[CanonicalAttr(name)] = name
 			attrs = append(attrs, AttrKV{Name: CanonicalAttr(name), Value: val})
 		}
 		enabled := true
@@ -89,4 +97,13 @@ func normalizeUsers(ctx context.Context, in *Input, peopleDN DN, resolver Secret
 	}
 	sortUsers(out)
 	return out, nil
+}
+
+func sortedKeys(m map[string]string) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }

@@ -408,6 +408,19 @@ func userFromEntry(e *ldap.Entry, groupsDN string) directory.User {
 		case "objectclass", "uid", "nsaccountlock", "memberof":
 			continue
 		}
+		// The user view only carries spellings the user write rule accepts:
+		// optioned planned names (cn;lang-en) are managed through the entry
+		// API, and a descriptor alias an engine might return is shown under
+		// the primary name, so console/REST round-trips never send them back.
+		if t := config.CanonicalAttrType(name); t == "cn" || t == "sn" || t == "uid" {
+			if strings.Contains(name, ";") {
+				continue
+			}
+			name = t
+		}
+		if name == "uid" {
+			continue
+		}
 		for _, v := range a.Values {
 			attrs = append(attrs, directory.AttrKV{Name: name, Value: v})
 		}
