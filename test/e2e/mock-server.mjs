@@ -483,6 +483,22 @@ async function handleAPI(req, res, url) {
       json(res, 201, ent);
       return;
     }
+    if (req.method === "PATCH") {
+      if (requireSession(req, res, "directory:write") === undefined || directoryUnavailable(res)) return;
+      const dn = url.searchParams.get("dn") ?? "";
+      const ent = extraEntries.get(dn);
+      if (!ent) { problem(res, 404, "not found"); return; }
+      if (req.headers["if-match"] !== `"${ent.revision}"`) { problem(res, 412, "revision conflict"); return; }
+      const body = await readBody(req);
+      for (const change of body.changes ?? []) {
+        if (change.op === "replace" || (change.op === "delete" && !change.values?.length)) ent.attributes = ent.attributes.filter((attr) => attr.name !== change.name);
+        if (change.op === "replace" || change.op === "add") ent.attributes.push(...(change.values ?? []).map((value) => ({ name: change.name, value })));
+        if (change.op === "delete") ent.attributes = ent.attributes.filter((attr) => attr.name !== change.name || !change.values?.includes(attr.value));
+      }
+      ent.revision = `${Date.now()}`;
+      json(res, 200, ent);
+      return;
+    }
     if (req.method === "DELETE") {
       if (requireSession(req, res, "directory:write") === undefined || directoryUnavailable(res)) {
         return;
@@ -547,6 +563,25 @@ async function handleAPI(req, res, url) {
       return;
     }
     json(res, 200, { items: [...users.values()] });
+    return;
+  }
+
+  const accountMatch = path.match(/^\/api\/v1\/users\/([^/]+)\/(account-state|lock|unlock|expire-password|clear-password-expiry)$/);
+  if (accountMatch) {
+    const action = accountMatch[2];
+    const scope = action === "account-state" ? "directory:read" : action.includes("password") ? "directory:password" : "directory:write";
+    if (requireSession(req, res, scope) === undefined || directoryUnavailable(res)) return;
+    const user = users.get(decodeURIComponent(accountMatch[1]));
+    if (!user) { problem(res, 404, "not found"); return; }
+    if (req.method === "POST") {
+      if (req.headers["if-match"] !== `"${user.revision}"`) { problem(res, 412, "revision conflict"); return; }
+      if (action === "lock") user.locked = true;
+      if (action === "unlock") user.locked = false;
+      if (action === "expire-password") user.mustChange = true;
+      if (action === "clear-password-expiry") user.mustChange = false;
+      user.revision = `${Date.now()}`;
+    }
+    json(res, 200, { id: user.id, enabled: user.enabled, locked: user.locked ?? false, mustChange: user.mustChange ?? false, revision: user.revision });
     return;
   }
 

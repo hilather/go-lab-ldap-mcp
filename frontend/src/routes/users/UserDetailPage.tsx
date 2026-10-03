@@ -1,10 +1,12 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { getCapabilities } from "../../api/directory";
 import { isApiError } from "../../api/problem";
 import type { User, UserPatch } from "../../api/types";
 import {
+  changeUserAccountState,
+  getUserAccountState,
   deleteUser,
   disableUser,
   enableUser,
@@ -82,6 +84,11 @@ export function UserDetailPage() {
     queryFn: () => getUser(id),
     enabled: canRead && id !== "",
   });
+  const accountQuery = useQuery({
+    queryKey: queryKeys.users.accountState(id),
+    queryFn: () => getUserAccountState(id),
+    enabled: canRead && id !== "",
+  });
   const groupsQuery = useQuery({
     queryKey: queryKeys.users.groups(id),
     queryFn: () => listUserGroups(id),
@@ -93,9 +100,11 @@ export function UserDetailPage() {
     enabled: passwordOpen,
   });
   const user = userQuery.data;
+  const account = accountQuery.data;
 
   const refresh = async (): Promise<void> => {
     setConflict(false);
+    await queryClient.invalidateQueries({ queryKey: queryKeys.users.accountState(id) });
     await queryClient.invalidateQueries({ queryKey: queryKeys.users.detail(id) });
     await queryClient.invalidateQueries({ queryKey: queryKeys.users.groups(id) });
   };
@@ -218,6 +227,50 @@ export function UserDetailPage() {
             onSave={(patch) => applyMutation(() => updateUser(user.id, patch, user.revision))}
           />
 
+          <section aria-labelledby="account-state-heading">
+            <h2 id="account-state-heading">Account state</h2>
+            {account === undefined ? (
+              <QueryStatus result={accountQuery} missing="account state" />
+            ) : (
+              <>
+                <p role="status">
+                  {account.locked ? "Locked" : "Unlocked"}; {account.mustChange ?
+                    "Password change required" : "Password change not required"}
+                </p>
+                <div className="form-actions">
+                  <button
+                    type="button"
+                    disabled={!writeGate.ok || account.locked}
+                    onClick={() => void runMutation(() => changeUserAccountState(id, "lock", account.revision))}
+                  >
+                    Lock account
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!writeGate.ok || !account.locked}
+                    onClick={() => void runMutation(() => changeUserAccountState(id, "unlock", account.revision))}
+                  >
+                    Unlock account
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!passwordGate.ok || account.mustChange}
+                    onClick={() => void runMutation(() => changeUserAccountState(id, "expire-password", account.revision))}
+                  >
+                    Require password change
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!passwordGate.ok || !account.mustChange}
+                    onClick={() => void runMutation(() => changeUserAccountState(id, "clear-password-expiry", account.revision))}
+                  >
+                    Clear password expiry
+                  </button>
+                </div>
+              </>
+            )}
+          </section>
+
           <section aria-labelledby="user-actions-heading">
             <h2 id="user-actions-heading">Account actions</h2>
             {!writeGate.ok ? <p>{writeGate.reason}</p> : null}
@@ -251,9 +304,9 @@ export function UserDetailPage() {
             hints={passwordPolicyHints(caps.data?.passwordScheme)}
             disabled={!passwordGate.ok}
             onDismiss={() => setPasswordOpen(false)}
-            onSave={async (password) => {
+            onSave={async (password, mustChange) => {
               try {
-                await setUserPassword(user.id, password, user.revision);
+                await setUserPassword(user.id, password, user.revision, mustChange);
                 setPasswordOpen(false);
                 await invalidateUsersAndGroups(queryClient);
                 await refresh();
@@ -431,7 +484,7 @@ function PasswordDialog({
   open: boolean;
   hints: string[];
   disabled: boolean;
-  onSave: (password: string) => Promise<void>;
+  onSave: (password: string, mustChange: boolean) => Promise<void>;
   onDismiss: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
@@ -439,17 +492,21 @@ function PasswordDialog({
     resolver: zodResolver(passwordSchema),
     defaultValues: clearedPasswordFields(),
   });
+  const [mustChange, setMustChange] = useState(false);
   const passwordError = form.formState.errors.password?.message;
   const confirmError = form.formState.errors.confirmPassword?.message;
   const [formError, setFormError] = useState<string | undefined>();
 
-  useEffect(() => {
+  // Flush the form reset before the modal is painted and accepts input.
+  // A passive effect can show the modal before React Hook Form applies reset.
+  useLayoutEffect(() => {
     const node = dialog.current;
     if (node === null) {
       return;
     }
     if (open && !node.open) {
       form.reset(clearedPasswordFields());
+      setMustChange(false);
       setFormError(undefined);
       node.showModal();
     } else if (!open && node.open) {
@@ -473,7 +530,7 @@ function PasswordDialog({
           form.reset(clearedPasswordFields());
           setFormError(undefined);
           try {
-            await onSave(password);
+            await onSave(password, mustChange);
           } catch (err) {
             if (isApiError(err) && err.rateLimited) {
               setFormError("Too many password changes. Wait a minute and try again.");
@@ -508,6 +565,15 @@ function PasswordDialog({
           />
           <FormError id="set-confirm-error" message={confirmError} />
         </div>
+        <label htmlFor="set-must-change">
+          <input
+            id="set-must-change"
+            type="checkbox"
+            checked={mustChange}
+            onChange={(event) => setMustChange(event.target.checked)}
+          />{" "}
+          Require password change after setting password
+        </label>
         <FormError id="set-password-form-error" message={formError} />
         <div className="form-actions">
           <button type="submit" className="button-primary" disabled={disabled || form.formState.isSubmitting}>

@@ -8,6 +8,7 @@ import {
   entryKind,
   isProtectedTreeDN,
   isSensitiveAttr,
+  isForbiddenEntryAttribute,
   membershipFromGroupEntry,
   nodeMatchesFilter,
   parentDN,
@@ -109,4 +110,13 @@ test("protected DNs are suffix, people, and groups only from known suffixes", ()
 test("delete still requires the exact DN", () => {
   assert.equal(exactIdConfirmed("ou=labtree,ou=people,dc=example,dc=test", "ou=labtree,ou=people,dc=example,dc=test"), true);
   assert.equal(exactIdConfirmed("ou=labtree,ou=people,dc=example,dc=test", "ou=labtree"), false);
+});
+
+test("structured entry editor rejects managed and secret attributes", () => {
+  for (const name of ["userPassword", "ACI", "memberOf", "nsAccountLock", "pwdReset", "pwdAccountLockedTime", "modifyTimestamp", "entryUUID", "nsslapd-rootpw", "objectClass", "nsAccountLock;binary", "2.5.4.35", "userPKCS12", "aci;lang-en"]) {
+    assert.equal(isForbiddenEntryAttribute(name), true, name);
+  }
+  assert.equal(isForbiddenEntryAttribute("description"), false);
+  assert.equal(isForbiddenEntryAttribute("ou"), false);
+  assert.equal(isForbiddenEntryAttribute("cn;lang-en"), false);
 });

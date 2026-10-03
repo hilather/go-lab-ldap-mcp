@@ -306,3 +306,17 @@ directory environment; changing this budget does not add automatic write retries
 - Do not log tokens, passwords, or session ids.
 
 When something is on fire: [Troubleshooting](../operations/troubleshooting.md).
+
+### Account state and structured entry changes
+
+The user detail page shows lock and password-change state. Operators with
+`directory:write` can lock or unlock the account; `directory:password` permits
+requiring a password change or clearing password expiry. Set password also offers
+**Require password change after setting password**. Every action sends the loaded
+revision and offers a refresh when the record changed.
+
+The Directory inspector can edit an entry attribute using replace, add, or delete
+with one value per line. Passwords, object classes, managed and operational
+attributes, and protected suffix/container entries cannot be edited here. Move,
+delete, and attribute edits preserve optimistic concurrency; refresh explicitly
+after a revision conflict before retrying.

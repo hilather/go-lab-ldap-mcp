@@ -51,6 +51,11 @@ test("operator can browse the directory, inspect a user, then create, move, and 
   await expect(page.getByRole("button", { name: "ou=labtree", exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "ou=labtree", exact: true }).click();
+  await page.getByLabel("Attribute name").fill("description");
+  await page.getByLabel("Values (one per line)").fill("Console edited container");
+  await page.getByRole("button", { name: "Apply attribute change" }).click();
+  await expect(page.locator("#inspector-attrs-heading").locator("..")).toContainText("Console edited container");
+
   await page.locator("#tree-move-to").fill("ou=labtree-moved,ou=people,dc=example,dc=test");
   await page.getByRole("button", { name: "Move entry" }).click();
   await expect(page.locator("#main").getByRole("status")).toContainText("Moved to ou=labtree-moved,ou=people,dc=example,dc=test");
@@ -62,3 +67,32 @@ test("operator can browse the directory, inspect a user, then create, move, and 
   expect(ifMatch.move).toMatch(/^"/);
   expect(ifMatch.delete).toMatch(/^"/);
 });
+
+for (const action of ["move", "delete"] as const) {
+  test(`tree ${action} uses the displayed revision and offers conflict refresh`, async ({ page }) => {
+    await login(page);
+    await visit(page, "/tree");
+    await page.getByRole("button", { name: "Expand ou=people" }).click();
+    await page.getByRole("button", { name: "uid=alice", exact: true }).click();
+    await expect(page.locator("#inspector-attrs-heading")).toBeVisible();
+    let entryReads = 0;
+    await page.route("**/api/v1/entries?*", async (route) => {
+      if (route.request().method() === "GET") { entryReads++; }
+      if (route.request().method() === "DELETE") {
+        await route.fulfill({ status: 412, contentType: "application/problem+json", body: JSON.stringify({ title: "revision conflict", code: "precondition_failed", status: 412 }) });
+      } else await route.continue();
+    });
+    await page.route("**/api/v1/entries/move", (route) => route.fulfill({ status: 412, contentType: "application/problem+json", body: JSON.stringify({ title: "revision conflict", code: "precondition_failed", status: 412 }) }));
+    if (action === "move") {
+      await page.locator("#tree-move-to").fill("uid=alice-renamed,ou=people,dc=example,dc=test");
+      await page.getByRole("button", { name: "Move entry" }).click();
+    } else {
+      await page.getByLabel("Type the exact DN to confirm").fill("uid=alice,ou=people,dc=example,dc=test");
+      await page.getByRole("button", { name: "Delete entry", exact: true }).click();
+    }
+    await expect(page.getByRole("dialog", { name: "Revision conflict" })).toBeVisible();
+    expect(entryReads).toBe(0);
+    await page.getByRole("dialog").getByRole("button", { name: "Refresh", exact: true }).click();
+    await expect.poll(() => entryReads).toBe(1);
+  });
+}

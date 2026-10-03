@@ -1,6 +1,6 @@
 import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { createEntry, deleteEntry, getEntry, listSuffixes, listTree, moveEntry } from "../../api/entries";
+import { createEntry, deleteEntry, getEntry, listSuffixes, listTree, moveEntry, updateEntry } from "../../api/entries";
 import { isApiError } from "../../api/problem";
 import type { TreeNode } from "../../api/types";
 import { listUserGroups } from "../../api/users";
@@ -15,6 +15,7 @@ import {
   entryKind,
   isProtectedTreeDN,
   isSensitiveAttr,
+  isForbiddenEntryAttribute,
   membershipFromGroupEntry,
   parentDN,
   rdnOf,
@@ -24,6 +25,7 @@ import {
   type EntryKind,
   type FilterableNode,
 } from "../../lib/tree-model";
+import { ConflictRefresh } from "../shared/ConflictRefresh";
 import { describedBy, ScopeNote } from "../shared/ResourcePage";
 import { LiveRegion, SafeText } from "../shared/SafeText";
 
@@ -60,8 +62,15 @@ export function TreePage() {
   const [extraCursor, setExtraCursor] = useState<Record<string, string>>({});
   const [status, setStatus] = useState("");
   const [formError, setFormError] = useState("");
+  const [conflict, setConflict] = useState(false);
   const [createClass, setCreateClass] = useState<(typeof CLASS_OPTIONS)[number]["value"]>("organizationalUnit");
   const [createRDN, setCreateRDN] = useState("");
+  const [moveRevision, setMoveRevision] = useState<string | undefined>();
+  const [deleteRevision, setDeleteRevision] = useState<string | undefined>();
+  const [editRevision, setEditRevision] = useState<string | undefined>();
+  const [attributeName, setAttributeName] = useState("description");
+  const [attributeOp, setAttributeOp] = useState<"replace" | "add" | "delete">("replace");
+  const [attributeValues, setAttributeValues] = useState("");
   const [moveTo, setMoveTo] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const [deleteRecursive, setDeleteRecursive] = useState(false);
@@ -116,6 +125,12 @@ export function TreePage() {
     queryFn: () => getEntry(selectedDN),
     enabled: canRead && selectedDN !== "",
   });
+  useEffect(() => {
+    setEditRevision(undefined);
+    setMoveRevision(undefined);
+    setDeleteRevision(undefined);
+    setAttributeValues("");
+  }, [selectedDN]);
   const selectedIsSuffix = suffixList.some((dn) => dn === selectedDN);
   const kind: EntryKind | undefined =
     entry.data === undefined
@@ -347,6 +362,94 @@ export function TreePage() {
                 </>
               ) : null}
 
+              <section className="inspector-card" aria-labelledby="tree-edit-heading">
+                <h2 id="tree-edit-heading">Edit entry attribute</h2>
+                <form
+                  onSubmit={async (event) => {
+                    event.preventDefault();
+                    if (!canWrite || protectedDN || entry.data === undefined) {
+                      return;
+                    }
+                    if (isForbiddenEntryAttribute(attributeName)) {
+                      setFormError("This attribute cannot be edited here.");
+                      return;
+                    }
+                    setFormError("");
+                    try {
+                      await updateEntry(selectedDN, {
+                        changes: [{
+                          op: attributeOp,
+                          name: attributeName.trim(),
+                          values: attributeValues === "" ? [] : attributeValues.split("\n"),
+                        }],
+                      }, editRevision ?? entry.data.revision);
+                      setEditRevision(undefined);
+                      setAttributeValues("");
+                      setStatus("Updated entry.");
+                      await refresh([parentDN(selectedDN)]);
+                    } catch (err) {
+                      if (isApiError(err) && err.revisionConflict) {
+                        setConflict(true);
+                        return;
+                      }
+                      setFormError(isApiError(err) ? err.message : "Entry update failed.");
+                    }
+                  }}
+                >
+                  <div className="field">
+                    <label htmlFor="tree-attribute-name">Attribute name</label>
+                    <input
+                      id="tree-attribute-name"
+                      value={attributeName}
+                      disabled={!canWrite || protectedDN}
+                      onChange={(event) => {
+                        setEditRevision((previous) => previous ?? entry.data?.revision);
+                        setAttributeName(event.target.value);
+                      }}
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="tree-attribute-op">Change operation</label>
+                    <select
+                      id="tree-attribute-op"
+                      value={attributeOp}
+                      disabled={!canWrite || protectedDN}
+                      onChange={(event) => {
+                        setEditRevision((previous) => previous ?? entry.data?.revision);
+                        setAttributeOp(event.target.value as "replace" | "add" | "delete");
+                      }}
+                    >
+                      <option value="replace">Replace values</option>
+                      <option value="add">Add values</option>
+                      <option value="delete">Delete values</option>
+                    </select>
+                  </div>
+                  <div className="field">
+                    <label htmlFor="tree-attribute-values">Values (one per line)</label>
+                    <textarea
+                      id="tree-attribute-values"
+                      value={attributeValues}
+                      disabled={!canWrite || protectedDN}
+                      onChange={(event) => {
+                        setEditRevision((previous) => previous ?? entry.data?.revision);
+                        setAttributeValues(event.target.value);
+                      }}
+                    />
+                  </div>
+                  <p className="field-hint">
+                    Passwords, object classes, and protected attributes cannot be edited here.
+                    Delete with no values removes the attribute.
+                  </p>
+                  <button
+                    type="submit"
+                    disabled={!canWrite || protectedDN || entry.data === undefined ||
+                      attributeName.trim() === "" || isForbiddenEntryAttribute(attributeName)}
+                  >
+                    Apply attribute change
+                  </button>
+                </form>
+              </section>
+
               <section className="inspector-card" aria-labelledby="tree-create-heading">
                 <h2 id="tree-create-heading">Create child</h2>
                 {!canWrite ? <p>{writeGate.reason}</p> : null}
@@ -413,15 +516,14 @@ export function TreePage() {
                 <form
                   onSubmit={async (event) => {
                     event.preventDefault();
-                    if (!canWrite || selectedDN === "" || protectedDN) {
+                    if (!canWrite || selectedDN === "" || protectedDN || entry.data === undefined) {
                       return;
                     }
                     setFormError("");
                     try {
-                      const live = await getEntry(selectedDN);
                       const moved = await moveEntry(
                         { dn: selectedDN, newDN: moveTo.trim(), deleteOldRdn: true },
-                        live.revision,
+                        moveRevision ?? entry.data.revision,
                       );
                       const oldParent = parentDN(selectedDN);
                       const newParent = parentDN(moved.dn);
@@ -437,6 +539,10 @@ export function TreePage() {
                       });
                       await refresh([oldParent, newParent]);
                     } catch (err) {
+                      if (isApiError(err) && err.revisionConflict) {
+                        setConflict(true);
+                        return;
+                      }
                       setFormError(isApiError(err) ? err.message : "Move failed.");
                     }
                   }}
@@ -449,7 +555,10 @@ export function TreePage() {
                       spellCheck={false}
                       value={moveTo}
                       disabled={!canWrite || protectedDN}
-                      onChange={(event) => setMoveTo(event.target.value)}
+                      onChange={(event) => {
+                        setMoveRevision((previous) => previous ?? entry.data?.revision);
+                        setMoveTo(event.target.value);
+                      }}
                     />
                   </div>
                   <button
@@ -466,7 +575,7 @@ export function TreePage() {
                 <form
                   onSubmit={async (event) => {
                     event.preventDefault();
-                    if (!canWrite || selectedDN === "" || protectedDN) {
+                    if (!canWrite || selectedDN === "" || protectedDN || entry.data === undefined) {
                       return;
                     }
                     if (!exactIdConfirmed(selectedDN, deleteConfirm.trim())) {
@@ -475,8 +584,7 @@ export function TreePage() {
                     }
                     setFormError("");
                     try {
-                      const live = await getEntry(selectedDN);
-                      await deleteEntry(selectedDN, live.revision, deleteRecursive);
+                      await deleteEntry(selectedDN, deleteRevision ?? entry.data.revision, deleteRecursive);
                       const next = parentDN(selectedDN);
                       setStatus("Deleted entry.");
                       setSelectedDN(next === selectedDN ? effectiveBase : next);
@@ -485,6 +593,10 @@ export function TreePage() {
                       setExpanded((prev) => prev.filter((item) => item !== selectedDN));
                       await refresh([next]);
                     } catch (err) {
+                      if (isApiError(err) && err.revisionConflict) {
+                        setConflict(true);
+                        return;
+                      }
                       setFormError(isApiError(err) ? err.message : "Delete failed.");
                     }
                   }}
@@ -497,7 +609,10 @@ export function TreePage() {
                       spellCheck={false}
                       value={deleteConfirm}
                       disabled={!canWrite || protectedDN}
-                      onChange={(event) => setDeleteConfirm(event.target.value)}
+                      onChange={(event) => {
+                        setDeleteRevision((previous) => previous ?? entry.data?.revision);
+                        setDeleteConfirm(event.target.value);
+                      }}
                       aria-describedby={describedBy(["tree-delete-hint"])}
                     />
                     <p id="tree-delete-hint" className="field-hint">
@@ -511,7 +626,10 @@ export function TreePage() {
                         type="checkbox"
                         checked={deleteRecursive}
                         disabled={!canWrite || protectedDN}
-                        onChange={(event) => setDeleteRecursive(event.target.checked)}
+                        onChange={(event) => {
+                          setDeleteRevision((previous) => previous ?? entry.data?.revision);
+                          setDeleteRecursive(event.target.checked);
+                        }}
                       />{" "}
                       Recursive
                     </label>
@@ -525,6 +643,17 @@ export function TreePage() {
           )}
         </section>
       </div>
+      <ConflictRefresh
+        open={conflict}
+        onDismiss={() => setConflict(false)}
+        onRefresh={() => {
+          setConflict(false);
+          setEditRevision(undefined);
+          setMoveRevision(undefined);
+          setDeleteRevision(undefined);
+          void entry.refetch();
+        }}
+      />
       <p className="directory-footnote">{TREE_FOOTNOTE}</p>
     </main>
   );
