@@ -83,7 +83,7 @@ func TestPasswordOptionSpellingsAreRejectedAndRedacted(t *testing.T) {
 	q := "/api/v1/entries?dn=" + url.QueryEscape(dn)
 
 	// (a) PATCH with option/OID spellings of protected names is rejected.
-	for _, name := range []string{"userPassword;lang-en", "USERPASSWORD;x-a", "2.5.4.35", "aci;lang-en", "nsAccountLock;x-a"} {
+	for _, name := range []string{"userPassword;lang-en", "USERPASSWORD;x-a", "2.5.4.35", "aci;lang-en", "nsAccountLock;x-a", "modifyTimestamp;lang-en"} {
 		_, _, et := do(http.MethodGet, q, "", "")
 		code, body, _ := do(http.MethodPatch, q, et, `{"changes":[{"op":"add","name":"`+name+`","values":["`+optionPasswordCanary+`"]}]}`)
 		if code != http.StatusBadRequest || !strings.Contains(body, "forbidden_attribute") {
