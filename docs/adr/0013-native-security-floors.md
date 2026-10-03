@@ -13,8 +13,7 @@ T-151, this ADR reserves no task id: both decisions change accepted parity
 (two new Deltas), so the implementation task is opened in `TASKS.md` only
 if the owner accepts them.
 
-Related ADRs: ADR-0008, ADR-0009, and ADR-0014 (proposed in PR #24, not yet
-on main). Related contract clauses: native-engine parity contract C1/C3/C8, and
+Related ADRs: ADR-0008, ADR-0009, and ADR-0014 (merged in #24). Related contract clauses: native-engine parity contract C1/C3/C8, and
 the proposed deltas D32/D33. Related fix: PR #25 (control-plane option and
 OID handling for protected attributes; adds accepted Delta D31).
 
@@ -60,7 +59,8 @@ engines (both control planes use the `ds389` runtime). That was a bug
 against the existing contract, not a parity question, and it is fixed
 separately in PR #25: the control plane now resolves attribute options
 and a static table of protected OIDs before the deny checks and read
-redaction, and the native engine hashes plaintext values of any variant
+redaction, rejects every numeric-OID attribute name on operator writes, and
+the native engine hashes plaintext values of any variant
 `userPassword` spelling (accepted Delta D31, because 389 stores them as
 written). This ADR depends on that fix and does not own it. What remains
 here is the native LDAP floor: whether native itself rejects option
@@ -77,7 +77,7 @@ Both engines then keep the Directory Manager identity:
   `authenticate` (`internal/ldapserver/op_bind.go:47-50`). The reset to
   anonymous happens only inside `authenticate` (`op_bind.go:70-71`).
 
-RFC 4513 §4 says receiving a Bind moves the association to anonymous, and a
+RFC 4513 §4 (and RFC 4511 §4.2.1) say receiving a Bind moves the association to anonymous, and a
 failed Bind leaves it anonymous.
 
 Native already has a related exposure on main. `serve()` runs Bind inline with
@@ -114,9 +114,11 @@ from D32 and D33:
 
 Proposed:
 
-1. **D32: option and OID resolution for client-modifiability.** Native
-   security checks resolve schema OID aliases and attribute options to the
-   underlying type. An option cannot make a server-owned operational attribute
+1. **D32: option stripping for client-modifiability.** Native already
+   resolves OIDs to schema types (`Registry.AttributeType`); D32 also strips
+   attribute options, including on OID spellings such as
+   `2.5.18.2;lang-en`, before the `Operational` check, and rejects through
+   the existing `errOperationalAttr` path (`constraintViolation(19)`). An option cannot make a server-owned operational attribute
    client-modifiable. Native rejects the write where the pinned 389 build
    accepts it, and the delta records that split.
    - Acceptance needs a direct LDAP assertion on both engines: native rejects,
@@ -175,12 +177,13 @@ Proposed:
 - Native becomes stricter than the pinned 389 oracle on two observed cases.
   That adds two accepted Deltas, each with per-engine controlling tests.
 - The control-plane tightening this ADR relies on (PR #25) already
-  changes every caller of the deny checks: user create and update
+  changes the callers of the deny checks, including read redaction
+  (`app/directory.go:227`), user create and update
   (`app/users.go:245`, `ds389/runtime.go:297`), entry create and update
   (`ds389/entries.go:423`, `:330`), the seed (`ds389/seed.go:335`), and
   config validation of `users[].attributes` (`internal/config/user.go:54`).
-  REST and MCP on the 389 engine reject option spellings that 389 itself
-  accepts, and scenarios or imports that used them fail validation. That
+  REST and MCP on the 389 engine reject option spellings of protected names
+  that 389 itself accepts, and every numeric-OID attribute name, and scenarios or imports that used them fail validation. That
   compatibility note ships with PR #25; D32 adds only the direct LDAP
   rejection on native.
 - D33 cannot ship until #19 and ADR-0014 are implemented.
@@ -194,6 +197,9 @@ Proposed:
 - The control-plane resolver is PR #25's; PR #18 extends it for
   user-write alias spellings. D32's native floor should reuse the same OID
   table rather than add a second one.
+- The comment at `internal/ldapserver/op_bind.go:40-42` says every Bind
+  first resets to anonymous (RFC 4511 §4.2.1); the code runs
+  `checkControls` first. Correct the comment with D33.
 - No new listener, endpoint, schema field or credential distribution is added.
 
 ## Alternatives considered
