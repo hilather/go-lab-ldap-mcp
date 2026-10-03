@@ -33,6 +33,11 @@ async function run(command, args, options = {}) {
 let env;
 let compose;
 let started = false;
+let failed = true;
+// Optional failure diagnostics (CI sets this). Service logs only: the
+// temporary secrets directory is never copied, and services do not log
+// secret values.
+const logFile = process.env.LABLDAP_E2E_LIVE_LOG_FILE;
 try {
   await run("ldapsearch", ["-VV"]);
   await run(go, ["run", "./tools/setupsecrets", "--dir", state]);
@@ -108,8 +113,16 @@ try {
       LABLDAP_E2E_DM_PASSWORD_FILE: ldapPasswordFile,
     },
   });
+  failed = false;
 } finally {
   try {
+    if (started && failed && logFile) {
+      try {
+        await run("sh", ["-c", 'docker "$@" logs --no-color --timestamps > "$LABLDAP_E2E_LIVE_LOG_FILE" 2>&1', "sh", ...compose], { env });
+      } catch (err) {
+        console.error(`live smoke: could not collect compose logs: ${err.message}`);
+      }
+    }
     if (started) await run("docker", [...compose, "down", "-v", "--remove-orphans"], { env });
   } finally {
     await rm(state, { recursive: true, force: true });

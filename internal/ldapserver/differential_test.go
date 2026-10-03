@@ -32,8 +32,10 @@ import (
 //     sequence against the in-process native server and pins every
 //     expected outcome exactly, so a native regression fails hermetically
 //     (go test ./... stays Docker-free).
-//   - TestDifferential389Oracle runs only when LABLDAP_DIFF_389=1 and the
-//     pinned 389 image (deploy/docker/dirsrv.digest) is startable. It
+//   - TestDifferential389Oracle runs only when LABLDAP_DIFF_389=1; once
+//     opted in, a missing Docker daemon or pinned 389 image
+//     (deploy/docker/dirsrv.digest) fails the test instead of skipping, so
+//     an opted-in run cannot report ok without comparing. It
 //     configures the container the way LabLDAP does for the compared
 //     surface (anonymous access off), seeds both engines with the same
 //     wire-level data, replays the identical PDU sequence, and compares.
@@ -734,13 +736,16 @@ func formatOutcome(o diffOutcome) string {
 // suffix root), anonymous access off (native default), cleartext binds on
 // the loopback LDAP lane (native leg sets AllowCleartextBind). It returns
 // the host loopback LDAP address. The DM password is the fixture value.
+//
+// Only called after the LABLDAP_DIFF_389=1 opt-in, so every missing
+// prerequisite is fatal: a skip here would let a required oracle leg pass.
 func start389Oracle(t *testing.T) string {
 	t.Helper()
 	if _, err := exec.LookPath("docker"); err != nil {
-		t.Skip("docker not on PATH")
+		t.Fatalf("%s=1 but docker is not on PATH", diffOracleEnv)
 	}
 	if err := exec.Command("docker", "info").Run(); err != nil {
-		t.Skip("docker daemon not available")
+		t.Fatalf("%s=1 but the docker daemon is not available: %v", diffOracleEnv, err)
 	}
 	refBytes, err := os.ReadFile("../../deploy/docker/dirsrv.digest")
 	if err != nil {
@@ -751,7 +756,7 @@ func start389Oracle(t *testing.T) string {
 		t.Fatalf("image ref is not a digest pin: %s", ref)
 	}
 	if err := exec.Command("docker", "image", "inspect", ref).Run(); err != nil {
-		t.Skipf("pinned 389 image not present locally (%s); docker pull it to run the oracle", ref)
+		t.Fatalf("%s=1 but the pinned 389 image is not present locally (%s); docker pull it or run make test-diff with LABLDAP_REQUIRE_389=1", diffOracleEnv, ref)
 	}
 
 	name := "labldap-diff-" + randID(t)

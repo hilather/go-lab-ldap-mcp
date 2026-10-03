@@ -65,11 +65,12 @@ help:
 		'  test-integration-workflow  REST account-state battery + ldapwhoami/ldapsearch (389 then native)' \
 		'  test-fuzz-short    T-149: every fuzz target, CI-short fuzztime' \
 		'  test-native-soak   T-150: goroutine/FD churn + bbolt growth gates' \
-		'  test-diff          T-149 differential: native always; 389 oracle when Docker+image' \
+		'  test-diff          T-149 differential: native always; 389 oracle (required when LABLDAP_REQUIRE_389=1)' \
 		'  test-parity        T-147 dual-engine parity harness (needs Docker)' \
 		'  test-parity-native hermetic native parity leg (no Docker)' \
 		'  verify-native      aggregate native lane (fuzz + soak + diff + parity)' \
 		'  test-e2e           Playwright UI suite (mock control plane; optional live URL)' \
+		'  test-e2e-live      isolated native Compose browser smoke (Docker; part of verify)' \
 		'  test-security      secret scan, govulncheck, license denylist' \
 		'  compose-up         native labldapd, ephemeral tmpfs /data; bootstrap → control' \
 		'  compose-up-persistent  native engine with named-volume /data' \
@@ -158,21 +159,36 @@ test-native-soak:
 	$(GO) test ./internal/ldapserver/store/ -run=TestBoltSoakWriteCycles -count=1
 
 # T-149 differential harness (internal/ldapserver/differential_test.go).
-# The native leg is hermetic and always runs; the 389 oracle leg runs only
-# when Docker and the pinned image are available, so Docker-less machines
-# skip it gracefully. Undecided divergences fail; accepted ones are the
-# Deltas in docs/design/parity-delta-log.md.
+# The native leg is hermetic and always runs. The 389 oracle leg runs when
+# Docker and the pinned image are available. With LABLDAP_REQUIRE_389=1 (CI
+# native-checks) the oracle is required: a missing image is pulled, and a
+# failed pull or missing Docker fails the target instead of skipping.
+# Without it, Docker-less or image-less machines skip the oracle with a
+# message (no surprise pulls on developer machines). Undecided divergences
+# fail; accepted ones are the Deltas in docs/design/parity-delta-log.md.
 test-diff:
 	$(GO) test ./internal/ldapserver/ -run=TestDifferentialNativeSequence -count=1
-	@if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1 && \
-		docker image inspect $(DIRSRV_IMAGE) >/dev/null 2>&1; then \
+	@set -e; \
+	if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then \
+		if ! docker image inspect $(DIRSRV_IMAGE) >/dev/null 2>&1; then \
+			if [ "$$LABLDAP_REQUIRE_389" = "1" ]; then \
+				docker pull $(DIRSRV_IMAGE) || { printf '%s\n' 'test-diff: LABLDAP_REQUIRE_389=1 and the pinned 389 image could not be pulled' >&2; exit 1; }; \
+			else \
+				printf '%s\n' 'test-diff: pinned 389 image not present; oracle leg skipped (native leg ran; set LABLDAP_REQUIRE_389=1 to pull and require it)'; \
+				exit 0; \
+			fi; \
+		fi; \
 		LABLDAP_DIFF_389=1 $(GO) test ./internal/ldapserver/ -run=TestDifferential389Oracle -count=1 -timeout 10m; \
+	elif [ "$$LABLDAP_REQUIRE_389" = "1" ]; then \
+		printf '%s\n' 'test-diff: LABLDAP_REQUIRE_389=1 but docker is unavailable' >&2; \
+		exit 1; \
 	else \
-		printf '%s\n' 'test-diff: docker or pinned 389 image unavailable; oracle leg skipped (native leg ran)'; \
+		printf '%s\n' 'test-diff: docker unavailable; oracle leg skipped (native leg ran)'; \
 	fi
 
 # T-147: the public parity target compares both engines. Native-only checks
-# have a separate target so verify-native remains hermetic.
+# have a separate target so verify-native stays hermetic (it only pulls the
+# 389 oracle image when LABLDAP_REQUIRE_389=1).
 test-parity:
 	$(GO) test -tags=integration ./test/parity/ -count=1 -timeout 30m
 
@@ -189,9 +205,13 @@ test-e2e: frontend-build
 	cd test/e2e && $(PNPM) test
 	@printf '%s\n' 'test-e2e: default target is the contract mock. External Compose URL support and live-coverage limits are documented in test/e2e/README.md.'
 
-# Opt-in isolated native Compose browser smoke; preserves LDAP TLS verification.
+# Isolated native Compose browser smoke; preserves LDAP TLS verification.
 # Images match the checked-out candidate. State and credentials are temporary.
-test-e2e-live: frontend-build image-native image-pair-check
+# Runs in verify when Docker is available and in the CI e2e-live job.
+# LIVE_E2E_PREREQS is a test seam (test/release stubs the image builds,
+# which verify reaches through a sub-make that does not see -f shims).
+LIVE_E2E_PREREQS ?= frontend-build image-native image-pair-check
+test-e2e-live: $(LIVE_E2E_PREREQS)
 	node tools/live-e2e.mjs
 
 test-security:
@@ -424,7 +444,8 @@ verify: format lint generate generate-drift test-unit test-security sbom checksu
 	@set -e; if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then \
 		$(MAKE) test-integration; \
 		$(MAKE) test-parity; \
+		$(MAKE) test-e2e-live; \
 	else \
-		printf '%s\n' 'verify: docker unavailable; skipped 389 integration + dual-engine parity legs'; \
+		printf '%s\n' 'verify: docker unavailable; skipped 389 integration, dual-engine parity, and live browser smoke legs'; \
 	fi
 	@printf '%s\n' 'verify: ok'
