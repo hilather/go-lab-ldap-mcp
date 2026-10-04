@@ -65,9 +65,10 @@ and a static table of protected OIDs (including `2.5.18.2`), and keys
 so the control plane strips options and resolves protected OIDs, and
 rejects every numeric-OID attribute name on operator writes.
 `modifyTimestamp;lang-en` is already `forbidden_attribute` on entry update.
-PR #25 (on main at `30d19b6`) added only the native half: the native engine hashes plaintext values
-of any variant `userPassword` spelling (accepted Delta D31, because 389
-stores them as written), plus tests, including the REST regression
+PR #25 (on main at `30d19b6`) changed behaviour only on native: the native
+engine hashes plaintext values of any variant `userPassword` spelling
+(accepted Delta D31, because 389 stores them as written). It also added
+docs, a `CanonicalAttr` doc comment and tests, including the REST regression
 `TestPasswordOptionSpellingsAreRejectedAndRedacted` that PATCHes
 `modifyTimestamp;lang-en` on both engines. This ADR depends on both and owns
 neither. What remains
@@ -203,12 +204,15 @@ Proposed:
 ### Neutral / follow-up
 
 - When implemented, add D32 and D33 rows to `docs/design/parity-delta-log.md`
-  (D31 was recorded by PR #25, on main at `30d19b6`) and regenerate the ledger with
-  `PARITY_UPDATE_LEDGER=1`. If numbering moves before then, the recording
-  rule (next free number) wins over the names used here.
+  (D31 was recorded by PR #25, on main at `30d19b6`) and regenerate the
+  ledger with `PARITY_UPDATE_LEDGER=1`. If numbering moves before then, the
+  recording rule (next free number) wins over the names used here.
 - The control-plane resolver (`CanonicalAttrType` and the protected OID
   table) is PR #18's; PR #25 owns D31 and the REST regression. D32's native
-  floor should reuse the same OID table rather than add a second one.
+  floor should reuse the same resolver and OID table rather than add a second
+  one, as #25's native hashing already does (`config.CanonicalAttrType` at
+  `internal/ldapserver/password.go:326`). `clientModifiable`
+  (`op_attrs.go:103-112`) is where D32 would add that call.
 - The comment at `internal/ldapserver/op_bind.go:40-42` says every Bind
   first resets to anonymous (RFC 4511 §4.2.1); the code runs
   `checkControls` first. Correct the comment with D33.
