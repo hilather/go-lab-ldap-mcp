@@ -17,7 +17,7 @@ func TestRESTWriteOnlyCannotSetPasswordThroughAttributeAliases(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, attr := range []string{"userPassword;binary", "2.5.4.35", "authPassword", "nsAccountLock;binary"} {
+	for _, attr := range []string{"userPassword;binary", "2.5.4.35", "authPassword", "nsAccountLock;binary", "objectClass", "commonName", "cn;lang-en", "userid"} {
 		body, _ := json.Marshal(map[string]any{"attributes": map[string]string{attr: "replacement"}})
 		req := httptest.NewRequest(http.MethodPatch, "/api/v1/users/alice", strings.NewReader(string(body)))
 		req.Header.Set("Authorization", "Bearer "+writeOnlyToken)
