@@ -112,7 +112,10 @@ A membership cycle is rejected and the group is left unchanged.
 inspect its attributes. Create allowlisted child entries
 (`organizationalUnit`, `domain`, or `container` stored as
 `organizationalUnit`) under the selected DN. Move or rename and delete
-with a typed-DN confirm still apply to that selected DN. Create users
+with a typed-DN confirm still apply to that selected DN. A move to a
+different parent works on the native engine but is refused (50) on 389,
+which needs a `moddn` grant no compiled ACI has (open parity candidate
+CAND-39); a rename under the same parent works on both. Create users
 and groups on `/users/new` and `/groups/new` — the tree does not host
 those forms. Writes outside the configured suffixes are rejected.
 Multi-domain here means multiple suffixes in one lab, not an AD forest.
@@ -124,7 +127,10 @@ base may be any managed suffix or a DN under one. Attribute names
 are allow-listed. `userPassword` and other forbidden names cannot be
 requested. Filters also reject secret attributes, including nested assertions,
 attribute options, and known OID aliases. Attribute-less extensible matches
-and unknown numeric OIDs are rejected. Results expand to a redacted LDIF snippet.
+and unknown numeric OIDs are rejected. The absolute filters `(&)` and `(|)`
+(RFC 4526) are rejected by both engines with protocolError(2) "Bad search
+filter"; use `(objectClass=*)` to match every entry. Results expand to a
+redacted LDIF snippet.
 
 Profile and structured attribute writes use attribute names. Numeric OIDs
 cannot bypass password, account-state, or ACI restrictions. Use the dedicated

@@ -205,6 +205,58 @@ with more than one name in `attributes.allow` or `attributes.deny` still
 compiles to `targetattr="*"`; this pre-existing over-grant is tracked as a
 follow-up and not changed here.
 
+## Unreleased: modrdn gates, star lists, absolute filters and DSL attribute lists
+
+For the release after the CAND-33/34/35 changes above. Native now matches
+the pinned 389 image in four more places (contract C8; oracle probes
+25-29; CAND-36, CAND-37, CAND-38 and the DSL list follow-up resolved):
+
+- **ModRDN (same-parent rename) uses 389's gates.** The subject needs
+  write on the new RDN attribute on the old DN (and on the old RDN
+  attribute with deleteoldrdn); only a deny-write ACI without
+  `targetattr` blocks at entry level, and no add right is needed. A
+  rename is no longer blocked by an unrelated attribute-scoped deny such
+  as `deny (write) targetattr="description;lang-en"`.
+- **ModRDN result codes follow 389.** A subject other than Directory
+  Manager now gets 50 instead of 32 for a missing source entry. A rename
+  onto an existing DN (68) and a move beneath itself (53) are answered
+  before any access check, so these codes now tell a subject without
+  rights that the entry exists, as on 389. Renaming an entry to its own
+  DN now succeeds (it was 68) and only updates `modifyTimestamp` and
+  `modifiersName`.
+- **Absolute filters are rejected.** A search whose filter holds `(&)` or
+  `(|)` anywhere (RFC 4526) now fails with protocolError(2) "Bad search
+  filter" for every subject and base, before controls are checked; the
+  connection stays open. Clients that used `(&)` as "match everything"
+  must use `(objectClass=*)`.
+- **`targetattr!="*"` loads.** `"*"` is accepted in `targetattr` lists
+  and after `!=`. A negated list holding `"*"` covers no attribute (the
+  ACI then applies only to add, delete and the modrdn entry gate); a
+  positive one covers every attribute. Raw ACIs that stopped labldapd
+  with `invalid_aci` now load.
+- **DSL attribute lists compile to one 389 list.** `attributes.allow:
+  [uid, sn]` now emits `targetattr="uid || sn"` instead of
+  `targetattr="*"` (the over-grant noted above is fixed), `attributes.deny`
+  with no allow list emits `targetattr!="a || b"`, and both lists emit
+  the allow names that no deny name covers. New validation errors on
+  `spec.acls.<id>.attributes.deny`: `invalid_attribute_filter` for a deny
+  name with options narrower than a same-attribute allow name, for a
+  combination that leaves no attribute, and for `deny: ["*"]` (it used to
+  compile; remove the ACL or narrow it). More than 64 names in one list
+  fail schema validation (`too_many_attributes` in the compiler).
+
+Upgrade risk: DSL ACLs with more than one attribute name now grant
+**less** than before (only the listed attributes). The compiled
+directory revision changes for such scenarios, so the first write-mode
+bootstrap rewrites their ACIs; until then `verify`/`inspect` report a
+mismatch and `reset.Compare` fails, on both engines. Renames under an
+attribute-scoped deny now succeed where native refused them, and
+existence of rename targets is disclosed by 68/53 as on 389. Cross-parent
+moves are unchanged: native still allows them with entry write and add,
+while 389 refuses them for every account without a `moddn` grant,
+including the runtime account (open CAND-39, owner decision pending).
+Case-only renames still return 68 on native (open CAND-30).
+
 ## Migration guidance
 
 v0.4.0 → v0.4.1 is **additive**. `apiVersion` stays `labldap.dev/v1alpha1`.

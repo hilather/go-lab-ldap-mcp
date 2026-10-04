@@ -102,6 +102,7 @@ spec:
         deny: [userPassword]</code></pre>
         <p>That compiles to 389 ACIs. Seed user <code>alice</code> can search the suffix, bind as herself, and cannot read <code>userPassword</code>.</p>
         <p>Names in <code>attributes.allow</code> and <code>attributes.deny</code> must be attribute types the pinned 389 image defines; anything else fails validation with <code>unknown_attribute</code>.</p>
+        <p>Each list compiles to one 389 <code>targetattr</code> list: <code>allow: [uid, sn]</code> gives <code>targetattr="uid || sn"</code>, a <code>deny</code> list with no <code>allow</code> list (or <code>allow: ["*"]</code>) gives <code>targetattr!="…"</code>, and both lists give the <code>allow</code> names no <code>deny</code> name covers. A <code>deny</code> name with options narrower than a same-attribute <code>allow</code> name, a combination leaving no attribute, and <code>deny: ["*"]</code> fail with <code>invalid_attribute_filter</code>; each list holds at most 64 names.</p>
 
         <h2 id="apply">Apply</h2>
         <p>Edit <code>deploy/compose/scenario.yaml</code> (or set <code>LABLDAP_SCENARIO_FILE</code>), then <code>make compose-up</code>. Bind as a seeded user, not Directory Manager:</p>

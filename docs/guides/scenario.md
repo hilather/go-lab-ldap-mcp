@@ -199,6 +199,17 @@ Anything else, such as a typo or an object class, fails validation with
 `unknown_attribute` on `spec.acls.<id>.attributes.allow` or `.deny`,
 because 389 refuses an ACI that names it.
 
+Each list compiles to one 389 `targetattr` list. `allow` alone gives
+`targetattr="uid || sn"` (`"*"` or no list means every attribute);
+`deny` with no `allow` list (or `allow: ["*"]`, as above) gives
+`targetattr!="userPassword"`; both lists give the `allow` names that no
+`deny` name covers (`allow: [uid, sn, mail]`, `deny: [sn]` →
+`targetattr="uid || mail"`; aliases such as `rfc822Mailbox` count as
+`mail`). Validation rejects with `invalid_attribute_filter` a `deny`
+name with options narrower than an `allow` name of the same attribute
+(`allow: [mail]`, `deny: [mail;lang-en]`), a combination that leaves no
+attribute, and `deny: ["*"]`; each list holds at most 64 names.
+
 ## Apply it
 
 1. Put secret files next to the scenario (Compose mounts
