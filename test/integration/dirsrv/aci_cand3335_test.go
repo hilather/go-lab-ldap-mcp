@@ -26,6 +26,8 @@ import (
 //   - Modify checks each change's attribute, before the entry lookup;
 //   - a value written as userid is stored and checked as uid.
 //
+// 389's answer for option-bearing names depends on what the connection
+// evaluated before (D36); rows use fresh connections and one row pins it.
 // Not asserted here (open, see the parity contract): modrdn under an
 // attribute-scoped deny-write (CAND-36), targetattr!="*" (CAND-37) and
 // absolute filters such as (&), which 389 rejects (CAND-38).
@@ -85,12 +87,8 @@ func TestACITargetAttrOptionsAndEntryLevel(t *testing.T) {
 	if !pool.AppendCertsFromPEM(pem) {
 		t.Fatal("parse test CA")
 	}
-	conns := map[string]*ldap.Conn{}
 	dial := func(dn, password string) *ldap.Conn {
 		t.Helper()
-		if c, ok := conns[dn]; ok {
-			return c
-		}
 		c, err := ldap.DialURL("ldaps://"+env.ldapsAddr, ldap.DialWithTLSConfig(&tls.Config{RootCAs: pool, ServerName: env.serverName, MinVersion: tls.VersionTLS12}))
 		if err != nil {
 			t.Fatal(err)
@@ -100,9 +98,10 @@ func TestACITargetAttrOptionsAndEntryLevel(t *testing.T) {
 			t.Fatalf("bind %s: %v", dn, err)
 		}
 		t.Cleanup(func() { _ = c.Close() })
-		conns[dn] = c
 		return c
 	}
+	// Each operation uses a fresh connection: 389 reuses an earlier ACL
+	// decision for a base type on the same connection (D36, probe 24).
 	as := func(s string) *ldap.Conn { return dial("uid="+s+","+people, pw) }
 	dm := dial("cn=Directory Manager", env.dmPassword)
 	add := func(dn string, attrs [][2]string) {
@@ -190,6 +189,19 @@ func TestACITargetAttrOptionsAndEntryLevel(t *testing.T) {
 		if got := search(as(tc.subject), tc.filter); got != tc.want {
 			t.Errorf("%s: %s %s: got [%s], oracle [%s]", env.engine, tc.subject, tc.filter, got, tc.want)
 		}
+	}
+
+	// D36 (probe 24): on one connection, after (uid=fa_bob) 389 applies the
+	// uid decision to uid;x-test, so d_uidopt's deny on uid;x-test no longer
+	// hides the leaf. Native gives the fresh-connection answer every time.
+	c := as("d_uidopt")
+	_ = search(c, "(uid=fa_bob)")
+	wantD36 := ""
+	if env.engine == Engine389DS {
+		wantD36 = "fa_bob"
+	}
+	if got := search(c, "(uid;x-test=bobtag)"); got != wantD36 {
+		t.Errorf("%s: D36 d_uidopt same-connection (uid;x-test=bobtag): got [%s], want [%s]", env.engine, got, wantD36)
 	}
 
 	code := func(err error) uint16 {
