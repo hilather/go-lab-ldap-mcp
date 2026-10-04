@@ -2,6 +2,7 @@ package ds389
 
 import (
 	"context"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -85,7 +86,7 @@ func (r *Runtime) UpdateEntry(ctx context.Context, patch directory.EntryPatch) (
 		mod := newModify(ctx, r, c, dn.String(), live)
 		r.afterSearch(ctx, dn.String())
 		for _, ch := range patch.Changes {
-			if e := applyEntryChange(mod, ch); e != nil {
+			if e := applyEntryChange(mod, ch, live); e != nil {
 				return e
 			}
 		}
@@ -323,7 +324,7 @@ func requireRevision(rev directory.Revision) error {
 	return nil
 }
 
-func applyEntryChange(mod *ldap.ModifyRequest, ch directory.EntryChange) error {
+func applyEntryChange(mod *ldap.ModifyRequest, ch directory.EntryChange, live *ldap.Entry) error {
 	name := strings.TrimSpace(ch.Name)
 	if name == "" {
 		return cfgErr("changes.name", "required", "attribute name is required")
@@ -331,20 +332,102 @@ func applyEntryChange(mod *ldap.ModifyRequest, ch directory.EntryChange) error {
 	if directory.ForbiddenEntryAttr(name) || config.CanonicalAttrType(name) == "objectclass" {
 		return cfgErr("changes.name", "forbidden_attribute", "attribute is not allowed")
 	}
+	// Replace and add send the primary descriptor (gn as givenName). Delete
+	// of a second descriptor goes through aliasDeleteName (parity delta
+	// D35).
 	switch strings.ToLower(strings.TrimSpace(ch.Op)) {
 	case directory.EntryModReplace:
-		mod.Replace(name, ch.Values)
+		mod.Replace(config.PrimaryAttrDescription(name), ch.Values)
 	case directory.EntryModAdd:
 		if len(ch.Values) == 0 {
 			return cfgErr("changes.values", "required", "add requires values")
 		}
-		mod.Add(name, ch.Values)
+		mod.Add(config.PrimaryAttrDescription(name), ch.Values)
 	case directory.EntryModDelete:
-		mod.Delete(name, ch.Values)
+		mod.Delete(aliasDeleteName(name, ch.Values, live), ch.Values)
 	default:
 		return cfgErr("changes.op", "invalid", "change op must be replace, add, or delete")
 	}
 	return nil
+}
+
+// aliasDeleteName picks the attribute description an entry-update delete
+// sends (parity delta D35). Names that are not second descriptors are sent
+// as written. For an alias spelling:
+//  1. a stored row under the same alias and option set (a native legacy
+//     attribute written by direct LDAP, D17) is deleted under its stored
+//     name, so the primary attribute is never touched; a value delete
+//     takes this branch only when that row holds every named value. 389
+//     returns primary names and never takes this branch;
+//  2. an optioned spelling (rfc822Mailbox;lang-en) otherwise deletes the
+//     optioned primary description that add and replace wrote for it
+//     (mail;lang-en), using the stored name when the entry holds one with
+//     the same option set (native matches names literally, options
+//     included); bare mail is not addressed;
+//  3. a bare alias keeps the client's spelling: native answers
+//     noSuchAttribute and never touches the primary value, 389 resolves the
+//     alias itself.
+func aliasDeleteName(name string, values []string, live *ldap.Entry) string {
+	if _, ok := config.AttrAliasType(name); !ok {
+		return name
+	}
+	want := literalAttrKey(name)
+	if stored, ok := storedAttrName(live, func(n string) bool { return literalAttrKey(n) == want }); ok &&
+		(len(values) == 0 || holdsValues(live, stored, values)) {
+		return stored
+	}
+	if !strings.Contains(name, ";") {
+		return name
+	}
+	key := config.AttrDuplicateKey(name)
+	if stored, ok := storedAttrName(live, func(n string) bool {
+		_, alias := config.AttrAliasType(n)
+		return !alias && config.AttrDuplicateKey(n) == key
+	}); ok {
+		return stored
+	}
+	return config.PrimaryAttrDescription(name)
+}
+
+// literalAttrKey is the lowercase attribute description with options
+// sorted, without resolving descriptor aliases (rfc822Mailbox stays
+// rfc822mailbox).
+func literalAttrKey(name string) string {
+	parts := strings.Split(config.CanonicalAttr(name), ";")
+	opts := parts[1:]
+	sort.Strings(opts)
+	return strings.Join(append([]string{parts[0]}, opts...), ";")
+}
+
+// holdsValues reports whether live's attribute stored under name holds
+// every value in values (case-insensitive, as mail and givenName match).
+func holdsValues(live *ldap.Entry, name string, values []string) bool {
+	for _, a := range live.Attributes {
+		if a.Name != name {
+			continue
+		}
+		for _, v := range values {
+			if !slices.ContainsFunc(a.Values, func(s string) bool { return strings.EqualFold(s, v) }) {
+				return false
+			}
+		}
+		return true
+	}
+	return false
+}
+
+// storedAttrName returns the first attribute name in live that holds
+// values and satisfies match.
+func storedAttrName(live *ldap.Entry, match func(string) bool) (string, bool) {
+	if live == nil {
+		return "", false
+	}
+	for _, a := range live.Attributes {
+		if len(a.Values) > 0 && match(a.Name) {
+			return a.Name, true
+		}
+	}
+	return "", false
 }
 
 func checkRDNForClass(dn config.DN, class string) error {
@@ -418,11 +501,12 @@ func entryAddAttrs(dn config.DN, class string, extra map[string]string) ([]ldap.
 	// Planned names are dropped in every spelling (option, OID, descriptor
 	// alias); the forbidden check runs first so a protected alias is still an
 	// error. Extras de-duplicate on AttrDuplicateKey, keeping the first name
-	// in sorted order (entry create drops duplicates; the user API rejects
-	// them with duplicate_attribute).
+	// in case-insensitive order (entry create drops duplicates; the user API
+	// rejects them with duplicate_attribute), and are sent under the primary
+	// descriptor (rfc822Mailbox as mail).
 	planned := map[string]struct{}{"objectclass": {}, strings.ToLower(attr): {}, "uid": {}, "cn": {}, "sn": {}, "dc": {}, "ou": {}}
 	seen := map[string]struct{}{}
-	for _, name := range sortedNames(extra) {
+	for _, name := range duplicateOrderNames(extra) {
 		val := extra[name]
 		if directory.ForbiddenEntryAttr(name) {
 			return nil, cfgErr("attributes."+name, "forbidden_attribute", "attribute is not allowed")
@@ -437,7 +521,7 @@ func entryAddAttrs(dn config.DN, class string, extra map[string]string) ([]ldap.
 		if strings.TrimSpace(val) == "" {
 			continue
 		}
-		out = append(out, ldap.Attribute{Type: name, Vals: []string{val}})
+		out = append(out, ldap.Attribute{Type: config.PrimaryAttrDescription(name), Vals: []string{val}})
 		seen[key] = struct{}{}
 	}
 	return out, nil
@@ -481,6 +565,15 @@ func hasChildren(e *ldap.Entry) bool {
 		return true
 	}
 	return false
+}
+
+// duplicateOrderNames lists m's keys in duplicate-detection order
+// (config.SortAttrNamesForDuplicates); sortedNames stays byte-ordered for
+// its other callers.
+func duplicateOrderNames(m map[string]string) []string {
+	out := sortedNames(m)
+	config.SortAttrNamesForDuplicates(out)
+	return out
 }
 
 func sortedNames(m map[string]string) []string {

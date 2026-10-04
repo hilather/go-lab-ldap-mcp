@@ -50,10 +50,17 @@ func normalizeUsers(ctx context.Context, in *Input, peopleDN DN, resolver Secret
 				acc = append(acc, fieldErr(path+".id", "identity_mismatch", "id/uid/dn are inconsistent"))
 			}
 		}
-		var attrs []AttrKV
+		// One pass decides each name in duplicate order (case-insensitive,
+		// first wins) and records its error; a second pass only emits the
+		// kept names (sortUsers orders AttrKV by name, so the revision does
+		// not depend on this order). Names are normalized to the primary
+		// descriptor after validation, so errors keep the caller's spelling.
+		names := sortedKeys(u.Attributes)
+		dupOrder := append([]string(nil), names...)
+		SortAttrNamesForDuplicates(dupOrder)
+		keep := map[string]bool{}
 		seenAttr := map[string]string{}
-		for _, name := range sortedKeys(u.Attributes) {
-			val := u.Attributes[name]
+		for _, name := range dupOrder {
 			if ForbiddenUserWriteAttr(name) {
 				acc = append(acc, fieldErr(path+".attributes."+name, "forbidden_attribute", "attribute is not allowed on users"))
 				continue
@@ -63,7 +70,13 @@ func normalizeUsers(ctx context.Context, in *Input, peopleDN DN, resolver Secret
 				continue
 			}
 			seenAttr[AttrDuplicateKey(name)] = name
-			attrs = append(attrs, AttrKV{Name: CanonicalAttr(name), Value: val})
+			keep[name] = true
+		}
+		var attrs []AttrKV
+		for _, name := range names {
+			if keep[name] {
+				attrs = append(attrs, AttrKV{Name: CanonicalAttr(PrimaryAttrDescription(name)), Value: u.Attributes[name]})
+			}
 		}
 		enabled := true
 		if u.Enabled != nil {

@@ -76,21 +76,70 @@ func CanonicalAttrType(name string) string {
 	if resolved, ok := protectedAttributeOIDs[base]; ok {
 		return resolved
 	}
-	if resolved, ok := attributeNameAliases[base]; ok {
-		return resolved
+	if a, ok := attributeNameAliases[base]; ok {
+		return a.typ
 	}
 	return base
 }
 
-// attributeNameAliases maps second descriptors of planned attributes to their
-// primary names (RFC 4519 / pinned 389 00core.ldif NAME lists).
-var attributeNameAliases = map[string]string{
-	"userid":                 "uid",
-	"commonname":             "cn",
-	"surname":                "sn",
-	"organizationalunitname": "ou",
-	"domaincomponent":        "dc",
-	"organizationname":       "o",
+// attrAlias is one second descriptor: the lowercase type it resolves to and
+// the primary descriptor in schema casing, which writes send.
+type attrAlias struct {
+	typ     string
+	primary string
+}
+
+// attributeNameAliases maps second descriptors to their attribute type
+// (RFC 4519 / pinned 389 00core.ldif and cosine NAME lists:
+// `NAME ( 'mail' 'rfc822mailbox' )`, `NAME ( 'givenName' 'gn' )`).
+var attributeNameAliases = map[string]attrAlias{
+	"userid":                 {"uid", "uid"},
+	"commonname":             {"cn", "cn"},
+	"surname":                {"sn", "sn"},
+	"organizationalunitname": {"ou", "ou"},
+	"domaincomponent":        {"dc", "dc"},
+	"organizationname":       {"o", "o"},
+	"rfc822mailbox":          {"mail", "mail"},
+	"gn":                     {"givenname", "givenName"},
+}
+
+// AttrAliasType reports the attribute type when name's base (options
+// stripped) is a second descriptor in the alias table. Protected OIDs are
+// not aliases here.
+func AttrAliasType(name string) (string, bool) {
+	base, _, _ := strings.Cut(CanonicalAttr(name), ";")
+	a, ok := attributeNameAliases[base]
+	return a.typ, ok
+}
+
+// PrimaryAttrDescription rewrites a second descriptor in the alias table to
+// the primary descriptor, keeping any options as written (rfc822Mailbox;x-a
+// becomes mail;x-a, GN becomes givenName). Other names come back trimmed and
+// unchanged. Writes send this spelling so both engines store the same name.
+func PrimaryAttrDescription(name string) string {
+	name = strings.TrimSpace(name)
+	base, opts, hasOpts := strings.Cut(name, ";")
+	a, ok := attributeNameAliases[strings.ToLower(strings.TrimSpace(base))]
+	if !ok {
+		return name
+	}
+	if !hasOpts {
+		return a.primary
+	}
+	return a.primary + ";" + opts
+}
+
+// SortAttrNamesForDuplicates orders attribute names for duplicate detection:
+// case-insensitive, with byte order as the tie-break, so the first name in
+// that order wins (givenName before GN and gn; mail before rfc822Mailbox).
+func SortAttrNamesForDuplicates(names []string) {
+	sort.SliceStable(names, func(i, j int) bool {
+		li, lj := strings.ToLower(names[i]), strings.ToLower(names[j])
+		if li != lj {
+			return li < lj
+		}
+		return names[i] < names[j]
+	})
 }
 
 // AttrDuplicateKey identifies attribute names that address the same values:

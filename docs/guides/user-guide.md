@@ -50,7 +50,11 @@ same write rule as the user API (below): `objectClass`, option or alias
 spellings of `uid`/`cn`/`sn` (`cn;lang-en`, `commonName`, `surname`,
 `userid`), numeric OIDs and protected names are rejected, and two keys that
 address the same attribute (`mail` and `Mail`, `ou` and
-`organizationalUnitName`) are a `duplicate_attribute` error.
+`organizationalUnitName`, `mail` and `rfc822Mailbox`, `givenName` and `gn`)
+are a `duplicate_attribute` error, reported on the later name in
+case-insensitive order. Second descriptors (`rfc822Mailbox`, `gn`,
+`organizationalUnitName`, …) are seeded under the primary name (`mail`,
+`givenName`, `ou`).
 Earlier releases silently dropped some of these spellings during seeding; a
 scenario that used them now fails to compile until they are removed. YAML is the compiled baseline
 (`startupMode: merge`); UI / REST / MCP mutations are live until soft reset
@@ -133,16 +137,36 @@ every `objectClass` spelling, and any non-bare spelling of `uid`, `cn` or
 writable through their normal fields. Names that address the same attribute
 (case variants, option order, or one of the resolved second descriptors
 `userid`, `commonName`, `surname`, `organizationalUnitName`,
-`domainComponent`, `organizationName`) are a `duplicate_attribute` error.
-Other second descriptors (`gn`, `rfc822Mailbox`, `localityName`, …) are not
-resolved, so do not send both spellings of one attribute. The user view shows only spellings this rule
+`domainComponent`, `organizationName`, `rfc822Mailbox`, `gn`) are a
+`duplicate_attribute` error on the later name in case-insensitive order
+(`givenName` + `GN` flags `GN`). User writes send a resolved second
+descriptor under its primary name, so `{"rfc822Mailbox": "a@x"}` is stored
+and shown as `mail` on both engines. Other second descriptors
+(`localityName`, `countryName`, …) are not resolved, so do not send both
+spellings of one attribute. The user view shows only spellings this rule
 accepts: optioned values such as `cn;lang-en` are hidden there and managed
-through the entry API, and an engine-returned alias such as `commonName` is
-shown as `cn`. Because optioned values are not part of the user view, they
+through the entry API, and attributes are listed under their primary names
+(`cn`, `mail`, `givenname`). Because optioned values are not part of the user view, they
 do not contribute to the user revision. Entry create with `inetOrgPerson` differs: it does not reject
 option or alias spellings of the planned names, it drops them and writes the
 planned `uid`/`cn`/`sn` values, and it keeps only the first of two names
-that address the same attribute (protected names are still rejected). User and account actions
+that address the same attribute in case-insensitive order (`mail` over
+`rfc822Mailbox`); protected names are still rejected. Entry create and the
+replace/add operations of entry update send `rfc822Mailbox`/`gn` as
+`mail`/`givenName`; entry-update delete keeps the spelling you send. On the
+native engine an attribute written earlier under an alias spelling by direct
+LDAP (for example `rfc822Mailbox`) is stored under that name, shown only in
+the entry view, and removed with a delete of that alias row; do not use
+"Replace values" on it, which writes the primary attribute instead. The
+console's attribute editor refuses replace and add for every alias name
+(`userid`, `commonName`, `surname`, `organizationalUnitName`,
+`domainComponent`, `organizationName`, `rfc822Mailbox`, `gn`) and allows
+delete only when the entry shows a row under that alias spelling. An
+entry-update delete of an optioned alias with no such row
+(`rfc822Mailbox;lang-en`) removes the optioned primary (`mail;lang-en`) it
+wrote; a bare alias delete never removes the primary attribute on native
+(parity delta D35). Search filters, compare, and search attribute lists on
+native do not resolve aliases yet. User and account actions
 share an opaque revision that changes when lock or password-expiry state
 changes; refresh existing revisions after upgrading.
 

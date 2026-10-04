@@ -498,7 +498,7 @@ export interface paths {
         head?: never;
         /**
          * Update allowlisted attributes by DN
-         * @description Sibling of ldap_update_entry. Requires If-Match.
+         * @description Sibling of ldap_update_entry. Requires If-Match. A delete of an attribute or value the entry does not hold, or an add of a value it already holds, answers 409 (field path `attribute` or `entry`, code `conflict`).
          */
         patch: operations["updateEntry"];
         trace?: never;
@@ -2257,6 +2257,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
         };
     };
