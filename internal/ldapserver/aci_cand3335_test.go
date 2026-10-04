@@ -324,3 +324,46 @@ func TestEmptyFilterOptionMatchesNothing(t *testing.T) {
 		}
 	}
 }
+
+// TestCodeSweepEdgeCases pins the code-sweep follow-ups: an empty targetattr
+// option covers nothing (not even a description with an empty option), a
+// description with an empty base fails closed instead of becoming an
+// entry-level check, and pwdChangedTime never counts for visibility.
+func TestCodeSweepEdgeCases(t *testing.T) {
+	t.Parallel()
+	p, err := ParseACITextA(`(target="ldap:///dc=example,dc=test")(targetattr="uid;")(version 3.0; acl "e"; allow (read,search) userdn="ldap:///anyone";)`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, opts := range [][]string{nil, {""}, {"x-test"}} {
+		if p.TargetsAttr("uid", opts) {
+			t.Errorf(`targetattr="uid;" covers uid with options %q`, opts)
+		}
+	}
+
+	opts := testOptions()
+	opts.Schema = standardSchemaT(t)
+	opts.ACI = nil
+	opts.ACITexts = []string{`(target="ldap:///dc=example,dc=test")(targetattr="*")(version 3.0; acl "all"; allow (read,search,write) userdn="ldap:///uid=someone,ou=people,dc=example,dc=test";)`}
+	srv, err := New(opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	s := Subject{DN: mustDNA(t, "uid=someone,ou=people,dc=example,dc=test")}
+	target := mustDNA(t, "ou=probe-fattr,dc=example,dc=test")
+	if err := srv.opts.Store.View(ctx, func(tx ReadTx) error {
+		if !srv.allowed(ctx, tx, s, target, "description", PermWrite) {
+			t.Error("control: write on description denied")
+		}
+		if srv.allowed(ctx, tx, s, target, ";x", PermWrite) {
+			t.Error(`write on ";x" allowed; want fail-closed`)
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if srv.countsForVisibility("pwdChangedTime") {
+		t.Error("pwdChangedTime counts for visibility")
+	}
+}

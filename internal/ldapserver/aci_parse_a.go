@@ -21,12 +21,12 @@ package ldapserver
 import (
 	"errors"
 	"fmt"
-	"github.com/hilather/go-lab-ldap-mcp/internal/schema389"
 	"regexp"
 	"strings"
 	"unicode/utf8"
 
 	"github.com/hilather/go-lab-ldap-mcp/internal/config"
+	"github.com/hilather/go-lab-ldap-mcp/internal/schema389"
 )
 
 // MaxACITextBytesA bounds the input ParseACITextA accepts. Compiler output
@@ -212,6 +212,12 @@ func aciAttrInA(list []string, base string, opts []string) bool {
 		}
 		covered := true
 		for _, o := range strings.Split(rest, ";") {
+			if o == "" {
+				// An empty targetattr option covers nothing, not even a
+				// description carrying an empty option (probes 16, 18).
+				covered = false
+				break
+			}
 			found := false
 			for _, have := range opts {
 				if strings.EqualFold(o, have) {

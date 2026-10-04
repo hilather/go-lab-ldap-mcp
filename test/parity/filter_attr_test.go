@@ -53,6 +53,36 @@ var fattrSubjects = []struct {
 	{"q_entryuuid", [][2]string{{`(targetattr="userid")`, fattrRSC}, {`(targetattr="entryUUID")`, "read"}}},
 }
 
+// fattr35Subjects are the probe 14/16/18 subjects for resolved CAND-34/35:
+// options inside targetattr, deny ACIs ("deny:" permission prefix) and an
+// omitted targetattr (empty clause). Their rows run on a fresh connection
+// each, because 389 reuses a connection's earlier decision for the plain
+// type when it later checks an option-bearing description (D36).
+var fattr35Subjects = []struct {
+	id   string
+	acis [][2]string
+	rows []fattrRow
+}{
+	{"t_uidopt", [][2]string{{`(targetattr="uid;x-test")`, fattrRSC}},
+		[]fattrRow{{"(uid=fa_bob)", ""}, {"(uid;x-test=bobtag)", "fa_bob"}, {"(uid;X-TEST=bobtag)", "fa_bob"}, {"(sn=S)", ""}}},
+	{"t_uidsemi", [][2]string{{`(targetattr="uid;")`, fattrRSC}},
+		[]fattrRow{{"(uid=fa_bob)", ""}, {"(uid;x-test=bobtag)", ""}}},
+	{"t_deny_uidopt", [][2]string{{`(targetattr!="uid;x-test")`, fattrRSC}},
+		[]fattrRow{{"(uid=fa_bob)", "fa_bob"}, {"(uid;x-test=bobtag)", ""}, {"(sn=S)", fattrAll}}},
+	{"d_uidopt", [][2]string{{`(targetattr="*")`, fattrRSC}, {`(targetattr="uid;x-test")`, "deny:" + fattrRSC}},
+		[]fattrRow{{"(uid=fa_bob)", "fa_bob"}, {"(uid;x-test=bobtag)", ""}, {"(description=hello)", "fa_bob"}}},
+	{"r_deny_pw_search", [][2]string{{`(targetattr="*")`, fattrRSC}, {`(targetattr="userPassword")`, "deny:search"}},
+		[]fattrRow{{"(sn=S)", fattrAll}, {"(uid=fa_bob)", "fa_bob"}, {"(userPassword=*)", ""}}},
+	{"e_deny_noattr", [][2]string{{`(targetattr="*")`, fattrRSC}, {``, "deny:search"}},
+		[]fattrRow{{"(sn=S)", fattrAll}, {"(uid=fa_bob)", "fa_bob"}}},
+	{"e_deny_pwsn", [][2]string{{`(targetattr="*")`, fattrRSC}, {`(targetattr="userPassword || sn")`, "deny:search"}},
+		[]fattrRow{{"(sn=S)", ""}, {"(uid=fa_bob)", "fa_bob"}, {"(objectClass=*)", fattrAll}}},
+	{"e_allow_noattr", [][2]string{{``, fattrRSC}},
+		[]fattrRow{{"(objectClass=*)", ""}, {"(uid=fa_bob)", ""}}},
+	{"e_allow_noattr_u", [][2]string{{``, fattrRSC}, {`(targetattr="uid")`, "read,search"}},
+		[]fattrRow{{"(uid=*)", fattrAll}, {"(sn=S)", ""}}},
+}
+
 // fattrVisRows are the probe 8/10 rows (389 DN sets, generated from the
 // transcripts) for the subjects added with CAND-31/32.
 var fattrVisRows = map[string][]fattrRow{
@@ -240,6 +270,17 @@ var fattrVisRows = map[string][]fattrRow{
 func filterAttrFixture(t *testing.T) *fixture {
 	t.Helper()
 	var acls strings.Builder
+	for _, s := range fattr35Subjects {
+		for i, a := range s.acis {
+			action, perms := "allow", a[1]
+			if p, ok := strings.CutPrefix(perms, "deny:"); ok {
+				action, perms = "deny", p
+			}
+			id := fmt.Sprintf("%s-%d", strings.ReplaceAll(s.id, "_", "-"), i)
+			fmt.Fprintf(&acls, "    - id: %s\n      rawACI: '(target=\"ldap:///%s\")%s(version 3.0; acl \"labldap:%s\"; %s (%s) userdn=\"ldap:///uid=%s,%s\";)'\n",
+				id, fattrOU, a[0], id, action, perms, s.id, peopleDN)
+		}
+	}
 	for _, s := range fattrSubjects {
 		// Probe 6/8/10 rawACI texts verbatim (target clause, one targetattr).
 		for i, a := range s.acis {
@@ -294,12 +335,18 @@ func seedFilterAttr(t *testing.T, dm *ldap.Conn) {
 	for _, s := range fattrSubjects {
 		add(userDN(s.id), map[string][]string{"objectClass": person, "uid": {s.id}, "cn": {s.id}, "sn": {"S"}, "userPassword": {fattrPassword}})
 	}
+	for _, s := range fattr35Subjects {
+		add(userDN(s.id), map[string][]string{"objectClass": person, "uid": {s.id}, "cn": {s.id}, "sn": {"S"}, "userPassword": {fattrPassword}})
+	}
 }
 
 func cleanupFilterAttr(t *testing.T, dm *ldap.Conn) {
 	t.Helper()
 	dns := []string{fattrDN("fa_alice"), fattrDN("fa_bob"), fattrDN("fa_carol"), fattrOU}
 	for _, s := range fattrSubjects {
+		dns = append(dns, userDN(s.id))
+	}
+	for _, s := range fattr35Subjects {
 		dns = append(dns, userDN(s.id))
 	}
 	for _, dn := range dns {
@@ -451,6 +498,13 @@ func filterAttrOutcomes(t *testing.T, e engine) []opOutcome {
 		conn := mustDial(t, e, userSpec(userDN(s.id), fattrPassword))
 		run(conn, s.id, fattrSubjectRows(s.id))
 		conn.Close()
+	}
+	for _, s := range fattr35Subjects {
+		for _, r := range s.rows {
+			conn := mustDial(t, e, userSpec(userDN(s.id), fattrPassword))
+			run(conn, s.id, []fattrRow{r})
+			conn.Close()
+		}
 	}
 	for _, c := range fattrCompare {
 		code := ldap.LDAPResultCompareFalse

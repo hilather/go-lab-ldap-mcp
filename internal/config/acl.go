@@ -1,13 +1,13 @@
 package config
 
 import (
-	"github.com/hilather/go-lab-ldap-mcp/internal/schema389"
 	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/hilather/go-lab-ldap-mcp/internal/apperr"
 	"github.com/hilather/go-lab-ldap-mcp/internal/config/v1alpha1"
+	"github.com/hilather/go-lab-ldap-mcp/internal/schema389"
 )
 
 var (
@@ -179,16 +179,11 @@ func emitACI(a v1alpha1.ACL, n *Normalized) (string, string, error) {
 	}
 	allow := "*"
 	deny := ""
+	// Every element was validated above.
 	if len(a.Attributes.Allow) == 1 {
-		if !aciAttrRe.MatchString(a.Attributes.Allow[0]) {
-			return "", "", fieldErr("spec.acls."+a.ID+".attributes.allow", "invalid_attribute", "attribute name is not allowed")
-		}
 		allow = a.Attributes.Allow[0]
 	}
 	if len(a.Attributes.Deny) == 1 {
-		if !aciAttrRe.MatchString(a.Attributes.Deny[0]) {
-			return "", "", fieldErr("spec.acls."+a.ID+".attributes.deny", "invalid_attribute", "attribute name is not allowed")
-		}
 		deny = a.Attributes.Deny[0]
 	}
 	b := aciBuilder{name: "labldap:" + a.ID, targetDN: tgt, perms: perms, allow: allow, deny: deny, who: who}

@@ -104,7 +104,13 @@ func (s *Server) allowed(ctx context.Context, tx ReadTx, subj Subject, target co
 	if _, rest, ok := strings.Cut(attr, ";"); ok {
 		opts = splitAttrOptions(rest)
 	}
-	return s.allowedIdentity(ctx, tx, subj, target, s.attributeIdentity(attr), opts, perm)
+	id := s.attributeIdentity(attr)
+	if attr != "" && id == "" {
+		// A description with an empty base (";x") must not fall through to
+		// an entry-level check; fail closed.
+		return false
+	}
+	return s.allowedIdentity(ctx, tx, subj, target, id, opts, perm)
 }
 
 // allowedIdentity is allowed for an attribute identity the caller already

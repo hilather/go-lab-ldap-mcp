@@ -22,5 +22,5 @@ Confirm the root `LICENSE` is MIT. Do not push images (OD-004).
     `internal/schema389/attributetypes.txt` with oracle probe 17
     (`test/parity/testdata/filter-attr-oracle-probes.txt`);
     `TestDataMatchesPinnedImage` fails until the header digest matches.
-16. Tag annotated: `git tag -a vX.Y.Z -m "LabLDAP vX.Y.Z"`.
-17. Do **not** `docker push`. Confirm `LICENSE` remains the MIT text.
+17. Tag annotated: `git tag -a vX.Y.Z -m "LabLDAP vX.Y.Z"`.
+18. Do **not** `docker push`. Confirm `LICENSE` remains the MIT text.
