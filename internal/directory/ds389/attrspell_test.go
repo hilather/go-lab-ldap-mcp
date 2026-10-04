@@ -171,24 +171,29 @@ func TestAliasDeleteName(t *testing.T) {
 		"givenName;LANG-FR": {"Alice"},
 	})
 	cases := []struct {
-		name string
-		live *ldap.Entry
-		want string
+		name   string
+		values []string
+		live   *ldap.Entry
+		want   string
 	}{
-		{"rfc822Mailbox;lang-en", legacy, "rfc822Mailbox;lang-en"},     // 1: literal legacy row
-		{"RFC822MAILBOX", legacy, "rfc822Mailbox"},                     // 1: stored spelling
-		{"rfc822Mailbox;lang-en", primaryOnly, "mail;lang-en"},         // 2: no row, optioned
-		{"rfc822Mailbox;lang-en;x-a", primaryOnly, "mail;x-a;lang-en"}, // 2: stored option order
-		{"GN;lang-fr", primaryOnly, "givenName;LANG-FR"},               // 2: stored primary row
-		{"GN;X-A", primaryOnly, "givenName;X-A"},                       // 2: nothing stored
-		{"rfc822Mailbox", primaryOnly, "rfc822Mailbox"},                // 3: bare alias kept
-		{"commonName", nil, "commonName"},                              // 3: no live entry
-		{"mail;lang-en", legacy, "mail;lang-en"},                       // not an alias
-		{"description", legacy, "description"},                         // not an alias
+		{name: "rfc822Mailbox;lang-en", live: legacy, want: "rfc822Mailbox;lang-en"},     // 1: literal legacy row
+		{name: "RFC822MAILBOX", live: legacy, want: "rfc822Mailbox"},                     // 1: stored spelling
+		{name: "rfc822Mailbox;lang-en", live: primaryOnly, want: "mail;lang-en"},         // 2: no row, optioned
+		{name: "rfc822Mailbox;lang-en;x-a", live: primaryOnly, want: "mail;x-a;lang-en"}, // 2: stored option order
+		{name: "GN;lang-fr", live: primaryOnly, want: "givenName;LANG-FR"},               // 2: stored primary row
+		{name: "GN;X-A", live: primaryOnly, want: "givenName;X-A"},                       // 2: nothing stored
+		{name: "rfc822Mailbox", live: primaryOnly, want: "rfc822Mailbox"},                // 3: bare alias kept
+		{name: "commonName", live: nil, want: "commonName"},                              // 3: no live entry
+		{name: "mail;lang-en", live: legacy, want: "mail;lang-en"},                       // not an alias
+		{name: "description", live: legacy, want: "description"},
+		// Value deletes reach the legacy row only when it holds the values.
+		{name: "rfc822Mailbox;lang-en", values: []string{"LEGACY-EN@example.test"}, live: legacy, want: "rfc822Mailbox;lang-en"},
+		{name: "rfc822Mailbox;lang-en", values: []string{"real-en@example.test"}, live: legacy, want: "mail;lang-en"},
+		{name: "rfc822Mailbox", values: []string{"real@example.test"}, live: legacy, want: "rfc822Mailbox"}, // not an alias
 	}
 	for _, tc := range cases {
 		mod := ldap.NewModifyRequest("uid=alice,ou=people,dc=example,dc=test", nil)
-		if err := applyEntryChange(mod, directory.EntryChange{Op: directory.EntryModDelete, Name: tc.name}, tc.live); err != nil {
+		if err := applyEntryChange(mod, directory.EntryChange{Op: directory.EntryModDelete, Name: tc.name, Values: tc.values}, tc.live); err != nil {
 			t.Fatal(err)
 		}
 		if got := mod.Changes[0].Modification.Type; got != tc.want {

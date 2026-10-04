@@ -310,6 +310,9 @@ func TestOptionedAliasDeleteRoundTrip(t *testing.T) {
 	if err := dm.Modify(mod); err != nil {
 		t.Fatalf("direct LDAP legacy write: %v", err)
 	}
+	if _, ent := entryAttrValues(t, svc, writer, aliceDN); !slices.Equal(ent["rfc822mailbox;lang-en"], []string{"legacy-en@example.test"}) || !slices.Equal(ent["mail;lang-en"], []string{"real-en@example.test"}) {
+		t.Fatalf("native setup: want the legacy row beside mail;lang-en: %v", ent)
+	}
 	if err := update(directory.EntryChange{Name: "RFC822Mailbox;LANG-EN", Op: "delete"}); err != nil {
 		t.Fatalf("delete optioned legacy alias: %v", err)
 	}

@@ -40,7 +40,7 @@ register only when the matching `register*` flag is true (OD-016).
 | `ldap_list_suffixes` | proposed | #5 | `directory:read` | on | `GET /api/v1/suffixes` |
 | `ldap_list_tree` | proposed | #5 | `directory:read` | on | `POST /api/v1/tree`; base must be a managed suffix or descendant |
 | `ldap_create_entry` | proposed | #5 | `directory:write` | `registerMutations` | Allowlisted classes only; DN under a managed suffix |
-| `ldap_update_entry` | proposed | #5 | `directory:write` | `registerMutations` | Requires `revision`; no raw LDAP mods |
+| `ldap_update_entry` | proposed | #5 | `directory:write` | `registerMutations` | Requires `revision`; no raw LDAP mods; a delete of an attribute or value the entry does not hold is `conflict` on field `attribute` (REST 409) |
 | `ldap_delete_entry` | proposed | #5 | `directory:write` | `registerMutations` | Destructive; `confirm` + `revision`; recursive for non-empty |
 | `ldap_move_entry` | proposed | #5 | `directory:write` | `registerMutations` | New DN must stay under a managed suffix |
 | `ldap_bind_test` | proposed | T-091 | `directory:password` | `registerPassword` | Unknown user ≡ wrong password |

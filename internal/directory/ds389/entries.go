@@ -2,6 +2,7 @@ package ds389
 
 import (
 	"context"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -343,7 +344,7 @@ func applyEntryChange(mod *ldap.ModifyRequest, ch directory.EntryChange, live *l
 		}
 		mod.Add(config.PrimaryAttrDescription(name), ch.Values)
 	case directory.EntryModDelete:
-		mod.Delete(aliasDeleteName(name, live), ch.Values)
+		mod.Delete(aliasDeleteName(name, ch.Values, live), ch.Values)
 	default:
 		return cfgErr("changes.op", "invalid", "change op must be replace, add, or delete")
 	}
@@ -355,8 +356,9 @@ func applyEntryChange(mod *ldap.ModifyRequest, ch directory.EntryChange, live *l
 // as written. For an alias spelling:
 //  1. a stored row under the same alias and option set (a native legacy
 //     attribute written by direct LDAP, D17) is deleted under its stored
-//     name, so the primary attribute is never touched; 389 returns primary
-//     names and never takes this branch;
+//     name, so the primary attribute is never touched; a value delete
+//     takes this branch only when that row holds every named value. 389
+//     returns primary names and never takes this branch;
 //  2. an optioned spelling (rfc822Mailbox;lang-en) otherwise deletes the
 //     optioned primary description that add and replace wrote for it
 //     (mail;lang-en), using the stored name when the entry holds one with
@@ -365,12 +367,13 @@ func applyEntryChange(mod *ldap.ModifyRequest, ch directory.EntryChange, live *l
 //  3. a bare alias keeps the client's spelling: native answers
 //     noSuchAttribute and never touches the primary value, 389 resolves the
 //     alias itself.
-func aliasDeleteName(name string, live *ldap.Entry) string {
+func aliasDeleteName(name string, values []string, live *ldap.Entry) string {
 	if _, ok := config.AttrAliasType(name); !ok {
 		return name
 	}
 	want := literalAttrKey(name)
-	if stored, ok := storedAttrName(live, func(n string) bool { return literalAttrKey(n) == want }); ok {
+	if stored, ok := storedAttrName(live, func(n string) bool { return literalAttrKey(n) == want }); ok &&
+		(len(values) == 0 || holdsValues(live, stored, values)) {
 		return stored
 	}
 	if !strings.Contains(name, ";") {
@@ -394,6 +397,23 @@ func literalAttrKey(name string) string {
 	opts := parts[1:]
 	sort.Strings(opts)
 	return strings.Join(append([]string{parts[0]}, opts...), ";")
+}
+
+// holdsValues reports whether live's attribute stored under name holds
+// every value in values (case-insensitive, as mail and givenName match).
+func holdsValues(live *ldap.Entry, name string, values []string) bool {
+	for _, a := range live.Attributes {
+		if a.Name != name {
+			continue
+		}
+		for _, v := range values {
+			if !slices.ContainsFunc(a.Values, func(s string) bool { return strings.EqualFold(s, v) }) {
+				return false
+			}
+		}
+		return true
+	}
+	return false
 }
 
 // storedAttrName returns the first attribute name in live that holds
