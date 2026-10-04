@@ -119,7 +119,7 @@ func (r *Runtime) Capabilities(ctx context.Context) (directory.Capabilities, err
 func (r *Runtime) fetchRootDSE(ctx context.Context) (directory.RootDSE, error) {
 	size, seconds := r.searchLimits()
 	var out directory.RootDSE
-	err := r.pool.Do(ctx, func(c *ldapclient.Conn) error {
+	err := r.pool.DoRead(ctx, func(c *ldapclient.Conn) error {
 		res, e := c.Search(ctx, &ldap.SearchRequest{
 			BaseDN:       "",
 			Scope:        ldap.ScopeBaseObject,
@@ -150,7 +150,7 @@ func (r *Runtime) fetchSchema(ctx context.Context) (directory.Schema, error) {
 	sub := "cn=schema"
 	size, seconds := r.searchLimits()
 	var out directory.Schema
-	err = r.pool.Do(ctx, func(c *ldapclient.Conn) error {
+	err = r.pool.DoRead(ctx, func(c *ldapclient.Conn) error {
 		if subEntry, e := searchBaseConn(ctx, c, "", []string{"subschemaSubentry"}, 1, seconds); e == nil {
 			if v := subEntry.GetAttributeValue("subschemaSubentry"); v != "" {
 				sub = v

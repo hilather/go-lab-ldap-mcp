@@ -36,17 +36,18 @@ type Plan struct {
 
 // PlanConfig is compiled geometry plus configured baseline DNs.
 type PlanConfig struct {
-	PeopleDN         string
-	GroupsDN         string
-	Suffix           string
-	RuntimeDN        string
-	MarkerDN         string
-	ConfiguredUsers  []string
-	ConfiguredGroups []string
+	PeopleDN           string
+	GroupsDN           string
+	AdditionalSuffixes []string
+	Suffix             string
+	RuntimeDN          string
+	MarkerDN           string
+	ConfiguredUsers    []string
+	ConfiguredGroups   []string
 }
 
 // BuildPlan inventories extras and orders deletes. It never includes DNs
-// outside people/groups, the runtime account, required containers, or the marker.
+// outside managed write areas, or the runtime account, required roots and containers, or marker.
 func BuildPlan(inv directory.ManagedInventory, cfg PlanConfig) Plan {
 	preserve := preserveSet(inv, cfg)
 	configured := dnSet(append(append([]string{}, cfg.ConfiguredUsers...), cfg.ConfiguredGroups...))
@@ -177,6 +178,9 @@ func preserveSet(inv directory.ManagedInventory, cfg PlanConfig) map[string]stru
 	add(cfg.GroupsDN)
 	add(cfg.MarkerDN)
 	add(cfg.Suffix)
+	for _, suffix := range cfg.AdditionalSuffixes {
+		add(suffix)
+	}
 	for _, p := range inv.Preserve {
 		add(p)
 	}
@@ -184,7 +188,15 @@ func preserveSet(inv directory.ManagedInventory, cfg PlanConfig) map[string]stru
 }
 
 func underManagedContainers(dn string, cfg PlanConfig) bool {
-	return underContainer(dn, cfg.PeopleDN) || underContainer(dn, cfg.GroupsDN)
+	if underContainer(dn, cfg.PeopleDN) || underContainer(dn, cfg.GroupsDN) {
+		return true
+	}
+	for _, suffix := range cfg.AdditionalSuffixes {
+		if underContainer(dn, suffix) {
+			return true
+		}
+	}
+	return false
 }
 
 func underContainer(dn, container string) bool {

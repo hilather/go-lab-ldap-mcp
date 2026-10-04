@@ -24,7 +24,7 @@ func (r *Runtime) Export(ctx context.Context, w io.Writer, opts directory.Export
 		return directory.ExportError("export", directory.FieldUnavailable, "export writer is not configured")
 	}
 	opts = r.exportOpts(opts)
-	dns, err := r.listExportDNs(ctx)
+	dns, err := r.listExportDNs(ctx, opts.MaxEntries)
 	if err != nil {
 		return err
 	}
@@ -60,17 +60,17 @@ func (r *Runtime) exportOpts(opts directory.ExportOptions) directory.ExportOptio
 	return opts
 }
 
-func (r *Runtime) listExportDNs(ctx context.Context) ([]string, error) {
+func (r *Runtime) listExportDNs(ctx context.Context, maxEntries int) ([]string, error) {
 	page := r.cfg.InventoryPageSize
 	if page <= 0 {
 		page = r.pageSize(0)
 	}
 	_, seconds := r.searchLimits()
 	var dns []string
-	err := r.pool.Do(ctx, func(c *ldapclient.Conn) error {
+	err := r.pool.DoRead(ctx, func(c *ldapclient.Conn) error {
 		var all []string
 		for _, base := range r.managedSuffixStrings() {
-			got, e := pageExportDNs(ctx, c, base, uint32(page), seconds)
+			got, e := pageExportDNs(ctx, c, base, uint32(page), seconds, maxEntries-len(all))
 			if e != nil {
 				return e
 			}
@@ -91,7 +91,7 @@ func (r *Runtime) listExportDNs(ctx context.Context) ([]string, error) {
 func (r *Runtime) readExportEntry(ctx context.Context, dn string) (directory.SearchEntry, error) {
 	_, seconds := r.searchLimits()
 	var out directory.SearchEntry
-	err := r.pool.Do(ctx, func(c *ldapclient.Conn) error {
+	err := r.pool.DoRead(ctx, func(c *ldapclient.Conn) error {
 		ent, e := searchBaseConn(ctx, c, dn, []string{"*", "+"}, 0, seconds)
 		if e != nil {
 			return e
@@ -102,7 +102,7 @@ func (r *Runtime) readExportEntry(ctx context.Context, dn string) (directory.Sea
 	return out, err
 }
 
-func pageExportDNs(ctx context.Context, c *ldapclient.Conn, base string, page uint32, seconds int) ([]string, error) {
+func pageExportDNs(ctx context.Context, c *ldapclient.Conn, base string, page uint32, seconds, maxEntries int) ([]string, error) {
 	if strings.TrimSpace(base) == "" {
 		return nil, nil
 	}
@@ -131,6 +131,9 @@ func pageExportDNs(ctx context.Context, c *ldapclient.Conn, base string, page ui
 		for _, e := range res.Entries {
 			if e == nil || strings.TrimSpace(e.DN) == "" {
 				continue
+			}
+			if len(dns) >= maxEntries {
+				return nil, directory.ExportLimit("export.entries", "export entry limit exceeded")
 			}
 			dns = append(dns, e.DN)
 		}

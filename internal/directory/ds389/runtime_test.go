@@ -483,3 +483,16 @@ func TestConfigFieldCodes(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestSearchRejectsSecretPredicatesAndAliases(t *testing.T) {
+	for _, filter := range []string{"(userPassword=*)", "(userPassword=prefix*)", "(2.5.4.35=*)", "(userPassword;binary=*)", "(&(uid=alice)(!(authPassword=secret)))", "(userPassword:octetStringMatch:=x)", "(:octetStringMatch:=x)"} {
+		if err := validateSearchFilter(filter); err == nil {
+			t.Fatalf("secret oracle filter accepted: %s", filter)
+		}
+	}
+	for _, filter := range []string{"(uid=alice)", "(&(uid=alice)(description=literal-userPassword))", "(cn:caseIgnoreMatch:=alice)", "(description;lang-en=hello)"} {
+		if err := validateSearchFilter(filter); err != nil {
+			t.Fatalf("safe filter %s: %v", filter, err)
+		}
+	}
+}

@@ -79,7 +79,8 @@ import (
 
 // indexVersion is the posting format version stored in idxmeta. Bump it when
 // normalizeIndexKey changes so open/migration can force RebuildIndexes.
-const indexVersion uint64 = 1
+// Version 2 also migrates structural DN keys to escaped FoldedKey values.
+const indexVersion uint64 = 2
 
 // idxMetaBucket holds index bookkeeping; key "version" is an 8-byte
 // big-endian indexVersion.

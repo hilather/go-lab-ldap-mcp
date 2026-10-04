@@ -1170,6 +1170,49 @@
         },
         {
           "code": 0
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 0,
+          "value": "1:ws  src"
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 0
+        },
+        {
+          "code": 0,
+          "value": "1:ws  dy"
+        },
+        {
+          "code": 0,
+          "value": "1:0"
+        },
+        {
+          "code": 0,
+          "value": "0:"
+        },
+        {
+          "code": 0,
+          "value": "0:"
+        },
+        {
+          "code": 0,
+          "value": "1:0"
+        },
+        {
+          "code": 0,
+          "value": "0:"
         }
       ]
     },
@@ -1730,7 +1773,7 @@
     {
       "id": "CAND-6",
       "topic": "rename into own subtree",
-      "verdict": "delta",
+      "verdict": "match",
       "oracle": [
         {
           "code": 53
@@ -1764,13 +1807,33 @@
       ],
       "native": [
         {
-          "code": 0
+          "code": 53
         },
         {
-          "code": 32
+          "code": 0,
+          "entries": [
+            {
+              "dn": "ou=movedemo,dc=example,dc=test",
+              "attrs": {
+                "ou": [
+                  "movedemo"
+                ]
+              }
+            }
+          ]
         },
         {
-          "code": 0
+          "code": 0,
+          "entries": [
+            {
+              "dn": "ou=movedemo,dc=example,dc=test",
+              "attrs": {
+                "ou": [
+                  "movedemo"
+                ]
+              }
+            }
+          ]
         }
       ]
     },

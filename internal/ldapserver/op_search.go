@@ -26,7 +26,7 @@ var errSearchLimit = errors.New("ldapserver: search limit reached")
 // limit wins. Partial results are returned with sizeLimitExceeded or
 // timeLimitExceeded in the SearchResultDone.
 func (s *Server) handleSearch(ctx context.Context, c *conn, m *Message, req *SearchRequest) ResultCode {
-	return s.runSearch(ctx, c, m, req, c.subject())
+	return s.runSearch(ctx, c, m, req, operationSubject(ctx, c))
 }
 
 func (s *Server) runSearch(ctx context.Context, c *conn, m *Message, req *SearchRequest, subj Subject) ResultCode {
@@ -77,27 +77,7 @@ func (s *Server) runSearch(ctx context.Context, c *conn, m *Message, req *Search
 	var matched []*Entry
 	code := ResultSuccess
 	viewErr := s.opts.Store.View(ctx, func(tx ReadTx) error {
-		var candidates []*Entry
-		var err error
-		switch req.Scope {
-		case ScopeBaseObject:
-			e, err2 := tx.Entry(ctx, base)
-			if err2 != nil {
-				return err2
-			}
-			candidates = []*Entry{e}
-		case ScopeSingleLevel, ScopeChildren:
-			candidates, err = tx.Children(ctx, base)
-			if err != nil {
-				return err
-			}
-		case ScopeWholeSubtree:
-			candidates, err = tx.Subtree(ctx, base)
-			if err != nil {
-				return err
-			}
-		}
-		for _, e := range candidates {
+		visit := func(e *Entry) error {
 			if err := ctx.Err(); err != nil {
 				return err
 			}
@@ -105,22 +85,73 @@ func (s *Server) runSearch(ctx context.Context, c *conn, m *Message, req *Search
 				code = ResultTimeLimitExceeded
 				return errSearchLimit
 			}
+			entryDN, err := config.ParseDN(e.DN)
+			if err != nil {
+				return nil
+			}
+			if !s.allowed(ctx, tx, subj, entryDN, "", PermSearch) {
+				return nil
+			}
+			if s.matchSearchFilter(ctx, tx, subj, entryDN, e, req.Filter) != filterTrue {
+				return nil
+			}
 			if len(matched) >= sizeLimit {
 				code = ResultSizeLimitExceeded
 				return errSearchLimit
 			}
-			entryDN, err := config.ParseDN(e.DN)
-			if err != nil {
-				continue // store invariant violation; never fail the search
-			}
-			// C8: search-permission denial filters the entry out.
-			if !s.allowed(ctx, tx, subj, entryDN, "", PermSearch) {
-				continue
-			}
-			if !matchFilter(e, req.Filter, s.opts.Schema) {
-				continue
-			}
 			matched = append(matched, s.projectEntry(ctx, tx, subj, entryDN, e, sel, req.TypesOnly))
+			return nil
+		}
+		if predicate := indexedSearchPredicate(req.Filter); req.Scope != ScopeBaseObject && predicate != nil {
+			if walker, ok := tx.(SearchEqualWalker); ok {
+				if _, err := tx.Entry(ctx, base); err != nil {
+					return err
+				}
+				indexed, err := walker.WalkEqual(ctx, predicate.Attr, predicate.Value, func(e *Entry) error {
+					if err := ctx.Err(); err != nil {
+						return err
+					}
+					if time.Now().After(deadline) {
+						code = ResultTimeLimitExceeded
+						return errSearchLimit
+					}
+					dn, err := config.ParseDN(e.DN)
+					if err != nil || !searchScopeContains(base, dn, req.Scope) {
+						return nil
+					}
+					return visit(e)
+				})
+				if indexed || err != nil {
+					return err
+				}
+			}
+		}
+		// Production bbolt visits one entry at a time, so size/time limits
+		// stop decoding and traversal before the whole subtree is allocated.
+		if walker, ok := tx.(SearchWalker); ok {
+			return walker.WalkSearch(ctx, base, req.Scope, visit)
+		}
+		var candidates []*Entry
+		var err error
+		switch req.Scope {
+		case ScopeBaseObject:
+			e, lookupErr := tx.Entry(ctx, base)
+			if lookupErr != nil {
+				return lookupErr
+			}
+			candidates = []*Entry{e}
+		case ScopeSingleLevel, ScopeChildren:
+			candidates, err = tx.Children(ctx, base)
+		case ScopeWholeSubtree:
+			candidates, err = tx.Subtree(ctx, base)
+		}
+		if err != nil {
+			return err
+		}
+		for _, e := range candidates {
+			if err := visit(e); err != nil {
+				return err
+			}
 		}
 		return nil
 	})
@@ -281,4 +312,109 @@ func selectDSEAttrs(e *Entry, sel attrSelection) *Entry {
 		}
 	}
 	return out
+}
+
+// Search permission applies to each filter attribute, independently of read
+// permission for returned values. Denied assertions are Undefined rather than
+// false so NOT cannot turn an inaccessible attribute into an existence oracle.
+type filterTruth uint8
+
+const (
+	filterFalse filterTruth = iota
+	filterTrue
+	filterUndefined
+)
+
+func (s *Server) matchSearchFilter(ctx context.Context, tx ReadTx, subj Subject, dn config.DN, e *Entry, f Filter) filterTruth {
+	var attr string
+	switch n := f.(type) {
+	case *FilterAnd:
+		result := filterTrue
+		for _, child := range n.Children {
+			v := s.matchSearchFilter(ctx, tx, subj, dn, e, child)
+			if v == filterFalse {
+				return filterFalse
+			}
+			if v == filterUndefined {
+				result = filterUndefined
+			}
+		}
+		return result
+	case *FilterOr:
+		result := filterFalse
+		for _, child := range n.Children {
+			v := s.matchSearchFilter(ctx, tx, subj, dn, e, child)
+			if v == filterTrue {
+				return filterTrue
+			}
+			if v == filterUndefined {
+				result = filterUndefined
+			}
+		}
+		return result
+	case *FilterNot:
+		switch s.matchSearchFilter(ctx, tx, subj, dn, e, n.Child) {
+		case filterTrue:
+			return filterFalse
+		case filterFalse:
+			return filterTrue
+		default:
+			return filterUndefined
+		}
+	case *FilterEquality:
+		attr = n.Attr
+	case *FilterSubstrings:
+		attr = n.Attr
+	case *FilterPresent:
+		attr = n.Attr
+	case *FilterGreaterOrEqual:
+		attr = n.Attr
+	case *FilterLessOrEqual:
+		attr = n.Attr
+	case *FilterApproxMatch:
+		attr = n.Attr
+	default:
+		return filterUndefined
+	}
+	if !s.allowed(ctx, tx, subj, dn, attr, PermSearch) {
+		return filterUndefined
+	}
+	if matchFilter(e, f, s.opts.Schema) {
+		return filterTrue
+	}
+	return filterFalse
+}
+
+// Only a required equality term (standalone or within AND) may narrow the
+// result. DN-valued postings deliberately retain traversal fallback because
+// their lowercased keys do not cover every Unicode EqualFold equivalence.
+func indexedSearchPredicate(f Filter) *FilterEquality {
+	switch n := f.(type) {
+	case *FilterEquality:
+		switch strings.ToLower(n.Attr) {
+		case "uid", "cn", "objectclass":
+			return n
+		}
+	case *FilterAnd:
+		for _, child := range n.Children {
+			if p := indexedSearchPredicate(child); p != nil {
+				return p
+			}
+		}
+	}
+	return nil
+}
+
+func searchScopeContains(base, dn config.DN, scope Scope) bool {
+	switch scope {
+	case ScopeBaseObject:
+		return dn.EqualFold(base)
+	case ScopeWholeSubtree:
+		return aciTargetScopeA(dn, base)
+	case ScopeSingleLevel, ScopeChildren:
+		parent, ok := parentDN(dn)
+		return ok && parent.EqualFold(base)
+	default:
+		return false
+	}
 }

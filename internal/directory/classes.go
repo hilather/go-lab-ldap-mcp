@@ -104,10 +104,10 @@ func ForbiddenEntryAttr(name string) bool {
 	if config.ForbiddenUserAttr(name) {
 		return true
 	}
-	switch config.CanonicalAttr(name) {
+	switch config.CanonicalAttrType(name) {
 	case "userpassword", "aci", "memberof", "nsaccountlock":
 		return true
 	default:
-		return strings.HasPrefix(config.CanonicalAttr(name), "nsslapd-")
+		return strings.HasPrefix(config.CanonicalAttrType(name), "nsslapd-")
 	}
 }

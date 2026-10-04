@@ -558,6 +558,39 @@ func caseModifyDN(c *caseCtx) []opOutcome {
 	// Cleanup so later cases see a stable tree.
 	del := ldap.NewDelRequest("cn=rename-dst,"+peopleDN, nil)
 	out = append(out, codeOutcome(dm.Del(del)))
+
+	// deleteoldrdn=true removes old RDN values by the attribute's equality
+	// rule (cn is caseIgnoreMatch: internal spaces are insignificant), then
+	// adds the new RDN value only if no equal value remains (CAND-29,
+	// resolved Contract). Only attribute values are compared: whether DNs
+	// differing only in internal spaces name the same entry, and how each
+	// engine spells the returned DN, stays open under CAND-30.
+	wsAdd := func(rdn string, cns ...string) {
+		a := ldap.NewAddRequest(rdn+","+suffixDN, nil)
+		a.Attribute("objectClass", []string{"top", "device"})
+		a.Attribute("cn", cns)
+		out = append(out, codeOutcome(dm.Add(a)))
+	}
+	// Respell: the old value "ws src" equals the new "ws  src", so it is
+	// removed and the new spelling stored. The respell is also a move to
+	// a new parent so the step never renames onto a DN that differs only
+	// in internal spaces (that DN-identity question is CAND-30).
+	wsAdd("cn=ws-src", "ws-src")
+	out = append(out, codeOutcome(dm.ModifyDN(ldap.NewModifyDNRequest("cn=ws-src,"+suffixDN, "cn=ws src", true, ""))))
+	out = append(out, codeOutcome(dm.ModifyDN(ldap.NewModifyDNRequest("cn=ws src,"+suffixDN, "cn=ws  src", true, peopleDN))))
+	out = append(out, valuesOutcome(dm, peopleDN, ldap.ScopeSingleLevel, "(cn=ws src)", "cn"))
+	// An equal value already present: old "ws-dx" removed, "ws dy" not
+	// added because "ws  dy" remains. (The pre-fix engine also produced
+	// this list; the respell above is the discriminating step.)
+	wsAdd("cn=ws-dx", "ws-dx", "ws  dy")
+	out = append(out, codeOutcome(dm.ModifyDN(ldap.NewModifyDNRequest("cn=ws-dx,"+suffixDN, "cn=ws dy", true, ""))))
+	out = append(out, valuesOutcome(dm, suffixDN, ldap.ScopeSingleLevel, "(cn=ws dy)", "cn"))
+	// Cleanup by the DN each engine returns (never a space-sensitive DN
+	// built here), under original or renamed names.
+	out = append(out, deleteMatching(dm, peopleDN, "(cn=ws src)"))
+	for _, f := range []string{"(cn=ws src)", "(cn=ws-src)", "(cn=ws dy)", "(cn=ws-dx)"} {
+		out = append(out, deleteMatching(dm, suffixDN, f))
+	}
 	return out
 }
 

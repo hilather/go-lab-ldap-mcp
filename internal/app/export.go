@@ -32,9 +32,11 @@ func (s *Export) Write(ctx context.Context, p Principal, w io.Writer, req Export
 	if err := s.hooks.authorize(ctx, p, OpExport); err != nil {
 		return err
 	}
-	if err := s.hooks.allowRead(ctx); err != nil {
+	release, err := s.hooks.acquireRead(ctx)
+	if err != nil {
 		return err
 	}
+	defer release()
 	if w == nil {
 		s.fail(ctx, p)
 		return directory.ExportError("export", directory.FieldUnavailable, "export writer is not configured")

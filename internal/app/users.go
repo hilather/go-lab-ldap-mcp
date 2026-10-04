@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"sort"
 
 	"github.com/hilather/go-lab-ldap-mcp/internal/apperr"
 	"github.com/hilather/go-lab-ldap-mcp/internal/config"
@@ -19,9 +20,11 @@ func (s *Users) List(ctx context.Context, p Principal, q directory.UserListQuery
 	if err := s.hooks.authorize(ctx, p, OpUserList); err != nil {
 		return directory.UserPage{}, err
 	}
-	if err := s.hooks.allowRead(ctx); err != nil {
+	release, err := s.hooks.acquireRead(ctx)
+	if err != nil {
 		return directory.UserPage{}, err
 	}
+	defer release()
 	return s.repo.List(ctx, q)
 }
 
@@ -29,9 +32,11 @@ func (s *Users) Get(ctx context.Context, p Principal, id directory.UserID) (dire
 	if err := s.hooks.authorize(ctx, p, OpUserGet); err != nil {
 		return directory.User{}, err
 	}
-	if err := s.hooks.allowRead(ctx); err != nil {
+	release, err := s.hooks.acquireRead(ctx)
+	if err != nil {
 		return directory.User{}, err
 	}
+	defer release()
 	return s.repo.Get(ctx, id)
 }
 
@@ -39,9 +44,11 @@ func (s *Users) Create(ctx context.Context, p Principal, spec CreateUser) (direc
 	if err := s.hooks.authorize(ctx, p, OpUserCreate); err != nil {
 		return directory.User{}, err
 	}
-	if err := s.hooks.allowWrite(ctx); err != nil {
+	release, err := s.hooks.acquireWrite(ctx)
+	if err != nil {
 		return directory.User{}, err
 	}
+	defer release()
 	unlock := s.hooks.lock(userLockKey(spec.ID))
 	defer unlock()
 	if err := validateCreateUser(spec); err != nil {
@@ -77,9 +84,11 @@ func (s *Users) Update(ctx context.Context, p Principal, id directory.UserID, pa
 	if err := s.hooks.authorize(ctx, p, OpUserUpdate); err != nil {
 		return directory.User{}, err
 	}
-	if err := s.hooks.allowWrite(ctx); err != nil {
+	release, err := s.hooks.acquireWrite(ctx)
+	if err != nil {
 		return directory.User{}, err
 	}
+	defer release()
 	unlock := s.hooks.lock(userLockKey(string(id)))
 	defer unlock()
 	if err := requireRevision(patch.Revision); err != nil {
@@ -103,16 +112,18 @@ func (s *Users) Delete(ctx context.Context, p Principal, id directory.UserID, re
 	if err := s.hooks.authorize(ctx, p, OpUserDelete); err != nil {
 		return err
 	}
-	if err := s.hooks.allowWrite(ctx); err != nil {
+	release, err := s.hooks.acquireWrite(ctx)
+	if err != nil {
 		return err
 	}
+	defer release()
 	unlock := s.hooks.lock(userLockKey(string(id)))
 	defer unlock()
 	if err := requireRevision(rev); err != nil {
 		s.hooks.record(ctx, p, OpUserDelete.Name, string(id), AuditFailure, string(rev), "")
 		return err
 	}
-	err := s.repo.Delete(ctx, id, rev)
+	err = s.repo.Delete(ctx, id, rev)
 	if err != nil {
 		s.hooks.record(ctx, p, OpUserDelete.Name, string(id), AuditFailure, string(rev), "")
 		return err
@@ -125,9 +136,11 @@ func (s *Users) SetEnabled(ctx context.Context, p Principal, id directory.UserID
 	if err := s.hooks.authorize(ctx, p, OpUserSetEnabled); err != nil {
 		return directory.User{}, err
 	}
-	if err := s.hooks.allowWrite(ctx); err != nil {
+	release, err := s.hooks.acquireWrite(ctx)
+	if err != nil {
 		return directory.User{}, err
 	}
+	defer release()
 	unlock := s.hooks.lock(userLockKey(string(id)))
 	defer unlock()
 	if err := requireRevision(rev); err != nil {
@@ -147,9 +160,11 @@ func (s *Users) SetPassword(ctx context.Context, p Principal, id directory.UserI
 	if err := s.hooks.authorize(ctx, p, OpUserPassword); err != nil {
 		return err
 	}
-	if err := s.hooks.allowWrite(ctx); err != nil {
+	release, err := s.hooks.acquireWrite(ctx)
+	if err != nil {
 		return err
 	}
+	defer release()
 	if err := s.hooks.rateLimit(ctx, "password:"+p.ID); err != nil {
 		return err
 	}
@@ -165,7 +180,7 @@ func (s *Users) SetPassword(ctx context.Context, p Principal, id directory.UserI
 			Path: "password", Code: "required", Message: "password is required",
 		})
 	}
-	err := s.repo.SetPassword(ctx, id, pw, rev, mustChange)
+	err = s.repo.SetPassword(ctx, id, pw, rev, mustChange)
 	if err != nil {
 		s.hooks.record(ctx, p, OpUserPassword.Name, string(id), AuditFailure, string(rev), "")
 		return err
@@ -178,9 +193,11 @@ func (s *Users) AccountState(ctx context.Context, p Principal, id directory.User
 	if err := s.hooks.authorize(ctx, p, OpUserAccountState); err != nil {
 		return directory.AccountState{}, err
 	}
-	if err := s.hooks.allowRead(ctx); err != nil {
+	release, err := s.hooks.acquireRead(ctx)
+	if err != nil {
 		return directory.AccountState{}, err
 	}
+	defer release()
 	return s.repo.AccountState(ctx, id)
 }
 
@@ -204,9 +221,11 @@ func (s *Users) mutateAccount(ctx context.Context, p Principal, op Operation, id
 	if err := s.hooks.authorize(ctx, p, op); err != nil {
 		return directory.AccountState{}, err
 	}
-	if err := s.hooks.allowWrite(ctx); err != nil {
+	release, err := s.hooks.acquireWrite(ctx)
+	if err != nil {
 		return directory.AccountState{}, err
 	}
+	defer release()
 	unlock := s.hooks.lock(userLockKey(string(id)))
 	defer unlock()
 	if err := requireRevision(rev); err != nil {
@@ -241,12 +260,25 @@ func validateUserPatch(patch directory.UserPatch) error {
 }
 
 func validateAttrMap(attrs map[string]string) error {
+	names := make([]string, 0, len(attrs))
 	for name := range attrs {
-		if config.ForbiddenUserAttr(name) {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	seen := map[string]string{}
+	for _, name := range names {
+		if config.ForbiddenUserWriteAttr(name) {
 			return apperr.New(apperr.CodeConfiguration, "attribute is not allowed on users").WithField(apperr.Field{
 				Path: "attributes." + name, Code: "forbidden_attribute", Message: "attribute is not allowed on users",
 			})
 		}
+		key := config.AttrDuplicateKey(name)
+		if prev, dup := seen[key]; dup {
+			return apperr.New(apperr.CodeConfiguration, "attribute is listed more than once").WithField(apperr.Field{
+				Path: "attributes." + name, Code: "duplicate_attribute", Message: "attribute duplicates " + prev,
+			})
+		}
+		seen[key] = name
 	}
 	return nil
 }

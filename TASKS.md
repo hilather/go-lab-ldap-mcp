@@ -1514,7 +1514,7 @@ Acceptance:
 - [x] RFC 4528-ready: a transaction can read-then-write atomically (used by T-141).
 - [x] Index updates on add/modify/delete stay consistent after simulated crash (re-open).
 
-Follow-up: `op_search.go` should type-assert `ReadTx` to `EqualCandidateResolver` when a filter has an indexed equality predicate (fold into T-140 or a T-127 refinement); index normalization must stay no finer than the `RuleMatcher`.
+Resolved (2026-10-03 review): `op_search.go` uses `SearchEqualWalker` to stream safe `uid`, `cn`, and `objectClass` equality predicates, including required AND terms, while retaining full scope, filter, and ACI checks. `test/parity/search_dispatch_test.go` verifies the production listener decodes one candidate in a 1k-entry fixture and stops a wide posting list at the size limit. DN-valued `member` / `uniqueMember` predicates retain bounded scope traversal: lowercased posting keys do not cover every Unicode `EqualFold` equivalence, so they must not narrow candidates until normalization is proven no finer than the matcher.
 
 ## [x] T-131 Matching rules and DN canonicalization
 
@@ -1762,6 +1762,18 @@ Acceptance:
 - [ ] Delta ledger lists every accepted skip with test name.
 - [ ] `make verify` green without requiring Docker native compose (compose-native stays `test-parity` / integration).
 - [ ] README/docs only advertise native as ready after this task.
+
+## [ ] T-151 Bind handling of outstanding operations (ADR-0014)
+
+Priority: P1 | Size: M | Depends on: ADR-0014 owner decision | Wave: unscheduled (post-M9; outside the M9 T-121 to T-150 range) | Cloud fit: low (needs local 389 oracle)
+
+Deliverables: owner-selected drain or abandon barrier before native Bind processing; 389 delayed-operation and concurrent-load probe; ADR-0014 accepted, plus a named Delta if native differs.
+
+Acceptance:
+- [ ] Pinned 389 delayed-operation and concurrent-load probe recorded before exact assertions are chosen.
+- [ ] Native ordering is asserted with deterministic scheduling hooks (drain: CompareResponse before BindResponse with the pre-Bind identity; abandon: no earlier-operation response after BindResponse, any earlier response reflects the pre-Bind identity, worker exits before `setSubject`).
+- [ ] A parametrized integration test asserts the same ordering on both engines, or a named accepted Delta.
+- [ ] 48 and 50 are never normalized silently.
 
 # Backlog completion checklist
 

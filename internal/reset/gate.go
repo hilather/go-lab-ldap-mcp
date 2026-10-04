@@ -26,7 +26,10 @@ type Metrics interface {
 }
 
 // Token is an exclusive Begin generation. Finish/Advance ignore stale tokens.
-type Token struct{ gen uint64 }
+type Token struct {
+	gen      uint64
+	previous State
+}
 
 // Operation is the current or last reset status. No secrets.
 type Operation struct {
@@ -57,6 +60,8 @@ type Gate struct {
 	gen     uint64
 	metrics Metrics
 	cur     Operation
+	active  int
+	drained chan struct{}
 	last    Operation
 }
 
@@ -175,7 +180,7 @@ func (g *Gate) Begin() (Token, error) {
 	g.state = PreparingReset
 	g.cur = Operation{Phase: string(PreparingReset), State: PreparingReset, StartedAt: time.Now().UTC()}
 	g.syncMetricsLocked()
-	return Token{gen: g.gen}, nil
+	return Token{gen: g.gen, previous: st}, nil
 }
 
 // Advance validates and records a phase change for tok.
@@ -349,4 +354,83 @@ func validTransition(from, to State) bool {
 	default:
 		return false
 	}
+}
+
+// AcquireWrite admits an ordinary mutation for its full lifetime. Begin closes
+// admission before WaitIdle drains operations already using the directory.
+func (g *Gate) AcquireWrite(ctx context.Context) (func(), error) { return g.acquire(ctx, false) }
+func (g *Gate) AcquireRead(ctx context.Context) (func(), error)  { return g.acquire(ctx, true) }
+
+func (g *Gate) acquire(ctx context.Context, read bool) (func(), error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if g == nil {
+		return func() {}, nil
+	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	st := g.stateOrReady()
+	if st != Ready && !(read && st == Failed) {
+		if st == Failed {
+			return nil, FailedErr()
+		}
+		return nil, InProgress()
+	}
+	if g.active == 0 {
+		g.drained = make(chan struct{})
+	}
+	g.active++
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			g.mu.Lock()
+			defer g.mu.Unlock()
+			g.active--
+			if g.active == 0 {
+				close(g.drained)
+			}
+		})
+	}, nil
+}
+
+// WaitIdle is called after Begin and before inventory or mutation.
+func (g *Gate) WaitIdle(ctx context.Context, tok Token) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	g.mu.Lock()
+	if tok.gen == 0 || tok.gen != g.gen || g.state != PreparingReset {
+		g.mu.Unlock()
+		return Busy()
+	}
+	if g.active == 0 {
+		g.mu.Unlock()
+		return nil
+	}
+	drained := g.drained
+	g.mu.Unlock()
+	select {
+	case <-drained:
+		return ctx.Err()
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+// Abort restores admission after a pre-mutation failure, preserving Failed
+// when a recovery reset did not reach mutation.
+func (g *Gate) Abort(tok Token) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if tok.gen == 0 || tok.gen != g.gen || g.state != PreparingReset {
+		return
+	}
+	g.state = tok.previous
+	if g.state == Failed {
+		g.cur = g.last
+	} else {
+		g.cur = Operation{State: Ready, Phase: string(Ready)}
+	}
+	g.syncMetricsLocked()
 }

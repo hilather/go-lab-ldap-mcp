@@ -331,11 +331,15 @@ func userObjectClasses(u config.NormalizedUser) []string {
 	return config.RequiredUserObjectClasses()
 }
 
+// skipPlannedUserAttr reports names the seed and adapter write through their
+// planned paths (or never). Keyed on the resolved type so option, OID and
+// descriptor-alias spellings are recognised; write validation
+// (ForbiddenUserWriteAttr) rejects those spellings before they reach here.
 func skipPlannedUserAttr(name string) bool {
 	if config.ForbiddenUserAttr(name) {
 		return true
 	}
-	switch config.CanonicalAttr(name) {
+	switch config.CanonicalAttrType(name) {
 	case "uid", "cn", "sn", "objectclass", "userpassword":
 		return true
 	default:

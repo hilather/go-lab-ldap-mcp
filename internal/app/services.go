@@ -41,11 +41,12 @@ type Deps struct {
 	// ControlRevision is the compiled control-plane revision.
 	ControlRevision string
 
-	PeopleDN  string
-	GroupsDN  string
-	Suffix    string
-	RuntimeDN string
-	MarkerDN  string
+	PeopleDN           string
+	GroupsDN           string
+	AdditionalSuffixes []string
+	Suffix             string
+	RuntimeDN          string
+	MarkerDN           string
 
 	ResetDir      directory.ResetSupport
 	Secrets       config.SecretResolver
@@ -116,13 +117,14 @@ func newReset(d Deps, h hooks, lock *reset.Gate) *Reset {
 		name:     d.ScenarioName,
 		expected: d.ExpectedRevision,
 		plan: reset.PlanConfig{
-			PeopleDN:         d.PeopleDN,
-			GroupsDN:         d.GroupsDN,
-			Suffix:           d.Suffix,
-			RuntimeDN:        d.RuntimeDN,
-			MarkerDN:         d.MarkerDN,
-			ConfiguredUsers:  userDNs(d.ResetUsers),
-			ConfiguredGroups: groupDNs(d.ResetGroups),
+			PeopleDN:           d.PeopleDN,
+			GroupsDN:           d.GroupsDN,
+			Suffix:             d.Suffix,
+			AdditionalSuffixes: append([]string(nil), d.AdditionalSuffixes...),
+			RuntimeDN:          d.RuntimeDN,
+			MarkerDN:           d.MarkerDN,
+			ConfiguredUsers:    userDNs(d.ResetUsers),
+			ConfiguredGroups:   groupDNs(d.ResetGroups),
 		},
 		seedU:     d.ResetUsers,
 		seedG:     d.ResetGroups,
@@ -174,18 +176,33 @@ func (h hooks) authorize(ctx context.Context, p Principal, op Operation) error {
 	return err
 }
 
-func (h hooks) allowWrite(ctx context.Context) error {
-	if h.gate == nil {
-		return nil
+// Admission leases cover the entire repository operation, including waits
+// for keyed locks, so reset can drain in-flight operations before inventory.
+func (h hooks) acquireWrite(ctx context.Context) (func(), error) {
+	if g, ok := h.gate.(interface {
+		AcquireWrite(context.Context) (func(), error)
+	}); ok {
+		return g.AcquireWrite(ctx)
 	}
-	return h.gate.Allow(ctx)
+	if h.gate != nil {
+		if err := h.gate.Allow(ctx); err != nil {
+			return nil, err
+		}
+	}
+	return func() {}, nil
 }
-
-func (h hooks) allowRead(ctx context.Context) error {
-	if h.gate == nil {
-		return nil
+func (h hooks) acquireRead(ctx context.Context) (func(), error) {
+	if g, ok := h.gate.(interface {
+		AcquireRead(context.Context) (func(), error)
+	}); ok {
+		return g.AcquireRead(ctx)
 	}
-	return h.gate.AllowRead(ctx)
+	if h.gate != nil {
+		if err := h.gate.AllowRead(ctx); err != nil {
+			return nil, err
+		}
+	}
+	return func() {}, nil
 }
 
 func (h hooks) rateLimit(ctx context.Context, key string) error {
