@@ -119,6 +119,10 @@ already rejected it: the server exits with a configuration error on
 ## Migration guidance
 
 v0.4.0 → v0.4.1 is **additive**. `apiVersion` stays `labldap.dev/v1alpha1`.
+One exception for native-engine raw ACIs: a `targetattr` list separated by
+a single `|` must be rewritten with `||` before upgrading. `labldap` config
+validation does not parse raw ACI text, so the failure appears only when
+labldapd starts.
 
 1. Default `make compose-up` / `setup-tls` is unchanged (`--host directory`).
 2. To include a public hostname or address on the lab leaf, pass `--dns`

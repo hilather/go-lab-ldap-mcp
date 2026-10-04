@@ -217,7 +217,7 @@ func (s *Server) entryReadable(ctx context.Context, tx ReadTx, subj Subject, dn 
 // visibilityOperational lists stored attributes whose 389 usage differs
 // from the native registry's Operational flag, keyed by lowercase base name
 // (probes 13 and 15 compared every registry attribute with the pinned
-// image's cn=schema): true means 389 treats the attribute as operational,
+// image's cn=schema; the subschema attributes already agree): true means 389 treats the attribute as operational,
 // false as a user attribute. pwdChangedTime and passwordHistory are not in
 // the registry; pwdChangedTime is native-only (389's counterpart
 // pwdUpdateTime is directoryOperation).
@@ -225,9 +225,6 @@ var visibilityOperational = map[string]bool{
 	"memberof":        false,
 	"nsaccountlock":   true,
 	"aci":             true,
-	"attributetypes":  true,
-	"objectclasses":   true,
-	"matchingrules":   true,
 	"passwordhistory": true,
 	"pwdchangedtime":  true,
 }

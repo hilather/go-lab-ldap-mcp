@@ -1086,6 +1086,10 @@ finally:
 # Probe 15 (2026-10-04): 389 cn=schema USAGE for every native registry name (object class names show ABSENT).
 
 ===== probe 15 =====
+# NOTE: the attributeTypes/objectClasses/matchingRules lines marked 'differs' after the 'subschema' line are
+# false positives: the script's name extractor picked them up from the subschema class's MAY list, where native
+# shows 'user'. The registry attribute lines above them show native=op, matching 389. Real differences:
+# nsAccountLock, memberOf, aci.
 image quay.io/389ds/dirsrv@sha256:f2851654c5df545cd893d84bea8d08c28dc25f0930493fbfed1d8a6eacf657f7
 top                          native=user  389=ABSENT
 domain                       native=user  389=ABSENT
