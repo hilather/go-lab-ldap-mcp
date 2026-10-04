@@ -7,6 +7,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -110,8 +111,9 @@ func startOracle(t *testing.T, fx *fixture) *oracleEngine {
 
 	e.configure389(t)
 
-	// Seed exactly like native does.
-	conn, err := e.dial(t, dialSpec{ldaps: true, bindDN: "cn=Directory Manager", bindPass: pw})
+	// Seed exactly like native does. dialDMReady waits out the first-boot
+	// window in which DS_DM_PASSWORD is not yet applied.
+	conn, err := e.dialDMReady(t)
 	if err != nil {
 		t.Fatalf("parity: oracle DM dial: %v", err)
 	}
@@ -232,6 +234,51 @@ func (e *oracleEngine) dial(t *testing.T, spec dialSpec) (*ldap.Conn, error) {
 		return nil, err
 	}
 	return conn, nil
+}
+
+// dialDMReady is the first Directory Manager dial. The image's dscontainer
+// creates the instance with a random root password, starts ns-slapd, waits
+// for its own LDAPI health check, and only then applies DS_DM_PASSWORD, so
+// waitReady (marker file, LDAPI socket, TCP, dsconf over LDAPI autobind) can
+// pass while a DM simple bind still returns 49. Only 49 is retried, within a
+// bound; any other error (TLS, network) is returned at once. The root DN is
+// exempt from the password policy configure389 applies, so these attempts
+// cannot lock it out. It runs after the instance CA and hostname are known,
+// over the same LDAPS dial the seed uses.
+func (e *oracleEngine) dialDMReady(t *testing.T) (*ldap.Conn, error) {
+	t.Helper()
+	var conn *ldap.Conn
+	err := oracleRetryInvalidCredentials(60*time.Second, 500*time.Millisecond, func() error {
+		c, err := e.dial(t, dialSpec{ldaps: true, bindDN: "cn=Directory Manager", bindPass: e.password})
+		if err != nil {
+			return err
+		}
+		conn = c
+		return nil
+	})
+	return conn, err
+}
+
+// errOracleDMTimeout reports that every DM bind within the bound returned 49.
+var errOracleDMTimeout = errors.New("DS_DM_PASSWORD was not applied in time (bind kept returning 49)")
+
+// oracleRetryInvalidCredentials calls attempt until it succeeds, retrying
+// only on LDAP result 49 until the deadline (mirrors the dirsrv harness).
+func oracleRetryInvalidCredentials(limit, interval time.Duration, attempt func() error) error {
+	deadline := time.Now().Add(limit)
+	for {
+		err := attempt()
+		if err == nil {
+			return nil
+		}
+		if !ldap.IsErrorWithCode(err, ldap.LDAPResultInvalidCredentials) {
+			return err
+		}
+		if time.Now().Add(interval).After(deadline) {
+			return errOracleDMTimeout
+		}
+		time.Sleep(interval)
+	}
 }
 
 func (e *oracleEngine) dm(t *testing.T) *ldap.Conn {

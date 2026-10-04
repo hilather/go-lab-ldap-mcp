@@ -395,6 +395,12 @@ func seedField(err error, code string) bool {
 	return false
 }
 
+// decodeSummary decodes the bootstrap JSON summary from combined command
+// output. The summary object is located by its leading "command" key (the
+// last one, so earlier runs in the same output are skipped). Only that first
+// JSON value is decoded: log lines the process writes after the summary
+// (stderr is interleaved with stdout) are ignored. Limitation: a JSON line
+// containing "command" printed after the summary would be picked instead.
 func decodeSummary(out string, dest any) error {
 	idx := strings.LastIndex(out, `"command"`)
 	if idx < 0 {
@@ -404,7 +410,13 @@ func decodeSummary(out string, dest any) error {
 	if brace < 0 {
 		return errors.New("no JSON object")
 	}
-	return json.Unmarshal([]byte(out[brace:]), dest)
+	// "command" must be the first key of a top-level object: the summary is
+	// printed starting at the beginning of a line, while a nested object's
+	// brace follows a key (`"plan": {`).
+	if strings.TrimSpace(out[brace+1:idx]) != "" || (brace > 0 && out[brace-1] != '\n') {
+		return errors.New("summary object does not start a line with \"command\" as its first key")
+	}
+	return json.NewDecoder(strings.NewReader(out[brace:])).Decode(dest)
 }
 
 func assertNoCanary(t *testing.T, inst *Instance, out, canary string) {
