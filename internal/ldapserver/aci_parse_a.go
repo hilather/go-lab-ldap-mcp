@@ -26,6 +26,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/hilather/go-lab-ldap-mcp/internal/config"
+	"github.com/hilather/go-lab-ldap-mcp/internal/schema389"
 )
 
 // MaxACITextBytesA bounds the input ParseACITextA accepts. Compiler output
@@ -78,14 +79,18 @@ func aciTruncA(s string) string {
 type ACITargetAttrModeA int
 
 const (
-	// ACITargetAttrAllA covers targetattr="*" and an omitted targetattr
-	// clause (389 semantics: all attributes).
+	// ACITargetAttrAllA covers targetattr="*".
 	ACITargetAttrAllA ACITargetAttrModeA = iota
 	// ACITargetAttrAllowA covers targetattr="a || b": only Attrs are targeted.
 	ACITargetAttrAllowA
 	// ACITargetAttrDenyA covers targetattr!="a || b": every attribute except
 	// Attrs is targeted.
 	ACITargetAttrDenyA
+	// ACITargetAttrNoneA is an omitted targetattr clause. As on 389 (oracle
+	// probes 16, 18, 19; resolved CAND-35) such an ACI targets no attribute
+	// for read, search, compare and write checks; entry-level checks (add,
+	// delete, the modrdn gates) still apply it.
+	ACITargetAttrNoneA
 )
 
 func (m ACITargetAttrModeA) String() string {
@@ -96,6 +101,8 @@ func (m ACITargetAttrModeA) String() string {
 		return "allow-list"
 	case ACITargetAttrDenyA:
 		return "deny-list"
+	case ACITargetAttrNoneA:
+		return "none"
 	}
 	return "unknown"
 }
@@ -149,7 +156,7 @@ type ParsedACI struct {
 	// entry itself or descendants, per C8) is the evaluator's concern.
 	TargetDN config.DN
 	// AttrMode and Attrs carry the targetattr clause. Attrs is nil when
-	// AttrMode is ACITargetAttrAllA.
+	// AttrMode is ACITargetAttrAllA or ACITargetAttrNoneA.
 	AttrMode ACITargetAttrModeA
 	Attrs    []string
 	// Deny reports a deny (...) rule instead of allow (...). Deny-wins
@@ -172,25 +179,58 @@ func (p *ParsedACI) HasPerm(perm Permission) bool {
 	return false
 }
 
-// TargetsAttr reports whether the targetattr clause covers attr. Attribute
-// comparison is case-insensitive per LDAP attribute-type equality.
-func (p *ParsedACI) TargetsAttr(attr string) bool {
+// TargetsAttr reports whether the targetattr clause covers the checked
+// attribute description: base is the resolved or literal type name and opts
+// its options (lowercased, no empty entries). See aciAttrInA.
+func (p *ParsedACI) TargetsAttr(base string, opts []string) bool {
 	switch p.AttrMode {
 	case ACITargetAttrAllA:
 		return true
 	case ACITargetAttrAllowA:
-		return aciAttrInA(p.Attrs, attr)
+		return aciAttrInA(p.Attrs, base, opts)
 	case ACITargetAttrDenyA:
-		return !aciAttrInA(p.Attrs, attr)
+		return !aciAttrInA(p.Attrs, base, opts)
 	}
 	return false
 }
 
-func aciAttrInA(list []string, attr string) bool {
-	attr, _, _ = strings.Cut(attr, ";")
+// aciAttrInA reports whether a targetattr name in list covers base;opts,
+// as on 389 (oracle probes 12, 16, 18; resolved CAND-34): the name's base
+// equals base literally (case-insensitive, no alias or OID resolution) and
+// every option of the name, including an empty one ("uid;" covers
+// nothing), appears in opts (case-insensitive). So "uid" covers uid and
+// uid;x-test, while "uid;x-test" covers uid;x-test and uid;x-test;x-two but
+// not uid.
+func aciAttrInA(list []string, base string, opts []string) bool {
 	for _, a := range list {
-		a, _, _ = strings.Cut(a, ";")
-		if strings.EqualFold(a, attr) {
+		name, rest, hasOpts := strings.Cut(a, ";")
+		if !strings.EqualFold(name, base) {
+			continue
+		}
+		if !hasOpts {
+			return true
+		}
+		covered := true
+		for _, o := range strings.Split(rest, ";") {
+			if o == "" {
+				// An empty targetattr option covers nothing, not even a
+				// description carrying an empty option (probes 16, 18).
+				covered = false
+				break
+			}
+			found := false
+			for _, have := range opts {
+				if strings.EqualFold(o, have) {
+					found = true
+					break
+				}
+			}
+			if !found {
+				covered = false
+				break
+			}
+		}
+		if covered {
 			return true
 		}
 	}
@@ -217,7 +257,7 @@ var aciAttrNameReA = regexp.MustCompile(`^(\*|[A-Za-z][A-Za-z0-9-;]*)$`)
 // attribute options), as the pinned 389 image does (CAND-32, oracle probes
 // 8 and 10). The name is compared literally, like any other entry: no
 // resolution to the descriptor.
-var aciAttrOIDReA = regexp.MustCompile(`^[0-9]+(\.[0-9]+)+(;[A-Za-z0-9-]+)*$`)
+var aciAttrOIDReA = regexp.MustCompile(`^[0-9]+(\.[0-9]+)+(;[A-Za-z0-9-]*)*$`)
 
 // aciTokKindA classifies lexer tokens.
 type aciTokKindA int
@@ -486,6 +526,9 @@ func ParseACITextA(text string) (*ParsedACI, error) {
 	if !seenTarget {
 		return nil, aciErrA(p.peek().pos, "missing target clause")
 	}
+	if !seenAttr {
+		out.AttrMode = ACITargetAttrNoneA
+	}
 	if !seenBody {
 		return nil, aciErrA(p.peek().pos, "missing (version 3.0; acl ...; allow|deny ...) bind rule clause")
 	}
@@ -544,6 +587,11 @@ func (p *aciParserA) parseTargetAttrClauseA(out *ParsedACI) error {
 		}
 		if !aciAttrNameReA.MatchString(a) && !aciAttrOIDReA.MatchString(a) {
 			return aciErrA(v.pos, "invalid attribute name %q in targetattr", aciTruncA(a))
+		}
+		// CAND-33: 389 rejects names its schema does not define (probe 16:
+		// invalidSyntax, "does not exist in schema"); options are not checked.
+		if !schema389.Known(a) {
+			return aciErrA(v.pos, "targetattr %q does not exist in the 389 schema", aciTruncA(a))
 		}
 		attrs = append(attrs, a)
 	}

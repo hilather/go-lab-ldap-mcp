@@ -157,11 +157,62 @@ already rejected it: the server exits with a configuration error on
 `aciTexts` ("ACI text failed to parse: ... invalid attribute name
 \"cn|sn\" in targetattr"). Rewrite it as `"cn || sn"`.
 
+## Unreleased: ACI targetattr schema, options and entry-level checks (native engine)
+
+Native ACI evaluation now matches the pinned 389 image in four more places
+(contract C8; oracle probes 16-20; CAND-33, CAND-34 and CAND-35 resolved):
+
+- **Unknown `targetattr` names are rejected.** A name must be an attribute
+  type, alias, numeric OID or `-oid` placeholder in the pinned 389 schema
+  (options are not checked). A raw ACI naming anything else (a typo, an
+  object class such as `person`, the native-only `pwdChangedTime`) now
+  stops labldapd at startup with `aciTexts` / `invalid_aci` ("targetattr
+  ... does not exist in the 389 schema"), as 389 refuses the ACI add with
+  invalidSyntax(21). A DSL ACL naming one in `attributes.allow` or
+  `attributes.deny` fails `labldap` config validation with
+  `unknown_attribute` on `spec.acls.<id>.attributes.allow|deny`.
+- **Options in `targetattr` narrow the rule.** `targetattr="uid;x-test"`
+  now covers only `uid;x-test` (and descriptions with more options), not
+  all of `uid`; `targetattr!="uid;x-test"` excludes only those. An empty
+  option (`"uid;"`) covers nothing. This is 389's answer on a fresh
+  connection; 389 can reuse an earlier decision for the plain type on the
+  same connection, native never does (delta D36).
+- **An omitted `targetattr` targets no attribute.** Such an ACI now
+  applies only to add, delete and the modrdn entry gates; before, native
+  treated it as `targetattr="*"`. Add `(targetattr="*")` to keep the old
+  meaning.
+- **No entry-level search or Modify check.** `deny (search)
+  targetattr="userPassword"` now hides only `userPassword` filter leaves
+  instead of every entry. Modify checks write on each changed attribute,
+  so an attribute-scoped deny-write blocks only changes to that
+  attribute; all changes are checked before the entry lookup and the
+  assertion control, so a subject without write gets 50, never 32.
+
+ACI checks also resolve second descriptors, so a value written as `userid`
+is covered by `targetattr="uid"` (389 stores it as `uid`), and a filter
+leaf with an empty option (`(cn;=x)`) matches nothing, as on 389.
+
+Upgrade risk: these changes can **widen** access for existing raw ACIs.
+A deny ACI without `targetattr` no longer denies attribute reads or writes;
+a `deny (search)` or `deny (write)` scoped to some attributes no longer
+hides or locks whole entries. They can also **narrow** access: an allow
+ACI without `targetattr`, or with an option-bearing name, stops granting
+reads, searches and writes on the plain attribute. Review raw ACIs before
+upgrading (DSL ACLs always emit an explicit `targetattr`). ModRDN keeps
+the stricter native entry gates (CAND-36), and absolute filters such as
+`(&)` keep the entry-level search check (CAND-38). Separately, a DSL ACL
+with more than one name in `attributes.allow` or `attributes.deny` still
+compiles to `targetattr="*"`; this pre-existing over-grant is tracked as a
+follow-up and not changed here.
+
 ## Migration guidance
 
 v0.4.0 → v0.4.1 is **additive**. `apiVersion` stays `labldap.dev/v1alpha1`.
-One exception for native-engine raw ACIs: a `targetattr` list separated by
-a single `|` must be rewritten with `||` before upgrading. `labldap` config
+Exceptions for native-engine raw ACIs: a `targetattr` list separated by
+a single `|` must be rewritten with `||`, every `targetattr` name must
+exist in the 389 schema, and ACIs without `targetattr` or with
+option-bearing names change meaning (see "ACI targetattr schema, options
+and entry-level checks" above); review them before upgrading. `labldap` config
 validation does not parse raw ACI text, so the failure appears only when
 labldapd starts.
 

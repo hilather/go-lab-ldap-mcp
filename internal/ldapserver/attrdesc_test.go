@@ -335,7 +335,7 @@ func TestFilterLeafSearchIdentityMatchesOracle(t *testing.T) {
 	want["fa_deny_userid"]["(!("+oid+";x-test=bobtag))"] = all
 	// CAND-31 (resolved as Contract): fa_allow_userid can read no attribute
 	// the entries hold, so 389 returns none even for the True NOT row; the
-	// entry-level visibility check (searchEntryVisible) matches that.
+	// read-visibility check (entryReadable, via searchResultVisible) matches that.
 
 	ctx := context.Background()
 	for subj, rows := range want {
@@ -346,7 +346,7 @@ func TestFilterLeafSearchIdentityMatchesOracle(t *testing.T) {
 			if err := opts.Store.View(ctx, func(tx ReadTx) error {
 				got = matchingNames(t, entries, func(e *Entry) bool {
 					dn := mustDNA(t, e.DN)
-					return srv.searchEntryVisible(ctx, tx, s, dn, e) && srv.matchSearchFilter(ctx, tx, s, dn, e, f) == filterTrue
+					return srv.searchResultVisible(ctx, tx, s, dn, e, f, filterHasAbsoluteSet(f))
 				})
 				return nil
 			}); err != nil {

@@ -81,6 +81,7 @@ The implementation should converge on this structure:
 |   |-- mcpserver/
 |   |-- observability/
 |   |-- reset/
+|   |-- schema389/
 |   `-- web/
 |-- api/
 |   |-- openapi.yaml
@@ -114,6 +115,7 @@ A different layout requires an ADR and must preserve package boundaries.
 - `internal/directory/native`: native-engine bootstrap reconcilers and capability inspect. Must not import `ds389`.
 - `internal/ldapserver`: native LDAPv3 listener, codec, dispatch, schema, ACI evaluation, and plugins. Must not import `internal/api`, `internal/mcpserver`, `internal/web`, `internal/auth`, or `internal/directory/ds389`.
 - `internal/ldapserver/store`: bbolt entry store behind the ldapserver `Store` interface.
+- `internal/schema389`: embedded attribute-type names of the pinned 389 image. Data only; no LDAP, HTTP, or engine imports.
 - `internal/apperr`: structured error taxonomy and test helpers. Leaf package; no LDAP, HTTP, or MCP imports.
 - `internal/app`: use cases, policy checks, transactions, reset orchestration, and audit calls.
 - `internal/api`: HTTP transport only.

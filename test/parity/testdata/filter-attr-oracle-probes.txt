@@ -1,4 +1,4 @@
-# Filter attribute-description oracle probes (contract C6, delta D34, CAND-31/32)
+# Filter attribute-description oracle probes (contract C6, delta D34, CAND-31/32, CAND-33/34/35, D36)
 # Pinned image quay.io/389ds/dirsrv@sha256:f2851654c5df545cd893d84bea8d08c28dc25f0930493fbfed1d8a6eacf657f7
 # Captured 2026-10-03/04 in throwaway containers. Directory Manager passwords were random per run and are not recorded; the probe scripts below hard-code throwaway subject passwords (Probe-Pw-...) that exist only inside those containers. Password hashes in transcripts are redacted.
 
@@ -1174,3 +1174,1294 @@ try:
     print(f'{nm:28} native={nat:5} 389={o}{flag}')
 finally:
   sp.run(['docker','rm','-f','-v',n],capture_output=True)
+
+# Probes 16-20 (2026-10-04, CAND-33/34/35 resolution): targetattr schema check and options (16), 389 attributeTypes (17, output is internal/schema389/attributetypes.txt), modify/modrdn with omitted targetattr and attribute-scoped write denies (18), absolute filters, -oid placeholders and empty options (19), userid storage and empty filter options (20; 20b sends raw BER because libldap rejects 'cn;' client-side).
+
+===== probe 16 =====
+image quay.io/389ds/dirsrv@sha256:f2851654c5df545cd893d84bea8d08c28dc25f0930493fbfed1d8a6eacf657f7
+backend 0
+add 0 
+v33 targetattr="uid" rc=0 
+v33 targetattr!="uid" rc=0 
+v33 targetattr="UID" rc=0 
+v33 targetattr!="UID" rc=0 
+v33 targetattr="userid" rc=0 
+v33 targetattr!="userid" rc=0 
+v33 targetattr="uid;x-test" rc=0 
+v33 targetattr!="uid;x-test" rc=0 
+v33 targetattr="UID;X-TEST" rc=0 
+v33 targetattr!="UID;X-TEST" rc=0 
+v33 targetattr="uid;" rc=0 
+v33 targetattr!="uid;" rc=0 
+v33 targetattr="fooBar" rc=21 ldap_modify: Invalid syntax (21) 	additional info: targetattr "fooBar" does not exist in schema. Please add attributeTypes "fooBar" to schema if necessary. ACL Syntax Error(-5):(target=\22ldap:///ou=p
+v33 targetattr!="fooBar" rc=21 ldap_modify: Invalid syntax (21) 	additional info: targetattr "fooBar" does not exist in schema. Please add attributeTypes "fooBar" to schema if necessary. ACL Syntax Error(-5):(target=\22ldap:///ou=p
+v33 targetattr="fooBar;x-test" rc=21 ldap_modify: Invalid syntax (21) 	additional info: targetattr "fooBar;x-test" does not exist in schema. Please add attributeTypes "fooBar;x-test" to schema if necessary. ACL Syntax Error(-5):(target=\
+v33 targetattr!="fooBar;x-test" rc=21 ldap_modify: Invalid syntax (21) 	additional info: targetattr "fooBar;x-test" does not exist in schema. Please add attributeTypes "fooBar;x-test" to schema if necessary. ACL Syntax Error(-5):(target=\
+v33 targetattr="2.5.4.4" rc=0 
+v33 targetattr!="2.5.4.4" rc=0 
+v33 targetattr="2.5.4.4;x-test" rc=0 
+v33 targetattr!="2.5.4.4;x-test" rc=0 
+v33 targetattr="1.2.3.4" rc=21 ldap_modify: Invalid syntax (21) 	additional info: targetattr "1.2.3.4" does not exist in schema. Please add attributeTypes "1.2.3.4" to schema if necessary. ACL Syntax Error(-5):(target=\22ldap:///ou
+v33 targetattr!="1.2.3.4" rc=21 ldap_modify: Invalid syntax (21) 	additional info: targetattr "1.2.3.4" does not exist in schema. Please add attributeTypes "1.2.3.4" to schema if necessary. ACL Syntax Error(-5):(target=\22ldap:///ou
+v33 targetattr="0.9.2342.19200300.100.1.1" rc=0 
+v33 targetattr!="0.9.2342.19200300.100.1.1" rc=0 
+v33 targetattr="pwdAccountLockedTime" rc=21 ldap_modify: Invalid syntax (21) 	additional info: targetattr "pwdAccountLockedTime" does not exist in schema. Please add attributeTypes "pwdAccountLockedTime" to schema if necessary. ACL Syntax Error
+v33 targetattr!="pwdAccountLockedTime" rc=21 ldap_modify: Invalid syntax (21) 	additional info: targetattr "pwdAccountLockedTime" does not exist in schema. Please add attributeTypes "pwdAccountLockedTime" to schema if necessary. ACL Syntax Error
+v33 targetattr="pwdReset" rc=0 
+v33 targetattr!="pwdReset" rc=0 
+v33 targetattr="pwdChangedTime" rc=21 ldap_modify: Invalid syntax (21) 	additional info: targetattr "pwdChangedTime" does not exist in schema. Please add attributeTypes "pwdChangedTime" to schema if necessary. ACL Syntax Error(-5):(target
+v33 targetattr!="pwdChangedTime" rc=21 ldap_modify: Invalid syntax (21) 	additional info: targetattr "pwdChangedTime" does not exist in schema. Please add attributeTypes "pwdChangedTime" to schema if necessary. ACL Syntax Error(-5):(target
+v33 targetattr="passwordHistory" rc=0 
+v33 targetattr!="passwordHistory" rc=0 
+v33 targetattr="pwdUpdateTime" rc=0 
+v33 targetattr!="pwdUpdateTime" rc=0 
+v33 targetattr="nsAccountLock" rc=0 
+v33 targetattr!="nsAccountLock" rc=0 
+v33 targetattr="entryUUID" rc=0 
+v33 targetattr!="entryUUID" rc=0 
+v33 targetattr="memberOf" rc=0 
+v33 targetattr!="memberOf" rc=0 
+v33 targetattr="aci" rc=0 
+v33 targetattr!="aci" rc=0 
+v33 targetattr="nsUniqueId" rc=0 
+v33 targetattr!="nsUniqueId" rc=0 
+v33 targetattr="entrydn" rc=0 
+v33 targetattr!="entrydn" rc=0 
+v33 targetattr="person" rc=21 ldap_modify: Invalid syntax (21) 	additional info: targetattr "person" does not exist in schema. Please add attributeTypes "person" to schema if necessary. ACL Syntax Error(-5):(target=\22ldap:///ou=p
+v33 targetattr!="person" rc=21 ldap_modify: Invalid syntax (21) 	additional info: targetattr "person" does not exist in schema. Please add attributeTypes "person" to schema if necessary. ACL Syntax Error(-5):(target=\22ldap:///ou=p
+v33 targetattr="inetOrgPerson" rc=21 ldap_modify: Invalid syntax (21) 	additional info: targetattr "inetOrgPerson" does not exist in schema. Please add attributeTypes "inetOrgPerson" to schema if necessary. ACL Syntax Error(-5):(target=\
+v33 targetattr!="inetOrgPerson" rc=21 ldap_modify: Invalid syntax (21) 	additional info: targetattr "inetOrgPerson" does not exist in schema. Please add attributeTypes "inetOrgPerson" to schema if necessary. ACL Syntax Error(-5):(target=\
+v33 targetattr="objectClass" rc=0 
+v33 targetattr!="objectClass" rc=0 
+v33 targetattr="telephoneNumber" rc=0 
+v33 targetattr!="telephoneNumber" rc=0 
+v33 targetattr="mailAlternateAddress" rc=0 
+v33 targetattr!="mailAlternateAddress" rc=0 
+v33 targetattr="nsds5ReplicaCredentials" rc=0 
+v33 targetattr!="nsds5ReplicaCredentials" rc=0 
+v33 targetattr="userCertificate;binary" rc=0 
+v33 targetattr!="userCertificate;binary" rc=0 
+v33 targetattr="cn;lang-en;x-a" rc=0 
+v33 targetattr!="cn;lang-en;x-a" rc=0 
+v33 targetattr="sn || fooBar" rc=21 ldap_modify: Invalid syntax (21) 	additional info: targetattr "fooBar" does not exist in schema. Please add attributeTypes "fooBar" to schema if necessary. ACL Syntax Error(-5):(target=\22ldap:///ou=p
+v33 targetattr!="sn || fooBar" rc=21 ldap_modify: Invalid syntax (21) 	additional info: targetattr "fooBar" does not exist in schema. Please add attributeTypes "fooBar" to schema if necessary. ACL Syntax Error(-5):(target=\22ldap:///ou=p
+v33 targetattr="sn||cn" rc=0 
+v33 targetattr!="sn||cn" rc=0 
+v33 targetattr="*" rc=0 
+v33 targetattr!="*" rc=0 
+v33 (no targetattr) rc= 0 
+aci t_uidopt 0 0 
+aci t_descopt 0 0 
+aci t_descopt 1 0 
+aci d_uidopt 0 0 
+aci d_uidopt 1 0 
+aci w_descopt 0 0 
+aci w_descopt 1 0 
+aci w_deny_descopt 0 0 
+aci w_deny_descopt 1 0 
+aci e_deny_noattr 0 0 
+aci e_deny_noattr 1 0 
+aci e_deny_star 0 0 
+aci e_deny_star 1 0 
+aci e_deny_notpw 0 0 
+aci e_deny_notpw 1 0 
+aci e_deny_pwsn 0 0 
+aci e_deny_pwsn 1 0 
+aci e_deny_readstar 0 0 
+aci e_deny_readstar 1 0 
+aci e_allow_noattr 0 0 
+aci e_allow_noattr_uid 0 0 
+aci e_allow_noattr_uid 1 0 
+DM                   (uid=fa_bob)                             rc=0 ['uid=fa_bob'] 
+DM                   (uid=bobtag)                             rc=0 ['uid=fa_bob'] 
+DM                   (uid;x-test=bobtag)                      rc=0 ['uid=fa_bob'] 
+DM                   (uid;X-TEST=bobtag)                      rc=0 ['uid=fa_bob'] 
+DM                   (uid;x-test=two)                         rc=0 ['uid=fa_carol'] 
+DM                   (uid;x-test;x-two=two)                   rc=0 ['uid=fa_carol'] 
+DM                   (uid;x-two=two)                          rc=0 ['uid=fa_carol'] 
+DM                   (!(uid;x-test=bobtag))                   rc=0 ['uid=fa_alice', 'uid=fa_carol'] 
+DM                   (description=hello)                      rc=0 ['uid=fa_bob'] 
+DM                   (description;lang-en=hello)              rc=0 ['uid=fa_bob'] 
+DM                   (description;lang-en=multi)              rc=0 ['uid=fa_carol'] 
+DM                   (description;lang-en;x-foo=multi)        rc=0 ['uid=fa_carol'] 
+DM                   (description;LANG-EN=hello)              rc=0 ['uid=fa_bob'] 
+DM                   (sn=S)                                   rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol'] 
+DM                   (!(sn=X))                                rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol'] 
+DM                   (userPassword=*)                         rc=0 ['uid=fa_bob'] 
+DM                   (!(userPassword=*))                      rc=0 ['uid=fa_alice', 'uid=fa_carol'] 
+DM                   (objectClass=*)                          rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol'] 
+DM                   (uid=*)                                  rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol'] 
+DM                   BASE fa_bob (objectClass=*)          -> ['dn: uid=fa_bob,ou=probe-fattr,dc=example,dc=test', 'uid: fa_bob', 'uid;x-test: bobtag', 'description;lang-en: hello', 'description;lang-en: hello', 'sn: S', 'userPassword:: <redacted>'] rc=0
+DM                   BASE fa_bob (uid;x-test=bobtag)      -> ['dn: uid=fa_bob,ou=probe-fattr,dc=example,dc=test', 'uid: fa_bob', 'uid;x-test: bobtag', 'description;lang-en: hello', 'description;lang-en: hello', 'sn: S', 'userPassword:: <redacted>'] rc=0
+DM                   BASE fa_bob (sn=S)                   -> ['dn: uid=fa_bob,ou=probe-fattr,dc=example,dc=test', 'uid: fa_bob', 'uid;x-test: bobtag', 'description;lang-en: hello', 'description;lang-en: hello', 'sn: S', 'userPassword:: <redacted>'] rc=0
+DM                   COMPARE fa_bob uid;x-test:bobtag rc=6 TRUE 
+DM                   COMPARE fa_bob uid:fa_bob rc=6 TRUE 
+DM                   COMPARE fa_bob uid:bobtag rc=6 TRUE 
+DM                   COMPARE fa_bob description;lang-en:hello rc=6 TRUE 
+DM                   COMPARE fa_bob description:hello rc=6 TRUE 
+t_uidopt             (uid=fa_bob)                             rc=0 [] 
+t_uidopt             (uid=bobtag)                             rc=0 [] 
+t_uidopt             (uid;x-test=bobtag)                      rc=0 ['uid=fa_bob'] 
+t_uidopt             (uid;X-TEST=bobtag)                      rc=0 ['uid=fa_bob'] 
+t_uidopt             (uid;x-test=two)                         rc=0 ['uid=fa_carol'] 
+t_uidopt             (uid;x-test;x-two=two)                   rc=0 ['uid=fa_carol'] 
+t_uidopt             (uid;x-two=two)                          rc=0 [] 
+t_uidopt             (!(uid;x-test=bobtag))                   rc=0 ['uid=fa_carol'] 
+t_uidopt             (description=hello)                      rc=0 [] 
+t_uidopt             (description;lang-en=hello)              rc=0 [] 
+t_uidopt             (description;lang-en=multi)              rc=0 [] 
+t_uidopt             (description;lang-en;x-foo=multi)        rc=0 [] 
+t_uidopt             (description;LANG-EN=hello)              rc=0 [] 
+t_uidopt             (sn=S)                                   rc=0 [] 
+t_uidopt             (!(sn=X))                                rc=0 [] 
+t_uidopt             (userPassword=*)                         rc=0 [] 
+t_uidopt             (!(userPassword=*))                      rc=0 [] 
+t_uidopt             (objectClass=*)                          rc=0 [] 
+t_uidopt             (uid=*)                                  rc=0 [] 
+t_uidopt             BASE fa_bob (objectClass=*)          -> [] rc=0
+t_uidopt             BASE fa_bob (uid;x-test=bobtag)      -> ['dn: uid=fa_bob,ou=probe-fattr,dc=example,dc=test', 'uid;x-test: bobtag'] rc=0
+t_uidopt             BASE fa_bob (sn=S)                   -> [] rc=0
+t_uidopt             COMPARE fa_bob uid;x-test:bobtag rc=6 TRUE 
+t_uidopt             COMPARE fa_bob uid:fa_bob rc=50 Compare Result: Insufficient access (50) 
+t_uidopt             COMPARE fa_bob uid:bobtag rc=50 Compare Result: Insufficient access (50) 
+t_uidopt             COMPARE fa_bob description;lang-en:hello rc=50 Compare Result: Insufficient access (50) 
+t_uidopt             COMPARE fa_bob description:hello rc=50 Compare Result: Insufficient access (50) 
+t_descopt            (uid=fa_bob)                             rc=0 [] 
+t_descopt            (uid=bobtag)                             rc=0 [] 
+t_descopt            (uid;x-test=bobtag)                      rc=0 [] 
+t_descopt            (uid;X-TEST=bobtag)                      rc=0 [] 
+t_descopt            (uid;x-test=two)                         rc=0 [] 
+t_descopt            (uid;x-test;x-two=two)                   rc=0 [] 
+t_descopt            (uid;x-two=two)                          rc=0 [] 
+t_descopt            (!(uid;x-test=bobtag))                   rc=0 [] 
+t_descopt            (description=hello)                      rc=0 [] 
+t_descopt            (description;lang-en=hello)              rc=0 ['uid=fa_bob'] 
+t_descopt            (description;lang-en=multi)              rc=0 ['uid=fa_carol'] 
+t_descopt            (description;lang-en;x-foo=multi)        rc=0 ['uid=fa_carol'] 
+t_descopt            (description;LANG-EN=hello)              rc=0 ['uid=fa_bob'] 
+t_descopt            (sn=S)                                   rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol'] 
+t_descopt            (!(sn=X))                                rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol'] 
+t_descopt            (userPassword=*)                         rc=0 [] 
+t_descopt            (!(userPassword=*))                      rc=0 [] 
+t_descopt            (objectClass=*)                          rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol'] 
+t_descopt            (uid=*)                                  rc=0 [] 
+t_descopt            BASE fa_bob (objectClass=*)          -> ['dn: uid=fa_bob,ou=probe-fattr,dc=example,dc=test', 'description;lang-en: hello', 'description;lang-en: hello', 'sn: S'] rc=0
+t_descopt            BASE fa_bob (uid;x-test=bobtag)      -> [] rc=0
+t_descopt            BASE fa_bob (sn=S)                   -> ['dn: uid=fa_bob,ou=probe-fattr,dc=example,dc=test', 'description;lang-en: hello', 'description;lang-en: hello', 'sn: S'] rc=0
+t_descopt            COMPARE fa_bob uid;x-test:bobtag rc=50 Compare Result: Insufficient access (50) 
+t_descopt            COMPARE fa_bob uid:fa_bob rc=50 Compare Result: Insufficient access (50) 
+t_descopt            COMPARE fa_bob uid:bobtag rc=50 Compare Result: Insufficient access (50) 
+t_descopt            COMPARE fa_bob description;lang-en:hello rc=6 TRUE 
+t_descopt            COMPARE fa_bob description:hello rc=50 Compare Result: Insufficient access (50) 
+d_uidopt             (uid=fa_bob)                             rc=0 ['uid=fa_bob'] 
+d_uidopt             (uid=bobtag)                             rc=0 ['uid=fa_bob'] 
+d_uidopt             (uid;x-test=bobtag)                      rc=0 [] 
+d_uidopt             (uid;X-TEST=bobtag)                      rc=0 [] 
+d_uidopt             (uid;x-test=two)                         rc=0 [] 
+d_uidopt             (uid;x-test;x-two=two)                   rc=0 [] 
+d_uidopt             (uid;x-two=two)                          rc=0 ['uid=fa_carol'] 
+d_uidopt             (!(uid;x-test=bobtag))                   rc=0 [] 
+d_uidopt             (description=hello)                      rc=0 ['uid=fa_bob'] 
+d_uidopt             (description;lang-en=hello)              rc=0 ['uid=fa_bob'] 
+d_uidopt             (description;lang-en=multi)              rc=0 ['uid=fa_carol'] 
+d_uidopt             (description;lang-en;x-foo=multi)        rc=0 ['uid=fa_carol'] 
+d_uidopt             (description;LANG-EN=hello)              rc=0 ['uid=fa_bob'] 
+d_uidopt             (sn=S)                                   rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol'] 
+d_uidopt             (!(sn=X))                                rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol'] 
+d_uidopt             (userPassword=*)                         rc=0 ['uid=fa_bob'] 
+d_uidopt             (!(userPassword=*))                      rc=0 ['uid=fa_alice', 'uid=fa_carol'] 
+d_uidopt             (objectClass=*)                          rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol'] 
+d_uidopt             (uid=*)                                  rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol'] 
+d_uidopt             BASE fa_bob (objectClass=*)          -> ['dn: uid=fa_bob,ou=probe-fattr,dc=example,dc=test', 'uid: fa_bob', 'description;lang-en: hello', 'description;lang-en: hello', 'sn: S', 'userPassword:: <redacted>'] rc=0
+d_uidopt             BASE fa_bob (uid;x-test=bobtag)      -> [] rc=0
+d_uidopt             BASE fa_bob (sn=S)                   -> ['dn: uid=fa_bob,ou=probe-fattr,dc=example,dc=test', 'uid: fa_bob', 'description;lang-en: hello', 'description;lang-en: hello', 'sn: S', 'userPassword:: <redacted>'] rc=0
+d_uidopt             COMPARE fa_bob uid;x-test:bobtag rc=50 Compare Result: Insufficient access (50) 
+d_uidopt             COMPARE fa_bob uid:fa_bob rc=6 TRUE 
+d_uidopt             COMPARE fa_bob uid:bobtag rc=6 TRUE 
+d_uidopt             COMPARE fa_bob description;lang-en:hello rc=6 TRUE 
+d_uidopt             COMPARE fa_bob description:hello rc=6 TRUE 
+e_deny_noattr        (uid=fa_bob)                             rc=0 ['uid=fa_bob'] 
+e_deny_noattr        (uid=bobtag)                             rc=0 ['uid=fa_bob'] 
+e_deny_noattr        (uid;x-test=bobtag)                      rc=0 ['uid=fa_bob'] 
+e_deny_noattr        (uid;X-TEST=bobtag)                      rc=0 ['uid=fa_bob'] 
+e_deny_noattr        (uid;x-test=two)                         rc=0 ['uid=fa_carol'] 
+e_deny_noattr        (uid;x-test;x-two=two)                   rc=0 ['uid=fa_carol'] 
+e_deny_noattr        (uid;x-two=two)                          rc=0 ['uid=fa_carol'] 
+e_deny_noattr        (!(uid;x-test=bobtag))                   rc=0 ['uid=fa_alice', 'uid=fa_carol'] 
+e_deny_noattr        (description=hello)                      rc=0 ['uid=fa_bob'] 
+e_deny_noattr        (description;lang-en=hello)              rc=0 ['uid=fa_bob'] 
+e_deny_noattr        (description;lang-en=multi)              rc=0 ['uid=fa_carol'] 
+e_deny_noattr        (description;lang-en;x-foo=multi)        rc=0 ['uid=fa_carol'] 
+e_deny_noattr        (description;LANG-EN=hello)              rc=0 ['uid=fa_bob'] 
+e_deny_noattr        (sn=S)                                   rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol'] 
+e_deny_noattr        (!(sn=X))                                rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol'] 
+e_deny_noattr        (userPassword=*)                         rc=0 ['uid=fa_bob'] 
+e_deny_noattr        (!(userPassword=*))                      rc=0 ['uid=fa_alice', 'uid=fa_carol'] 
+e_deny_noattr        (objectClass=*)                          rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol'] 
+e_deny_noattr        (uid=*)                                  rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol'] 
+e_deny_noattr        BASE fa_bob (objectClass=*)          -> ['dn: uid=fa_bob,ou=probe-fattr,dc=example,dc=test', 'uid: fa_bob', 'uid;x-test: bobtag', 'description;lang-en: hello', 'description;lang-en: hello', 'sn: S', 'userPassword:: <redacted>'] rc=0
+e_deny_noattr        BASE fa_bob (uid;x-test=bobtag)      -> ['dn: uid=fa_bob,ou=probe-fattr,dc=example,dc=test', 'uid: fa_bob', 'uid;x-test: bobtag', 'description;lang-en: hello', 'description;lang-en: hello', 'sn: S', 'userPassword:: <redacted>'] rc=0
+e_deny_noattr        BASE fa_bob (sn=S)                   -> ['dn: uid=fa_bob,ou=probe-fattr,dc=example,dc=test', 'uid: fa_bob', 'uid;x-test: bobtag', 'description;lang-en: hello', 'description;lang-en: hello', 'sn: S', 'userPassword:: <redacted>'] rc=0
+e_deny_noattr        COMPARE fa_bob uid;x-test:bobtag rc=6 TRUE 
+e_deny_noattr        COMPARE fa_bob uid:fa_bob rc=6 TRUE 
+e_deny_noattr        COMPARE fa_bob uid:bobtag rc=6 TRUE 
+e_deny_noattr        COMPARE fa_bob description;lang-en:hello rc=6 TRUE 
+e_deny_noattr        COMPARE fa_bob description:hello rc=6 TRUE 
+e_deny_star          (uid=fa_bob)                             rc=0 [] 
+e_deny_star          (uid=bobtag)                             rc=0 [] 
+e_deny_star          (uid;x-test=bobtag)                      rc=0 [] 
+e_deny_star          (uid;X-TEST=bobtag)                      rc=0 [] 
+e_deny_star          (uid;x-test=two)                         rc=0 [] 
+e_deny_star          (uid;x-test;x-two=two)                   rc=0 [] 
+e_deny_star          (uid;x-two=two)                          rc=0 [] 
+e_deny_star          (!(uid;x-test=bobtag))                   rc=0 [] 
+e_deny_star          (description=hello)                      rc=0 [] 
+e_deny_star          (description;lang-en=hello)              rc=0 [] 
+e_deny_star          (description;lang-en=multi)              rc=0 [] 
+e_deny_star          (description;lang-en;x-foo=multi)        rc=0 [] 
+e_deny_star          (description;LANG-EN=hello)              rc=0 [] 
+e_deny_star          (sn=S)                                   rc=0 [] 
+e_deny_star          (!(sn=X))                                rc=0 [] 
+e_deny_star          (userPassword=*)                         rc=0 [] 
+e_deny_star          (!(userPassword=*))                      rc=0 [] 
+e_deny_star          (objectClass=*)                          rc=0 [] 
+e_deny_star          (uid=*)                                  rc=0 [] 
+e_deny_star          BASE fa_bob (objectClass=*)          -> [] rc=0
+e_deny_star          BASE fa_bob (uid;x-test=bobtag)      -> [] rc=0
+e_deny_star          BASE fa_bob (sn=S)                   -> [] rc=0
+e_deny_star          COMPARE fa_bob uid;x-test:bobtag rc=6 TRUE 
+e_deny_star          COMPARE fa_bob uid:fa_bob rc=6 TRUE 
+e_deny_star          COMPARE fa_bob uid:bobtag rc=6 TRUE 
+e_deny_star          COMPARE fa_bob description;lang-en:hello rc=6 TRUE 
+e_deny_star          COMPARE fa_bob description:hello rc=6 TRUE 
+e_deny_notpw         (uid=fa_bob)                             rc=0 [] 
+e_deny_notpw         (uid=bobtag)                             rc=0 [] 
+e_deny_notpw         (uid;x-test=bobtag)                      rc=0 [] 
+e_deny_notpw         (uid;X-TEST=bobtag)                      rc=0 [] 
+e_deny_notpw         (uid;x-test=two)                         rc=0 [] 
+e_deny_notpw         (uid;x-test;x-two=two)                   rc=0 [] 
+e_deny_notpw         (uid;x-two=two)                          rc=0 [] 
+e_deny_notpw         (!(uid;x-test=bobtag))                   rc=0 [] 
+e_deny_notpw         (description=hello)                      rc=0 [] 
+e_deny_notpw         (description;lang-en=hello)              rc=0 [] 
+e_deny_notpw         (description;lang-en=multi)              rc=0 [] 
+e_deny_notpw         (description;lang-en;x-foo=multi)        rc=0 [] 
+e_deny_notpw         (description;LANG-EN=hello)              rc=0 [] 
+e_deny_notpw         (sn=S)                                   rc=0 [] 
+e_deny_notpw         (!(sn=X))                                rc=0 [] 
+e_deny_notpw         (userPassword=*)                         rc=0 ['uid=fa_bob'] 
+e_deny_notpw         (!(userPassword=*))                      rc=0 ['uid=fa_alice', 'uid=fa_carol'] 
+e_deny_notpw         (objectClass=*)                          rc=0 [] 
+e_deny_notpw         (uid=*)                                  rc=0 [] 
+e_deny_notpw         BASE fa_bob (objectClass=*)          -> [] rc=0
+e_deny_notpw         BASE fa_bob (uid;x-test=bobtag)      -> [] rc=0
+e_deny_notpw         BASE fa_bob (sn=S)                   -> [] rc=0
+e_deny_notpw         COMPARE fa_bob uid;x-test:bobtag rc=6 TRUE 
+e_deny_notpw         COMPARE fa_bob uid:fa_bob rc=6 TRUE 
+e_deny_notpw         COMPARE fa_bob uid:bobtag rc=6 TRUE 
+e_deny_notpw         COMPARE fa_bob description;lang-en:hello rc=6 TRUE 
+e_deny_notpw         COMPARE fa_bob description:hello rc=6 TRUE 
+e_deny_pwsn          (uid=fa_bob)                             rc=0 ['uid=fa_bob'] 
+e_deny_pwsn          (uid=bobtag)                             rc=0 ['uid=fa_bob'] 
+e_deny_pwsn          (uid;x-test=bobtag)                      rc=0 ['uid=fa_bob'] 
+e_deny_pwsn          (uid;X-TEST=bobtag)                      rc=0 ['uid=fa_bob'] 
+e_deny_pwsn          (uid;x-test=two)                         rc=0 ['uid=fa_carol'] 
+e_deny_pwsn          (uid;x-test;x-two=two)                   rc=0 ['uid=fa_carol'] 
+e_deny_pwsn          (uid;x-two=two)                          rc=0 ['uid=fa_carol'] 
+e_deny_pwsn          (!(uid;x-test=bobtag))                   rc=0 ['uid=fa_alice', 'uid=fa_carol'] 
+e_deny_pwsn          (description=hello)                      rc=0 ['uid=fa_bob'] 
+e_deny_pwsn          (description;lang-en=hello)              rc=0 ['uid=fa_bob'] 
+e_deny_pwsn          (description;lang-en=multi)              rc=0 ['uid=fa_carol'] 
+e_deny_pwsn          (description;lang-en;x-foo=multi)        rc=0 ['uid=fa_carol'] 
+e_deny_pwsn          (description;LANG-EN=hello)              rc=0 ['uid=fa_bob'] 
+e_deny_pwsn          (sn=S)                                   rc=0 [] 
+e_deny_pwsn          (!(sn=X))                                rc=0 [] 
+e_deny_pwsn          (userPassword=*)                         rc=0 [] 
+e_deny_pwsn          (!(userPassword=*))                      rc=0 [] 
+e_deny_pwsn          (objectClass=*)                          rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol'] 
+e_deny_pwsn          (uid=*)                                  rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol'] 
+e_deny_pwsn          BASE fa_bob (objectClass=*)          -> ['dn: uid=fa_bob,ou=probe-fattr,dc=example,dc=test', 'uid: fa_bob', 'uid;x-test: bobtag', 'description;lang-en: hello', 'description;lang-en: hello', 'sn: S', 'userPassword:: <redacted>'] rc=0
+e_deny_pwsn          BASE fa_bob (uid;x-test=bobtag)      -> ['dn: uid=fa_bob,ou=probe-fattr,dc=example,dc=test', 'uid: fa_bob', 'uid;x-test: bobtag', 'description;lang-en: hello', 'description;lang-en: hello', 'sn: S', 'userPassword:: <redacted>'] rc=0
+e_deny_pwsn          BASE fa_bob (sn=S)                   -> [] rc=0
+e_deny_pwsn          COMPARE fa_bob uid;x-test:bobtag rc=6 TRUE 
+e_deny_pwsn          COMPARE fa_bob uid:fa_bob rc=6 TRUE 
+e_deny_pwsn          COMPARE fa_bob uid:bobtag rc=6 TRUE 
+e_deny_pwsn          COMPARE fa_bob description;lang-en:hello rc=6 TRUE 
+e_deny_pwsn          COMPARE fa_bob description:hello rc=6 TRUE 
+e_deny_readstar      (uid=fa_bob)                             rc=0 [] 
+e_deny_readstar      (uid=bobtag)                             rc=0 [] 
+e_deny_readstar      (uid;x-test=bobtag)                      rc=0 [] 
+e_deny_readstar      (uid;X-TEST=bobtag)                      rc=0 [] 
+e_deny_readstar      (uid;x-test=two)                         rc=0 [] 
+e_deny_readstar      (uid;x-test;x-two=two)                   rc=0 [] 
+e_deny_readstar      (uid;x-two=two)                          rc=0 [] 
+e_deny_readstar      (!(uid;x-test=bobtag))                   rc=0 [] 
+e_deny_readstar      (description=hello)                      rc=0 [] 
+e_deny_readstar      (description;lang-en=hello)              rc=0 [] 
+e_deny_readstar      (description;lang-en=multi)              rc=0 [] 
+e_deny_readstar      (description;lang-en;x-foo=multi)        rc=0 [] 
+e_deny_readstar      (description;LANG-EN=hello)              rc=0 [] 
+e_deny_readstar      (sn=S)                                   rc=0 [] 
+e_deny_readstar      (!(sn=X))                                rc=0 [] 
+e_deny_readstar      (userPassword=*)                         rc=0 [] 
+e_deny_readstar      (!(userPassword=*))                      rc=0 [] 
+e_deny_readstar      (objectClass=*)                          rc=0 [] 
+e_deny_readstar      (uid=*)                                  rc=0 [] 
+e_deny_readstar      BASE fa_bob (objectClass=*)          -> [] rc=0
+e_deny_readstar      BASE fa_bob (uid;x-test=bobtag)      -> [] rc=0
+e_deny_readstar      BASE fa_bob (sn=S)                   -> [] rc=0
+e_deny_readstar      COMPARE fa_bob uid;x-test:bobtag rc=50 Compare Result: Insufficient access (50) 
+e_deny_readstar      COMPARE fa_bob uid:fa_bob rc=50 Compare Result: Insufficient access (50) 
+e_deny_readstar      COMPARE fa_bob uid:bobtag rc=50 Compare Result: Insufficient access (50) 
+e_deny_readstar      COMPARE fa_bob description;lang-en:hello rc=50 Compare Result: Insufficient access (50) 
+e_deny_readstar      COMPARE fa_bob description:hello rc=50 Compare Result: Insufficient access (50) 
+e_allow_noattr       (uid=fa_bob)                             rc=0 [] 
+e_allow_noattr       (uid=bobtag)                             rc=0 [] 
+e_allow_noattr       (uid;x-test=bobtag)                      rc=0 [] 
+e_allow_noattr       (uid;X-TEST=bobtag)                      rc=0 [] 
+e_allow_noattr       (uid;x-test=two)                         rc=0 [] 
+e_allow_noattr       (uid;x-test;x-two=two)                   rc=0 [] 
+e_allow_noattr       (uid;x-two=two)                          rc=0 [] 
+e_allow_noattr       (!(uid;x-test=bobtag))                   rc=0 [] 
+e_allow_noattr       (description=hello)                      rc=0 [] 
+e_allow_noattr       (description;lang-en=hello)              rc=0 [] 
+e_allow_noattr       (description;lang-en=multi)              rc=0 [] 
+e_allow_noattr       (description;lang-en;x-foo=multi)        rc=0 [] 
+e_allow_noattr       (description;LANG-EN=hello)              rc=0 [] 
+e_allow_noattr       (sn=S)                                   rc=0 [] 
+e_allow_noattr       (!(sn=X))                                rc=0 [] 
+e_allow_noattr       (userPassword=*)                         rc=0 [] 
+e_allow_noattr       (!(userPassword=*))                      rc=0 [] 
+e_allow_noattr       (objectClass=*)                          rc=0 [] 
+e_allow_noattr       (uid=*)                                  rc=0 [] 
+e_allow_noattr       BASE fa_bob (objectClass=*)          -> [] rc=0
+e_allow_noattr       BASE fa_bob (uid;x-test=bobtag)      -> [] rc=0
+e_allow_noattr       BASE fa_bob (sn=S)                   -> [] rc=0
+e_allow_noattr       COMPARE fa_bob uid;x-test:bobtag rc=50 Compare Result: Insufficient access (50) 
+e_allow_noattr       COMPARE fa_bob uid:fa_bob rc=50 Compare Result: Insufficient access (50) 
+e_allow_noattr       COMPARE fa_bob uid:bobtag rc=50 Compare Result: Insufficient access (50) 
+e_allow_noattr       COMPARE fa_bob description;lang-en:hello rc=50 Compare Result: Insufficient access (50) 
+e_allow_noattr       COMPARE fa_bob description:hello rc=50 Compare Result: Insufficient access (50) 
+e_allow_noattr_uid   (uid=fa_bob)                             rc=0 ['uid=fa_bob'] 
+e_allow_noattr_uid   (uid=bobtag)                             rc=0 ['uid=fa_bob'] 
+e_allow_noattr_uid   (uid;x-test=bobtag)                      rc=0 ['uid=fa_bob'] 
+e_allow_noattr_uid   (uid;X-TEST=bobtag)                      rc=0 ['uid=fa_bob'] 
+e_allow_noattr_uid   (uid;x-test=two)                         rc=0 ['uid=fa_carol'] 
+e_allow_noattr_uid   (uid;x-test;x-two=two)                   rc=0 ['uid=fa_carol'] 
+e_allow_noattr_uid   (uid;x-two=two)                          rc=0 ['uid=fa_carol'] 
+e_allow_noattr_uid   (!(uid;x-test=bobtag))                   rc=0 ['uid=fa_alice', 'uid=fa_carol'] 
+e_allow_noattr_uid   (description=hello)                      rc=0 [] 
+e_allow_noattr_uid   (description;lang-en=hello)              rc=0 [] 
+e_allow_noattr_uid   (description;lang-en=multi)              rc=0 [] 
+e_allow_noattr_uid   (description;lang-en;x-foo=multi)        rc=0 [] 
+e_allow_noattr_uid   (description;LANG-EN=hello)              rc=0 [] 
+e_allow_noattr_uid   (sn=S)                                   rc=0 [] 
+e_allow_noattr_uid   (!(sn=X))                                rc=0 [] 
+e_allow_noattr_uid   (userPassword=*)                         rc=0 [] 
+e_allow_noattr_uid   (!(userPassword=*))                      rc=0 [] 
+e_allow_noattr_uid   (objectClass=*)                          rc=0 [] 
+e_allow_noattr_uid   (uid=*)                                  rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol'] 
+e_allow_noattr_uid   BASE fa_bob (objectClass=*)          -> [] rc=0
+e_allow_noattr_uid   BASE fa_bob (uid;x-test=bobtag)      -> ['dn: uid=fa_bob,ou=probe-fattr,dc=example,dc=test', 'uid: fa_bob', 'uid;x-test: bobtag'] rc=0
+e_allow_noattr_uid   BASE fa_bob (sn=S)                   -> [] rc=0
+e_allow_noattr_uid   COMPARE fa_bob uid;x-test:bobtag rc=50 Compare Result: Insufficient access (50) 
+e_allow_noattr_uid   COMPARE fa_bob uid:fa_bob rc=50 Compare Result: Insufficient access (50) 
+e_allow_noattr_uid   COMPARE fa_bob uid:bobtag rc=50 Compare Result: Insufficient access (50) 
+e_allow_noattr_uid   COMPARE fa_bob description;lang-en:hello rc=50 Compare Result: Insufficient access (50) 
+e_allow_noattr_uid   COMPARE fa_bob description:hello rc=50 Compare Result: Insufficient access (50) 
+w_descopt            WRITE add description;lang-en rc=0 
+w_descopt            WRITE add description rc=50 ldap_modify: Insufficient access (50) 	additional info: Insufficient 'write' privilege to the 'descr
+w_descopt            WRITE add description;lang-en;x-foo rc=0 
+w_descopt            WRITE add description;LANG-EN rc=0 
+w_descopt            WRITE add sn rc=50 ldap_modify: Insufficient access (50) 	additional info: Insufficient 'write' privilege to the 'sn' a
+w_deny_descopt       WRITE add description;lang-en rc=50 ldap_modify: Insufficient access (50) 	additional info: Insufficient 'write' privilege to the 'descr
+w_deny_descopt       WRITE add description rc=0 
+w_deny_descopt       WRITE add description;lang-en;x-foo rc=50 ldap_modify: Insufficient access (50) 	additional info: Insufficient 'write' privilege to the 'descr
+w_deny_descopt       WRITE add description;LANG-EN rc=50 ldap_modify: Insufficient access (50) 	additional info: Insufficient 'write' privilege to the 'descr
+w_deny_descopt       WRITE add sn rc=0 
+DM alice after writes -> ['dn: uid=fa_alice,ou=probe-fattr,dc=example,dc=test', 'description;lang-en: w_descopt-w1', 'description;lang-en: w_descopt-w4', 'description;lang-en;x-foo: w_descopt-w3', 'description: w_deny_descopt-w2', 'sn: S', 'sn: w_deny_descopt-w5']
+
+===== probe 18 =====
+image quay.io/389ds/dirsrv@sha256:f2851654c5df545cd893d84bea8d08c28dc25f0930493fbfed1d8a6eacf657f7
+backend 0
+add 0 
+aci t_deny_uidopt 0 0 
+aci t_uidsemi 0 0 
+aci w_noattr 0 0 
+aci w_noattr 1 0 
+aci w_deny_noattr 0 0 
+aci w_deny_noattr 1 0 
+aci w_deny_descopt 0 0 
+aci w_deny_descopt 1 0 
+aci w_deny_uid 0 0 
+aci w_deny_uid 1 0 
+aci w_none 0 0 
+t_deny_uidopt        (uid=fa_bob)                             rc=0 ['uid=fa_bob']
+t_deny_uidopt        (uid=bobtag)                             rc=0 ['uid=fa_bob']
+t_deny_uidopt        (uid;x-test=bobtag)                      rc=0 []
+t_deny_uidopt        (uid;x-test;x-two=two)                   rc=0 []
+t_deny_uidopt        (uid;x-two=two)                          rc=0 ['uid=fa_carol']
+t_deny_uidopt        (uid=two)                                rc=0 ['uid=fa_carol']
+t_deny_uidopt        (!(uid;x-test=bobtag))                   rc=0 []
+t_deny_uidopt        (sn=S)                                   rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol']
+t_deny_uidopt        READ one (sn=S) uid -> ['dn: uid=fa_alice,ou=probe-fattr,dc=example,dc=test', 'uid: fa_alice', 'dn: uid=fa_bob,ou=probe-fattr,dc=example,dc=test', 'uid: fa_bob', 'dn: uid=fa_carol,ou=probe-fattr,dc=example,dc=test', 'uid: fa_carol'] rc=0
+t_uidsemi            (uid=fa_bob)                             rc=0 []
+t_uidsemi            (uid=bobtag)                             rc=0 []
+t_uidsemi            (uid;x-test=bobtag)                      rc=0 []
+t_uidsemi            (uid;x-test;x-two=two)                   rc=0 []
+t_uidsemi            (uid;x-two=two)                          rc=0 []
+t_uidsemi            (uid=two)                                rc=0 []
+t_uidsemi            (!(uid;x-test=bobtag))                   rc=0 []
+t_uidsemi            (sn=S)                                   rc=0 []
+t_uidsemi            READ one (sn=S) uid -> [] rc=0
+w_noattr             WRITE add sn 50 ldap_modify: Insufficient access (50) 	additional info: Insufficient 'write' privilege to the 'sn' attribute o
+w_noattr             WRITE missing-dn add sn 50 ldap_modify: Insufficient access (50)
+w_noattr             WRITE empty-change replace none 50 ldap_modify: Insufficient access (50) 	additional info: Insufficient 'write' privilege to the 'description;x-n
+w_deny_noattr        WRITE add sn 0 
+w_deny_noattr        WRITE missing-dn add sn 32 ldap_modify: No such object (32) 	matched DN: ou=probe-fattr,dc=example,dc=test
+w_deny_noattr        WRITE empty-change replace none 0 
+w_deny_descopt       WRITE add sn 0 
+w_deny_descopt       WRITE missing-dn add sn 32 ldap_modify: No such object (32) 	matched DN: ou=probe-fattr,dc=example,dc=test
+w_deny_descopt       WRITE empty-change replace none 0 
+w_deny_uid           WRITE add sn 0 
+w_deny_uid           WRITE missing-dn add sn 32 ldap_modify: No such object (32) 	matched DN: ou=probe-fattr,dc=example,dc=test
+w_deny_uid           WRITE empty-change replace none 0 
+w_none               WRITE add sn 50 ldap_modify: Insufficient access (50) 	additional info: Insufficient 'write' privilege to the 'sn' attribute o
+w_none               WRITE missing-dn add sn 50 ldap_modify: Insufficient access (50)
+w_none               WRITE empty-change replace none 50 ldap_modify: Insufficient access (50) 	additional info: Insufficient 'write' privilege to the 'description;x-n
+w_deny_descopt       MODRDN uid=fa_carol -> uid=fa_carol2 0 
+w_deny_uid           MODRDN uid=fa_alice -> uid=fa_alice2 50 ldap_rename: Insufficient access (50)
+w_noattr             MODRDN uid=fa_bob -> uid=fa_bob2 50 ldap_rename: Insufficient access (50)
+w_none               MODRDN uid=fa_bob -> uid=fa_bob3 50 ldap_rename: Insufficient access (50)
+DM after ['dn: uid=fa_alice,ou=probe-fattr,dc=example,dc=test', 'dn: uid=fa_bob,ou=probe-fattr,dc=example,dc=test', 'dn: uid=fa_carol2,ou=probe-fattr,dc=example,dc=test']
+
+===== probe 19 =====
+image quay.io/389ds/dirsrv@sha256:f2851654c5df545cd893d84bea8d08c28dc25f0930493fbfed1d8a6eacf657f7
+backend 0
+add 0 
+aci p_star_read 0 0 
+aci e_deny_star 0 0 
+aci e_deny_star 1 0 
+aci e_allow_noattr 0 0 
+aci p_star_rsc 0 0 
+aci r_noattr_wa 0 0 
+aci r_noattr_wa 1 0 
+v19 targetattr="allowWeakCipher-oid" rc=0 
+v19 targetattr="nsAdminDomainName-oid" rc=0 
+v19 targetattr="2.5.4.4;" rc=0 
+v19 targetattr="uid;;x-test" rc=0 
+p_star_read      one  (&)        rc=2 [] Protocol error (2)
+Additional information: Bad search filter
+p_star_read      base (&)        rc=2 [] Protocol error (2)
+Additional information: Bad search filter
+p_star_read      one  (!(|))     rc=2 [] Protocol error (2)
+Additional information: Bad search filter
+p_star_read      base (!(|))     rc=2 [] Protocol error (2)
+Additional information: Bad search filter
+p_star_read      one  (|)        rc=2 [] Protocol error (2)
+Additional information: Bad search filter
+p_star_read      base (|)        rc=2 [] Protocol error (2)
+Additional information: Bad search filter
+p_star_read      one  (sn=S)     rc=0 [] 
+p_star_read      base (sn=S)     rc=0 [] 
+e_deny_star      one  (&)        rc=2 [] Protocol error (2)
+Additional information: Bad search filter
+e_deny_star      base (&)        rc=2 [] Protocol error (2)
+Additional information: Bad search filter
+e_deny_star      one  (!(|))     rc=2 [] Protocol error (2)
+Additional information: Bad search filter
+e_deny_star      base (!(|))     rc=2 [] Protocol error (2)
+Additional information: Bad search filter
+e_deny_star      one  (|)        rc=2 [] Protocol error (2)
+Additional information: Bad search filter
+e_deny_star      base (|)        rc=2 [] Protocol error (2)
+Additional information: Bad search filter
+e_deny_star      one  (sn=S)     rc=0 [] 
+e_deny_star      base (sn=S)     rc=0 [] 
+e_allow_noattr   one  (&)        rc=2 [] Protocol error (2)
+Additional information: Bad search filter
+e_allow_noattr   base (&)        rc=2 [] Protocol error (2)
+Additional information: Bad search filter
+e_allow_noattr   one  (!(|))     rc=2 [] Protocol error (2)
+Additional information: Bad search filter
+e_allow_noattr   base (!(|))     rc=2 [] Protocol error (2)
+Additional information: Bad search filter
+e_allow_noattr   one  (|)        rc=2 [] Protocol error (2)
+Additional information: Bad search filter
+e_allow_noattr   base (|)        rc=2 [] Protocol error (2)
+Additional information: Bad search filter
+e_allow_noattr   one  (sn=S)     rc=0 [] 
+e_allow_noattr   base (sn=S)     rc=0 [] 
+p_star_rsc       one  (&)        rc=2 [] Protocol error (2)
+Additional information: Bad search filter
+p_star_rsc       base (&)        rc=2 [] Protocol error (2)
+Additional information: Bad search filter
+p_star_rsc       one  (!(|))     rc=2 [] Protocol error (2)
+Additional information: Bad search filter
+p_star_rsc       base (!(|))     rc=2 [] Protocol error (2)
+Additional information: Bad search filter
+p_star_rsc       one  (|)        rc=2 [] Protocol error (2)
+Additional information: Bad search filter
+p_star_rsc       base (|)        rc=2 [] Protocol error (2)
+Additional information: Bad search filter
+p_star_rsc       one  (sn=S)     rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol'] 
+p_star_rsc       base (sn=S)     rc=0 ['uid=fa_bob'] 
+r_noattr_wa MODRDN uid=fa_bob -> uid=fa_bob2 50 ldap_rename: Insufficient access (50)
+r_noattr_wa WRITE add sn 50 ldap_modify: Insufficient access (50) 	additional info: Insufficient 'write' privilege to the 'sn' attribute o
+
+===== probe 20 =====
+image quay.io/389ds/dirsrv@sha256:f2851654c5df545cd893d84bea8d08c28dc25f0930493fbfed1d8a6eacf657f7
+backend 0
+add 0 
+aci i_uid_rs 0 0 
+aci i_userid_rs 0 0 
+aci i_cn_rs 0 0 
+aci i_star_rsc 0 0 
+add userid-spelled entry 0 
+DM stored spelling: ['dn: userid=v_u,ou=probe-fattr,dc=example,dc=test', 'objectClass: inetOrgPerson', 'objectClass: organizationalPerson', 'objectClass: person', 'objectClass: top', 'uid: v_u', 'cn: v_u', 'sn: S', 'cn;lang-en: en_u']
+DM           (uid=v_u)            rc=0 ['dn: userid=v_u'] ['uid: v_u', 'cn: v_u', 'cn;lang-en: en_u'] 
+DM           (userid=v_u)         rc=0 ['dn: userid=v_u'] ['uid: v_u', 'cn: v_u', 'cn;lang-en: en_u'] 
+DM           (cn=v_u)             rc=0 ['dn: userid=v_u'] ['uid: v_u', 'cn: v_u', 'cn;lang-en: en_u'] 
+DM           (cn;=v_u)            rc=249 [] [] ldap_search_ext: Bad search filter (-7)
+DM           (cn;=en_u)           rc=249 [] [] ldap_search_ext: Bad search filter (-7)
+DM           (cn=en_u)            rc=0 ['dn: userid=v_u'] ['uid: v_u', 'cn: v_u', 'cn;lang-en: en_u'] 
+DM           (cn;lang-en=en_u)    rc=0 ['dn: userid=v_u'] ['uid: v_u', 'cn: v_u', 'cn;lang-en: en_u'] 
+DM           (cn;lang-en;=en_u)   rc=249 [] [] ldap_search_ext: Bad search filter (-7)
+DM           (uid;=v_u)           rc=249 [] [] ldap_search_ext: Bad search filter (-7)
+DM           (cn;=fa_bob)         rc=249 [] [] ldap_search_ext: Bad search filter (-7)
+DM           COMPARE uid:v_u rc=32 Compare Result: No such object (32)
+Matched DN: ou=probe-fattr,dc=example,dc=test
+UNDEFINED 
+DM           COMPARE cn;:v_u rc=32 Compare Result: No such object (32)
+Matched DN: ou=probe-fattr,dc=example,dc=test
+UNDEFINED 
+i_uid_rs     (uid=v_u)            rc=0 ['dn: userid=v_u'] ['uid: v_u'] 
+i_uid_rs     (userid=v_u)         rc=0 ['dn: userid=v_u'] ['uid: v_u'] 
+i_uid_rs     (cn=v_u)             rc=0 [] [] 
+i_uid_rs     (cn;=v_u)            rc=249 [] [] ldap_search_ext: Bad search filter (-7)
+i_uid_rs     (cn;=en_u)           rc=249 [] [] ldap_search_ext: Bad search filter (-7)
+i_uid_rs     (cn=en_u)            rc=0 [] [] 
+i_uid_rs     (cn;lang-en=en_u)    rc=0 [] [] 
+i_uid_rs     (cn;lang-en;=en_u)   rc=249 [] [] ldap_search_ext: Bad search filter (-7)
+i_uid_rs     (uid;=v_u)           rc=249 [] [] ldap_search_ext: Bad search filter (-7)
+i_uid_rs     (cn;=fa_bob)         rc=249 [] [] ldap_search_ext: Bad search filter (-7)
+i_uid_rs     COMPARE uid:v_u rc=0 UNDEFINED 
+i_uid_rs     COMPARE cn;:v_u rc=0 UNDEFINED 
+i_userid_rs  (uid=v_u)            rc=0 [] [] 
+i_userid_rs  (userid=v_u)         rc=0 [] [] 
+i_userid_rs  (cn=v_u)             rc=0 [] [] 
+i_userid_rs  (cn;=v_u)            rc=249 [] [] ldap_search_ext: Bad search filter (-7)
+i_userid_rs  (cn;=en_u)           rc=249 [] [] ldap_search_ext: Bad search filter (-7)
+i_userid_rs  (cn=en_u)            rc=0 [] [] 
+i_userid_rs  (cn;lang-en=en_u)    rc=0 [] [] 
+i_userid_rs  (cn;lang-en;=en_u)   rc=249 [] [] ldap_search_ext: Bad search filter (-7)
+i_userid_rs  (uid;=v_u)           rc=249 [] [] ldap_search_ext: Bad search filter (-7)
+i_userid_rs  (cn;=fa_bob)         rc=249 [] [] ldap_search_ext: Bad search filter (-7)
+i_userid_rs  COMPARE uid:v_u rc=0 UNDEFINED 
+i_userid_rs  COMPARE cn;:v_u rc=0 UNDEFINED 
+i_cn_rs      (uid=v_u)            rc=0 [] [] 
+i_cn_rs      (userid=v_u)         rc=0 [] [] 
+i_cn_rs      (cn=v_u)             rc=0 ['dn: userid=v_u'] ['cn: v_u', 'cn;lang-en: en_u'] 
+i_cn_rs      (cn;=v_u)            rc=249 [] [] ldap_search_ext: Bad search filter (-7)
+i_cn_rs      (cn;=en_u)           rc=249 [] [] ldap_search_ext: Bad search filter (-7)
+i_cn_rs      (cn=en_u)            rc=0 ['dn: userid=v_u'] ['cn: v_u', 'cn;lang-en: en_u'] 
+i_cn_rs      (cn;lang-en=en_u)    rc=0 ['dn: userid=v_u'] ['cn: v_u', 'cn;lang-en: en_u'] 
+i_cn_rs      (cn;lang-en;=en_u)   rc=249 [] [] ldap_search_ext: Bad search filter (-7)
+i_cn_rs      (uid;=v_u)           rc=249 [] [] ldap_search_ext: Bad search filter (-7)
+i_cn_rs      (cn;=fa_bob)         rc=249 [] [] ldap_search_ext: Bad search filter (-7)
+i_cn_rs      COMPARE uid:v_u rc=0 UNDEFINED 
+i_cn_rs      COMPARE cn;:v_u rc=0 UNDEFINED 
+i_star_rsc   (uid=v_u)            rc=0 ['dn: userid=v_u'] ['uid: v_u', 'cn: v_u', 'cn;lang-en: en_u'] 
+i_star_rsc   (userid=v_u)         rc=0 ['dn: userid=v_u'] ['uid: v_u', 'cn: v_u', 'cn;lang-en: en_u'] 
+i_star_rsc   (cn=v_u)             rc=0 ['dn: userid=v_u'] ['uid: v_u', 'cn: v_u', 'cn;lang-en: en_u'] 
+i_star_rsc   (cn;=v_u)            rc=249 [] [] ldap_search_ext: Bad search filter (-7)
+i_star_rsc   (cn;=en_u)           rc=249 [] [] ldap_search_ext: Bad search filter (-7)
+i_star_rsc   (cn=en_u)            rc=0 ['dn: userid=v_u'] ['uid: v_u', 'cn: v_u', 'cn;lang-en: en_u'] 
+i_star_rsc   (cn;lang-en=en_u)    rc=0 ['dn: userid=v_u'] ['uid: v_u', 'cn: v_u', 'cn;lang-en: en_u'] 
+i_star_rsc   (cn;lang-en;=en_u)   rc=249 [] [] ldap_search_ext: Bad search filter (-7)
+i_star_rsc   (uid;=v_u)           rc=249 [] [] ldap_search_ext: Bad search filter (-7)
+i_star_rsc   (cn;=fa_bob)         rc=249 [] [] ldap_search_ext: Bad search filter (-7)
+i_star_rsc   COMPARE uid:v_u rc=32 Compare Result: No such object (32)
+Matched DN: ou=probe-fattr,dc=example,dc=test
+UNDEFINED 
+i_star_rsc   COMPARE cn;:v_u rc=32 Compare Result: No such object (32)
+Matched DN: ou=probe-fattr,dc=example,dc=test
+UNDEFINED 
+
+===== probe 20b =====
+image quay.io/389ds/dirsrv@sha256:f2851654c5df545cd893d84bea8d08c28dc25f0930493fbfed1d8a6eacf657f7
+backend 0
+add 0 
+aci i_uid_rs 0 0 
+aci i_userid_rs 0 0 
+aci i_cn_rs 0 0 
+aci i_star_rsc 0 0 
+add userid-spelled entry 0 
+DM stored spelling: ['dn: userid=v_u,ou=probe-fattr,dc=example,dc=test', 'objectClass: inetOrgPerson', 'objectClass: organizationalPerson', 'objectClass: person', 'objectClass: top', 'uid: v_u', 'cn: v_u', 'sn: S', 'cn;lang-en: en_u']
+DM bind resp 02010161070a010004000400 | (cn;=v_u) entries=[] result=0 | (cn;=en_u) entries=[] result=0 | (cn;lang-en;=en_u) entries=[] result=0 | (uid;=v_u) entries=[] result=0 | (cn;LANG-EN=en_u) entries=['userid=v_u'] result=0 | (cn=v_u) entries=['userid=v_u'] result=0 
+i_cn_rs bind resp 02010161070a010004000400 | (cn;=v_u) entries=[] result=0 | (cn;=en_u) entries=[] result=0 | (cn;lang-en;=en_u) entries=[] result=0 | (uid;=v_u) entries=[] result=0 | (cn;LANG-EN=en_u) entries=['userid=v_u'] result=0 | (cn=v_u) entries=['userid=v_u'] result=0 
+i_star_rsc bind resp 02010161070a010004000400 | (cn;=v_u) entries=[] result=0 | (cn;=en_u) entries=[] result=0 | (cn;lang-en;=en_u) entries=[] result=0 | (uid;=v_u) entries=[] result=0 | (cn;LANG-EN=en_u) entries=['userid=v_u'] result=0 | (cn=v_u) entries=['userid=v_u'] result=0 
+
+===== probe 17 =====
+(output: internal/schema389/attributetypes.txt, header lines carry the image digest and count)
+
+===== script filterprobe16.py =====
+import subprocess as sp, time, secrets, re
+ref=open('deploy/docker/dirsrv.digest').read().strip()
+pw=secrets.token_hex(16); n='muse-fprobe16-'+secrets.token_hex(3)
+def ex(*a, inp=None): return sp.run(['docker','exec','-i',n,*a],input=inp,capture_output=True,text=True)
+sp.run(['docker','run','-d','--name',n,'-e','DS_DM_PASSWORD='+pw,'-v','/data',ref],stdout=sp.DEVNULL,check=True)
+S='dc=example,dc=test'; B='ou=probe-fattr,'+S; P='ou=people,'+S
+def who(u): return f'uid={u},{P}'
+H=['-H','ldap://127.0.0.1:3389']
+def red(t): return re.sub(r'(userPassword[^:]*::?) .*', r'\1 <redacted>', t)
+try:
+  for i in range(600):
+    l=sp.run(['docker','logs',n],capture_output=True,text=True)
+    if '389-ds-container started.' in l.stdout+l.stderr: break
+    time.sleep(0.5)
+  print('image',ref); print('backend',ex('dsconf','localhost','backend','create','--suffix',S,'--be-name','userroot','--create-suffix').returncode)
+  RSC='read,search,compare'
+  acis={
+    # CAND-34: options inside targetattr
+    't_uidopt':[('(targetattr="uid;x-test")',RSC)],
+    't_descopt':[('(targetattr="description;lang-en")',RSC),('(targetattr="objectClass || sn")','read,search')],
+    'd_uidopt':[('(targetattr="*")',RSC),('(targetattr="uid;x-test")','DENY'+RSC)],
+    'w_descopt':[('(targetattr="*")','read,search'),('(targetattr="description;lang-en")','write')],
+    'w_deny_descopt':[('(targetattr="*")','read,search,write'),('(targetattr="description;lang-en")','DENYwrite')],
+    # CAND-35: entry-level search and attribute-scoped denies
+    'e_deny_noattr':[('(targetattr="*")',RSC),('','DENYsearch')],
+    'e_deny_star':[('(targetattr="*")',RSC),('(targetattr="*")','DENYsearch')],
+    'e_deny_notpw':[('(targetattr="*")',RSC),('(targetattr!="userPassword")','DENYsearch')],
+    'e_deny_pwsn':[('(targetattr="*")',RSC),('(targetattr="userPassword || sn")','DENYsearch')],
+    'e_deny_readstar':[('(targetattr="*")','search'),('(targetattr="*")','DENYread')],
+    'e_allow_noattr':[('',RSC)],
+    'e_allow_noattr_uid':[('',RSC),('(targetattr="uid")','read,search')],
+  }
+  ldif=f"dn: {P}\nobjectClass: organizationalUnit\nou: people\n\n"
+  for s in acis: ldif+=f"dn: {who(s)}\nobjectClass: inetOrgPerson\nuid: {s}\ncn: {s}\nsn: S\nuserPassword: Probe-Pw-{s}-1\n\n"
+  ldif+=f"dn: {B}\nobjectClass: organizationalUnit\nou: probe-fattr\n\n"
+  for u,extra in [('fa_alice',''),('fa_bob','userPassword: Probe-Bob-Pw-1\nuid;x-test: bobtag\ndescription;lang-en: hello\n'),('fa_carol','description;lang-en;x-foo: multi\nuid;x-test;x-two: two\n')]:
+    ldif+=f"dn: uid={u},{B}\nobjectClass: inetOrgPerson\nuid: {u}\ncn: {u}\nsn: S\n{extra}\n"
+  r=ex('ldapadd','-x',*H,'-D','cn=Directory Manager','-w',pw,inp=ldif); print('add',r.returncode,r.stderr.strip()[:300])
+  def addaci(text):
+    r=ex('ldapmodify','-x',*H,'-D','cn=Directory Manager','-w',pw,inp=f"dn: {B}\nchangetype: modify\nadd: aci\naci: {text}\n\n")
+    return r.returncode, r.stderr.strip().replace('\n',' ')[:200]
+  # CAND-33: which targetattr names does 389 accept when the ACI is added?
+  for k,ta in enumerate(['uid','UID','userid','uid;x-test','UID;X-TEST','uid;','fooBar','fooBar;x-test','2.5.4.4','2.5.4.4;x-test','1.2.3.4','0.9.2342.19200300.100.1.1',
+      'pwdAccountLockedTime','pwdReset','pwdChangedTime','passwordHistory','pwdUpdateTime','nsAccountLock','entryUUID','memberOf','aci','nsUniqueId','entrydn',
+      'person','inetOrgPerson','objectClass','telephoneNumber','mailAlternateAddress','nsds5ReplicaCredentials','userCertificate;binary','cn;lang-en;x-a','sn || fooBar','sn||cn','*']):
+    for neg in ['','!']:
+      rc,err=addaci(f'(target="ldap:///{B}")(targetattr{neg}="{ta}")(version 3.0; acl "labldap:v33-{k}{neg and "n"}"; allow (read) userdn="ldap:///{who("nobody")}";)')
+      print(f'v33 targetattr{neg}="{ta}" rc={rc} {err}')
+  rc,err=addaci(f'(target="ldap:///{B}")(version 3.0; acl "labldap:v33-noattr"; allow (read) userdn="ldap:///{who("nobody")}";)'); print('v33 (no targetattr) rc=',rc,err)
+  for s_,lst in acis.items():
+    for k,(t,perm) in enumerate(lst):
+      act="deny ("+perm[4:]+")" if perm.startswith("DENY") else "allow ("+perm+")"
+      print('aci',s_,k,*addaci(f'(target="ldap:///{B}"){t}(version 3.0; acl "labldap:{s_}-{k}"; {act} userdn="ldap:///{who(s_)}";)'))
+  fl=['(uid=fa_bob)','(uid=bobtag)','(uid;x-test=bobtag)','(uid;X-TEST=bobtag)','(uid;x-test=two)','(uid;x-test;x-two=two)','(uid;x-two=two)','(!(uid;x-test=bobtag))',
+      '(description=hello)','(description;lang-en=hello)','(description;lang-en=multi)','(description;lang-en;x-foo=multi)','(description;LANG-EN=hello)',
+      '(sn=S)','(!(sn=X))','(userPassword=*)','(!(userPassword=*))','(objectClass=*)','(uid=*)']
+  subs=[('DM','cn=Directory Manager',pw)]+[(s,who(s),f'Probe-Pw-{s}-1') for s in acis]
+  for name,dn,p in subs:
+    if name.startswith('w_'): continue
+    for f in fl:
+      r=ex('ldapsearch','-x','-LLL',*H,'-D',dn,'-w',p,'-b',B,'-s','one',f,'1.1')
+      dns=sorted(l.split(',')[0][4:] for l in r.stdout.splitlines() if l.startswith('dn:'))
+      print(f"{name:20} {f:40} rc={r.returncode} {dns} {r.stderr.strip()[:80]}")
+    for f in ['(objectClass=*)','(uid;x-test=bobtag)','(sn=S)']:
+      r=ex('ldapsearch','-x','-LLL','-o','ldif-wrap=no',*H,'-D',dn,'-w',p,'-b','uid=fa_bob,'+B,'-s','base',f,'uid','uid;x-test','description','description;lang-en','sn','userPassword')
+      print(f"{name:20} BASE fa_bob {f:24} -> {[red(l) for l in r.stdout.splitlines() if l]} rc={r.returncode}")
+    for a,v in [('uid;x-test','bobtag'),('uid','fa_bob'),('uid','bobtag'),('description;lang-en','hello'),('description','hello')]:
+      r=ex('ldapcompare','-x',*H,'-D',dn,'-w',p,'uid=fa_bob,'+B,f'{a}:{v}')
+      print(f"{name:20} COMPARE fa_bob {a}:{v} rc={r.returncode} {r.stdout.strip()[:40]} {r.stderr.strip()[:80]}")
+  for name in ['w_descopt','w_deny_descopt']:
+    dn,p=who(name),f'Probe-Pw-{name}-1'
+    for a,v in [('description;lang-en','w1'),('description','w2'),('description;lang-en;x-foo','w3'),('description;LANG-EN','w4'),('sn','w5')]:
+      r=ex('ldapmodify','-x',*H,'-D',dn,'-w',p,inp=f"dn: uid=fa_alice,{B}\nchangetype: modify\nadd: {a}\n{a}: {name}-{v}\n\n")
+      print(f"{name:20} WRITE add {a} rc={r.returncode} {r.stderr.strip().replace(chr(10),' ')[:100]}")
+  r=ex('ldapsearch','-x','-LLL','-o','ldif-wrap=no',*H,'-D','cn=Directory Manager','-w',pw,'-b','uid=fa_alice,'+B,'-s','base','(objectClass=*)','description','sn')
+  print('DM alice after writes ->',[l for l in r.stdout.splitlines() if l])
+finally:
+  sp.run(['docker','rm','-f','-v',n],capture_output=True)
+
+===== script filterprobe17.py =====
+# Probe 17: every attributeType name, alias and OID in the pinned image's cn=schema (input for the native targetattr schema check, CAND-33).
+import subprocess as sp, time, secrets, re
+ref=open('deploy/docker/dirsrv.digest').read().strip()
+pw=secrets.token_hex(16); n='muse-fprobe17-'+secrets.token_hex(3)
+sp.run(['docker','run','-d','--name',n,'-e','DS_DM_PASSWORD='+pw,'-v','/data',ref],stdout=sp.DEVNULL,check=True)
+try:
+  for i in range(600):
+    l=sp.run(['docker','logs',n],capture_output=True,text=True)
+    if '389-ds-container started.' in l.stdout+l.stderr: break
+    time.sleep(0.5)
+  r=sp.run(['docker','exec',n,'ldapsearch','-x','-LLL','-o','ldif-wrap=no','-H','ldap://127.0.0.1:3389','-D','cn=Directory Manager','-w',pw,'-b','cn=schema','-s','base','(objectClass=*)','attributeTypes'],capture_output=True,text=True,check=True)
+  out=[]
+  for line in r.stdout.splitlines():
+    if not line.lower().startswith('attributetypes:'): continue
+    body=line.split(':',1)[1].strip()
+    m=re.match(r"\(\s*([0-9.]+|[A-Za-z][A-Za-z0-9-]*-oid)\s+NAME\s+(\(([^)]*)\)|'([^']*)')",body)
+    if not m: print('UNPARSED',body[:120]); continue
+    names=re.findall(r"'([^']+)'",m.group(2))
+    out.append((m.group(1),names))
+  print('# image',ref)
+  print('# attributeTypes',len(out))
+  for oid,names in sorted(out,key=lambda x:x[1][0].lower()):
+    print(oid,' '.join(names))
+finally:
+  sp.run(['docker','rm','-f','-v',n],capture_output=True)
+
+===== script filterprobe18.py =====
+import subprocess as sp, time, secrets, re
+ref=open('deploy/docker/dirsrv.digest').read().strip()
+pw=secrets.token_hex(16); n='muse-fprobe18-'+secrets.token_hex(3)
+def ex(*a, inp=None): return sp.run(['docker','exec','-i',n,*a],input=inp,capture_output=True,text=True)
+sp.run(['docker','run','-d','--name',n,'-e','DS_DM_PASSWORD='+pw,'-v','/data',ref],stdout=sp.DEVNULL,check=True)
+S='dc=example,dc=test'; B='ou=probe-fattr,'+S; P='ou=people,'+S
+def who(u): return f'uid={u},{P}'
+H=['-H','ldap://127.0.0.1:3389']
+def red(t): return re.sub(r'(userPassword[^:]*::?) .*', r'\1 <redacted>', t)
+try:
+  for i in range(600):
+    l=sp.run(['docker','logs',n],capture_output=True,text=True)
+    if '389-ds-container started.' in l.stdout+l.stderr: break
+    time.sleep(0.5)
+  print('image',ref); print('backend',ex('dsconf','localhost','backend','create','--suffix',S,'--be-name','userroot','--create-suffix').returncode)
+  RSC='read,search,compare'
+  acis={
+    't_deny_uidopt':[('(targetattr!="uid;x-test")',RSC)],
+    't_uidsemi':[('(targetattr="uid;")',RSC)],
+    'w_noattr':[('(targetattr="*")','read,search'),('','write')],
+    'w_deny_noattr':[('(targetattr="*")','read,search,write'),('','DENYwrite')],
+    'w_deny_descopt':[('(targetattr="*")','read,search,write'),('(targetattr="description;lang-en")','DENYwrite')],
+    'w_deny_uid':[('(targetattr="*")','read,search,write'),('(targetattr="uid")','DENYwrite')],
+    'w_none':[('(targetattr="*")','read,search')],
+  }
+  ldif=f"dn: {P}\nobjectClass: organizationalUnit\nou: people\n\n"
+  for s in acis: ldif+=f"dn: {who(s)}\nobjectClass: inetOrgPerson\nuid: {s}\ncn: {s}\nsn: S\nuserPassword: Probe-Pw-{s}-1\n\n"
+  ldif+=f"dn: {B}\nobjectClass: organizationalUnit\nou: probe-fattr\n\n"
+  for u,extra in [('fa_alice',''),('fa_bob','userPassword: Probe-Bob-Pw-1\nuid;x-test: bobtag\ndescription;lang-en: hello\n'),('fa_carol','description;lang-en;x-foo: multi\nuid;x-test;x-two: two\n')]:
+    ldif+=f"dn: uid={u},{B}\nobjectClass: inetOrgPerson\nuid: {u}\ncn: {u}\nsn: S\n{extra}\n"
+  r=ex('ldapadd','-x',*H,'-D','cn=Directory Manager','-w',pw,inp=ldif); print('add',r.returncode,r.stderr.strip()[:300])
+  def addaci(text):
+    r=ex('ldapmodify','-x',*H,'-D','cn=Directory Manager','-w',pw,inp=f"dn: {B}\nchangetype: modify\nadd: aci\naci: {text}\n\n")
+    return r.returncode, r.stderr.strip().replace('\n',' ')[:200]
+  for s_,lst in acis.items():
+    for k,(t,perm) in enumerate(lst):
+      act="deny ("+perm[4:]+")" if perm.startswith("DENY") else "allow ("+perm+")"
+      print('aci',s_,k,*addaci(f'(target="ldap:///{B}"){t}(version 3.0; acl "labldap:{s_}-{k}"; {act} userdn="ldap:///{who(s_)}";)'))
+  fl=['(uid=fa_bob)','(uid=bobtag)','(uid;x-test=bobtag)','(uid;x-test;x-two=two)','(uid;x-two=two)','(uid=two)','(!(uid;x-test=bobtag))','(sn=S)']
+  for name in ['t_deny_uidopt','t_uidsemi']:
+    dn,p=who(name),f'Probe-Pw-{name}-1'
+    for f in fl:
+      r=ex('ldapsearch','-x','-LLL',*H,'-D',dn,'-w',p,'-b',B,'-s','one',f,'1.1')
+      dns=sorted(l.split(',')[0][4:] for l in r.stdout.splitlines() if l.startswith('dn:'))
+      print(f"{name:20} {f:40} rc={r.returncode} {dns}")
+    r=ex('ldapsearch','-x','-LLL','-o','ldif-wrap=no',*H,'-D',dn,'-w',p,'-b',B,'-s','one','(sn=S)','uid','uid;x-test','uid;x-two')
+    print(f"{name:20} READ one (sn=S) uid -> {[l for l in r.stdout.splitlines() if l]} rc={r.returncode}")
+  def mod(name,ldif):
+    r=ex('ldapmodify','-x',*H,'-D',who(name),'-w',f'Probe-Pw-{name}-1',inp=ldif); return r.returncode, r.stderr.strip().replace(chr(10),' ')[:110]
+  for name in ['w_noattr','w_deny_noattr','w_deny_descopt','w_deny_uid','w_none']:
+    print(f"{name:20} WRITE add sn", *mod(name,f"dn: uid=fa_alice,{B}\nchangetype: modify\nadd: sn\nsn: {name}\n\n"))
+    print(f"{name:20} WRITE missing-dn add sn", *mod(name,f"dn: uid=nobody,{B}\nchangetype: modify\nadd: sn\nsn: {name}\n\n"))
+    print(f"{name:20} WRITE empty-change replace none", *mod(name,f"dn: uid=fa_alice,{B}\nchangetype: modify\nreplace: description;x-none\n\n"))
+  for name,old,new in [('w_deny_descopt','fa_carol','fa_carol2'),('w_deny_uid','fa_alice','fa_alice2'),('w_noattr','fa_bob','fa_bob2'),('w_none','fa_bob','fa_bob3')]:
+    print(f"{name:20} MODRDN uid={old} -> uid={new}", *mod(name,f"dn: uid={old},{B}\nchangetype: modrdn\nnewrdn: uid={new}\ndeleteoldrdn: 1\n\n"))
+  r=ex('ldapsearch','-x','-LLL',*H,'-D','cn=Directory Manager','-w',pw,'-b',B,'-s','one','(objectClass=*)','1.1'); print('DM after', sorted(l for l in r.stdout.splitlines() if l))
+finally:
+  sp.run(['docker','rm','-f','-v',n],capture_output=True)
+
+===== script filterprobe19.py =====
+import subprocess as sp, time, secrets, re
+ref=open('deploy/docker/dirsrv.digest').read().strip()
+pw=secrets.token_hex(16); n='muse-fprobe19-'+secrets.token_hex(3)
+def ex(*a, inp=None): return sp.run(['docker','exec','-i',n,*a],input=inp,capture_output=True,text=True)
+sp.run(['docker','run','-d','--name',n,'-e','DS_DM_PASSWORD='+pw,'-v','/data',ref],stdout=sp.DEVNULL,check=True)
+S='dc=example,dc=test'; B='ou=probe-fattr,'+S; P='ou=people,'+S
+def who(u): return f'uid={u},{P}'
+H=['-H','ldap://127.0.0.1:3389']
+def red(t): return re.sub(r'(userPassword[^:]*::?) .*', r'\1 <redacted>', t)
+try:
+  for i in range(600):
+    l=sp.run(['docker','logs',n],capture_output=True,text=True)
+    if '389-ds-container started.' in l.stdout+l.stderr: break
+    time.sleep(0.5)
+  print('image',ref); print('backend',ex('dsconf','localhost','backend','create','--suffix',S,'--be-name','userroot','--create-suffix').returncode)
+  RSC='read,search,compare'
+  acis={
+    'p_star_read':[('(targetattr="*")','read')],
+    'e_deny_star':[('(targetattr="*")',RSC),('(targetattr="*")','DENYsearch')],
+    'e_allow_noattr':[('',RSC)],
+    'p_star_rsc':[('(targetattr="*")',RSC)],
+    'r_noattr_wa':[('(targetattr="*")','read,search'),('','write,add')],
+  }
+  ldif=f"dn: {P}\nobjectClass: organizationalUnit\nou: people\n\n"
+  for s in acis: ldif+=f"dn: {who(s)}\nobjectClass: inetOrgPerson\nuid: {s}\ncn: {s}\nsn: S\nuserPassword: Probe-Pw-{s}-1\n\n"
+  ldif+=f"dn: {B}\nobjectClass: organizationalUnit\nou: probe-fattr\n\n"
+  for u,extra in [('fa_alice',''),('fa_bob','userPassword: Probe-Bob-Pw-1\nuid;x-test: bobtag\ndescription;lang-en: hello\n'),('fa_carol','description;lang-en;x-foo: multi\nuid;x-test;x-two: two\n')]:
+    ldif+=f"dn: uid={u},{B}\nobjectClass: inetOrgPerson\nuid: {u}\ncn: {u}\nsn: S\n{extra}\n"
+  r=ex('ldapadd','-x',*H,'-D','cn=Directory Manager','-w',pw,inp=ldif); print('add',r.returncode,r.stderr.strip()[:300])
+  def addaci(text):
+    r=ex('ldapmodify','-x',*H,'-D','cn=Directory Manager','-w',pw,inp=f"dn: {B}\nchangetype: modify\nadd: aci\naci: {text}\n\n")
+    return r.returncode, r.stderr.strip().replace('\n',' ')[:200]
+  for s_,lst in acis.items():
+    for k,(t,perm) in enumerate(lst):
+      act="deny ("+perm[4:]+")" if perm.startswith("DENY") else "allow ("+perm+")"
+      print('aci',s_,k,*addaci(f'(target="ldap:///{B}"){t}(version 3.0; acl "labldap:{s_}-{k}"; {act} userdn="ldap:///{who(s_)}";)'))
+  for k,ta in enumerate(['allowWeakCipher-oid','nsAdminDomainName-oid','2.5.4.4;','uid;;x-test']):
+    rc,err=addaci(f'(target="ldap:///{B}")(targetattr="{ta}")(version 3.0; acl "labldap:v19-{k}"; allow (read) userdn="ldap:///{who("nobody")}";)')
+    print(f'v19 targetattr="{ta}" rc={rc} {err}')
+  for name in ['p_star_read','e_deny_star','e_allow_noattr','p_star_rsc']:
+    dn,p=who(name),f'Probe-Pw-{name}-1'
+    for f in ['(&)','(!(|))','(|)','(sn=S)']:
+      for scope,base in [('one',B),('base','uid=fa_bob,'+B)]:
+        r=ex('ldapsearch','-x','-LLL',*H,'-D',dn,'-w',p,'-b',base,'-s',scope,f,'1.1')
+        dns=sorted(l.split(',')[0][4:] for l in r.stdout.splitlines() if l.startswith('dn:'))
+        print(f"{name:16} {scope:4} {f:10} rc={r.returncode} {dns} {r.stderr.strip()[:80]}")
+  def mod(name,ldif):
+    r=ex('ldapmodify','-x',*H,'-D',who(name),'-w',f'Probe-Pw-{name}-1',inp=ldif); return r.returncode, r.stderr.strip().replace(chr(10),' ')[:110]
+  print('r_noattr_wa MODRDN uid=fa_bob -> uid=fa_bob2', *mod('r_noattr_wa',f"dn: uid=fa_bob,{B}\nchangetype: modrdn\nnewrdn: uid=fa_bob2\ndeleteoldrdn: 1\n\n"))
+  print('r_noattr_wa WRITE add sn', *mod('r_noattr_wa',f"dn: uid=fa_alice,{B}\nchangetype: modify\nadd: sn\nsn: x\n\n"))
+finally:
+  sp.run(['docker','rm','-f','-v',n],capture_output=True)
+
+===== script filterprobe20.py =====
+import subprocess as sp, time, secrets, re
+ref=open('deploy/docker/dirsrv.digest').read().strip()
+pw=secrets.token_hex(16); n='muse-fprobe20-'+secrets.token_hex(3)
+def ex(*a, inp=None): return sp.run(['docker','exec','-i',n,*a],input=inp,capture_output=True,text=True)
+sp.run(['docker','run','-d','--name',n,'-e','DS_DM_PASSWORD='+pw,'-v','/data',ref],stdout=sp.DEVNULL,check=True)
+S='dc=example,dc=test'; B='ou=probe-fattr,'+S; P='ou=people,'+S
+def who(u): return f'uid={u},{P}'
+H=['-H','ldap://127.0.0.1:3389']
+def red(t): return re.sub(r'(userPassword[^:]*::?) .*', r'\1 <redacted>', t)
+try:
+  for i in range(600):
+    l=sp.run(['docker','logs',n],capture_output=True,text=True)
+    if '389-ds-container started.' in l.stdout+l.stderr: break
+    time.sleep(0.5)
+  print('image',ref); print('backend',ex('dsconf','localhost','backend','create','--suffix',S,'--be-name','userroot','--create-suffix').returncode)
+  RSC='read,search,compare'
+  acis={
+    'i_uid_rs':[('(targetattr="uid")','read,search')],
+    'i_userid_rs':[('(targetattr="userid")','read,search')],
+    'i_cn_rs':[('(targetattr="cn")','read,search')],
+    'i_star_rsc':[('(targetattr="*")',RSC)],
+  }
+  ldif=f"dn: {P}\nobjectClass: organizationalUnit\nou: people\n\n"
+  for s in acis: ldif+=f"dn: {who(s)}\nobjectClass: inetOrgPerson\nuid: {s}\ncn: {s}\nsn: S\nuserPassword: Probe-Pw-{s}-1\n\n"
+  ldif+=f"dn: {B}\nobjectClass: organizationalUnit\nou: probe-fattr\n\n"
+  for u,extra in [('fa_alice',''),('fa_bob','userPassword: Probe-Bob-Pw-1\nuid;x-test: bobtag\ndescription;lang-en: hello\n'),('fa_carol','description;lang-en;x-foo: multi\nuid;x-test;x-two: two\n')]:
+    ldif+=f"dn: uid={u},{B}\nobjectClass: inetOrgPerson\nuid: {u}\ncn: {u}\nsn: S\n{extra}\n"
+  r=ex('ldapadd','-x',*H,'-D','cn=Directory Manager','-w',pw,inp=ldif); print('add',r.returncode,r.stderr.strip()[:300])
+  def addaci(text):
+    r=ex('ldapmodify','-x',*H,'-D','cn=Directory Manager','-w',pw,inp=f"dn: {B}\nchangetype: modify\nadd: aci\naci: {text}\n\n")
+    return r.returncode, r.stderr.strip().replace('\n',' ')[:200]
+  for s_,lst in acis.items():
+    for k,(t,perm) in enumerate(lst):
+      act="deny ("+perm[4:]+")" if perm.startswith("DENY") else "allow ("+perm+")"
+      print('aci',s_,k,*addaci(f'(target="ldap:///{B}"){t}(version 3.0; acl "labldap:{s_}-{k}"; {act} userdn="ldap:///{who(s_)}";)'))
+  r=ex('ldapadd','-x',*H,'-D','cn=Directory Manager','-w',pw,inp=f"dn: userid=v_u,{B}\nobjectClass: inetOrgPerson\nuserid: v_u\ncommonName: v_u\nsurname: S\ncn;lang-en: en_u\n\n")
+  print('add userid-spelled entry',r.returncode,r.stderr.strip()[:200])
+  r=ex('ldapsearch','-x','-LLL','-o','ldif-wrap=no',*H,'-D','cn=Directory Manager','-w',pw,'-b',B,'-s','one','(cn=v_u)','*')
+  print('DM stored spelling:',[l for l in r.stdout.splitlines() if l])
+  for name in ['DM']+list(acis):
+    dn,p=(('cn=Directory Manager',pw) if name=='DM' else (who(name),f'Probe-Pw-{name}-1'))
+    for f in ['(uid=v_u)','(userid=v_u)','(cn=v_u)','(cn;=v_u)','(cn;=en_u)','(cn=en_u)','(cn;lang-en=en_u)','(cn;lang-en;=en_u)','(uid;=v_u)','(cn;=fa_bob)']:
+      r=ex('ldapsearch','-x','-LLL','-o','ldif-wrap=no',*H,'-D',dn,'-w',p,'-b',B,'-s','one',f,'uid','cn')
+      out=[l for l in r.stdout.splitlines() if l and not l.startswith('dn:')]
+      dns=sorted(l.split(',')[0] for l in r.stdout.splitlines() if l.startswith('dn:'))
+      print(f"{name:12} {f:20} rc={r.returncode} {dns} {out} {r.stderr.strip()[:80]}")
+    r=ex('ldapcompare','-x',*H,'-D',dn,'-w',p,f'uid=v_u,{B}','uid:v_u'); print(f"{name:12} COMPARE uid:v_u rc={r.returncode} {r.stdout.strip()} {r.stderr.strip()[:60]}")
+    r=ex('ldapcompare','-x',*H,'-D',dn,'-w',p,f'uid=v_u,{B}','cn;:v_u'); print(f"{name:12} COMPARE cn;:v_u rc={r.returncode} {r.stdout.strip()} {r.stderr.strip()[:60]}")
+finally:
+  sp.run(['docker','rm','-f','-v',n],capture_output=True)
+
+===== script filterprobe20b.py =====
+import subprocess as sp, time, secrets, re
+ref=open('deploy/docker/dirsrv.digest').read().strip()
+pw=secrets.token_hex(16); n='muse-fprobe20b-'+secrets.token_hex(3)
+def ex(*a, inp=None): return sp.run(['docker','exec','-i',n,*a],input=inp,capture_output=True,text=True)
+sp.run(['docker','run','-d','--name',n,'-e','DS_DM_PASSWORD='+pw,'-v','/data',ref],stdout=sp.DEVNULL,check=True)
+S='dc=example,dc=test'; B='ou=probe-fattr,'+S; P='ou=people,'+S
+def who(u): return f'uid={u},{P}'
+H=['-H','ldap://127.0.0.1:3389']
+def red(t): return re.sub(r'(userPassword[^:]*::?) .*', r'\1 <redacted>', t)
+try:
+  for i in range(600):
+    l=sp.run(['docker','logs',n],capture_output=True,text=True)
+    if '389-ds-container started.' in l.stdout+l.stderr: break
+    time.sleep(0.5)
+  print('image',ref); print('backend',ex('dsconf','localhost','backend','create','--suffix',S,'--be-name','userroot','--create-suffix').returncode)
+  RSC='read,search,compare'
+  acis={
+    'i_uid_rs':[('(targetattr="uid")','read,search')],
+    'i_userid_rs':[('(targetattr="userid")','read,search')],
+    'i_cn_rs':[('(targetattr="cn")','read,search')],
+    'i_star_rsc':[('(targetattr="*")',RSC)],
+  }
+  ldif=f"dn: {P}\nobjectClass: organizationalUnit\nou: people\n\n"
+  for s in acis: ldif+=f"dn: {who(s)}\nobjectClass: inetOrgPerson\nuid: {s}\ncn: {s}\nsn: S\nuserPassword: Probe-Pw-{s}-1\n\n"
+  ldif+=f"dn: {B}\nobjectClass: organizationalUnit\nou: probe-fattr\n\n"
+  for u,extra in [('fa_alice',''),('fa_bob','userPassword: Probe-Bob-Pw-1\nuid;x-test: bobtag\ndescription;lang-en: hello\n'),('fa_carol','description;lang-en;x-foo: multi\nuid;x-test;x-two: two\n')]:
+    ldif+=f"dn: uid={u},{B}\nobjectClass: inetOrgPerson\nuid: {u}\ncn: {u}\nsn: S\n{extra}\n"
+  r=ex('ldapadd','-x',*H,'-D','cn=Directory Manager','-w',pw,inp=ldif); print('add',r.returncode,r.stderr.strip()[:300])
+  def addaci(text):
+    r=ex('ldapmodify','-x',*H,'-D','cn=Directory Manager','-w',pw,inp=f"dn: {B}\nchangetype: modify\nadd: aci\naci: {text}\n\n")
+    return r.returncode, r.stderr.strip().replace('\n',' ')[:200]
+  for s_,lst in acis.items():
+    for k,(t,perm) in enumerate(lst):
+      act="deny ("+perm[4:]+")" if perm.startswith("DENY") else "allow ("+perm+")"
+      print('aci',s_,k,*addaci(f'(target="ldap:///{B}"){t}(version 3.0; acl "labldap:{s_}-{k}"; {act} userdn="ldap:///{who(s_)}";)'))
+  r=ex('ldapadd','-x',*H,'-D','cn=Directory Manager','-w',pw,inp=f"dn: userid=v_u,{B}\nobjectClass: inetOrgPerson\nuserid: v_u\ncommonName: v_u\nsurname: S\ncn;lang-en: en_u\n\n")
+  print('add userid-spelled entry',r.returncode,r.stderr.strip()[:200])
+  r=ex('ldapsearch','-x','-LLL','-o','ldif-wrap=no',*H,'-D','cn=Directory Manager','-w',pw,'-b',B,'-s','one','(cn=v_u)','*')
+  print('DM stored spelling:',[l for l in r.stdout.splitlines() if l])
+  open('/tmp/_r','w')
+  sp.run(['docker','cp','/tmp/rawldap.py',n+':/tmp/rawldap.py'])
+  F=['cn;=v_u','cn;=en_u','cn;lang-en;=en_u','uid;=v_u','cn;LANG-EN=en_u','cn=v_u']
+  for name in ['DM','i_cn_rs','i_star_rsc']:
+    dn,p=(('cn=Directory Manager',pw) if name=='DM' else (who(name),f'Probe-Pw-{name}-1'))
+    r=ex('python3','/tmp/rawldap.py','127.0.0.1','3389',dn,p,B,*F)
+    print(name, r.stdout.strip().replace(chr(10),' | '), r.stderr.strip()[-200:])
+finally:
+  sp.run(['docker','rm','-f','-v',n],capture_output=True)
+
+===== script rawldap.py (probe 20b helper, run inside the container) =====
+import socket,sys
+def L(n):
+    if n<128: return bytes([n])
+    b=n.to_bytes((n.bit_length()+7)//8,'big'); return bytes([0x80|len(b)])+b
+def T(t,v): return bytes([t])+L(len(v))+v
+def I(n): return T(0x02,bytes([n]))
+def S(s): return T(0x04,s.encode())
+def rd(sk):
+    h=sk.recv(2)
+    if not h: return None
+    n=h[1]
+    if n&0x80:
+        k=n&0x7f; n=int.from_bytes(sk.recv(k),'big')
+    b=b''
+    while len(b)<n: b+=sk.recv(n-len(b))
+    return h[0],b
+host,port,dn,pw,base=sys.argv[1:6]
+sk=socket.create_connection((host,int(port)))
+sk.send(T(0x30,I(1)+T(0x60,I(3)+S(dn)+T(0x80,pw.encode()))))
+t,b=rd(sk); print('bind resp',b[-12:].hex())
+for i,(attr,val) in enumerate([(a.split('=')[0],a.split('=')[1]) for a in sys.argv[6:]]):
+    flt=T(0xa3,S(attr)+S(val))
+    req=T(0x63,S(base)+T(0x0a,b'\x01')+T(0x0a,b'\x00')+I(0)+I(0)+T(0x01,b'\x00')+flt+T(0x30,S('1.1')))
+    sk.send(T(0x30,I(2+i)+req))
+    dns=[];
+    while True:
+        t,b=rd(sk)
+        # find op tag: after msgid
+        j=2+b[1]; op=b[j]
+        if op==0x64:
+            k=j+1; ln=b[k]; k+=1
+            if ln&0x80: k+=ln&0x7f
+            dl=b[k+1]; dns.append(b[k+2:k+2+dl].decode().split(',')[0])
+        elif op==0x65:
+            k=j+1; ln=b[k]; k+=1
+            if ln&0x80: k+=ln&0x7f
+            print(f'({attr}={val}) entries={dns} result={b[k+2]}'); break
+
+# Probes 21-24 (2026-10-04): ACI placement does not change option handling (21, 23); go-ldap adds and searches behave like ldapsearch on fresh connections (22); on ONE connection 389 reuses an earlier decision for the base type when it later checks an option-bearing description (24, recorded as D36).
+
+===== probe 21 =====
+image quay.io/389ds/dirsrv@sha256:f2851654c5df545cd893d84bea8d08c28dc25f0930493fbfed1d8a6eacf657f7
+backend 0
+add people 0
+add 0 
+sfx_before   (uid;x-test=bobtag)    rc=0 ['uid=fa_bob']
+sfx_before   (uid;x-test=two)       rc=0 ['uid=fa_carol']
+sfx_before   (uid=fa_bob)           rc=0 []
+sfx_after    (uid;x-test=bobtag)    rc=0 ['uid=fa_bob']
+sfx_after    (uid;x-test=two)       rc=0 ['uid=fa_carol']
+sfx_after    (uid=fa_bob)           rc=0 []
+ou_after     (uid;x-test=bobtag)    rc=0 ['uid=fa_bob']
+ou_after     (uid;x-test=two)       rc=0 ['uid=fa_carol']
+ou_after     (uid=fa_bob)           rc=0 []
+
+===== probe 23no =====
+image quay.io/389ds/dirsrv@sha256:f2851654c5df545cd893d84bea8d08c28dc25f0930493fbfed1d8a6eacf657f7
+backend 0
+add 0 
+variant nosemi
+d_uidopt       (uid;x-test=bobtag)    rc=0 []
+d_uidopt       (uid;x-test=two)       rc=0 []
+d_uidopt       (uid=fa_bob)           rc=0 ['uid=fa_bob']
+t_deny_uidopt  (uid;x-test=bobtag)    rc=0 []
+t_deny_uidopt  (uid;x-test=two)       rc=0 []
+t_deny_uidopt  (uid=fa_bob)           rc=0 ['uid=fa_bob']
+t_uidopt       (uid;x-test=bobtag)    rc=0 ['uid=fa_bob']
+t_uidopt       (uid;x-test=two)       rc=0 ['uid=fa_carol']
+t_uidopt       (uid=fa_bob)           rc=0 []
+
+===== probe 23semi =====
+image quay.io/389ds/dirsrv@sha256:f2851654c5df545cd893d84bea8d08c28dc25f0930493fbfed1d8a6eacf657f7
+backend 0
+add 0 
+variant semi
+d_uidopt       (uid;x-test=bobtag)    rc=0 []
+d_uidopt       (uid;x-test=two)       rc=0 []
+d_uidopt       (uid=fa_bob)           rc=0 ['uid=fa_bob']
+t_deny_uidopt  (uid;x-test=bobtag)    rc=0 []
+t_deny_uidopt  (uid;x-test=two)       rc=0 []
+t_deny_uidopt  (uid=fa_bob)           rc=0 ['uid=fa_bob']
+t_uidopt       (uid;x-test=bobtag)    rc=0 ['uid=fa_bob']
+t_uidopt       (uid;x-test=two)       rc=0 ['uid=fa_carol']
+t_uidopt       (uid=fa_bob)           rc=0 []
+t_uidsemi      (uid;x-test=bobtag)    rc=0 []
+t_uidsemi      (uid;x-test=two)       rc=0 []
+t_uidsemi      (uid=fa_bob)           rc=0 []
+
+===== probe 24 =====
+image quay.io/389ds/dirsrv@sha256:f2851654c5df545cd893d84bea8d08c28dc25f0930493fbfed1d8a6eacf657f7
+backend 0
+add 0 
+d_uidopt       same-conn plain-first: (uid=fa_bob)=[fa_bob] (uid;x-test=bobtag)=[fa_bob] (uid;x-test=two)=[fa_carol] 
+d_uidopt       same-conn opt-first: (uid;x-test=bobtag)=[] (uid;x-test=two)=[] (uid=fa_bob)=[fa_bob] 
+t_deny_uidopt  same-conn plain-first: (uid=fa_bob)=[fa_bob] (uid;x-test=bobtag)=[fa_bob] (uid;x-test=two)=[fa_carol] 
+t_deny_uidopt  same-conn opt-first: (uid;x-test=bobtag)=[] (uid;x-test=two)=[] (uid=fa_bob)=[fa_bob] 
+t_uidopt       same-conn plain-first: (uid=fa_bob)=[] (uid;x-test=bobtag)=[] (uid;x-test=two)=[] 
+t_uidopt       same-conn opt-first: (uid;x-test=bobtag)=[fa_bob] (uid;x-test=two)=[fa_carol] (uid=fa_bob)=[] 
+
+===== probe 22 =====
+image quay.io/389ds/dirsrv@sha256:f2851654c5df545cd893d84bea8d08c28dc25f0930493fbfed1d8a6eacf657f7
+backend 0
+add people 0
+add 0 
+(uid;x-test=bobtag) [uid=fa_bob] <nil>
+(uid;x-test=two) [uid=fa_carol] <nil>
+(uid;x-test=gbobtag) [] <nil>
+(uid;x-test=gtwo) [] <nil>
+(uid=fa_bob) [] <nil>
+ 
+DM-add add g_bob <nil>
+add g_carol <nil>
+ 
+after go add (uid;x-test=bobtag) [uid=fa_bob] <nil>
+(uid;x-test=two) [uid=fa_carol] <nil>
+(uid;x-test=gbobtag) [uid=g_bob] <nil>
+(uid;x-test=gtwo) [uid=g_carol] <nil>
+(uid=fa_bob) [] <nil>
+ 
+
+===== script filterprobe21.py =====
+import subprocess as sp, time, secrets, re
+ref=open('deploy/docker/dirsrv.digest').read().strip()
+pw=secrets.token_hex(16); n='muse-fprobe21-'+secrets.token_hex(3)
+def ex(*a, inp=None): return sp.run(['docker','exec','-i',n,*a],input=inp,capture_output=True,text=True)
+sp.run(['docker','run','-d','--name',n,'-e','DS_DM_PASSWORD='+pw,'-v','/data',ref],stdout=sp.DEVNULL,check=True)
+S='dc=example,dc=test'; B='ou=probe-fattr,'+S; P='ou=people,'+S
+def who(u): return f'uid={u},{P}'
+H=['-H','ldap://127.0.0.1:3389']
+def red(t): return re.sub(r'(userPassword[^:]*::?) .*', r'\1 <redacted>', t)
+try:
+  for i in range(600):
+    l=sp.run(['docker','logs',n],capture_output=True,text=True)
+    if '389-ds-container started.' in l.stdout+l.stderr: break
+    time.sleep(0.5)
+  print('image',ref); print('backend',ex('dsconf','localhost','backend','create','--suffix',S,'--be-name','userroot','--create-suffix').returncode)
+  RSC='read,search,compare'
+  def addaci(dn,text):
+    r=ex('ldapmodify','-x',*H,'-D','cn=Directory Manager','-w',pw,inp=f"dn: {dn}\nchangetype: modify\nadd: aci\naci: {text}\n\n")
+    return r.returncode, r.stderr.strip().replace('\n',' ')[:200]
+  subs=['sfx_before','sfx_after','ou_after']
+  ldif=f"dn: {P}\nobjectClass: organizationalUnit\nou: people\n\n"
+  for s_ in subs: ldif+=f"dn: {who(s_)}\nobjectClass: inetOrgPerson\nuid: {s_}\ncn: {s_}\nsn: S\nuserPassword: Probe-Pw-{s_}-1\n\n"
+  r=ex('ldapadd','-x',*H,'-D','cn=Directory Manager','-w',pw,inp=ldif); print('add people',r.returncode)
+  T=lambda s_: f'(target="ldap:///{B}")(targetattr="uid;x-test")(version 3.0; acl "labldap:{s_}"; allow (read,search,compare) userdn="ldap:///{who(s_)}";)'
+  print('aci sfx_before', *addaci(S,T('sfx_before')))
+  ldif=f"dn: {B}\nobjectClass: organizationalUnit\nou: probe-fattr\n\n"
+  for u,extra in [('fa_alice',''),('fa_bob','uid;x-test: bobtag\n'),('fa_carol','uid;x-test;x-two: two\n')]:
+    ldif+=f"dn: uid={u},{B}\nobjectClass: inetOrgPerson\nuid: {u}\ncn: {u}\nsn: S\n{extra}\n"
+  r=ex('ldapadd','-x',*H,'-D','cn=Directory Manager','-w',pw,inp=ldif); print('add',r.returncode,r.stderr.strip()[:300])
+  print('aci sfx_after', *addaci(S,T('sfx_after')))
+  print('aci ou_after', *addaci(B,T('ou_after')))
+  for s_ in subs:
+    for f in ['(uid;x-test=bobtag)','(uid;x-test=two)','(uid=fa_bob)']:
+      r=ex('ldapsearch','-x','-LLL',*H,'-D',who(s_),'-w',f'Probe-Pw-{s_}-1','-b',B,'-s','one',f,'1.1')
+      dns=sorted(l.split(',')[0][4:] for l in r.stdout.splitlines() if l.startswith('dn:'))
+      print(f"{s_:12} {f:22} rc={r.returncode} {dns}")
+finally:
+  sp.run(['docker','rm','-f','-v',n],capture_output=True)
+
+===== script filterprobe22.py =====
+import subprocess as sp, time, secrets, re
+ref=open('deploy/docker/dirsrv.digest').read().strip()
+pw=secrets.token_hex(16); n='muse-fprobe22-'+secrets.token_hex(3)
+def ex(*a, inp=None): return sp.run(['docker','exec','-i',n,*a],input=inp,capture_output=True,text=True)
+sp.run(['docker','run','-d','--name',n,'-e','DS_DM_PASSWORD='+pw,'-v','/data',ref],stdout=sp.DEVNULL,check=True)
+S='dc=example,dc=test'; B='ou=probe-fattr,'+S; P='ou=people,'+S
+def who(u): return f'uid={u},{P}'
+H=['-H','ldap://127.0.0.1:3389']
+def red(t): return re.sub(r'(userPassword[^:]*::?) .*', r'\1 <redacted>', t)
+try:
+  for i in range(600):
+    l=sp.run(['docker','logs',n],capture_output=True,text=True)
+    if '389-ds-container started.' in l.stdout+l.stderr: break
+    time.sleep(0.5)
+  print('image',ref); print('backend',ex('dsconf','localhost','backend','create','--suffix',S,'--be-name','userroot','--create-suffix').returncode)
+  RSC='read,search,compare'
+  def addaci(dn,text):
+    r=ex('ldapmodify','-x',*H,'-D','cn=Directory Manager','-w',pw,inp=f"dn: {dn}\nchangetype: modify\nadd: aci\naci: {text}\n\n")
+    return r.returncode, r.stderr.strip().replace('\n',' ')[:200]
+  subs=['sfx_before','sfx_after','ou_after']
+  ldif=f"dn: {P}\nobjectClass: organizationalUnit\nou: people\n\n"
+  for s_ in subs: ldif+=f"dn: {who(s_)}\nobjectClass: inetOrgPerson\nuid: {s_}\ncn: {s_}\nsn: S\nuserPassword: Probe-Pw-{s_}-1\n\n"
+  r=ex('ldapadd','-x',*H,'-D','cn=Directory Manager','-w',pw,inp=ldif); print('add people',r.returncode)
+  T=lambda s_: f'(target="ldap:///{B}")(targetattr="uid;x-test")(version 3.0; acl "labldap:{s_}"; allow (read,search,compare) userdn="ldap:///{who(s_)}";)'
+  print('aci sfx_before', *addaci(S,T('sfx_before')))
+  ldif=f"dn: {B}\nobjectClass: organizationalUnit\nou: probe-fattr\n\n"
+  for u,extra in [('fa_alice',''),('fa_bob','uid;x-test: bobtag\n'),('fa_carol','uid;x-test;x-two: two\n')]:
+    ldif+=f"dn: uid={u},{B}\nobjectClass: inetOrgPerson\nuid: {u}\ncn: {u}\nsn: S\n{extra}\n"
+  r=ex('ldapadd','-x',*H,'-D','cn=Directory Manager','-w',pw,inp=ldif); print('add',r.returncode,r.stderr.strip()[:300])
+  print('aci sfx_after', *addaci(S,T('sfx_after')))
+  print('aci ou_after', *addaci(B,T('ou_after')))
+  ip=sp.run(['docker','inspect','-f','{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}',n],capture_output=True,text=True).stdout.strip()
+  open('/tmp/probe22.env','w').write(f"{ip}\n{n}\n")
+  r=sp.run(['go','run','./tmpprobe22',ip,who('ou_after'),'Probe-Pw-ou_after-1',B],capture_output=True,text=True,cwd='.')
+  print(r.stdout, r.stderr[-800:])
+  r=sp.run(['go','run','./tmpprobe22',ip,'cn=Directory Manager',pw,B,'add'],capture_output=True,text=True,cwd='.')
+  print('DM-add', r.stdout, r.stderr[-800:])
+  r=sp.run(['go','run','./tmpprobe22',ip,who('ou_after'),'Probe-Pw-ou_after-1',B],capture_output=True,text=True,cwd='.')
+  print('after go add', r.stdout, r.stderr[-800:])
+  r=ex('ldapsearch','-x','-LLL','-o','ldif-wrap=no',*H,'-D','cn=Directory Manager','-w',pw,'-b',B,'-s','one','(uid=g_*)','*')
+  print('stored', r.stdout)
+finally:
+  sp.run(['docker','rm','-f','-v',n],capture_output=True)
+
+===== script filterprobe23.py =====
+import subprocess as sp, time, secrets, re
+ref=open('deploy/docker/dirsrv.digest').read().strip()
+pw=secrets.token_hex(16); n='muse-fprobe23-'+secrets.token_hex(3)
+def ex(*a, inp=None): return sp.run(['docker','exec','-i',n,*a],input=inp,capture_output=True,text=True)
+sp.run(['docker','run','-d','--name',n,'-e','DS_DM_PASSWORD='+pw,'-v','/data',ref],stdout=sp.DEVNULL,check=True)
+S='dc=example,dc=test'; B='ou=probe-fattr,'+S; P='ou=people,'+S
+def who(u): return f'uid={u},{P}'
+H=['-H','ldap://127.0.0.1:3389']
+def red(t): return re.sub(r'(userPassword[^:]*::?) .*', r'\1 <redacted>', t)
+try:
+  for i in range(600):
+    l=sp.run(['docker','logs',n],capture_output=True,text=True)
+    if '389-ds-container started.' in l.stdout+l.stderr: break
+    time.sleep(0.5)
+  print('image',ref); print('backend',ex('dsconf','localhost','backend','create','--suffix',S,'--be-name','userroot','--create-suffix').returncode)
+  RSC='read,search,compare'
+  import sys
+  variant=sys.argv[1]
+  acis={
+    'd_uidopt':[('(targetattr="*")',RSC),('(targetattr="uid;x-test")','DENY'+RSC)],
+    't_deny_uidopt':[('(targetattr!="uid;x-test")',RSC)],
+    't_uidopt':[('(targetattr="uid;x-test")',RSC)],
+  }
+  if variant=='semi': acis['t_uidsemi']=[('(targetattr="uid;")',RSC)]
+  ldif=f"dn: {P}\nobjectClass: organizationalUnit\nou: people\n\n"
+  for s in acis: ldif+=f"dn: {who(s)}\nobjectClass: inetOrgPerson\nuid: {s}\ncn: {s}\nsn: S\nuserPassword: Probe-Pw-{s}-1\n\n"
+  ldif+=f"dn: {B}\nobjectClass: organizationalUnit\nou: probe-fattr\n\n"
+  for u,extra in [('fa_alice',''),('fa_bob','userPassword: Probe-Bob-Pw-1\nuid;x-test: bobtag\ndescription;lang-en: hello\n'),('fa_carol','description;lang-en;x-foo: multi\nuid;x-test;x-two: two\n')]:
+    ldif+=f"dn: uid={u},{B}\nobjectClass: inetOrgPerson\nuid: {u}\ncn: {u}\nsn: S\n{extra}\n"
+  r=ex('ldapadd','-x',*H,'-D','cn=Directory Manager','-w',pw,inp=ldif); print('add',r.returncode,r.stderr.strip()[:300])
+  def addaci(text):
+    r=ex('ldapmodify','-x',*H,'-D','cn=Directory Manager','-w',pw,inp=f"dn: {B}\nchangetype: modify\nadd: aci\naci: {text}\n\n")
+    return r.returncode, r.stderr.strip().replace('\n',' ')[:200]
+  for s_,lst in acis.items():
+    for k,(t,perm) in enumerate(lst):
+      act="deny ("+perm[4:]+")" if perm.startswith("DENY") else "allow ("+perm+")"
+      print('aci',s_,k,*addaci(f'(target="ldap:///{B}"){t}(version 3.0; acl "labldap:{s_}-{k}"; {act} userdn="ldap:///{who(s_)}";)'))
+  print('variant',variant)
+  for name in acis:
+    for f in ['(uid;x-test=bobtag)','(uid;x-test=two)','(uid=fa_bob)']:
+      r=ex('ldapsearch','-x','-LLL',*H,'-D',who(name),'-w',f'Probe-Pw-{name}-1','-b',B,'-s','one',f,'1.1')
+      dns=sorted(l.split(',')[0][4:] for l in r.stdout.splitlines() if l.startswith('dn:'))
+      print(f"{name:14} {f:22} rc={r.returncode} {dns}")
+finally:
+  sp.run(['docker','rm','-f','-v',n],capture_output=True)
+
+===== script filterprobe24.py =====
+import subprocess as sp, time, secrets, re
+ref=open('deploy/docker/dirsrv.digest').read().strip()
+pw=secrets.token_hex(16); n='muse-fprobe24-'+secrets.token_hex(3)
+def ex(*a, inp=None): return sp.run(['docker','exec','-i',n,*a],input=inp,capture_output=True,text=True)
+sp.run(['docker','run','-d','--name',n,'-e','DS_DM_PASSWORD='+pw,'-v','/data',ref],stdout=sp.DEVNULL,check=True)
+S='dc=example,dc=test'; B='ou=probe-fattr,'+S; P='ou=people,'+S
+def who(u): return f'uid={u},{P}'
+H=['-H','ldap://127.0.0.1:3389']
+def red(t): return re.sub(r'(userPassword[^:]*::?) .*', r'\1 <redacted>', t)
+try:
+  for i in range(600):
+    l=sp.run(['docker','logs',n],capture_output=True,text=True)
+    if '389-ds-container started.' in l.stdout+l.stderr: break
+    time.sleep(0.5)
+  print('image',ref); print('backend',ex('dsconf','localhost','backend','create','--suffix',S,'--be-name','userroot','--create-suffix').returncode)
+  RSC='read,search,compare'
+  import sys
+  variant=sys.argv[1]
+  acis={
+    'd_uidopt':[('(targetattr="*")',RSC),('(targetattr="uid;x-test")','DENY'+RSC)],
+    't_deny_uidopt':[('(targetattr!="uid;x-test")',RSC)],
+    't_uidopt':[('(targetattr="uid;x-test")',RSC)],
+  }
+  if variant=='semi': acis['t_uidsemi']=[('(targetattr="uid;")',RSC)]
+  ldif=f"dn: {P}\nobjectClass: organizationalUnit\nou: people\n\n"
+  for s in acis: ldif+=f"dn: {who(s)}\nobjectClass: inetOrgPerson\nuid: {s}\ncn: {s}\nsn: S\nuserPassword: Probe-Pw-{s}-1\n\n"
+  ldif+=f"dn: {B}\nobjectClass: organizationalUnit\nou: probe-fattr\n\n"
+  for u,extra in [('fa_alice',''),('fa_bob','userPassword: Probe-Bob-Pw-1\nuid;x-test: bobtag\ndescription;lang-en: hello\n'),('fa_carol','description;lang-en;x-foo: multi\nuid;x-test;x-two: two\n')]:
+    ldif+=f"dn: uid={u},{B}\nobjectClass: inetOrgPerson\nuid: {u}\ncn: {u}\nsn: S\n{extra}\n"
+  r=ex('ldapadd','-x',*H,'-D','cn=Directory Manager','-w',pw,inp=ldif); print('add',r.returncode,r.stderr.strip()[:300])
+  def addaci(text):
+    r=ex('ldapmodify','-x',*H,'-D','cn=Directory Manager','-w',pw,inp=f"dn: {B}\nchangetype: modify\nadd: aci\naci: {text}\n\n")
+    return r.returncode, r.stderr.strip().replace('\n',' ')[:200]
+  for s_,lst in acis.items():
+    for k,(t,perm) in enumerate(lst):
+      act="deny ("+perm[4:]+")" if perm.startswith("DENY") else "allow ("+perm+")"
+      print('aci',s_,k,*addaci(f'(target="ldap:///{B}"){t}(version 3.0; acl "labldap:{s_}-{k}"; {act} userdn="ldap:///{who(s_)}";)'))
+  ip=sp.run(['docker','inspect','-f','{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}',n],capture_output=True,text=True).stdout.strip()
+  for name in acis:
+    for order in ['plain-first','opt-first']:
+      fl=['(uid=fa_bob)','(uid;x-test=bobtag)','(uid;x-test=two)'] if order=='plain-first' else ['(uid;x-test=bobtag)','(uid;x-test=two)','(uid=fa_bob)']
+      r=sp.run(['go','run','./tmpprobe24',ip,who(name),f'Probe-Pw-{name}-1',B,*fl],capture_output=True,text=True,cwd='.')
+      print(f"{name:14} same-conn {order}: {r.stdout.strip()} {r.stderr[-300:]}")
+finally:
+  sp.run(['docker','rm','-f','-v',n],capture_output=True)
+
+===== go helper for probe 24 (tmpprobe24/main.go, run from the repo root, then removed) =====
+// Binds as os.Args[2] and runs each filter in os.Args[5:] in order on ONE connection
+// (one-level search under os.Args[4], attributes 1.1), printing filter=[rdn values].
+package main
+
+import (
+	"fmt"
+	"os"
+	"strings"
+
+	ldap "github.com/go-ldap/ldap/v3"
+)
+
+func main() {
+	ip, dn, pw, base := os.Args[1], os.Args[2], os.Args[3], os.Args[4]
+	c, err := ldap.DialURL("ldap://" + ip + ":3389")
+	if err != nil {
+		fmt.Println("dial", err)
+		return
+	}
+	if err := c.Bind(dn, pw); err != nil {
+		fmt.Println("bind", err)
+		return
+	}
+	var out []string
+	for _, f := range os.Args[5:] {
+		res, err := c.Search(ldap.NewSearchRequest(base, ldap.ScopeSingleLevel, ldap.NeverDerefAliases, 0, 0, false, f, []string{"1.1"}, nil))
+		var got []string
+		if res != nil {
+			for _, e := range res.Entries {
+				got = append(got, strings.TrimPrefix(strings.Split(e.DN, ",")[0], "uid="))
+			}
+		}
+		out = append(out, fmt.Sprintf("%s=%v%v", f, got, map[bool]string{true: "", false: fmt.Sprint(err)}[err == nil]))
+	}
+	fmt.Println(strings.Join(out, " "))
+}

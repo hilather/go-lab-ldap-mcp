@@ -39,7 +39,11 @@ type ACICheck struct {
 	Subject   Subject
 	Target    config.DN
 	Attribute string
-	Perm      Permission
+	// Options are the checked description's attribute options, lowercased
+	// (targetattr names with options cover only descriptions carrying
+	// them; resolved CAND-34). Empty for entry-level checks.
+	Options []string
+	Perm    Permission
 }
 
 // ACIEngine evaluates the ACI text the LabLDAP compiler emits (parity
