@@ -114,8 +114,8 @@ export function childDN(rdnOrDn: string, parent: string): string {
 }
 
 export function isSensitiveAttr(name: string): boolean {
-  const n = name.trim().toLowerCase();
-  return n === "userpassword" || n.includes("password") || n === "aci";
+  const n = name.trim().toLowerCase().split(";")[0] ?? "";
+  return n === "userpassword" || n.includes("password") || n === "aci" || n === "userpkcs12";
 }
 
 export function userIdFromEntry(entry: TreeEntryLike): string | undefined {
@@ -175,4 +175,14 @@ export function displayMembershipLabel(group: { id: string; dn?: string }): stri
   }
   const id = group.id.trim();
   return id === "" ? "" : `cn=${id}`;
+}
+
+// Matches the structured-entry API's protected operational attributes.
+export function isForbiddenEntryAttribute(name: string): boolean {
+  const canonical = name.trim().toLowerCase().split(";")[0] ?? "";
+  return /^[0-9]/.test(canonical) || isSensitiveAttr(canonical) || canonical.startsWith("nsslapd-") || [
+    "objectclass", "memberof", "modifiersname", "modifytimestamp", "entryuuid",
+    "nsuniqueid", "createtimestamp", "creatorsname", "pwdaccountlockedtime",
+    "nsaccountlock", "pwdreset", "accountunlocktime", "entrydn", "numsubordinates",
+  ].includes(canonical);
 }

@@ -45,3 +45,5 @@ export type AttributeType = components["schemas"]["AttributeType"];
 export type Schema = components["schemas"]["Schema"];
 export type ResetRequest = components["schemas"]["ResetRequest"];
 export type ResetStatus = components["schemas"]["ResetStatus"];
+
+export type AccountState = components["schemas"]["AccountState"];

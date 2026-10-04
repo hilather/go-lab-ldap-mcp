@@ -173,7 +173,7 @@ test("user detail mutations send revision and require exact ID delete", async ()
   assert.match(detail, /updateUser\(user\.id, patch, user\.revision\)/);
   assert.match(detail, /enableUser\(user\.id, user\.revision\)/);
   assert.match(detail, /disableUser\(user\.id, user\.revision\)/);
-  assert.match(detail, /setUserPassword\(user\.id, password, user\.revision\)/);
+  assert.match(detail, /setUserPassword\(user\.id, password, user\.revision, mustChange\)/);
   assert.match(detail, /deleteUser\(user\.id, user\.revision\)/);
   assert.match(detail, /revisionConflict/);
   assert.match(detail, /ConflictRefresh/);

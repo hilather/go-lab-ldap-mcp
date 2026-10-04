@@ -1,7 +1,7 @@
 import { ifMatchHeader } from "../lib/directory-model";
 import { api } from "./client";
 import { toApiError } from "./problem";
-import type { GroupPage, User, UserPage, UserPatch, UserSpec } from "./types";
+import type { AccountState, GroupPage, User, UserPage, UserPatch, UserSpec } from "./types";
 
 export type UserListParams = {
   pageSize: number;
@@ -57,10 +57,10 @@ export async function deleteUser(id: string, revision: string): Promise<void> {
   }
 }
 
-export async function setUserPassword(id: string, password: string, revision: string): Promise<void> {
+export async function setUserPassword(id: string, password: string, revision: string, mustChange = false): Promise<void> {
   const { error, response } = await api.POST("/api/v1/users/{id}/password", {
     params: { path: { id } },
-    body: { password, revision },
+    body: { password, revision, mustChange },
   });
   if (!response.ok) {
     throw toApiError(error, response.status, "password update failed");
@@ -93,6 +93,28 @@ export async function listUserGroups(id: string): Promise<GroupPage> {
   });
   if (!response.ok || data === undefined) {
     throw toApiError(error, response.status, "user groups unavailable");
+  }
+  return data;
+}
+
+export async function getUserAccountState(id: string): Promise<AccountState> {
+  const { data, error, response } = await api.GET("/api/v1/users/{id}/account-state", {
+    params: { path: { id } },
+  });
+  if (!response.ok || data === undefined) {
+    throw toApiError(error, response.status, "account state unavailable");
+  }
+  return data;
+}
+
+export type AccountAction = "lock" | "unlock" | "expire-password" | "clear-password-expiry";
+
+export async function changeUserAccountState(id: string, action: AccountAction, revision: string): Promise<AccountState> {
+  const { data, error, response } = await api.POST(`/api/v1/users/{id}/${action}`, {
+    params: { path: { id }, header: ifMatchHeader(revision) },
+  });
+  if (!response.ok || data === undefined) {
+    throw toApiError(error, response.status, "account change failed");
   }
   return data;
 }

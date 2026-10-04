@@ -29,6 +29,7 @@ export const queryKeys = {
     all: usersQueryKey,
     list: (q: { pageSize: number; q?: string; cursor?: string }) => [...usersQueryKey, "list", q] as const,
     detail: (id: string) => [...usersQueryKey, "detail", id] as const,
+    accountState: (id: string) => [...usersQueryKey, "account-state", id] as const,
     groups: (id: string) => [...usersQueryKey, "groups", id] as const,
   },
   groups: {
