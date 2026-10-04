@@ -43,7 +43,10 @@ the pinned 389 image in four more places (contract C8; oracle probes
   [uid, sn]` now emits `targetattr="uid || sn"` instead of
   `targetattr="*"` (the v0.6.0 over-grant listed under Known limitations is fixed), `attributes.deny`
   with no allow list emits `targetattr!="a || b"`, and both lists emit
-  the allow names that no deny name covers. New validation errors on
+  the allow names that no deny name covers. Deny names that are 389
+  aliases (`pwdHistory`, `homeTelephoneNumber`, `rfc822Mailbox`) are
+  resolved to the stored attribute's NAME; before, such a deny was
+  emitted literally and denied nothing. New validation errors on
   `spec.acls.<id>.attributes.deny`: `invalid_attribute_filter` for a deny
   name with options narrower than a same-attribute allow name, for a
   combination that leaves no attribute, and for `deny: ["*"]` (it used to

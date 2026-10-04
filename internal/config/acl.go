@@ -238,11 +238,12 @@ func dslTargetAttr(a v1alpha1.ACL) (allow, deny string, err error) {
 		return allow, "", err
 	case allowAll:
 		// targetattr names are compared literally on both engines, so a
-		// deny names the primary descriptor (rfc822Mailbox -> mail) or it
-		// would not deny the stored attribute.
+		// deny names the 389 NAME (rfc822Mailbox -> mail, pwdHistory ->
+		// passwordHistory) or it would not deny the stored
+		// attribute.
 		names := make([]string, len(a.Attributes.Deny))
 		for i, n := range a.Attributes.Deny {
-			names[i] = PrimaryAttrDescription(n)
+			names[i] = schema389.Primary(PrimaryAttrDescription(n))
 		}
 		deny, err = join("deny", names)
 		return "", deny, err
@@ -281,7 +282,7 @@ func splitDSLAttr(name string) (string, []string) {
 	if rest != "" || strings.Contains(name, ";") {
 		opts = strings.Split(rest, ";")
 	}
-	return CanonicalAttrType(base), opts
+	return CanonicalAttrType(schema389.Primary(base)), opts
 }
 
 // optionSubset reports whether every option in sub appears in set

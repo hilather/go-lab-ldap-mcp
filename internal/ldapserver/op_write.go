@@ -554,16 +554,19 @@ func (s *Server) handleModifyDN(ctx context.Context, c *conn, m *Message, req *M
 			return errRenameIntoSubtree
 		}
 		sameDN := newDN.FoldedKey() == dn.FoldedKey()
-		// noOp: the same DN, spelled identically (389 answers 0 and
-		// updates modifyTimestamp, probe 28). A sameDN rename that changes
-		// only value case is CAND-30 (open): it keeps today's gates and 68.
-		// Compared with the stored DN, so a request spelling the source in
-		// another case is not a no-op either.
+		// noOp: the same DN with the new RDN value spelled exactly as the
+		// stored one (389 answers 0 and updates modifyTimestamp, probe 28).
+		// The stored leaf is the reference, so neither the request's
+		// spelling of the source nor of its parent matters. A sameDN rename
+		// that changes the RDN value's case is CAND-30 (open): it keeps
+		// today's gates and 68.
 		storedDN, err := config.ParseDN(before.DN)
 		if err != nil {
 			return err
 		}
-		noOp := sameDN && dnValuesIdentical(storedDN, newDN)
+		_, storedVal, _ := storedDN.Leaf()
+		_, newRDNVal, _ := newRDN.Leaf()
+		noOp := sameDN && storedVal == newRDNVal
 		if !sameDN {
 			if _, err := tx.Entry(ctx, newDN); err == nil {
 				return ErrEntryExists
@@ -678,33 +681,6 @@ func (s *Server) handleModifyDN(ctx context.Context, c *conn, m *Message, req *M
 		return respond(mapWriteError(err))
 	}
 	return respond(Result{Code: ResultSuccess})
-}
-
-// dnValuesIdentical reports whether two fold-equal DNs spell every RDN
-// value byte-identically (attribute type names may differ in case).
-func dnValuesIdentical(a, b config.DN) bool {
-	for {
-		_, av, aok := a.Leaf()
-		_, bv, bok := b.Leaf()
-		if aok != bok {
-			return false
-		}
-		if !aok {
-			return true
-		}
-		if av != bv {
-			return false
-		}
-		ap, aHas := parentDN(a)
-		bp, bHas := parentDN(b)
-		if aHas != bHas {
-			return false
-		}
-		if !aHas {
-			return true
-		}
-		a, b = ap, bp
-	}
 }
 
 // joinDN concatenates a single-RDN DN with a parent DN.

@@ -212,6 +212,7 @@ func TestModifyDNKeepsOpenCandidates(t *testing.T) {
 	}{
 		{"case-only, write and add", []string{c3638ACI(S, `(targetattr="*")`, "write,add")}, ModifyDNRequest{DN: c3638Alice, NewRDN: "uid=ALICE", DeleteOldRDN: true}, ResultEntryAlreadyExists},
 		{"source spelled in another case, case-only", []string{c3638ACI(S, `(targetattr="*")`, "write,add")}, ModifyDNRequest{DN: "uid=ALICE," + c3638People, NewRDN: "uid=ALICE", DeleteOldRDN: true}, ResultEntryAlreadyExists},
+		{"parent spelled in another case, no-op", []string{c3638ACI(S, `(targetattr="uid")`, "write")}, ModifyDNRequest{DN: "uid=alice,OU=People,DC=example,dc=test", NewRDN: "uid=alice"}, ResultSuccess},
 		{"source spelled in another case, no-op", []string{c3638ACI(S, `(targetattr="uid")`, "write")}, ModifyDNRequest{DN: "uid=ALICE," + c3638People, NewRDN: "uid=alice", DeleteOldRDN: true}, ResultSuccess},
 		{"case-only, write without add", []string{c3638ACI(S, `(targetattr="*")`, "write")}, ModifyDNRequest{DN: c3638Alice, NewRDN: "uid=ALICE", DeleteOldRDN: true}, ResultInsufficientAccessRights},
 		{"move, write and add", []string{c3638ACI(S, `(targetattr="*")`, "write,add")}, ModifyDNRequest{DN: c3638Alice, NewRDN: "uid=alice", NewSuperior: "ou=groups," + S}, ResultSuccess},
