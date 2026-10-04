@@ -569,21 +569,27 @@ func (s *Server) handleModifyDN(ctx context.Context, c *conn, m *Message, req *M
 		if err != nil {
 			return err
 		}
-		// Maintain RDN attributes on the moved entry: add the new RDN
-		// value, and drop the old one when deleteoldrdn is set.
+		// Maintain RDN attributes on the moved entry as the pinned 389
+		// oracle does: with deleteoldrdn, remove the old RDN value(s) by
+		// the equality rule first, then add the new RDN value unless an
+		// equal value remains. Adding first would let a rule-equal but
+		// byte-different old value (respelled or differently cased RDN)
+		// delete the only value standing for the new RDN (RFC 4511 4.9).
 		oldAttr, oldVal, _ := dn.Leaf()
 		newAttr, newVal, _ := newRDN.Leaf()
 		m := NewRuleMatcher(s.opts.Schema)
+		if req.DeleteOldRDN {
+			if idx := attrIndex(after, oldAttr); idx >= 0 {
+				// Keep the emptied slot until the new value is added so a
+				// same-type rename keeps the attribute's position.
+				after.Attributes[idx].Values = removeMatched(m, oldAttr, after.Attributes[idx].Values, []byte(oldVal))
+			}
+		}
 		if !hasMatched(m, newAttr, after.Values(newAttr), []byte(newVal)) {
 			after.Attributes = upsertValue(after, newAttr, []byte(newVal))
 		}
-		if req.DeleteOldRDN && (oldAttr != newAttr || oldVal != newVal) {
-			if idx := attrIndex(after, oldAttr); idx >= 0 {
-				after.Attributes[idx].Values = removeMatched(m, oldAttr, after.Attributes[idx].Values, []byte(oldVal))
-				if len(after.Attributes[idx].Values) == 0 {
-					after.Attributes = append(after.Attributes[:idx], after.Attributes[idx+1:]...)
-				}
-			}
+		if idx := attrIndex(after, oldAttr); idx >= 0 && len(after.Attributes[idx].Values) == 0 {
+			after.Attributes = append(after.Attributes[:idx], after.Attributes[idx+1:]...)
 		}
 		if err := s.schemaCheckEntry(after); err != nil {
 			return err

@@ -19,7 +19,7 @@ func TestMCPWriteOnlyCannotSetPasswordThroughAttributeAliases(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.Handle(MountPath, s.Handler())
 	sess, _ := connectMCP(t, mux, writeToken, "")
-	for _, attr := range []string{"userPassword;binary", "2.5.4.35", "authPassword"} {
+	for _, attr := range []string{"userPassword;binary", "2.5.4.35", "authPassword", "objectClass", "surname", "sn;lang-en"} {
 		res := callTool(t, sess, ToolUpdateUser, UpdateUserInput{ID: "alice", Revision: string(user.Revision), Attributes: map[string]string{attr: "replacement"}})
 		if !res.IsError {
 			t.Fatalf("alias %s bypass", attr)

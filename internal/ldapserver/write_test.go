@@ -680,3 +680,99 @@ func TestModifyProtectsAttributeOptionsAndOIDs(t *testing.T) {
 		}
 	}
 }
+
+// TestModifyDNDeleteOldRDNEquality pins deleteoldrdn to the pinned 389
+// oracle: old RDN values are removed by the equality rule, then the new RDN
+// value is added unless an equal value remains (RFC 4511 4.9). A
+// rule-equal but byte-different pair must never leave the naming attribute
+// empty.
+func TestModifyDNDeleteOldRDNEquality(t *testing.T) {
+	t.Parallel()
+	const people = "ou=people,dc=example,dc=test"
+	uids := func(t *testing.T, opts Options, dn string) []string {
+		t.Helper()
+		e, err := fetchEntry(t, opts, dn)
+		if err != nil {
+			t.Fatalf("read %s: %v", dn, err)
+		}
+		var out []string
+		for _, v := range e.Values("uid") {
+			out = append(out, string(v))
+		}
+		return out
+	}
+	addUser := func(t *testing.T, cl *ldapTestClient, rdn string, values ...string) {
+		t.Helper()
+		res := roundTrip(t, cl, &AddRequest{DN: rdn + "," + people, Attributes: []Attribute{
+			StringAttribute("objectClass", "top", "person", "organizationalPerson", "inetOrgPerson"),
+			StringAttribute("uid", values...),
+			StringAttribute("cn", "probe"),
+			StringAttribute("sn", "probe"),
+		}})
+		if res.Code != ResultSuccess {
+			t.Fatalf("add %s = %v", rdn, res)
+		}
+	}
+	rename := func(t *testing.T, cl *ldapTestClient, dn, rdn string, del bool, sup string) {
+		t.Helper()
+		if res := roundTrip(t, cl, &ModifyDNRequest{DN: dn, NewRDN: rdn, DeleteOldRDN: del, NewSuperior: sup}); res.Code != ResultSuccess {
+			t.Fatalf("moddn %s -> %s = %v", dn, rdn, res)
+		}
+	}
+	equal := func(got []string, want ...string) bool {
+		if len(got) != len(want) {
+			return false
+		}
+		for i := range got {
+			if got[i] != want[i] {
+				return false
+			}
+		}
+		return true
+	}
+	opts := writeOptions(t, nil)
+	_, addr := serveTestServerFrom(t, opts, nil)
+	cl := dialTestClient(t, addr)
+
+	t.Run("respell", func(t *testing.T) {
+		addUser(t, cl, "uid=renamer", "renamer")
+		rename(t, cl, "uid=renamer,"+people, "uid=ren amer", true, "")
+		rename(t, cl, "uid=ren amer,"+people, "uid=ren  amer", true, "")
+		if got := uids(t, opts, "uid=ren  amer,"+people); !equal(got, "ren  amer") {
+			t.Fatalf("uid after equal respell = %q, want [ren  amer]", got)
+		}
+		entries, done := search(t, cl, &SearchRequest{BaseDN: people, Scope: ScopeWholeSubtree, Filter: &FilterEquality{Attr: "uid", Value: []byte("ren  amer")}, Attributes: []string{"uid"}})
+		if done.Result.Code != ResultSuccess || len(entries) != 1 {
+			t.Fatalf("renamed entry not findable by uid: %d entries, %v", len(entries), done)
+		}
+	})
+	t.Run("request dn spelling", func(t *testing.T) {
+		addUser(t, cl, "uid=caser", "caser")
+		rename(t, cl, "uid=CASER,"+people, "uid=caser", true, "ou=groups,dc=example,dc=test")
+		if got := uids(t, opts, "uid=caser,ou=groups,dc=example,dc=test"); !equal(got, "caser") {
+			t.Fatalf("uid after differently spelled request DN = %q, want [caser]", got)
+		}
+	})
+	t.Run("pure move multi-valued", func(t *testing.T) {
+		addUser(t, cl, "uid=mover", "Mover", "m2")
+		rename(t, cl, "uid=mover,"+people, "uid=mover", true, "ou=groups,dc=example,dc=test")
+		if got := uids(t, opts, "uid=mover,ou=groups,dc=example,dc=test"); !equal(got, "m2", "mover") {
+			t.Fatalf("uid after pure move = %q, want [m2 mover] as 389", got)
+		}
+	})
+	t.Run("multi-valued equal remains", func(t *testing.T) {
+		addUser(t, cl, "uid=dx", "dx", "d  y")
+		rename(t, cl, "uid=dx,"+people, "uid=d y", true, "")
+		if got := uids(t, opts, "uid=d y,"+people); !equal(got, "d  y") {
+			t.Fatalf("uid after rename onto equal value = %q, want [d  y]", got)
+		}
+	})
+	t.Run("keep old respell", func(t *testing.T) {
+		addUser(t, cl, "uid=keeper", "keeper")
+		rename(t, cl, "uid=keeper,"+people, "uid=kee per", false, "")
+		rename(t, cl, "uid=kee per,"+people, "uid=kee  per", false, "")
+		if got := uids(t, opts, "uid=kee  per,"+people); !equal(got, "keeper", "kee per") {
+			t.Fatalf("uid after keep-old respell = %q, want [keeper kee per]", got)
+		}
+	})
+}

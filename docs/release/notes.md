@@ -69,6 +69,21 @@ Build application images with the same `VERSION` so
 - No public registry push (OD-004). Project license is MIT (OD-003 resolved).
 - Signing (`cosign`) is optional and not performed.
 
+## Unreleased: stricter user attribute names
+
+Pending the next tag (owner decision on whether this needs an `apiVersion`
+bump). User attribute writes from REST, MCP, the console and scenario YAML
+now share one rule: `objectClass`, numeric OIDs, protected names in any
+spelling, and option or alias spellings of `uid`/`cn`/`sn` (`cn;lang-en`,
+`commonName`, `surname`, `userid`) are rejected, and names that address
+the same attribute (`mail`/`Mail`, `ou`/`organizationalUnitName`) are a
+`duplicate_attribute` error. A scenario that used these spellings in
+`users[].attributes` compiled before (the seed dropped them) and now fails
+to compile until they are removed. The user view no longer carries
+optioned `cn`/`sn`/`uid` values, so a user that has them gets a new
+revision after upgrading, and later edits to those values through the
+entry API do not change the user revision.
+
 ## Migration guidance
 
 v0.4.0 → v0.4.1 is **additive**. `apiVersion` stays `labldap.dev/v1alpha1`.

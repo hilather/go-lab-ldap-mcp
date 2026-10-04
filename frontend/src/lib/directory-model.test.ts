@@ -131,6 +131,29 @@ test("allowlisted attributes reject operational and password names", () => {
   });
 });
 
+test("forbidden check strips options and resolves aliases like the server", () => {
+  for (const name of [
+    "userPassword;lang-en",
+    "2.5.4.35",
+    "2.5.4.35;x-a",
+    "objectClass",
+    "2.5.4.0",
+    "1.2.3.4",
+    "cn;lang-en",
+    "commonName",
+    "surname",
+    "userid",
+    "uid;x-a",
+    "2.5.4.3",
+    "authPassword",
+  ]) {
+    assert.equal(isForbiddenUserAttr(name), true, name);
+  }
+  for (const name of ["cn", " CN ", "sn", "uid", "mail", "mail;lang-en", "ou", "organizationalUnitName"]) {
+    assert.equal(isForbiddenUserAttr(name), false, name);
+  }
+});
+
 test("edit patch sends empty values for attributes removed from the form", () => {
   const patch = userPatchAttributes(
     [
