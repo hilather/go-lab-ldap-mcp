@@ -19,6 +19,7 @@ func TestMapErrorLDAPCategories(t *testing.T) {
 		retry bool
 	}{
 		{ldap.LDAPResultNoSuchObject, directory.FieldNotFound, false},
+		{ldap.LDAPResultNoSuchAttribute, directory.FieldConflict, false},
 		{ldap.LDAPResultEntryAlreadyExists, directory.FieldConflict, false},
 		{ldap.LDAPResultAssertionFailed, directory.FieldConflict, false},
 		{ldap.LDAPResultInvalidCredentials, directory.FieldInvalidCredentials, false},
@@ -33,6 +34,22 @@ func TestMapErrorLDAPCategories(t *testing.T) {
 		if !hasField(err, tc.field) {
 			t.Fatalf("code %d: missing field %s in %#v", tc.code, tc.field, err)
 		}
+	}
+}
+
+func TestMapErrorNoSuchAttributeIsNotMissingEntry(t *testing.T) {
+	t.Parallel()
+	err := MapError(&ldap.Error{ResultCode: ldap.LDAPResultNoSuchAttribute, Err: errors.New("no such attribute")})
+	var ae *apperr.Error
+	if !errors.As(err, &ae) {
+		t.Fatalf("not an apperr: %v", err)
+	}
+	fields := ae.Fields()
+	if len(fields) != 1 || fields[0].Path != "attribute" || fields[0].Code != directory.FieldConflict {
+		t.Fatalf("noSuchAttribute fields = %+v, want attribute/conflict", fields)
+	}
+	if hasField(err, directory.FieldNotFound) {
+		t.Fatal("noSuchAttribute must not read as a missing entry")
 	}
 }
 

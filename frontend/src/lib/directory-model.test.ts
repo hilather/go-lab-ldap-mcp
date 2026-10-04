@@ -34,7 +34,7 @@ import {
   userPatchAttributes,
   attrDuplicateKey,
   canonicalAttrType,
-  legacyAliasPrimary,
+  entryAliasEditError,
   secondDescriptorPrimary,
   wouldEmptyGroup,
 } from "./directory-model.ts";
@@ -273,10 +273,49 @@ test("second descriptors resolve like the server alias table", () => {
   assert.equal(secondDescriptorPrimary("gn"), "givenName");
   assert.equal(secondDescriptorPrimary("rfc822Mailbox;x-a"), "mail");
   assert.equal(secondDescriptorPrimary("givenName"), undefined);
-  assert.equal(legacyAliasPrimary("GN"), "givenName");
-  assert.equal(legacyAliasPrimary("rfc822Mailbox"), "mail");
-  for (const name of ["commonName", "userid", "organizationalUnitName", "mail"]) {
-    assert.equal(legacyAliasPrimary(name), undefined, name);
+});
+
+const ALIAS_PRIMARIES: ReadonlyArray<[string, string]> = [
+  ["userid", "uid"],
+  ["commonName", "cn"],
+  ["surname", "sn"],
+  ["organizationalUnitName", "ou"],
+  ["domainComponent", "dc"],
+  ["organizationName", "o"],
+  ["rfc822Mailbox", "mail"],
+  ["gn", "givenName"],
+];
+
+test("tree alias guard blocks replace and add for every second descriptor", () => {
+  for (const [alias, primary] of ALIAS_PRIMARIES) {
+    for (const spelled of [alias, alias.toUpperCase(), `${alias};lang-en`]) {
+      for (const op of ["replace", "add"]) {
+        assert.equal(
+          entryAliasEditError(spelled, op, [spelled]),
+          `${spelled} is another name for ${primary}: replace and add would change ${primary}. Edit ${primary} instead.`,
+          `${op} ${spelled}`,
+        );
+      }
+    }
+  }
+  for (const name of ["cn", "mail", "givenName", "uid", "o", "dc", "description", "l", "mail;lang-en"]) {
+    for (const op of ["replace", "add", "delete"]) {
+      assert.equal(entryAliasEditError(name, op, []), undefined, `${op} ${name}`);
+    }
+  }
+});
+
+test("tree alias guard allows delete only of a stored alias row", () => {
+  // Native legacy rows: stored under the alias spelling (D35).
+  assert.equal(entryAliasEditError("commonName", "delete", ["cn", "commonName"]), undefined);
+  assert.equal(entryAliasEditError("RFC822MAILBOX;X-A;lang-en", "delete", ["rfc822Mailbox;lang-en;x-a"]), undefined);
+  // No stored alias row: on 389 the delete would remove the primary values.
+  for (const [alias, primary] of ALIAS_PRIMARIES) {
+    assert.equal(
+      entryAliasEditError(alias, "delete", [primary, `${alias};lang-en`]),
+      `${alias} is another name for ${primary}, and this entry has no stored ${alias} row. Deleting it could remove ${primary} values; delete ${primary} instead.`,
+      alias,
+    );
   }
 });
 

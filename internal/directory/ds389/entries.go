@@ -85,7 +85,7 @@ func (r *Runtime) UpdateEntry(ctx context.Context, patch directory.EntryPatch) (
 		mod := newModify(ctx, r, c, dn.String(), live)
 		r.afterSearch(ctx, dn.String())
 		for _, ch := range patch.Changes {
-			if e := applyEntryChange(mod, ch); e != nil {
+			if e := applyEntryChange(mod, ch, live); e != nil {
 				return e
 			}
 		}
@@ -323,7 +323,7 @@ func requireRevision(rev directory.Revision) error {
 	return nil
 }
 
-func applyEntryChange(mod *ldap.ModifyRequest, ch directory.EntryChange) error {
+func applyEntryChange(mod *ldap.ModifyRequest, ch directory.EntryChange, live *ldap.Entry) error {
 	name := strings.TrimSpace(ch.Name)
 	if name == "" {
 		return cfgErr("changes.name", "required", "attribute name is required")
@@ -332,9 +332,8 @@ func applyEntryChange(mod *ldap.ModifyRequest, ch directory.EntryChange) error {
 		return cfgErr("changes.name", "forbidden_attribute", "attribute is not allowed")
 	}
 	// Replace and add send the primary descriptor (gn as givenName). Delete
-	// keeps the client's spelling (parity delta D35): 389 resolves the alias
-	// itself, and on native a legacy attribute stored under the alias stays
-	// removable without touching the primary attribute.
+	// of a second descriptor goes through aliasDeleteName (parity delta
+	// D35).
 	switch strings.ToLower(strings.TrimSpace(ch.Op)) {
 	case directory.EntryModReplace:
 		mod.Replace(config.PrimaryAttrDescription(name), ch.Values)
@@ -344,11 +343,71 @@ func applyEntryChange(mod *ldap.ModifyRequest, ch directory.EntryChange) error {
 		}
 		mod.Add(config.PrimaryAttrDescription(name), ch.Values)
 	case directory.EntryModDelete:
-		mod.Delete(name, ch.Values)
+		mod.Delete(aliasDeleteName(name, live), ch.Values)
 	default:
 		return cfgErr("changes.op", "invalid", "change op must be replace, add, or delete")
 	}
 	return nil
+}
+
+// aliasDeleteName picks the attribute description an entry-update delete
+// sends (parity delta D35). Names that are not second descriptors are sent
+// as written. For an alias spelling:
+//  1. a stored row under the same alias and option set (a native legacy
+//     attribute written by direct LDAP, D17) is deleted under its stored
+//     name, so the primary attribute is never touched; 389 returns primary
+//     names and never takes this branch;
+//  2. an optioned spelling (rfc822Mailbox;lang-en) otherwise deletes the
+//     optioned primary description that add and replace wrote for it
+//     (mail;lang-en), using the stored name when the entry holds one with
+//     the same option set (native matches names literally, options
+//     included); bare mail is not addressed;
+//  3. a bare alias keeps the client's spelling: native answers
+//     noSuchAttribute and never touches the primary value, 389 resolves the
+//     alias itself.
+func aliasDeleteName(name string, live *ldap.Entry) string {
+	if _, ok := config.AttrAliasType(name); !ok {
+		return name
+	}
+	want := literalAttrKey(name)
+	if stored, ok := storedAttrName(live, func(n string) bool { return literalAttrKey(n) == want }); ok {
+		return stored
+	}
+	if !strings.Contains(name, ";") {
+		return name
+	}
+	key := config.AttrDuplicateKey(name)
+	if stored, ok := storedAttrName(live, func(n string) bool {
+		_, alias := config.AttrAliasType(n)
+		return !alias && config.AttrDuplicateKey(n) == key
+	}); ok {
+		return stored
+	}
+	return config.PrimaryAttrDescription(name)
+}
+
+// literalAttrKey is the lowercase attribute description with options
+// sorted, without resolving descriptor aliases (rfc822Mailbox stays
+// rfc822mailbox).
+func literalAttrKey(name string) string {
+	parts := strings.Split(config.CanonicalAttr(name), ";")
+	opts := parts[1:]
+	sort.Strings(opts)
+	return strings.Join(append([]string{parts[0]}, opts...), ";")
+}
+
+// storedAttrName returns the first attribute name in live that holds
+// values and satisfies match.
+func storedAttrName(live *ldap.Entry, match func(string) bool) (string, bool) {
+	if live == nil {
+		return "", false
+	}
+	for _, a := range live.Attributes {
+		if len(a.Values) > 0 && match(a.Name) {
+			return a.Name, true
+		}
+	}
+	return "", false
 }
 
 func checkRDNForClass(dn config.DN, class string) error {

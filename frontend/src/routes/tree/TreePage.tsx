@@ -5,7 +5,7 @@ import { isApiError } from "../../api/problem";
 import type { TreeNode } from "../../api/types";
 import { listUserGroups } from "../../api/users";
 import { useSession } from "../../auth/SessionGate";
-import { canSubmitMutation, exactIdConfirmed, legacyAliasPrimary } from "../../lib/directory-model";
+import { canSubmitMutation, entryAliasEditError, exactIdConfirmed } from "../../lib/directory-model";
 import { queryKeys } from "../../lib/query";
 import { hasScope, SCOPE_DIRECTORY_READ, SCOPE_DIRECTORY_WRITE } from "../../lib/session-model";
 import {
@@ -374,9 +374,13 @@ export function TreePage() {
                       setFormError("This attribute cannot be edited here.");
                       return;
                     }
-                    const primary = legacyAliasPrimary(attributeName);
-                    if (primary !== undefined && attributeOp !== "delete") {
-                      setFormError(`${attributeName.trim()} is another name for ${primary}: replace and add would change ${primary}. Edit ${primary} instead; Delete here only removes a stored ${attributeName.trim()} row.`);
+                    const aliasError = entryAliasEditError(
+                      attributeName,
+                      attributeOp,
+                      entry.data.attributes.map((attr) => attr.name),
+                    );
+                    if (aliasError !== undefined) {
+                      setFormError(aliasError);
                       return;
                     }
                     setFormError("");

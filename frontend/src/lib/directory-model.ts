@@ -165,10 +165,7 @@ const ATTRIBUTE_PRIMARY_NAMES: Record<string, string> = {
 };
 
 // secondDescriptorPrimary returns the primary name when name's base is a
-// second descriptor (gn -> givenName), else undefined. The tree page uses it
-// to keep a legacy alias row (native stores it as an unknown attribute) to
-// Delete only: replace/add of an alias are sent under the primary name and
-// would overwrite the real attribute.
+// second descriptor (gn -> givenName), else undefined.
 export function secondDescriptorPrimary(name: string): string | undefined {
   const base = name.trim().toLowerCase().split(";")[0] ?? "";
   const type = ATTRIBUTE_NAME_ALIASES[base];
@@ -178,16 +175,38 @@ export function secondDescriptorPrimary(name: string): string | undefined {
   return ATTRIBUTE_PRIMARY_NAMES[type] ?? type;
 }
 
-// LEGACY_ALIAS_BASES are the second descriptors that native may hold as
-// stored rows written before #18 (rfc822Mailbox, gn). Other aliases
-// (commonName, userid, organizationalUnitName, ...) are not guarded.
-const LEGACY_ALIAS_BASES = new Set(["rfc822mailbox", "gn"]);
+// literalAttrKey is the lowercase attribute description with options sorted,
+// without resolving aliases (rfc822Mailbox stays rfc822mailbox).
+function literalAttrKey(name: string): string {
+  const [base = "", ...opts] = name.trim().toLowerCase().split(";");
+  return [base, ...opts.sort()].join(";");
+}
 
-// legacyAliasPrimary is secondDescriptorPrimary limited to the legacy alias
-// rows the tree page keeps to Delete only.
-export function legacyAliasPrimary(name: string): string | undefined {
-  const base = name.trim().toLowerCase().split(";")[0] ?? "";
-  return LEGACY_ALIAS_BASES.has(base) ? secondDescriptorPrimary(name) : undefined;
+// entryAliasEditError guards the tree page's attribute editor against every
+// second descriptor in ATTRIBUTE_NAME_ALIASES (kept in step with the server
+// table by internal/config TestFrontendAliasTableMirrorsConfig). Replace and
+// add of an alias are written under the primary name, so they would change
+// the primary attribute. Delete is allowed only for a row the entry stores
+// under that alias spelling (a native legacy attribute, parity delta D35);
+// without one, 389 would delete the primary attribute's values.
+export function entryAliasEditError(
+  name: string,
+  op: string,
+  storedNames: readonly string[],
+): string | undefined {
+  const primary = secondDescriptorPrimary(name);
+  if (primary === undefined) {
+    return undefined;
+  }
+  const spelled = name.trim();
+  if (op !== "delete") {
+    return `${spelled} is another name for ${primary}: replace and add would change ${primary}. Edit ${primary} instead.`;
+  }
+  const key = literalAttrKey(spelled);
+  if (storedNames.some((stored) => literalAttrKey(stored) === key)) {
+    return undefined;
+  }
+  return `${spelled} is another name for ${primary}, and this entry has no stored ${spelled} row. Deleting it could remove ${primary} values; delete ${primary} instead.`;
 }
 
 // attrDuplicateKey mirrors config.AttrDuplicateKey: resolved type plus the

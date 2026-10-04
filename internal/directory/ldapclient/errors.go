@@ -45,8 +45,13 @@ func MapError(err error) error {
 
 func mapLDAP(le *ldap.Error) error {
 	switch le.ResultCode {
-	case ldap.LDAPResultNoSuchObject, ldap.LDAPResultNoSuchAttribute:
+	case ldap.LDAPResultNoSuchObject:
 		return directory.Error("entry", directory.FieldNotFound, "directory entry not found").Wrap(le)
+	case ldap.LDAPResultNoSuchAttribute:
+		// A modify delete named an attribute or value the entry does not
+		// hold: a modify precondition, like attributeOrValueExists below,
+		// not a missing entry.
+		return directory.Error("attribute", directory.FieldConflict, "directory attribute or value not present").Wrap(le)
 	case ldap.LDAPResultEntryAlreadyExists, ldap.LDAPResultAttributeOrValueExists:
 		return directory.Error("entry", directory.FieldConflict, "directory entry already exists").Wrap(le)
 	case ldap.LDAPResultAssertionFailed:

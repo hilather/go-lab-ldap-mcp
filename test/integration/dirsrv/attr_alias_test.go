@@ -254,3 +254,78 @@ func TestLegacyAliasAttributeDelete(t *testing.T) {
 		t.Fatalf("389 delete of the alias removes mail: %v", ent)
 	}
 }
+
+// TestOptionedAliasDeleteRoundTrip pins the optioned branch of parity delta
+// D35: an entry-API add of rfc822Mailbox;lang-en stores mail;lang-en, and a
+// delete of the same spelling removes it on both engines without touching
+// bare mail. On native a legacy row stored under the optioned alias is
+// removed first and alone, and a bare alias delete with no legacy row
+// answers conflict on attribute (noSuchAttribute) with mail untouched.
+func TestOptionedAliasDeleteRoundTrip(t *testing.T) {
+	env := startCompatEngine(t)
+	rt := aliasRuntime(t, env)
+	svc := app.New(app.Deps{Users: rt.Users(), Entries: rt, Search: rt})
+	writer := app.Principal{Kind: app.KindToken, ID: "writer", Scopes: directory.ScopeSet{"directory:read", "directory:write"}}
+	const aliceDN = "uid=alice,ou=people,dc=example,dc=test"
+	native := env.engine == EngineNative
+
+	u, err := svc.Users.Get(t.Context(), writer, "alice")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Users.Update(t.Context(), writer, "alice", app.UpdateUser{Revision: u.Revision, UserPatch: directory.UserPatch{Attributes: map[string]string{"mail": "real@example.test"}}}); err != nil {
+		t.Fatal(err)
+	}
+	update := func(ch directory.EntryChange) error {
+		t.Helper()
+		e, _ := entryAttrValues(t, svc, writer, aliceDN)
+		_, err := svc.Entries.Update(t.Context(), writer, directory.EntryPatch{DN: aliceDN, Revision: e.Revision, Changes: []directory.EntryChange{ch}})
+		return err
+	}
+
+	if err := update(directory.EntryChange{Name: "rfc822Mailbox;lang-en", Op: "add", Values: []string{"en@example.test"}}); err != nil {
+		t.Fatalf("add optioned alias: %v", err)
+	}
+	if _, ent := entryAttrValues(t, svc, writer, aliceDN); !slices.Equal(ent["mail;lang-en"], []string{"en@example.test"}) {
+		t.Fatalf("optioned alias add must store mail;lang-en: %v", ent)
+	}
+	if err := update(directory.EntryChange{Name: "rfc822Mailbox;lang-en", Op: "delete"}); err != nil {
+		t.Fatalf("delete optioned alias: %v", err)
+	}
+	if _, ent := entryAttrValues(t, svc, writer, aliceDN); len(ent["mail;lang-en"]) != 0 || !slices.Equal(ent["mail"], []string{"real@example.test"}) {
+		t.Fatalf("optioned alias delete must remove mail;lang-en only: %v", ent)
+	}
+	if !native {
+		return
+	}
+
+	// Native legacy row under the optioned alias (direct LDAP, D17) next
+	// to a real mail;lang-en: the delete removes only the legacy row.
+	if err := update(directory.EntryChange{Name: "mail;lang-en", Op: "add", Values: []string{"real-en@example.test"}}); err != nil {
+		t.Fatal(err)
+	}
+	dm := dialDM(t, env)
+	mod := ldap.NewModifyRequest(aliceDN, nil)
+	mod.Add("rfc822Mailbox;lang-en", []string{"legacy-en@example.test"})
+	if err := dm.Modify(mod); err != nil {
+		t.Fatalf("direct LDAP legacy write: %v", err)
+	}
+	if err := update(directory.EntryChange{Name: "RFC822Mailbox;LANG-EN", Op: "delete"}); err != nil {
+		t.Fatalf("delete optioned legacy alias: %v", err)
+	}
+	_, ent := entryAttrValues(t, svc, writer, aliceDN)
+	if len(ent["rfc822mailbox;lang-en"]) != 0 || !slices.Equal(ent["mail;lang-en"], []string{"real-en@example.test"}) || !slices.Equal(ent["mail"], []string{"real@example.test"}) {
+		t.Fatalf("native optioned legacy delete must remove only the legacy row: %v", ent)
+	}
+
+	// Bare alias with no legacy row: D35 keeps the spelling, native answers
+	// noSuchAttribute (conflict on attribute) and mail stays.
+	err = update(directory.EntryChange{Name: "rfc822Mailbox", Op: "delete"})
+	var ae *apperr.Error
+	if !errors.As(err, &ae) || len(ae.Fields()) != 1 || ae.Fields()[0].Path != "attribute" || ae.Fields()[0].Code != directory.FieldConflict {
+		t.Fatalf("native bare alias delete without a legacy row: want attribute/conflict, got %v", err)
+	}
+	if _, ent := entryAttrValues(t, svc, writer, aliceDN); !slices.Equal(ent["mail"], []string{"real@example.test"}) {
+		t.Fatalf("native bare alias delete must not touch mail: %v", ent)
+	}
+}

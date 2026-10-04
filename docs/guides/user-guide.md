@@ -157,8 +157,16 @@ replace/add operations of entry update send `rfc822Mailbox`/`gn` as
 native engine an attribute written earlier under an alias spelling by direct
 LDAP (for example `rfc822Mailbox`) is stored under that name, shown only in
 the entry view, and removed with a delete of that alias row; do not use
-"Replace values" on it, which writes the primary attribute instead (the
-console only offers delete for such rows; parity delta D35). User and account actions
+"Replace values" on it, which writes the primary attribute instead. The
+console's attribute editor refuses replace and add for every alias name
+(`userid`, `commonName`, `surname`, `organizationalUnitName`,
+`domainComponent`, `organizationName`, `rfc822Mailbox`, `gn`) and allows
+delete only when the entry shows a row under that alias spelling. An
+entry-update delete of an optioned alias with no such row
+(`rfc822Mailbox;lang-en`) removes the optioned primary (`mail;lang-en`) it
+wrote; a bare alias delete never removes the primary attribute on native
+(parity delta D35). Search filters, compare, and search attribute lists on
+native do not resolve aliases yet. User and account actions
 share an opaque revision that changes when lock or password-expiry state
 changes; refresh existing revisions after upgrading.
 

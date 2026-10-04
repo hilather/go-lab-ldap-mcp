@@ -112,6 +112,17 @@ entry API do not change the user revision.
   through the user view. On a native store seeded on an older release with
   YAML `gn: X`, the first merge apply after upgrading adds `givenName: X`
   and reports the user as Updated once.
+- The console tree editor refuses replace and add for every alias name
+  (not only `rfc822Mailbox`/`gn`): a replace of `commonName` would change
+  `cn`. It allows delete only for a row stored under the alias spelling.
+- An entry-update delete of an optioned alias (`rfc822Mailbox;lang-en`)
+  with no row stored under that spelling now removes the `mail;lang-en`
+  value its add wrote, on both engines (it answered 404 on native).
+- An LDAP `noSuchAttribute` result (a delete of an attribute or value the
+  entry does not hold) now answers HTTP 409 with field `attribute` /
+  `conflict` instead of 404 "directory entry not found".
+- Native search filters, compare, and search attribute lists do not resolve
+  second descriptors yet: `(rfc822Mailbox=x)` does not match `mail`.
 
 ## Migration guidance
 
