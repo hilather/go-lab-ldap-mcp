@@ -51,6 +51,9 @@ func TestDNKeyMigrationAndCollisionIsolation(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer s.Close()
+	if v := storeIndexVersion(t, s); v != indexVersion {
+		t.Fatalf("migration left index version %d, want %d (next Open would rebuild again)", v, indexVersion)
+	}
 	err = s.Update(t.Context(), func(tx ldapserver.UpdateTx) error {
 		return tx.Add(t.Context(), ldapserver.NewEntry(plain, ldapserver.StringAttribute("uid", "plain")))
 	})

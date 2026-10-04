@@ -165,8 +165,9 @@ delete only when the entry shows a row under that alias spelling. An
 entry-update delete of an optioned alias with no such row
 (`rfc822Mailbox;lang-en`) removes the optioned primary (`mail;lang-en`) it
 wrote; a bare alias delete never removes the primary attribute on native
-(parity delta D35). Search filters, compare, and search attribute lists on
-native do not resolve aliases yet. User and account actions
+(parity delta D35). Search filters resolve aliases on both engines
+(`(rfc822Mailbox=x)` matches `mail`); compare and search attribute lists
+on native match the name literally and do not. User and account actions
 share an opaque revision that changes when lock or password-expiry state
 changes; refresh existing revisions after upgrading.
 

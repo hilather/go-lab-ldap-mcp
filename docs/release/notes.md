@@ -121,12 +121,49 @@ entry API do not change the user revision.
 - An LDAP `noSuchAttribute` result (a delete of an attribute or value the
   entry does not hold) now answers HTTP 409 with field `attribute` /
   `conflict` instead of 404 "directory entry not found".
-- Native search filters, compare, and search attribute lists do not resolve
-  second descriptors yet: `(rfc822Mailbox=x)` does not match `mail`.
+- Native search filters resolve second descriptors (see the filter
+  section below): `(rfc822Mailbox=x)` matches `mail`. Compare and search
+  attribute lists still match names literally and do not resolve aliases.
+
+## Unreleased: filter attribute descriptions (native engine)
+
+Native search filters now treat attribute descriptions as 389 does
+(contract C6): `(description=hello)` matches a value stored as
+`description;lang-en`, `(userid=x)` and numeric OIDs such as
+`(2.5.4.0=inetOrgPerson)` resolve to their type, and an OID or second
+descriptor with options (`userid;x-test`) matches nothing. Compare is
+unchanged (delta D34). The bbolt equality index now keys postings by
+attribute type (index format 3): the first start after upgrading rebuilds
+the DN and equality indexes once, inside the open transaction, and stamps
+the format so later starts do not rebuild (earlier builds rebuilt on every
+start after a format change because the stamp was never written).
+Downgrade caveat: an older binary rebuilds on every start of a format-3
+store and never rewrites the stamp, so after a
+downgrade-then-upgrade round trip this binary sees format 3 and does not
+rebuild, and indexed searches can miss subtype values written by the older
+binary. Recover with a reset or a fresh store volume (there is no rebuild
+command).
+
+Native ACI evaluation now follows 389 in two more places. Search results
+leave out an entry unless the subject can read at least one
+non-operational attribute it holds; before, native returned such entries
+with only their DN. `targetattr` lists are separated by `||`, numeric OIDs
+are accepted, and every name is compared literally, so a numeric OID does
+not cover the attribute's name (a deny on `2.5.4.35` does not deny
+`userPassword`). Native logs a warning at startup for each numeric-OID
+`targetattr` name; use attribute names instead. A raw ACI that used a
+single `|` as a separator (`"cn|sn"`) is now rejected at startup, as 389
+already rejected it: the server exits with a configuration error on
+`aciTexts` ("ACI text failed to parse: ... invalid attribute name
+\"cn|sn\" in targetattr"). Rewrite it as `"cn || sn"`.
 
 ## Migration guidance
 
 v0.4.0 → v0.4.1 is **additive**. `apiVersion` stays `labldap.dev/v1alpha1`.
+One exception for native-engine raw ACIs: a `targetattr` list separated by
+a single `|` must be rewritten with `||` before upgrading. `labldap` config
+validation does not parse raw ACI text, so the failure appears only when
+labldapd starts.
 
 1. Default `make compose-up` / `setup-tls` is unchanged (`--host directory`).
 2. To include a public hostname or address on the lab leaf, pass `--dns`

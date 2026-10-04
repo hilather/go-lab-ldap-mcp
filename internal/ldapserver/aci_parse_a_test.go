@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -160,7 +161,7 @@ spec:
       attributes: {}
     - id: raw-pass
       # Raw text targets the suffix so the plan's Target matches the text.
-      rawACI: '(target="ldap:///dc=example,dc=test")(targetattr="cn|sn")(version 3.0; acl "labldap:raw-pass"; deny (write) userdn="ldap:///self";)'
+      rawACI: '(target="ldap:///dc=example,dc=test")(targetattr="cn || sn")(version 3.0; acl "labldap:raw-pass"; deny (write) userdn="ldap:///self";)'
 `)
 	c, err := config.Compile(t.Context(), scenario, "aci-ops.yaml", config.LoadOptions{
 		Caller: config.CallerCLI,
@@ -295,7 +296,7 @@ func TestParseACITextAAttrAndNameData(t *testing.T) {
 }
 
 func TestParseACITextAKeywordCase(t *testing.T) {
-	p := mustParseA(t, `(TARGET="LDAP:///dc=example,dc=test")(TARGETATTR="UID|CN")(Version 3.0; ACL "labldap:case"; ALLOW (READ,Search) USERDN="LDAP:///ANYONE";)`)
+	p := mustParseA(t, `(TARGET="LDAP:///dc=example,dc=test")(TARGETATTR="UID || CN")(Version 3.0; ACL "labldap:case"; ALLOW (READ,Search) USERDN="LDAP:///ANYONE";)`)
 	if !p.TargetDN.Equal(mustDNA(t, "dc=example,dc=test")) {
 		t.Errorf("TargetDN = %q", p.TargetDN.String())
 	}
@@ -391,8 +392,10 @@ func TestParseACITextARejects(t *testing.T) {
 		{"target without url", `(target="dc=example,dc=test")` + validBody},
 		{"target keyword", `(target="ldap:///all")` + validBody},
 		{"targetattr empty", `(target="ldap:///dc=example,dc=test")(targetattr="")` + validBody},
-		{"targetattr empty segment", `(target="ldap:///dc=example,dc=test")(targetattr="uid|")` + validBody},
-		{"targetattr star mixed", `(target="ldap:///dc=example,dc=test")(targetattr="*|uid")` + validBody},
+		{"targetattr empty segment", `(target="ldap:///dc=example,dc=test")(targetattr="uid ||")` + validBody},
+		{"targetattr single pipe", `(target="ldap:///dc=example,dc=test")(targetattr="uid|sn")` + validBody},
+		{"targetattr star mixed", `(target="ldap:///dc=example,dc=test")(targetattr="* || uid")` + validBody},
+		{"targetattr oid trailing dot", `(target="ldap:///dc=example,dc=test")(targetattr="2.5.4.")` + validBody},
 		{"targetattr star deny", `(target="ldap:///dc=example,dc=test")(targetattr!="*")` + validBody},
 		{"targetattr bad char", `(target="ldap:///dc=example,dc=test")(targetattr="user Password")` + validBody},
 		{"targetattr oversized name", `(target="ldap:///dc=example,dc=test")(targetattr="1` + bigAttr + `")` + validBody},
@@ -461,7 +464,7 @@ func FuzzParseACITextA(f *testing.F) {
 		`(target="ldap:///dc=example,dc=test")(targetattr!="userPassword")(version 3.0; acl "labldap:runtime-suffix-read"; allow (read,search,compare) userdn="ldap:///uid=labldap-runtime,ou=people,dc=example,dc=test";)`,
 		`(target="ldap:///ou=people,dc=example,dc=test")(targetattr="userPassword")(version 3.0; acl "labldap:runtime-password"; allow (write) userdn="ldap:///uid=labldap-runtime,ou=people,dc=example,dc=test";)`,
 		`(target="ldap:///dc=example,dc=test")(targetattr="*")(version 3.0; acl "labldap:staff-read"; allow (read,search,compare) groupdn="ldap:///cn=staff,ou=groups,dc=example,dc=test";)`,
-		`(target="ldap:///ou=people,dc=example,dc=test")(targetattr="cn|sn")(version 3.0; acl "labldap:raw-pass"; deny (write) userdn="ldap:///self";)`,
+		`(target="ldap:///ou=people,dc=example,dc=test")(targetattr="cn || sn")(version 3.0; acl "labldap:raw-pass"; deny (write) userdn="ldap:///self";)`,
 		`(target="ldap:///cn=a\28b\29,dc=example,dc=test")(version 3.0; acl "x"; allow (add) userdn="ldap:///anyone";)`,
 		`(target="ldap:///dc=example,dc=test")(version 3.0; acl "x"; allow (read) userdn="ldap:///all";)`,
 		``,
@@ -471,6 +474,7 @@ func FuzzParseACITextA(f *testing.F) {
 		`(version 2.0; acl "x"; allow (all) userdn="ldap:///all";)`,
 		`garbage`,
 		`(targetattr="*|uid")`,
+		`(target="ldap:///dc=example,dc=test")(targetattr="2.5.4.4 || uid")(version 3.0; acl "x"; allow (read) userdn="ldap:///all";)`,
 	}
 	for _, s := range seeds {
 		f.Add(s)
@@ -483,12 +487,60 @@ func FuzzParseACITextA(f *testing.F) {
 	})
 }
 
-func TestNumericTargetAttributeRuleFailsClosedOutsideCompilerGrammar(t *testing.T) {
-	// E6: compiler targetattr tokens are names/options, never numeric OIDs.
-	// An unsupported numeric rule must reject the whole policy, rather than
-	// silently missing an intended deny after request-side OID resolution.
+// CAND-32 resolved as Contract: targetattr lists use "||" (any spacing)
+// and may name numeric OIDs; every name is compared literally, as on the
+// pinned 389 image (oracle probes 8, 10, 11). A numeric OID therefore does
+// not cover its descriptor: a deny on "2.5.4.35" does not deny userPassword
+// on either engine (probe 11). The control plane never emits numeric
+// targetattr, and New logs a warning for raw ACIs that use one.
+func TestTargetAttrListsMatchOracle(t *testing.T) {
+	t.Parallel()
+	const body = `(version 3.0; acl "x"; allow (read) userdn="ldap:///all";)`
+	for _, tc := range []struct {
+		targetattr string
+		deny       bool
+		attrs      []string
+		yes, no    []string
+	}{
+		{`"uid || sn"`, false, []string{"uid", "sn"}, []string{"uid", "SN", "sn;lang-en"}, []string{"cn", "userid", "2.5.4.4"}},
+		{`"uid||sn"`, false, []string{"uid", "sn"}, []string{"uid", "sn"}, []string{"cn"}},
+		{`" UID || Sn "`, false, []string{"UID", "Sn"}, []string{"uid", "sn"}, []string{"cn"}},
+		{`"2.5.4.4 || uid"`, false, []string{"2.5.4.4", "uid"}, []string{"uid", "2.5.4.4"}, []string{"sn", "surname"}},
+		{`"0.9.2342.19200300.100.1.1"`, false, []string{"0.9.2342.19200300.100.1.1"}, []string{"0.9.2342.19200300.100.1.1"}, []string{"uid", "userid"}},
+		{`"2.5.4.13;lang-en"`, false, []string{"2.5.4.13;lang-en"}, []string{"2.5.4.13"}, []string{"description"}},
+		{`"0.9.2342.19200300.100.1.1"`, true, []string{"0.9.2342.19200300.100.1.1"}, []string{"uid", "cn"}, []string{"0.9.2342.19200300.100.1.1"}},
+		{`"uid || description"`, true, []string{"uid", "description"}, []string{"sn", "cn"}, []string{"uid", "description;lang-en"}},
+	} {
+		op := "="
+		if tc.deny {
+			op = "!="
+		}
+		text := `(target="ldap:///dc=example,dc=test")(targetattr` + op + tc.targetattr + `)` + body
+		p, err := ParseACITextA(text)
+		if err != nil {
+			t.Fatalf("%s: %v", text, err)
+		}
+		if !slices.Equal(p.Attrs, tc.attrs) {
+			t.Errorf("%s: attrs %q, want %q", tc.targetattr, p.Attrs, tc.attrs)
+		}
+		for _, a := range tc.yes {
+			if !p.TargetsAttr(a) {
+				t.Errorf("%s%s: %s not targeted", op, tc.targetattr, a)
+			}
+		}
+		for _, a := range tc.no {
+			if p.TargetsAttr(a) {
+				t.Errorf("%s%s: %s targeted", op, tc.targetattr, a)
+			}
+		}
+	}
+	// Probe 11: a numeric-OID deny is literal on 389 too.
 	text := `(target="ldap:///ou=people,dc=example,dc=test")(targetattr="2.5.4.35")(version 3.0; acl "numeric-deny"; deny (read) userdn="ldap:///all";)`
-	if _, err := NewACIEngine([]string{text}, nil); err == nil {
-		t.Fatal("unsupported numeric targetattr accepted")
+	p, err := ParseACITextA(text)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.TargetsAttr("userPassword") {
+		t.Fatal("numeric-OID targetattr must be literal (oracle probe 11)")
 	}
 }

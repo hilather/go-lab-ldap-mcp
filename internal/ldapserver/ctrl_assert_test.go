@@ -216,3 +216,46 @@ func TestAssertionCannotProbeDeniedAttribute(t *testing.T) {
 		t.Fatal("denied assertion committed a write")
 	}
 }
+
+// The assertion control evaluates through matchSearchFilter, so it takes
+// the C6 attribute-description semantics: a base-type assertion matches a
+// value stored only under a subtype; an OID with options is unresolved
+// (False -> 122). 389's pinned build rejects the control (D7), so this is
+// native-only behaviour.
+func TestModifyAssertionAttributeDescriptions(t *testing.T) {
+	t.Parallel()
+	opts := writeOptions(t, func(o *Options) {
+		s, err := StandardSchema()
+		if err != nil {
+			t.Fatal(err)
+		}
+		o.Schema = s
+	})
+	_, addr := serveTestServerFrom(t, opts, nil)
+	cl := dialTestClient(t, addr)
+	dn := "uid=alice,ou=people,dc=example,dc=test"
+	if res := modifyWithControls(t, cl, &ModifyRequest{DN: dn, Changes: []ModifyChange{
+		{Op: ModifyAdd, Attr: StringAttribute("description;lang-en", "hello")},
+	}}); res.Code != ResultSuccess {
+		t.Fatalf("seed subtype value: %v", res)
+	}
+	res := modifyWithControls(t, cl, &ModifyRequest{DN: dn, Changes: []ModifyChange{
+		{Op: ModifyReplace, Attr: StringAttribute("sn", "Asserted")},
+	}}, assertionControl(t, &FilterEquality{Attr: "description", Value: []byte("hello")}, true))
+	if res.Code != ResultSuccess {
+		t.Fatalf("(description=hello) over description;lang-en: %v, want success", res)
+	}
+	res = modifyWithControls(t, cl, &ModifyRequest{DN: dn, Changes: []ModifyChange{
+		{Op: ModifyReplace, Attr: StringAttribute("sn", "MustNotLand")},
+	}}, assertionControl(t, &FilterEquality{Attr: "2.5.4.13;lang-en", Value: []byte("hello")}, true))
+	if res.Code != ResultAssertionFailed {
+		t.Fatalf("(2.5.4.13;lang-en=hello): %v, want assertionFailed(122)", res)
+	}
+	e, err := fetchEntry(t, opts, dn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := e.Values("sn"); len(got) != 1 || string(got[0]) != "Asserted" {
+		t.Fatalf("sn = %q", got)
+	}
+}

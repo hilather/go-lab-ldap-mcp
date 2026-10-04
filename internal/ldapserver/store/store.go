@@ -90,6 +90,10 @@ func Open(path string) (*Store, error) {
 			if err := RebuildIndexes(tx, storeEntryIter(tx)); err != nil {
 				return err
 			}
+			// Without the stamp every later Open would rebuild again.
+			if err := stampIndexVersion(tx); err != nil {
+				return err
+			}
 		}
 		return nil
 	})
