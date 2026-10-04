@@ -215,6 +215,10 @@ func TestValidateAttrMapFieldPathsAndCodes(t *testing.T) {
 		{map[string]string{"userid": "x"}, "attributes.userid", "forbidden_attribute"},
 		{map[string]string{"Mail": "a", "mail": "b"}, "attributes.mail", "duplicate_attribute"},
 		{map[string]string{"ou": "a", "organizationalUnitName": "b"}, "attributes.ou", "duplicate_attribute"},
+		{map[string]string{"mail": "a", "rfc822Mailbox": "b"}, "attributes.rfc822Mailbox", "duplicate_attribute"},
+		{map[string]string{"givenName": "a", "gn": "b"}, "attributes.gn", "duplicate_attribute"},
+		{map[string]string{"givenName": "a", "GN": "b"}, "attributes.GN", "duplicate_attribute"},
+		{map[string]string{"OU": "a", "organizationalUnitName": "b"}, "attributes.OU", "duplicate_attribute"},
 	}
 	for _, tc := range cases {
 		err := validateAttrMap(tc.attrs)

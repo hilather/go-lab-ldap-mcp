@@ -5,7 +5,7 @@ import { isApiError } from "../../api/problem";
 import type { TreeNode } from "../../api/types";
 import { listUserGroups } from "../../api/users";
 import { useSession } from "../../auth/SessionGate";
-import { canSubmitMutation, exactIdConfirmed } from "../../lib/directory-model";
+import { canSubmitMutation, entryAliasEditError, exactIdConfirmed } from "../../lib/directory-model";
 import { queryKeys } from "../../lib/query";
 import { hasScope, SCOPE_DIRECTORY_READ, SCOPE_DIRECTORY_WRITE } from "../../lib/session-model";
 import {
@@ -372,6 +372,15 @@ export function TreePage() {
                     }
                     if (isForbiddenEntryAttribute(attributeName)) {
                       setFormError("This attribute cannot be edited here.");
+                      return;
+                    }
+                    const aliasError = entryAliasEditError(
+                      attributeName,
+                      attributeOp,
+                      entry.data.attributes.map((attr) => attr.name),
+                    );
+                    if (aliasError !== undefined) {
+                      setFormError(aliasError);
                       return;
                     }
                     setFormError("");

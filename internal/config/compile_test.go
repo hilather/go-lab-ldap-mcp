@@ -591,6 +591,54 @@ spec:
 	}
 }
 
+func TestYAMLMailAndGivenNameAliases(t *testing.T) {
+	base := `
+apiVersion: labldap.dev/v1alpha1
+kind: LabScenario
+metadata: { name: x }
+spec:
+  directory: { suffix: "dc=example,dc=test" }
+  transport: { ldaps: { enabled: true, port: 3636 } }
+  runtimeAccount: { id: rt, passwordFile: secrets/runtime-ldap }
+  users:
+    - id: alice
+      passwordFile: secrets/user-alice
+      attributes:
+`
+	compile := func(attrs string) (*config.Compiled, error) {
+		return config.Compile(t.Context(), []byte(base+attrs), "aliases.yaml", config.LoadOptions{Secrets: fixtureSecrets(), Caller: config.CallerCLI})
+	}
+	_, err := compile("        mail: a@example.test\n        rfc822Mailbox: b@example.test\n        givenName: A\n        gn: B\n        GN: C\n        OU: Eng\n        organizationalUnitName: Ops\n")
+	if err == nil {
+		t.Fatal("expected duplicate attribute errors")
+	}
+	got := map[string]string{}
+	for _, f := range mustFields(t, err) {
+		got[f.Path] = f.Code
+	}
+	for _, path := range []string{"spec.users[0].attributes.rfc822Mailbox", "spec.users[0].attributes.gn", "spec.users[0].attributes.GN", "spec.users[0].attributes.OU"} {
+		if got[path] != "duplicate_attribute" {
+			t.Fatalf("%s: got %q; fields = %#v", path, got[path], got)
+		}
+	}
+	for _, path := range []string{"spec.users[0].attributes.mail", "spec.users[0].attributes.givenName", "spec.users[0].attributes.organizationalUnitName"} {
+		if _, ok := got[path]; ok {
+			t.Fatalf("%s must be kept (first in case-insensitive order); fields = %#v", path, got)
+		}
+	}
+	c, err := compile("        rfc822Mailbox: b@example.test\n        gn: B\n        organizationalUnitName: Ops\n        Description: D\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	for _, a := range c.Normalized.Users[0].Attributes {
+		names = append(names, a.Name)
+	}
+	if got := strings.Join(names, ","); got != "description,givenname,mail,ou" {
+		t.Fatalf("normalized AttrKV names = %s", got)
+	}
+}
+
 // TestACLAttributesMustExistIn389Schema pins CAND-33: 389 rejects an ACI
 // whose targetattr names a type its schema lacks (oracle probe 16), so the
 // compiler rejects such a DSL ACL instead of emitting an ACI 389 refuses.
