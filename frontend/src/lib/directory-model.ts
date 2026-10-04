@@ -147,6 +147,7 @@ const PROTECTED_ATTRIBUTE_OIDS: Record<string, string> = {
   "2.5.4.0": "objectclass",
 };
 
+// Mirrors internal/config attributeNameAliases (second descriptor -> type).
 const ATTRIBUTE_NAME_ALIASES: Record<string, string> = {
   userid: "uid",
   commonname: "cn",
@@ -154,7 +155,68 @@ const ATTRIBUTE_NAME_ALIASES: Record<string, string> = {
   organizationalunitname: "ou",
   domaincomponent: "dc",
   organizationname: "o",
+  rfc822mailbox: "mail",
+  gn: "givenname",
 };
+
+// Primary descriptor casing for the aliases above (config.PrimaryAttrDescription).
+const ATTRIBUTE_PRIMARY_NAMES: Record<string, string> = {
+  givenname: "givenName",
+};
+
+// secondDescriptorPrimary returns the primary name when name's base is a
+// second descriptor (gn -> givenName), else undefined.
+export function secondDescriptorPrimary(name: string): string | undefined {
+  const base = name.trim().toLowerCase().split(";")[0] ?? "";
+  const type = ATTRIBUTE_NAME_ALIASES[base];
+  if (type === undefined) {
+    return undefined;
+  }
+  return ATTRIBUTE_PRIMARY_NAMES[type] ?? type;
+}
+
+// literalAttrKey is the lowercase attribute description with options sorted,
+// without resolving aliases (rfc822Mailbox stays rfc822mailbox).
+function literalAttrKey(name: string): string {
+  const [base = "", ...opts] = name.trim().toLowerCase().split(";");
+  return [base, ...opts.sort()].join(";");
+}
+
+// entryAliasEditError guards the tree page's attribute editor against every
+// second descriptor in ATTRIBUTE_NAME_ALIASES (kept in step with the server
+// table by internal/config TestFrontendAliasTableMirrorsConfig). Replace and
+// add of an alias are written under the primary name, so they would change
+// the primary attribute. Delete is allowed only for a row the entry stores
+// under that alias spelling (a native legacy attribute, parity delta D35);
+// without one, 389 would delete the primary attribute's values.
+export function entryAliasEditError(
+  name: string,
+  op: string,
+  storedNames: readonly string[],
+): string | undefined {
+  const primary = secondDescriptorPrimary(name);
+  if (primary === undefined) {
+    return undefined;
+  }
+  const spelled = name.trim();
+  if (op !== "delete") {
+    return `${spelled} is another name for ${primary}: replace and add would change ${primary}. Edit ${primary} instead.`;
+  }
+  const key = literalAttrKey(spelled);
+  if (storedNames.some((stored) => literalAttrKey(stored) === key)) {
+    return undefined;
+  }
+  return `${spelled} is another name for ${primary}, and this entry has no stored ${spelled} row. Deleting it could remove ${primary} values; delete ${primary} instead.`;
+}
+
+// attrDuplicateKey mirrors config.AttrDuplicateKey: resolved type plus the
+// sorted lowercase option set.
+export function attrDuplicateKey(name: string): string {
+  const parts = name.trim().toLowerCase().split(";");
+  const opts = parts.slice(1).sort();
+  const type = canonicalAttrType(name);
+  return opts.length === 0 ? type : `${type};${opts.join(";")}`;
+}
 
 // canonicalAttrType strips attribute options (";lang-en") and resolves known
 // OIDs and second descriptors to the primary lowercase name.
@@ -217,13 +279,17 @@ export function userPatchAttributes(
   rows: readonly AttrRow[],
 ): Record<string, string> | undefined {
   const attrs = attributeMapFromRows(rows) ?? {};
-  const submitted = new Set(Object.keys(attrs).map((name) => name.toLowerCase()));
+  // Keyed by attribute type so a row renamed to an alias (mail ->
+  // rfc822Mailbox) does not also send mail: "" (the server would reject the
+  // pair as duplicate_attribute). Defensive: the name picker offers only
+  // ALLOWED_USER_ATTRS, which lists primary names.
+  const submitted = new Set(Object.keys(attrs).map((name) => attrDuplicateKey(name)));
   for (const pair of current) {
     const name = pair.name.trim();
     if (name === "" || isForbiddenUserAttr(name)) {
       continue;
     }
-    if (!submitted.has(name.toLowerCase())) {
+    if (!submitted.has(attrDuplicateKey(name))) {
       attrs[name] = "";
     }
   }

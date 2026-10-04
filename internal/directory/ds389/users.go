@@ -116,7 +116,9 @@ func (r *Runtime) Add(ctx context.Context, spec directory.UserSpec) (directory.U
 		if forbiddenWriteAttr(name) {
 			return directory.User{}, cfgErr("attributes."+name, "forbidden_attribute", "attribute is not allowed on users")
 		}
-		add.Attribute(strings.TrimSpace(name), []string{val})
+		// Second descriptors (rfc822Mailbox, gn) are sent as the primary
+		// name so both engines store the same attribute.
+		add.Attribute(config.PrimaryAttrDescription(name), []string{val})
 	}
 	size, seconds := r.searchLimits()
 	var out directory.User
@@ -188,10 +190,13 @@ func (r *Runtime) Modify(ctx context.Context, id directory.UserID, patch directo
 			if (key == "cn" || key == "sn") && strings.TrimSpace(val) == "" {
 				return cfgErr("attributes."+name, "required", "schema-required attribute cannot be empty")
 			}
-			attr := strings.TrimSpace(name)
+			attr := config.PrimaryAttrDescription(name)
 			if strings.TrimSpace(val) == "" {
 				// Empty value is the UserPatch delete signal (omit = leave).
-				if live.GetAttributeValue(attr) != "" {
+				// The live lookup is by attribute type: native returns the
+				// stored spelling (a YAML-seeded givenname), go-ldap's
+				// GetAttributeValue is case-sensitive.
+				if liveHasAttr(live, name) {
 					mod.Delete(attr, nil)
 				}
 				continue
@@ -411,13 +416,23 @@ func userFromEntry(e *ldap.Entry, groupsDN string) directory.User {
 		}
 		// The user view only carries spellings the user write rule accepts:
 		// optioned planned names (cn;lang-en) are managed through the entry
-		// API, and a descriptor alias an engine might return is shown under
-		// the primary name, so console/REST round-trips never send them back.
+		// API, and a second descriptor is folded to its type (commonName to
+		// cn, gn to givenname, options kept). The fold is defensive: the user
+		// read list requests primary names, 389 returns primary names, and
+		// native never returns a legacy alias attribute to that list, so
+		// legacy gn/rfc822Mailbox values are reachable only through the
+		// entry API.
 		if t := config.CanonicalAttrType(name); t == "cn" || t == "sn" || t == "uid" {
 			if strings.Contains(name, ";") {
 				continue
 			}
 			name = t
+		} else if t, ok := config.AttrAliasType(name); ok {
+			if _, opts, has := strings.Cut(name, ";"); has {
+				name = t + ";" + opts
+			} else {
+				name = t
+			}
 		}
 		if name == "uid" {
 			continue
@@ -499,4 +514,22 @@ func (r *Runtime) verifyUserRemovedFromGroups(ctx context.Context, c *ldapclient
 		case <-time.After(50 * time.Millisecond):
 		}
 	}
+}
+
+// liveHasAttr reports whether the live user entry holds a value for name's
+// attribute type and option set (config.AttrDuplicateKey). The user read
+// list requests bare names only, so option-order edge cases (x;a;b against a
+// stored x;b;a, which native's exact-name delete would not match) cannot
+// arise here.
+func liveHasAttr(live *ldap.Entry, name string) bool {
+	if live == nil {
+		return false
+	}
+	key := config.AttrDuplicateKey(name)
+	for _, a := range live.Attributes {
+		if len(a.Values) > 0 && config.AttrDuplicateKey(a.Name) == key {
+			return true
+		}
+	}
+	return false
 }

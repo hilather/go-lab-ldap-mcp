@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"sort"
 
 	"github.com/hilather/go-lab-ldap-mcp/internal/apperr"
 	"github.com/hilather/go-lab-ldap-mcp/internal/config"
@@ -264,7 +263,9 @@ func validateAttrMap(attrs map[string]string) error {
 	for name := range attrs {
 		names = append(names, name)
 	}
-	sort.Strings(names)
+	// Duplicate order is case-insensitive (first wins), matching YAML and
+	// entry create.
+	config.SortAttrNamesForDuplicates(names)
 	seen := map[string]string{}
 	for _, name := range names {
 		if config.ForbiddenUserWriteAttr(name) {

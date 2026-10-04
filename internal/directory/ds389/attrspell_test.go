@@ -69,3 +69,135 @@ func TestUserFromEntryHidesOptionedAndRenamesAliases(t *testing.T) {
 		t.Fatalf("attributes = %#v", u.Attributes)
 	}
 }
+
+func TestEntryAddAttrsSendsPrimaryNamesForMailAndGivenName(t *testing.T) {
+	dn, err := config.ParseDN("uid=alice,ou=people,dc=example,dc=test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	attrs, err := entryAddAttrs(dn, directory.ClassInetOrgPerson, map[string]string{
+		"rfc822Mailbox": "a@example.test", "GN": "Upper", "givenName": "Alice", "gn": "lower",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string][]string{}
+	for _, a := range attrs {
+		switch a.Type {
+		case "objectClass", "uid", "cn", "sn":
+			continue
+		}
+		got[a.Type] = a.Vals
+	}
+	if len(got) != 2 || len(got["mail"]) != 1 || got["mail"][0] != "a@example.test" || len(got["givenName"]) != 1 || got["givenName"][0] != "Alice" {
+		t.Fatalf("extras = %v (want mail and the givenName value, first in case-insensitive order)", got)
+	}
+}
+
+func TestApplyEntryChangeKeepsClientSpellingOnDeleteOnly(t *testing.T) {
+	for op, want := range map[string]string{directory.EntryModReplace: "givenName", directory.EntryModAdd: "givenName", directory.EntryModDelete: "gn"} {
+		mod := ldap.NewModifyRequest("uid=alice,ou=people,dc=example,dc=test", nil)
+		if err := applyEntryChange(mod, directory.EntryChange{Op: op, Name: "gn", Values: []string{"x"}}, nil); err != nil {
+			t.Fatal(err)
+		}
+		if len(mod.Changes) != 1 || mod.Changes[0].Modification.Type != want {
+			t.Fatalf("%s gn: sent %+v, want type %s", op, mod.Changes, want)
+		}
+	}
+}
+
+func TestSeedValueCheckComparesByAttributeType(t *testing.T) {
+	e := ldap.NewEntry("uid=alice,ou=people,dc=example,dc=test", map[string][]string{
+		"GivenName":         {"Alice"},
+		"MAIL":              {"a@example.test"},
+		"description;x-a":   {"tagged"},
+		"givenName;lang-en": {"Alicia"},
+	})
+	for _, tc := range []struct {
+		name, value string
+		want        bool
+	}{
+		{"givenname", "alice", true},
+		{"gn", "Alice", true},
+		{"mail", "A@example.test", true},
+		{"rfc822mailbox", "a@example.test", true},
+		{"description", "tagged", false},
+		{"description;x-a", "tagged", true},
+		{"givenname", "Alicia", false},
+	} {
+		if got := hasAttrValue(e, tc.name, tc.value); got != tc.want {
+			t.Fatalf("hasAttrValue(%s=%s) = %v, want %v", tc.name, tc.value, got, tc.want)
+		}
+	}
+}
+
+func TestLiveHasAttrByType(t *testing.T) {
+	live := ldap.NewEntry("uid=alice,ou=people,dc=example,dc=test", map[string][]string{"givenname": {"Alice"}})
+	for _, name := range []string{"gn", "givenName", "GIVENNAME"} {
+		if !liveHasAttr(live, name) {
+			t.Fatalf("%s must find the stored givenname", name)
+		}
+	}
+	if liveHasAttr(live, "mail") || liveHasAttr(live, "givenName;lang-en") || liveHasAttr(nil, "gn") {
+		t.Fatal("other types and option sets must not match")
+	}
+}
+
+func TestUserFromEntryFoldsMailAndGivenNameAliases(t *testing.T) {
+	e := ldap.NewEntry("uid=alice,ou=people,dc=example,dc=test", map[string][]string{
+		"uid":                   {"alice"},
+		"gn":                    {"Alice"},
+		"rfc822mailbox;lang-en": {"a@example.test"},
+	})
+	got := map[string]string{}
+	for _, kv := range userFromEntry(e, "ou=groups,dc=example,dc=test").Attributes {
+		got[kv.Name] = kv.Value
+	}
+	if got["givenname"] != "Alice" || got["mail;lang-en"] != "a@example.test" || len(got) != 2 {
+		t.Fatalf("user view attributes = %v", got)
+	}
+}
+
+func TestAliasDeleteName(t *testing.T) {
+	legacy := ldap.NewEntry("uid=alice,ou=people,dc=example,dc=test", map[string][]string{
+		"mail":                  {"real@example.test"},
+		"mail;lang-en":          {"real-en@example.test"},
+		"rfc822Mailbox;lang-en": {"legacy-en@example.test"},
+		"rfc822Mailbox":         {"legacy@example.test"},
+	})
+	primaryOnly := ldap.NewEntry("uid=alice,ou=people,dc=example,dc=test", map[string][]string{
+		"mail":              {"real@example.test"},
+		"mail;x-a;lang-en":  {"tagged@example.test"},
+		"givenName;LANG-FR": {"Alice"},
+	})
+	cases := []struct {
+		name   string
+		values []string
+		live   *ldap.Entry
+		want   string
+	}{
+		{name: "rfc822Mailbox;lang-en", live: legacy, want: "rfc822Mailbox;lang-en"},     // 1: literal legacy row
+		{name: "RFC822MAILBOX", live: legacy, want: "rfc822Mailbox"},                     // 1: stored spelling
+		{name: "rfc822Mailbox;lang-en", live: primaryOnly, want: "mail;lang-en"},         // 2: no row, optioned
+		{name: "rfc822Mailbox;lang-en;x-a", live: primaryOnly, want: "mail;x-a;lang-en"}, // 2: stored option order
+		{name: "GN;lang-fr", live: primaryOnly, want: "givenName;LANG-FR"},               // 2: stored primary row
+		{name: "GN;X-A", live: primaryOnly, want: "givenName;X-A"},                       // 2: nothing stored
+		{name: "rfc822Mailbox", live: primaryOnly, want: "rfc822Mailbox"},                // 3: bare alias kept
+		{name: "commonName", live: nil, want: "commonName"},                              // 3: no live entry
+		{name: "mail;lang-en", live: legacy, want: "mail;lang-en"},                       // not an alias
+		{name: "description", live: legacy, want: "description"},
+		// Value deletes reach the legacy row only when it holds the values.
+		{name: "rfc822Mailbox;lang-en", values: []string{"LEGACY-EN@example.test"}, live: legacy, want: "rfc822Mailbox;lang-en"},
+		{name: "rfc822Mailbox;lang-en", values: []string{"real-en@example.test"}, live: legacy, want: "mail;lang-en"},
+		{name: "rfc822Mailbox", values: []string{"real@example.test"}, live: legacy, want: "rfc822Mailbox"}, // not an alias
+	}
+	for _, tc := range cases {
+		mod := ldap.NewModifyRequest("uid=alice,ou=people,dc=example,dc=test", nil)
+		if err := applyEntryChange(mod, directory.EntryChange{Op: directory.EntryModDelete, Name: tc.name, Values: tc.values}, tc.live); err != nil {
+			t.Fatal(err)
+		}
+		if got := mod.Changes[0].Modification.Type; got != tc.want {
+			t.Errorf("delete %q: sent %q, want %q", tc.name, got, tc.want)
+		}
+	}
+}

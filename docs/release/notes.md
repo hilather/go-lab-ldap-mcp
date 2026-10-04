@@ -84,6 +84,47 @@ optioned `cn`/`sn`/`uid` values, so a user that has them gets a new
 revision after upgrading, and later edits to those values through the
 entry API do not change the user revision.
 
+`rfc822Mailbox` and `gn` are now resolved as `mail` and `givenName`
+(#18 follow-up):
+
+- Users (REST, MCP, console, YAML) with both spellings of one attribute
+  (`mail` + `rfc822Mailbox`, `givenName` + `gn`) get `duplicate_attribute`.
+  Duplicate detection now walks names in case-insensitive order, so the
+  error lands on the later name in that order; for existing pairs the
+  field changes, e.g. `OU` + `organizationalUnitName` now flags `OU`.
+  Forbidden-name checks share that walk, so when a request or scenario
+  has several forbidden names, the first one reported can change too.
+- User writes, YAML seeding, entry create and entry-update replace/add send
+  every resolved second descriptor (also `organizationalUnitName`,
+  `domainComponent`, `organizationName`) under its primary name. A
+  scenario that uses such keys gets a new directory revision, so a
+  persistent deployment in `startupMode: validate` needs one merge apply
+  after upgrading.
+- Entry create keeps the first of `mail` + `rfc822Mailbox` (`mail`) and of
+  `givenName` + `gn` (`givenName`).
+- `PATCH {"gn": ""}` now deletes `givenName` (it was silently skipped), and
+  the empty-value delete finds attributes stored under another case (a
+  YAML-seeded `givenname` on native).
+- Native persistent stores that already hold an unknown `rfc822Mailbox` or
+  `gn` attribute keep it. Those values are visible and removable only
+  through the entry API (delete of the alias spelling, which on native
+  leaves `mail`/`givenName` untouched; parity delta D35) or a reset, never
+  through the user view. On a native store seeded on an older release with
+  YAML `gn: X`, the first merge apply after upgrading adds `givenName: X`
+  and reports the user as Updated once.
+- The console tree editor refuses replace and add for every alias name
+  (not only `rfc822Mailbox`/`gn`): a replace of `commonName` would change
+  `cn`. It allows delete only for a row stored under the alias spelling.
+- An entry-update delete of an optioned alias (`rfc822Mailbox;lang-en`)
+  with no row stored under that spelling now removes the `mail;lang-en`
+  value its add wrote, on both engines (it answered 404 on native).
+- An LDAP `noSuchAttribute` result (a delete of an attribute or value the
+  entry does not hold) now answers HTTP 409 with field `attribute` /
+  `conflict` instead of 404 "directory entry not found".
+- Native search filters resolve second descriptors (see the filter
+  section below): `(rfc822Mailbox=x)` matches `mail`. Compare and search
+  attribute lists still match names literally and do not resolve aliases.
+
 ## Unreleased: filter attribute descriptions (native engine)
 
 Native search filters now treat attribute descriptions as 389 does
