@@ -169,11 +169,15 @@ func (s *Server) handleExtended(ctx context.Context, c *conn, m *Message, req *E
 	return code
 }
 
-// attributeIdentity resolves options and schema OID aliases before security
-// policy decisions. Attribute options never create a new writable/readable
-// type distinct from the protected underlying attribute.
+// attributeIdentity resolves options, second descriptors and OIDs before
+// security policy decisions, the same way stored names resolve
+// (storedTypeKey). Attribute options never create a new writable/readable
+// type distinct from the protected underlying attribute. 389 stores a value
+// written as userid under uid, so targetattr="uid" covers it and
+// targetattr="userid" covers nothing (oracle probe 20).
 func (s *Server) attributeIdentity(attr string) string {
 	base, _, _ := strings.Cut(attr, ";")
+	base = config.CanonicalAttrType(strings.TrimSpace(base))
 	if at, ok := s.opts.Schema.AttributeType(base); ok {
 		return at.Name
 	}

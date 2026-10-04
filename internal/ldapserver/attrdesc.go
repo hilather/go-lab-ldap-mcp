@@ -23,6 +23,9 @@ import (
 //   - A second descriptor or numeric OID WITH options (userid;x-test,
 //     0.9.2342.19200300.100.1.1;x-test) is unresolved: it matches nothing,
 //     and the search-permission check for that leaf uses the literal base.
+//   - An empty option (cn;, cn;lang-en;) is kept as an option no stored
+//     value carries, so the leaf matches nothing (oracle probe 20, sent as
+//     raw BER because libldap rejects the filter client-side).
 //
 // ACI targetattr lists stay literal (aciAttrInA): 389 does not resolve
 // aliases or OIDs inside them.
@@ -31,16 +34,19 @@ import (
 type attrDesc struct {
 	typ      string   // lowercase type key used for value selection and rules
 	name     string   // ACI identity: registry casing when resolved, else the literal base
-	opts     []string // lowercased, non-empty options
+	opts     []string // lowercased options; "" marks an empty option (matches nothing)
 	resolved bool
 }
 
 // parseAttrDesc resolves a filter attribute description against s. A nil s
 // resolves second descriptors and protected OIDs only.
 func parseAttrDesc(s Schema, desc string) attrDesc {
-	base, rest, _ := strings.Cut(strings.TrimSpace(desc), ";")
+	base, rest, hasOpts := strings.Cut(strings.TrimSpace(desc), ";")
 	base = strings.TrimSpace(base)
 	opts := splitAttrOptions(rest)
+	if hasOpts && hasEmptyAttrOption(rest) {
+		opts = append(opts, "")
+	}
 	canon := config.CanonicalAttrType(base)
 	name := canon
 	regName := ""
@@ -97,6 +103,17 @@ func filterValues(e *Entry, d attrDesc, s Schema) [][]byte {
 		out = append(out, a.Values...)
 	}
 	return out
+}
+
+// hasEmptyAttrOption reports whether the option list after the first ';'
+// has an empty entry ("", "lang-en;", "a;;b").
+func hasEmptyAttrOption(rest string) bool {
+	for _, o := range strings.Split(rest, ";") {
+		if strings.TrimSpace(o) == "" {
+			return true
+		}
+	}
+	return false
 }
 
 func splitAttrOptions(rest string) []string {

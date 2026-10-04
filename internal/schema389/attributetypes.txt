@@ -1,5 +1,5 @@
 # 389 DS attributeTypes (numeric OID or -oid placeholder, then NAME and aliases), read from the pinned image's cn=schema.
-# Source: oracle probe 17 (test/parity/testdata/filter-attr-oracle-probes.txt). Regenerate when deploy/docker/dirsrv.digest changes.
+# Output of oracle probe 17 (script in test/parity/testdata/filter-attr-oracle-probes.txt). Regenerate when deploy/docker/dirsrv.digest changes.
 # image quay.io/389ds/dirsrv@sha256:f2851654c5df545cd893d84bea8d08c28dc25f0930493fbfed1d8a6eacf657f7
 # attributeTypes 1020
 5.3.6.1.1.1.1.1 accessTo

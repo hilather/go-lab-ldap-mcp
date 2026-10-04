@@ -1,6 +1,7 @@
 package config
 
 import (
+	"github.com/hilather/go-lab-ldap-mcp/internal/schema389"
 	"regexp"
 	"strconv"
 	"strings"
@@ -159,6 +160,22 @@ func emitACI(a v1alpha1.ACL, n *Normalized) (string, string, error) {
 	}
 	if len(perms) == 0 {
 		return "", "", fieldErr("spec.acls."+a.ID+".permissions", "required", "at least one permission is required")
+	}
+	// CAND-33: every listed name must be a valid targetattr spelling that
+	// the pinned 389 schema defines, as 389 rejects the ACI otherwise
+	// (oracle probe 16). Only single-element lists are emitted (see below).
+	for _, l := range []struct {
+		field string
+		names []string
+	}{{"allow", a.Attributes.Allow}, {"deny", a.Attributes.Deny}} {
+		for _, name := range l.names {
+			if !aciAttrRe.MatchString(name) {
+				return "", "", fieldErr("spec.acls."+a.ID+".attributes."+l.field, "invalid_attribute", "attribute name is not allowed")
+			}
+			if name != "*" && !schema389.Known(name) {
+				return "", "", fieldErr("spec.acls."+a.ID+".attributes."+l.field, "unknown_attribute", "attribute is not defined in the 389 schema")
+			}
+		}
 	}
 	allow := "*"
 	deny := ""

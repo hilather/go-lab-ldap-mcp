@@ -590,3 +590,60 @@ spec:
 		}
 	}
 }
+
+// TestACLAttributesMustExistIn389Schema pins CAND-33: 389 rejects an ACI
+// whose targetattr names a type its schema lacks (oracle probe 16), so the
+// compiler rejects such a DSL ACL instead of emitting an ACI 389 refuses.
+// Options are not checked, as on 389; every list element is validated.
+func TestACLAttributesMustExistIn389Schema(t *testing.T) {
+	for _, tc := range []struct {
+		attrs, path, code string
+	}{
+		{`{ allow: [fooBar] }`, "spec.acls.x.attributes.allow", "unknown_attribute"},
+		{`{ deny: [person] }`, "spec.acls.x.attributes.deny", "unknown_attribute"},
+		{`{ allow: [mail, fooBar] }`, "spec.acls.x.attributes.allow", "unknown_attribute"},
+		{`{ deny: [pwdChangedTime] }`, "spec.acls.x.attributes.deny", "unknown_attribute"},
+		{`{ allow: ["uid;x-test"] }`, "", ""},
+		{`{ allow: [userid] }`, "", ""},
+		{`{ deny: [userPassword] }`, "", ""},
+	} {
+		src := []byte(`
+apiVersion: labldap.dev/v1alpha1
+kind: LabScenario
+metadata: { name: x }
+spec:
+  directory: { suffix: "dc=example,dc=test" }
+  transport: { ldaps: { enabled: true, port: 3636 } }
+  runtimeAccount: { id: rt, passwordFile: secrets/runtime-ldap }
+  users:
+    - id: alice
+      passwordFile: secrets/user-alice
+  acls:
+    - id: x
+      principal: { kind: user, ref: alice }
+      target: { kind: suffix }
+      permissions: [read]
+      attributes: ` + tc.attrs + `
+`)
+		_, err := config.Compile(t.Context(), src, "acl.yaml", config.LoadOptions{Secrets: fixtureSecrets(), Caller: config.CallerCLI})
+		if tc.code == "" {
+			if err != nil {
+				t.Errorf("%s: %v", tc.attrs, err)
+			}
+			continue
+		}
+		if err == nil {
+			t.Errorf("%s: compiled", tc.attrs)
+			continue
+		}
+		found := false
+		for _, f := range mustFields(t, err) {
+			if f.Path == tc.path && f.Code == tc.code {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("%s: want %s %s, got %#v", tc.attrs, tc.path, tc.code, mustFields(t, err))
+		}
+	}
+}
