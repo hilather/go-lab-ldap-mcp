@@ -133,7 +133,8 @@ func fattrDMRows() []fattrRow {
 
 // fattrSubjectRows are the probe-6 rows per subject. The CAND-31 row
 // (fa_allow_userid (!(userid;x-test=bobtag)): 389 none, native all three)
-// is excluded until the owner adjudicates it.
+// is excluded until the owner adjudicates it. Native checks that leaf under
+// the literal base userid, which matches the literal allow list.
 func fattrSubjectRows(subject string) []fattrRow {
 	uidRows := []fattrRow{
 		{"(uid=fa_bob)", "fa_bob"}, {"(!(uid=fa_bob))", fattrNotBob},

@@ -218,6 +218,9 @@ func TestParseAttrDesc(t *testing.T) {
 		resolved      bool
 	}{
 		{"uid", "uid", "uid", nil, true},
+		// Native-only: surrounding spaces are trimmed (RFC 4512 descriptions
+		// cannot contain them; no oracle row). Permission and matching use
+		// the same resolved name, so this cannot widen access.
 		{" UID ", "uid", "uid", nil, true},
 		{"userid", "uid", "uid", nil, true},
 		{"0.9.2342.19200300.100.1.1", "uid", "uid", nil, true},
@@ -330,9 +333,9 @@ func TestFilterLeafSearchIdentityMatchesOracle(t *testing.T) {
 	want["fa_deny_uid"]["(!("+oid+";x-test=bobtag))"] = all
 	want["fa_deny_userid"]["(!("+oid+";x-test=bobtag))"] = all
 	// CAND-31 (open, excluded): 389 returns no entries for fa_allow_userid
-	// (!(userid;x-test=bobtag)); native's entry-level check skips
-	// targetattr, so the literal-userid leaf is allowed, False, and its NOT
-	// returns all three.
+	// (!(userid;x-test=bobtag)) (reason not probed); native checks the leaf
+	// under the literal base userid, which matches the literal allow list,
+	// so the leaf is allowed, False, and its NOT returns all three.
 	delete(want["fa_allow_userid"], "(!(userid;x-test=bobtag))")
 
 	ctx := context.Background()
