@@ -73,6 +73,7 @@ func (s *Server) runSearch(ctx context.Context, c *conn, m *Message, req *Search
 		}
 	}
 	deadline := time.Now().Add(timeLimit)
+	leafless := filterHasAbsoluteSet(req.Filter)
 
 	var matched []*Entry
 	code := ResultSuccess
@@ -89,15 +90,7 @@ func (s *Server) runSearch(ctx context.Context, c *conn, m *Message, req *Search
 			if err != nil {
 				return nil
 			}
-			if !s.allowed(ctx, tx, subj, entryDN, "", PermSearch) {
-				return nil
-			}
-			if s.matchSearchFilter(ctx, tx, subj, entryDN, e, req.Filter) != filterTrue {
-				return nil
-			}
-			// C8 visibility runs after the filter so only matching
-			// entries pay the per-attribute read checks.
-			if !s.entryReadable(ctx, tx, subj, entryDN, e) {
+			if !s.searchResultVisible(ctx, tx, subj, entryDN, e, req.Filter, leafless) {
 				return nil
 			}
 			if len(matched) >= sizeLimit {
@@ -188,11 +181,52 @@ func (s *Server) runSearch(ctx context.Context, c *conn, m *Message, req *Search
 	return code
 }
 
-// searchEntryVisible is the full entry-level access check for a search
-// result (contract C8): the entry-level search grant plus entryReadable.
-// runSearch runs the two halves around the filter; tests use this form.
-func (s *Server) searchEntryVisible(ctx context.Context, tx ReadTx, subj Subject, dn config.DN, e *Entry) bool {
-	return s.allowed(ctx, tx, subj, dn, "", PermSearch) && s.entryReadable(ctx, tx, subj, dn, e)
+// searchResultVisible is the per-entry search result decision (contract
+// C8). As on 389 (resolved CAND-35) there is no entry-level search check:
+// each evaluated filter leaf needs search on its attribute (matchSearchFilter)
+// and the subject must read at least one stored attribute (entryReadable).
+// absolute is filterHasAbsoluteSet(f): such a filter can be True without
+// checking any leaf; 389 rejects it (oracle probe 19), so native keeps the
+// entry-level search check for it (CAND-38).
+func (s *Server) searchResultVisible(ctx context.Context, tx ReadTx, subj Subject, dn config.DN, e *Entry, f Filter, absolute bool) bool {
+	if absolute && !s.allowed(ctx, tx, subj, dn, "", PermSearch) {
+		return false
+	}
+	if s.matchSearchFilter(ctx, tx, subj, dn, e, f) != filterTrue {
+		return false
+	}
+	// Visibility runs after the filter so only matching entries pay the
+	// per-attribute read checks.
+	return s.entryReadable(ctx, tx, subj, dn, e)
+}
+
+// filterHasAbsoluteSet reports whether f contains an empty AND or OR
+// (RFC 4526 absolute true/false), which can decide the filter without any
+// attribute leaf being checked.
+func filterHasAbsoluteSet(f Filter) bool {
+	switch n := f.(type) {
+	case *FilterAnd:
+		if len(n.Children) == 0 {
+			return true
+		}
+		for _, c := range n.Children {
+			if filterHasAbsoluteSet(c) {
+				return true
+			}
+		}
+	case *FilterOr:
+		if len(n.Children) == 0 {
+			return true
+		}
+		for _, c := range n.Children {
+			if filterHasAbsoluteSet(c) {
+				return true
+			}
+		}
+	case *FilterNot:
+		return filterHasAbsoluteSet(n.Child)
+	}
+	return false
 }
 
 // entryReadable reports whether subj may read at least one attribute of e
@@ -443,7 +477,7 @@ func (s *Server) matchSearchFilter(ctx context.Context, tx ReadTx, subj Subject,
 	// options) is checked under its literal base, as the oracle does; its
 	// value set is always empty, so allowing it reveals no attribute data.
 	d := parseAttrDesc(s.opts.Schema, attr)
-	if !s.allowedIdentity(ctx, tx, subj, dn, d.name, PermSearch) {
+	if !s.allowedIdentity(ctx, tx, subj, dn, d.name, d.opts, PermSearch) {
 		return filterUndefined
 	}
 	if matchLeaf(e, f, d, NewRuleMatcher(s.opts.Schema)) {

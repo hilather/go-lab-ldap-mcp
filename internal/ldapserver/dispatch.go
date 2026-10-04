@@ -100,17 +100,23 @@ func (s *Server) checkControls(m *Message) (Result, bool) {
 // allowed evaluates one ACI check as the connection's subject inside the
 // operation's store transaction. ACI engine errors fail closed.
 func (s *Server) allowed(ctx context.Context, tx ReadTx, subj Subject, target config.DN, attr string, perm Permission) bool {
-	return s.allowedIdentity(ctx, tx, subj, target, s.attributeIdentity(attr), perm)
+	var opts []string
+	if _, rest, ok := strings.Cut(attr, ";"); ok {
+		opts = splitAttrOptions(rest)
+	}
+	return s.allowedIdentity(ctx, tx, subj, target, s.attributeIdentity(attr), opts, perm)
 }
 
 // allowedIdentity is allowed for an attribute identity the caller already
 // resolved (filter leaves resolve through parseAttrDesc instead of
-// attributeIdentity; see matchSearchFilter).
-func (s *Server) allowedIdentity(ctx context.Context, tx ReadTx, subj Subject, target config.DN, attr string, perm Permission) bool {
+// attributeIdentity; see matchSearchFilter). opts are the description's
+// lowercased options, matched against targetattr options (CAND-34).
+func (s *Server) allowedIdentity(ctx context.Context, tx ReadTx, subj Subject, target config.DN, attr string, opts []string, perm Permission) bool {
 	ok, err := s.opts.ACI.Allowed(ctx, tx, ACICheck{
 		Subject:   subj,
 		Target:    target,
 		Attribute: attr,
+		Options:   opts,
 		Perm:      perm,
 	})
 	if err != nil {

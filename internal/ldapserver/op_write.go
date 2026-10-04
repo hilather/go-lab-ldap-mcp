@@ -215,8 +215,24 @@ func (s *Server) handleModify(ctx context.Context, c *conn, m *Message, req *Mod
 		return respond(Result{Code: ResultInvalidDNSyntax, DiagnosticMessage: "invalid entry DN"})
 	}
 	err = s.opts.Store.Update(ctx, func(tx UpdateTx) error {
-		if !s.allowed(ctx, tx, subj, dn, "", PermWrite) {
-			return errDenied
+		// C8 (resolved CAND-35): like 389, Modify has no entry-level write
+		// check; every change needs write on its own attribute, so an
+		// attribute-scoped deny blocks only changes to that attribute
+		// (oracle probes 16 and 18). The checks run before the entry is
+		// read and before the assertion, in request order, so a caller
+		// without write cannot probe entry existence (50, not 32) or entry
+		// state through the assertion outcome.
+		for _, ch := range req.Changes {
+			if !s.allowed(ctx, tx, subj, dn, ch.Attr.Name, PermWrite) {
+				return errDenied
+			}
+			// T-137: operational attributes are server-owned (RFC 4512
+			// NO-USER-MODIFICATION); internal writes — the write plugins
+			// and the T-134 lockout stamp — go through the store directly
+			// and never cross this gate.
+			if !s.clientModifiable(ch.Attr.Name) {
+				return &operationalAttrError{attr: ch.Attr.Name}
+			}
 		}
 		before, err := tx.Entry(ctx, dn)
 		if err != nil {
@@ -230,16 +246,6 @@ func (s *Server) handleModify(ctx context.Context, c *conn, m *Message, req *Mod
 		}
 		after := cloneEntry(before)
 		for _, ch := range req.Changes {
-			if !s.allowed(ctx, tx, subj, dn, ch.Attr.Name, PermWrite) {
-				return errDenied
-			}
-			// T-137: operational attributes are server-owned (RFC 4512
-			// NO-USER-MODIFICATION); internal writes — the write plugins
-			// and the T-134 lockout stamp — go through the store directly
-			// and never cross this gate.
-			if !s.clientModifiable(ch.Attr.Name) {
-				return &operationalAttrError{attr: ch.Attr.Name}
-			}
 			if err := s.applyChange(after, ch); err != nil {
 				return err
 			}

@@ -93,7 +93,7 @@ func (eng *aciEngine) Allowed(ctx context.Context, tx ReadTx, check ACICheck) (b
 		if !aci.HasPerm(check.Perm) {
 			continue
 		}
-		if check.Attribute != "" && !aci.TargetsAttr(check.Attribute) {
+		if check.Attribute != "" && !aci.TargetsAttr(check.Attribute, check.Options) {
 			continue
 		}
 		match, err := eng.subjectMatchA(ctx, tx, aci, check, &groups)

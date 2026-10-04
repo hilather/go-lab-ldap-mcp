@@ -257,7 +257,7 @@ func TestACIEngineGroupDN(t *testing.T) {
 	}
 
 	// uniqueMember participates in the same membership test.
-	uniqueGrant := `(target="ldap:///dc=example,dc=test")` +
+	uniqueGrant := `(target="ldap:///dc=example,dc=test")(targetattr="*")` +
 		`(version 3.0; acl "labldap:unique-read"; allow (read) groupdn="ldap:///cn=unixadmins,ou=groups,dc=example,dc=test";)`
 	ctx := context.Background()
 	if err := store.Update(ctx, func(tx UpdateTx) error {

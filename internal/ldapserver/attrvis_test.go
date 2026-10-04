@@ -254,7 +254,7 @@ func TestSearchEntryVisibilityMatchesOracle(t *testing.T) {
 			if err := opts.Store.View(ctx, func(tx ReadTx) error {
 				got = matchingNames(t, entries, func(e *Entry) bool {
 					dn := mustDNA(t, e.DN)
-					return srv.searchEntryVisible(ctx, tx, s, dn, e) && srv.matchSearchFilter(ctx, tx, s, dn, e, f) == filterTrue
+					return srv.searchResultVisible(ctx, tx, s, dn, e, f, filterHasAbsoluteSet(f))
 				})
 				return nil
 			}); err != nil {
@@ -270,9 +270,10 @@ func TestSearchEntryVisibilityMatchesOracle(t *testing.T) {
 // TestSearchVisibilityOperationalOverridesMatchOracle pins probe 13: with
 // userid (matches nothing) plus read on one more attribute, 389 returns the
 // entry for memberOf (a user attribute there) but not for nsAccountLock
-// (directoryOperation). pwdChangedTime and passwordHistory are operational
-// on 389 too (native-only stamp / directoryOperation), and so is aci
-// (probe 15).
+// (directoryOperation). passwordHistory is operational on 389 too
+// (directoryOperation), and so is aci (probe 15). pwdChangedTime is a
+// native-only stamp: 389's schema has no such type, so no ACI can name it
+// (CAND-33, probe 17); v_p still stores it and must not count.
 func TestSearchVisibilityOperationalOverridesMatchOracle(t *testing.T) {
 	t.Parallel()
 	const base = "ou=probe-vis13,dc=example,dc=test"
@@ -287,7 +288,6 @@ func TestSearchVisibilityOperationalOverridesMatchOracle(t *testing.T) {
 	subjects := map[string]struct{ attr, want string }{
 		"q_userid_memberof": {"memberOf", "v_m"},
 		"q_userid_acctlock": {"nsAccountLock", ""},
-		"q_userid_pwdtime":  {"pwdChangedTime", ""},
 		"q_userid_pwdhist":  {"passwordHistory", ""},
 		"q_userid_aci":      {"aci", ""},
 		// v_l also stores nsAccountLock under its OID spelling (a direct
@@ -316,7 +316,7 @@ func TestSearchVisibilityOperationalOverridesMatchOracle(t *testing.T) {
 		if err := opts.Store.View(ctx, func(tx ReadTx) error {
 			got = matchingNames(t, entries, func(e *Entry) bool {
 				dn := mustDNA(t, e.DN)
-				return srv.searchEntryVisible(ctx, tx, s, dn, e) && srv.matchSearchFilter(ctx, tx, s, dn, e, f) == filterTrue
+				return srv.searchResultVisible(ctx, tx, s, dn, e, f, filterHasAbsoluteSet(f))
 			})
 			return nil
 		}); err != nil {

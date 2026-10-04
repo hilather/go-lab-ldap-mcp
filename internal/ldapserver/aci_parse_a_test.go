@@ -289,9 +289,10 @@ func TestParseACITextAAttrAndNameData(t *testing.T) {
 	if p.Subject.Kind != ACISubjectGroupDNA {
 		t.Errorf("subject = %s, want groupdn", p.Subject.Kind)
 	}
-	// Missing targetattr means all attributes (389 semantics).
-	if p.AttrMode != ACITargetAttrAllA || !p.TargetsAttr("anything") {
-		t.Errorf("omitted targetattr should mean all attributes, got %s", p.AttrMode)
+	// Omitted targetattr targets no attribute (389 semantics, oracle
+	// probes 16, 18, 19; resolved CAND-35).
+	if p.AttrMode != ACITargetAttrNoneA || targetsDesc(p, "uid") || targetsDesc(p, "userPassword") {
+		t.Errorf("omitted targetattr should target no attribute, got %s", p.AttrMode)
 	}
 }
 
@@ -310,7 +311,7 @@ func TestParseACITextAKeywordCase(t *testing.T) {
 		t.Errorf("subject = %s, want anyone", p.Subject.Kind)
 	}
 	// Attribute lookup is case-insensitive regardless of emission case.
-	if !p.TargetsAttr("uid") || !p.TargetsAttr("cn") || p.TargetsAttr("sn") {
+	if !targetsDesc(p, "uid") || !targetsDesc(p, "cn") || targetsDesc(p, "sn") {
 		t.Error("TargetsAttr case folding wrong")
 	}
 }
@@ -330,16 +331,16 @@ func TestParseACITextAHelpers(t *testing.T) {
 			password = mustParseA(t, fields[2])
 		}
 	}
-	if suffixRead.TargetsAttr("userpassword") {
+	if targetsDesc(suffixRead, "userpassword") {
 		t.Error("suffix-read must not target userPassword")
 	}
-	if !suffixRead.TargetsAttr("uid") {
+	if !targetsDesc(suffixRead, "uid") {
 		t.Error("suffix-read must target uid")
 	}
 	if suffixRead.HasPerm(PermAdd) || !suffixRead.HasPerm(PermRead) {
 		t.Error("suffix-read perms wrong")
 	}
-	if !password.TargetsAttr("userPassword") || password.TargetsAttr("uid") {
+	if !targetsDesc(password, "userPassword") || targetsDesc(password, "uid") {
 		t.Error("password ACI targets only userPassword")
 	}
 }
@@ -507,7 +508,7 @@ func TestTargetAttrListsMatchOracle(t *testing.T) {
 		{`" UID || Sn "`, false, []string{"UID", "Sn"}, []string{"uid", "sn"}, []string{"cn"}},
 		{`"2.5.4.4 || uid"`, false, []string{"2.5.4.4", "uid"}, []string{"uid", "2.5.4.4"}, []string{"sn", "surname"}},
 		{`"0.9.2342.19200300.100.1.1"`, false, []string{"0.9.2342.19200300.100.1.1"}, []string{"0.9.2342.19200300.100.1.1"}, []string{"uid", "userid"}},
-		{`"2.5.4.13;lang-en"`, false, []string{"2.5.4.13;lang-en"}, []string{"2.5.4.13"}, []string{"description"}},
+		{`"2.5.4.13;lang-en"`, false, []string{"2.5.4.13;lang-en"}, []string{"2.5.4.13;lang-en", "2.5.4.13;LANG-EN;x-a"}, []string{"2.5.4.13", "description;lang-en"}},
 		{`"0.9.2342.19200300.100.1.1"`, true, []string{"0.9.2342.19200300.100.1.1"}, []string{"uid", "cn"}, []string{"0.9.2342.19200300.100.1.1"}},
 		{`"uid || description"`, true, []string{"uid", "description"}, []string{"sn", "cn"}, []string{"uid", "description;lang-en"}},
 	} {
@@ -524,12 +525,12 @@ func TestTargetAttrListsMatchOracle(t *testing.T) {
 			t.Errorf("%s: attrs %q, want %q", tc.targetattr, p.Attrs, tc.attrs)
 		}
 		for _, a := range tc.yes {
-			if !p.TargetsAttr(a) {
+			if !targetsDesc(p, a) {
 				t.Errorf("%s%s: %s not targeted", op, tc.targetattr, a)
 			}
 		}
 		for _, a := range tc.no {
-			if p.TargetsAttr(a) {
+			if targetsDesc(p, a) {
 				t.Errorf("%s%s: %s targeted", op, tc.targetattr, a)
 			}
 		}
@@ -540,7 +541,15 @@ func TestTargetAttrListsMatchOracle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p.TargetsAttr("userPassword") {
+	if targetsDesc(p, "userPassword") {
 		t.Fatal("numeric-OID targetattr must be literal (oracle probe 11)")
 	}
+}
+
+// targetsDesc splits an attribute description the way the server does
+// (dispatch.allowed: lowercased options, no empty ones) and asks p whether
+// it targets the description, without resolving aliases.
+func targetsDesc(p *ParsedACI, desc string) bool {
+	base, rest, _ := strings.Cut(desc, ";")
+	return p.TargetsAttr(base, splitAttrOptions(rest))
 }
