@@ -192,7 +192,9 @@ write `cn=config`.
 
 Names in `attributes.allow` and `attributes.deny` must be attribute types
 the pinned 389 image defines (a name, alias or numeric OID; options such
-as `;lang-en` are allowed and narrow the rule to values carrying them).
+as `;lang-en` are allowed and narrow the rule to values carrying them,
+so `attributes.deny: [userPassword;lang-en]` no longer excludes plain
+`userPassword`, only `userPassword;lang-en` values).
 Anything else, such as a typo or an object class, fails validation with
 `unknown_attribute` on `spec.acls.<id>.attributes.allow` or `.deny`,
 because 389 refuses an ACI that names it.

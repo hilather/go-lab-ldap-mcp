@@ -203,6 +203,18 @@ func TestACITargetAttrOptionsAndEntryLevel(t *testing.T) {
 	if got := search(c, "(uid;x-test=bobtag)"); got != wantD36 {
 		t.Errorf("%s: D36 d_uidopt same-connection (uid;x-test=bobtag): got [%s], want [%s]", env.engine, got, wantD36)
 	}
+	// D36 mirror (probe 24): t_uidopt's allow covers only uid;x-test; after
+	// (uid=fa_bob) is denied on the same connection, 389 reuses that denial
+	// for uid;x-test, while native grants it as on a fresh connection.
+	c2 := as("t_uidopt")
+	_ = search(c2, "(uid=fa_bob)")
+	wantD36t := "fa_bob"
+	if env.engine == Engine389DS {
+		wantD36t = ""
+	}
+	if got := search(c2, "(uid;x-test=bobtag)"); got != wantD36t {
+		t.Errorf("%s: D36 t_uidopt same-connection (uid;x-test=bobtag): got [%s], want [%s]", env.engine, got, wantD36t)
+	}
 
 	code := func(err error) uint16 {
 		var le *ldap.Error
