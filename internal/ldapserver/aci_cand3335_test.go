@@ -359,6 +359,12 @@ func TestCodeSweepEdgeCases(t *testing.T) {
 		if srv.allowed(ctx, tx, s, target, ";x", PermWrite) {
 			t.Error(`write on ";x" allowed; want fail-closed`)
 		}
+		e := NewEntry("uid=v_u,ou=probe-fattr,dc=example,dc=test", StringAttribute("uid", "v_u"))
+		for _, flt := range []string{"(;x=v)", "(!(;x=v))", "(;x=*)"} {
+			if srv.matchSearchFilter(ctx, tx, s, target, e, parseTestFilter(t, flt)) != filterUndefined {
+				t.Errorf("%s: want Undefined for an empty-base leaf", flt)
+			}
+		}
 		return nil
 	}); err != nil {
 		t.Fatal(err)

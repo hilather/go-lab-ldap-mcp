@@ -477,6 +477,11 @@ func (s *Server) matchSearchFilter(ctx context.Context, tx ReadTx, subj Subject,
 	// options) is checked under its literal base, as the oracle does; its
 	// value set is always empty, so allowing it reveals no attribute data.
 	d := parseAttrDesc(s.opts.Schema, attr)
+	if d.name == "" {
+		// An empty base (";x") names no attribute; it must not fall back
+		// to an entry-level check, so the leaf is Undefined (fail closed).
+		return filterUndefined
+	}
 	if !s.allowedIdentity(ctx, tx, subj, dn, d.name, d.opts, PermSearch) {
 		return filterUndefined
 	}

@@ -478,7 +478,13 @@ func filterAttrOutcomes(t *testing.T, e engine) []opOutcome {
 	dm := e.dm(t)
 	defer dm.Close()
 	seedFilterAttr(t, dm)
-	defer cleanupFilterAttr(t, dm)
+	// The per-row subject connections below take long enough that native's
+	// idle read deadline can close dm; cleanup and compares redial.
+	defer func() {
+		c := e.dm(t)
+		defer c.Close()
+		cleanupFilterAttr(t, c)
+	}()
 
 	var out []opOutcome
 	run := func(conn *ldap.Conn, who string, rows []fattrRow) {
@@ -506,9 +512,11 @@ func filterAttrOutcomes(t *testing.T, e engine) []opOutcome {
 			conn.Close()
 		}
 	}
+	cmp := e.dm(t)
+	defer cmp.Close()
 	for _, c := range fattrCompare {
 		code := ldap.LDAPResultCompareFalse
-		ok, err := dm.Compare(fattrDN("fa_bob"), c.attr, c.value)
+		ok, err := cmp.Compare(fattrDN("fa_bob"), c.attr, c.value)
 		switch {
 		case err != nil:
 			code = codeOutcome(err).Code
