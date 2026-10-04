@@ -6,8 +6,11 @@ import (
 	"github.com/hilather/go-lab-ldap-mcp/internal/config"
 )
 
-// Matcher is the consumer-owned seam between filter evaluation (T-127,
-// filter_eval.go) and the RFC 4512/4517 matching-rule engine (T-131).
+// Matcher is the consumer-owned seam for the rule primitives (equality,
+// substrings, ordering) used by the leaf matchers in filter_eval.go and the
+// write-path value checks. Filter evaluation itself (matchFilterM) is typed
+// to *RuleMatcher, whose schema also resolves attribute descriptions
+// (attrdesc.go), so value selection and rule lookup share one schema.
 //
 // Implementations must never panic on malformed values and must never log
 // attribute values: stored values and assertions may be sensitive

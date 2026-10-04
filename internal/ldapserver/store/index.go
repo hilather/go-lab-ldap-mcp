@@ -80,7 +80,10 @@ import (
 // indexVersion is the posting format version stored in idxmeta. Bump it when
 // normalizeIndexKey changes so open/migration can force RebuildIndexes.
 // Version 2 also migrates structural DN keys to escaped FoldedKey values.
-const indexVersion uint64 = 2
+// Version 3 keys postings by attribute type (ldapserver.AttrTypeKey), so
+// subtype spellings (uid;x-test), second descriptors (userid) and OIDs post
+// to their type's bucket.
+const indexVersion uint64 = 3
 
 // idxMetaBucket holds index bookkeeping; key "version" is an 8-byte
 // big-endian indexVersion.
@@ -100,10 +103,13 @@ type indexedAttribute struct {
 	uniqueMember bool // strip RFC 4519 '#' bit-string before DN parse
 }
 
-// indexedAttributes is the equality index registry. Attribute names are
-// compared case-insensitively and without attribute options; an attribute
-// with options (e.g. "cn;lang-en") is not indexed and search falls back to
-// a scan.
+// indexedAttributes is the equality index registry, keyed by lowercase
+// attribute type. Stored attribute names resolve through indexSpecFor:
+// options are stripped and second descriptors and OIDs resolve, so
+// "cn;lang-en", "commonName" and "2.5.4.3" values all post to eq_cn. Filter
+// evaluation applies the same subtype semantics (ldapserver/attrdesc.go),
+// and indexed candidates are always post-filtered, so a broader posting set
+// never drops a true match.
 var indexedAttributes = map[string]indexedAttribute{
 	"uid":          {bucket: "eq_uid"},
 	"cn":           {bucket: "eq_cn"},
@@ -242,6 +248,35 @@ func EnsureIndexBuckets(tx *bolt.Tx) error {
 	return nil
 }
 
+// indexSpecFor resolves a stored attribute name to its equality index, if
+// any. Keys use ldapserver.StandardSchema, while filter evaluation uses the
+// server's configured schema: the two are the same registry in labldapd
+// (cmd/labldapd/serve.go) and in the parity native engine. A custom schema
+// that renamed an indexed standard type could make them disagree; the
+// planner only narrows on uid, cn and objectClass.
+func indexSpecFor(name string) (indexedAttribute, bool, error) {
+	std, err := ldapserver.StandardSchema()
+	if err != nil {
+		return indexedAttribute{}, false, fmt.Errorf("standard schema: %w", err)
+	}
+	spec, ok := indexedAttributes[ldapserver.AttrTypeKey(std, name)]
+	return spec, ok, nil
+}
+
+// stampIndexVersion records the current posting format after a successful
+// rebuild, in the rebuild's transaction, so the next Open does not rebuild
+// again. EnsureIndexBuckets only stamps a fresh database.
+func stampIndexVersion(tx *bolt.Tx) error {
+	meta := tx.Bucket([]byte(idxMetaBucket))
+	if meta == nil {
+		return errors.New("store: stamp index version: meta bucket missing")
+	}
+	if err := meta.Put(idxVersionKey, binary.BigEndian.AppendUint64(nil, indexVersion)); err != nil {
+		return fmt.Errorf("store: stamp index version: %w", err)
+	}
+	return nil
+}
+
 // IndexVersion reports the stamped posting format version, or 0 when the
 // meta bucket or key is absent (pre-T-130 database: caller should rebuild).
 func IndexVersion(tx *bolt.Tx) (uint64, error) {
@@ -293,7 +328,10 @@ func reindex(tx *bolt.Tx, id uint64, e *ldapserver.Entry, apply func(b *bolt.Buc
 		return nil
 	}
 	for _, a := range e.Attributes {
-		spec, ok := indexedAttributes[strings.ToLower(a.Name)]
+		spec, ok, err := indexSpecFor(a.Name)
+		if err != nil {
+			return fmt.Errorf("store: reindex: %w", err)
+		}
 		if !ok {
 			continue
 		}
@@ -366,12 +404,17 @@ func VerifyIndexes(tx *bolt.Tx, entries EntryIter) error {
 		return errors.New("store: verify indexes: nil entry iterator")
 	}
 	expected := map[string]map[string]struct{}{}
+	var specErr error
 	entries(func(id uint64, e *ldapserver.Entry) bool {
 		if e == nil {
 			return true
 		}
 		for _, a := range e.Attributes {
-			spec, ok := indexedAttributes[strings.ToLower(a.Name)]
+			spec, ok, err := indexSpecFor(a.Name)
+			if err != nil {
+				specErr = err
+				return false
+			}
 			if !ok {
 				continue
 			}
@@ -386,6 +429,9 @@ func VerifyIndexes(tx *bolt.Tx, entries EntryIter) error {
 		}
 		return true
 	})
+	if specErr != nil {
+		return fmt.Errorf("store: verify indexes: %w", specErr)
+	}
 	for _, spec := range indexedAttributes {
 		b := tx.Bucket([]byte(spec.bucket))
 		if b == nil {

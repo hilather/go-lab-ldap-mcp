@@ -20,9 +20,15 @@ func matchFilter(e *Entry, f Filter, s Schema) bool {
 	return matchFilterM(e, f, NewRuleMatcher(s))
 }
 
-// matchFilterM is the Matcher-driven filter evaluator; tests exercise it
-// directly against golden matching pairs.
-func matchFilterM(e *Entry, f Filter, m Matcher) bool {
+// matchFilterM is the rule-driven filter evaluator; tests exercise it
+// directly against golden matching pairs. Attribute descriptions resolve
+// against the matcher's own schema (attrdesc.go), so value selection and
+// matching rules cannot disagree.
+func matchFilterM(e *Entry, f Filter, m *RuleMatcher) bool {
+	var s Schema
+	if m != nil {
+		s = m.schema
+	}
 	switch flt := f.(type) {
 	case *FilterAnd:
 		for _, child := range flt.Children {
@@ -40,21 +46,56 @@ func matchFilterM(e *Entry, f Filter, m Matcher) bool {
 		return false
 	case *FilterNot:
 		return !matchFilterM(e, flt.Child, m)
-	case *FilterEquality:
-		return matchEquality(e, flt.Attr, flt.Value, m)
-	case *FilterSubstrings:
-		return matchSubstrings(e, flt, m)
-	case *FilterPresent:
-		return len(e.Values(flt.Attr)) > 0
-	case *FilterGreaterOrEqual:
-		return matchOrdering(e, flt.Attr, flt.Value, m, 1)
-	case *FilterLessOrEqual:
-		return matchOrdering(e, flt.Attr, flt.Value, m, -1)
-	case *FilterApproxMatch:
-		return matchEquality(e, flt.Attr, flt.Value, m)
 	default:
-		return false
+		attr, ok := leafAttr(f)
+		if !ok {
+			return false
+		}
+		return matchLeaf(e, f, parseAttrDesc(s, attr), m)
 	}
+}
+
+// leafAttr returns the attribute description of a leaf filter node.
+func leafAttr(f Filter) (string, bool) {
+	switch n := f.(type) {
+	case *FilterEquality:
+		return n.Attr, true
+	case *FilterSubstrings:
+		return n.Attr, true
+	case *FilterPresent:
+		return n.Attr, true
+	case *FilterGreaterOrEqual:
+		return n.Attr, true
+	case *FilterLessOrEqual:
+		return n.Attr, true
+	case *FilterApproxMatch:
+		return n.Attr, true
+	}
+	return "", false
+}
+
+// matchLeaf evaluates one leaf whose description the caller already parsed
+// (matchSearchFilter parses once for both the ACI identity and the match).
+func matchLeaf(e *Entry, f Filter, d attrDesc, m *RuleMatcher) bool {
+	var s Schema
+	if m != nil {
+		s = m.schema
+	}
+	switch flt := f.(type) {
+	case *FilterEquality:
+		return matchEquality(e, d, flt.Value, m, s)
+	case *FilterSubstrings:
+		return matchSubstrings(e, d, flt, m, s)
+	case *FilterPresent:
+		return len(filterValues(e, d, s)) > 0
+	case *FilterGreaterOrEqual:
+		return matchOrdering(e, d, flt.Value, m, s, 1)
+	case *FilterLessOrEqual:
+		return matchOrdering(e, d, flt.Value, m, s, -1)
+	case *FilterApproxMatch:
+		return matchEquality(e, d, flt.Value, m, s)
+	}
+	return false
 }
 
 // foldCase reports whether the attribute's registered equality rule folds
@@ -84,9 +125,9 @@ func valueEqual(fold bool, a, b []byte) bool {
 
 // matchEquality evaluates the attribute's equality rule through the
 // Matcher; malformed assertions are Undefined (no match), never errors.
-func matchEquality(e *Entry, attr string, value []byte, m Matcher) bool {
-	for _, v := range e.Values(attr) {
-		if m.Equal(attr, v, value) {
+func matchEquality(e *Entry, d attrDesc, value []byte, m Matcher, s Schema) bool {
+	for _, v := range filterValues(e, d, s) {
+		if m.Equal(d.typ, v, value) {
 			return true
 		}
 	}
@@ -95,9 +136,9 @@ func matchEquality(e *Entry, attr string, value []byte, m Matcher) bool {
 
 // matchOrdering implements >= (dir 1) and <= (dir -1) over the attribute
 // values under the attribute's ordering rule.
-func matchOrdering(e *Entry, attr string, value []byte, m Matcher, dir int) bool {
-	for _, v := range e.Values(attr) {
-		cmp := m.Compare(attr, v, value)
+func matchOrdering(e *Entry, d attrDesc, value []byte, m Matcher, s Schema, dir int) bool {
+	for _, v := range filterValues(e, d, s) {
+		cmp := m.Compare(d.typ, v, value)
 		if dir > 0 && cmp >= 0 {
 			return true
 		}
@@ -110,9 +151,9 @@ func matchOrdering(e *Entry, attr string, value []byte, m Matcher, dir int) bool
 
 // matchSubstrings evaluates an RFC 4511 substring assertion through the
 // Matcher's substring rule.
-func matchSubstrings(e *Entry, f *FilterSubstrings, m Matcher) bool {
-	for _, v := range e.Values(f.Attr) {
-		if m.Substrings(f.Attr, v, f.Initial, f.Final, f.Any) {
+func matchSubstrings(e *Entry, d attrDesc, f *FilterSubstrings, m Matcher, s Schema) bool {
+	for _, v := range filterValues(e, d, s) {
+		if m.Substrings(d.typ, v, f.Initial, f.Final, f.Any) {
 			return true
 		}
 	}

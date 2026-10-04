@@ -376,10 +376,16 @@ func (s *Server) matchSearchFilter(ctx context.Context, tx ReadTx, subj Subject,
 	default:
 		return filterUndefined
 	}
-	if !s.allowed(ctx, tx, subj, dn, attr, PermSearch) {
+	// The search-permission identity of a leaf is the attribute type its
+	// description resolves to (userid, the uid OID and uid;x-test are all
+	// uid). An unresolved description (second descriptor or OID with
+	// options) is checked under its literal base, as the oracle does; its
+	// value set is always empty, so allowing it reveals no attribute data.
+	d := parseAttrDesc(s.opts.Schema, attr)
+	if !s.allowedIdentity(ctx, tx, subj, dn, d.name, PermSearch) {
 		return filterUndefined
 	}
-	if matchFilter(e, f, s.opts.Schema) {
+	if matchLeaf(e, f, d, NewRuleMatcher(s.opts.Schema)) {
 		return filterTrue
 	}
 	return filterFalse

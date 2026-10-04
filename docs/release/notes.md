@@ -84,6 +84,25 @@ optioned `cn`/`sn`/`uid` values, so a user that has them gets a new
 revision after upgrading, and later edits to those values through the
 entry API do not change the user revision.
 
+## Unreleased: filter attribute descriptions (native engine)
+
+Native search filters now treat attribute descriptions as 389 does
+(contract C6): `(description=hello)` matches a value stored as
+`description;lang-en`, `(userid=x)` and numeric OIDs such as
+`(2.5.4.0=inetOrgPerson)` resolve to their type, and an OID or second
+descriptor with options (`userid;x-test`) matches nothing. Compare is
+unchanged (delta D34). The bbolt equality index now keys postings by
+attribute type (index format 3): the first start after upgrading rebuilds
+the DN and equality indexes once, inside the open transaction, and stamps
+the format so later starts do not rebuild (earlier builds rebuilt on every
+start after a format change because the stamp was never written).
+Downgrade caveat: an older binary rebuilds on every start of a format-3
+store and never rewrites the stamp, so after a
+downgrade-then-upgrade round trip this binary sees format 3 and does not
+rebuild, and indexed searches can miss subtype values written by the older
+binary. Recover with a reset or a fresh store volume (there is no rebuild
+command).
+
 ## Migration guidance
 
 v0.4.0 → v0.4.1 is **additive**. `apiVersion` stays `labldap.dev/v1alpha1`.
