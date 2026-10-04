@@ -128,8 +128,9 @@ are allow-listed. `userPassword` and other forbidden names cannot be
 requested. Filters also reject secret attributes, including nested assertions,
 attribute options, and known OID aliases. Attribute-less extensible matches
 and unknown numeric OIDs are rejected. The absolute filters `(&)` and `(|)`
-(RFC 4526) are rejected by both engines with protocolError(2) "Bad search
-filter"; use `(objectClass=*)` to match every entry. Results expand to a
+(RFC 4526) are rejected as an invalid `filter` (raw LDAP clients get
+protocolError(2) "Bad search filter" from both engines); use
+`(objectClass=*)` to match every entry. Results expand to a
 redacted LDIF snippet.
 
 Profile and structured attribute writes use attribute names. Numeric OIDs

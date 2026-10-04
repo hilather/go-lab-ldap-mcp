@@ -313,4 +313,9 @@ func TestACIModRDNStarListsAbsoluteFilters(t *testing.T) {
 	if got := search(dial("uid=alice,"+people, seedCanary), "(description=hello)"); got != "" {
 		t.Errorf("%s: DSL list (description=hello): got [%s], want none", env.engine, got)
 	}
+	// cn is outside the list; the pre-fix compiler emitted
+	// targetattr!="description", which granted it.
+	if got := search(dial("uid=alice,"+people, seedCanary), "(cn=fa_bob)"); got != "" {
+		t.Errorf("%s: DSL list (cn=fa_bob): got [%s], want none", env.engine, got)
+	}
 }

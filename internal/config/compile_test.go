@@ -723,7 +723,9 @@ func TestACLAttributeListsAre389Lists(t *testing.T) {
 		{`{ allow: [sn], deny: [sn] }`, "", "spec.acls.x.attributes.deny", "invalid_attribute_filter"},
 		{`{ deny: ["*"] }`, "", "spec.acls.x.attributes.deny", "invalid_attribute_filter"},
 		{`{ allow: [uid], deny: ["*"] }`, "", "spec.acls.x.attributes.deny", "invalid_attribute_filter"},
-		{`{ allow: ["` + strings.Join(many, `", "`) + `"] }`, "", "spec.acls.x.attributes.allow", ""},
+		{`{ allow: [mail], deny: ["mail;"] }`, `(targetattr="mail")`, "", ""},
+		{`{ allow: ["` + strings.Join(many, `", "`) + `"] }`, "", "spec.acls.x.attributes.allow", "too_many_attributes"},
+		{`{ allow: [uid], deny: ["` + strings.Join(many, `", "`) + `"] }`, "", "spec.acls.x.attributes.deny", "too_many_attributes"},
 	} {
 		src := []byte(`
 apiVersion: labldap.dev/v1alpha1
@@ -766,7 +768,7 @@ spec:
 		}
 		found := false
 		for _, f := range mustFields(t, err) {
-			if strings.HasPrefix(f.Path, tc.path) && (tc.code == "" || f.Code == tc.code) {
+			if f.Path == tc.path && f.Code == tc.code {
 				found = true
 			}
 		}

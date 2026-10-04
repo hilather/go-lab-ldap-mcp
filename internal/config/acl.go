@@ -2,6 +2,7 @@ package config
 
 import (
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -203,6 +204,14 @@ const MaxACIAttrs = 64
 // rejected.
 func dslTargetAttr(a v1alpha1.ACL) (allow, deny string, err error) {
 	path := "spec.acls." + a.ID + ".attributes."
+	for _, l := range []struct {
+		field string
+		names []string
+	}{{"allow", a.Attributes.Allow}, {"deny", a.Attributes.Deny}} {
+		if len(l.names) > MaxACIAttrs {
+			return "", "", fieldErr(path+l.field, "too_many_attributes", "too many attribute names in one list")
+		}
+	}
 	allowAll := len(a.Attributes.Allow) == 0
 	for _, n := range a.Attributes.Allow {
 		if n == "*" {
@@ -237,7 +246,8 @@ func dslTargetAttr(a v1alpha1.ACL) (allow, deny string, err error) {
 		drop := false
 		for _, dn := range a.Attributes.Deny {
 			dBase, dOpts := splitDSLAttr(dn)
-			if !strings.EqualFold(aBase, dBase) {
+			if !strings.EqualFold(aBase, dBase) || slices.Contains(dOpts, "") {
+				// A name with an empty option ("mail;") covers nothing.
 				continue
 			}
 			if !optionSubset(dOpts, aOpts) {

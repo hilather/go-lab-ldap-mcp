@@ -360,6 +360,13 @@ func TestAbsoluteFilterRejectedMatchesOracle(t *testing.T) {
 	if done.Result.Code != ResultSuccess || len(entries) != 1 {
 		t.Fatalf("connection not usable after rejections: %v, %d entries", done.Result, len(entries))
 	}
+	// Leaf-only nesting is not absolute.
+	for _, f := range []string{"(&(uid=alice)(!(uid=x)))", "(|(uid=alice)(&(uid=alice)(!(cn=x))))", "(!(!(uid=alice)))"} {
+		entries, done, _ := searchFull(t, cl, &SearchRequest{BaseDN: c3638Alice, Scope: ScopeBaseObject, Filter: parseTestFilter(t, f), Attributes: []string{"1.1"}})
+		if done.Result.Code != ResultSuccess || len(entries) != 1 {
+			t.Errorf("leaf-only %s: %v, %d entries, want success with alice", f, done.Result, len(entries))
+		}
+	}
 	_, done, _ = searchFull(t, cl, &SearchRequest{BaseDN: c3638Alice, Scope: ScopeBaseObject, Filter: parseTestFilter(t, "(uid=alice)")}, crit)
 	if done.Result.Code != ResultUnavailableCriticalExtension {
 		t.Fatalf("leaf filter with critical unknown control = %v, want 12", done.Result)

@@ -243,7 +243,12 @@ the pinned 389 image in four more places (contract C8; oracle probes
   name with options narrower than a same-attribute allow name, for a
   combination that leaves no attribute, and for `deny: ["*"]` (it used to
   compile; remove the ACL or narrow it). More than 64 names in one list
-  fail schema validation (`too_many_attributes` in the compiler).
+  fail with `too_many_attributes`. A deny name with an empty option
+  (`"mail;"`) covers nothing and does not narrow the allow list.
+- **REST, MCP and the console reject absolute filters up front.** A
+  search filter holding `(&)` or `(|)` is a `filter` / `invalid` field
+  error ("use (objectClass=*)") instead of an engine protocolError shown
+  as "directory unavailable" (this also fixes the 389 engine).
 
 Upgrade risk: DSL ACLs with more than one attribute name now grant
 **less** than before (only the listed attributes). The compiled
