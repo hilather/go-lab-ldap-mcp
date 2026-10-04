@@ -16,8 +16,8 @@ if the owner accepts them.
 Related ADRs: ADR-0008, ADR-0009, and ADR-0014 (merged in #24). Related contract clauses: native-engine parity contract C1/C3/C8, and
 the proposed deltas D32/D33. Related fixes: PR #18 (on main at `fd9454b`;
 control-plane resolution of option and OID spellings of protected
-attributes) and PR #25 (native hashing of optioned `userPassword`, accepted
-Delta D31, plus its tests).
+attributes) and PR #25 (on main at `30d19b6`; native hashing of optioned
+`userPassword`, accepted Delta D31, plus its tests).
 
 ## Context
 
@@ -65,7 +65,7 @@ and a static table of protected OIDs (including `2.5.18.2`), and keys
 so the control plane strips options and resolves protected OIDs, and
 rejects every numeric-OID attribute name on operator writes.
 `modifyTimestamp;lang-en` is already `forbidden_attribute` on entry update.
-PR #25 adds only the native half: the native engine hashes plaintext values
+PR #25 (on main at `30d19b6`) added only the native half: the native engine hashes plaintext values
 of any variant `userPassword` spelling (accepted Delta D31, because 389
 stores them as written), plus tests, including the REST regression
 `TestPasswordOptionSpellingsAreRejectedAndRedacted` that PATCHes
@@ -203,7 +203,7 @@ Proposed:
 ### Neutral / follow-up
 
 - When implemented, add D32 and D33 rows to `docs/design/parity-delta-log.md`
-  (D31 is taken by PR #25) and regenerate the ledger with
+  (D31 was recorded by PR #25, on main at `30d19b6`) and regenerate the ledger with
   `PARITY_UPDATE_LEDGER=1`. If numbering moves before then, the recording
   rule (next free number) wins over the names used here.
 - The control-plane resolver (`CanonicalAttrType` and the protected OID
@@ -228,5 +228,6 @@ Proposed:
 - On 2026-10-03 the owner asked for a proposal-only review. Current parity is
   unchanged.
 - The 19-vs-53 code split for `2.5.18.2` is not decided here.
-- Code line references are to `main` at `4cfc057`. Commit `4f05463` is cited
+- Code line references are to `main` at `30d19b6` (the cited lines are
+  unchanged from `4cfc057`). Commit `4f05463` is cited
   only as the pre-#18 state of the control plane.
