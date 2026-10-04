@@ -5,7 +5,7 @@ import { isApiError } from "../../api/problem";
 import type { TreeNode } from "../../api/types";
 import { listUserGroups } from "../../api/users";
 import { useSession } from "../../auth/SessionGate";
-import { canSubmitMutation, exactIdConfirmed } from "../../lib/directory-model";
+import { canSubmitMutation, exactIdConfirmed, secondDescriptorPrimary } from "../../lib/directory-model";
 import { queryKeys } from "../../lib/query";
 import { hasScope, SCOPE_DIRECTORY_READ, SCOPE_DIRECTORY_WRITE } from "../../lib/session-model";
 import {
@@ -372,6 +372,11 @@ export function TreePage() {
                     }
                     if (isForbiddenEntryAttribute(attributeName)) {
                       setFormError("This attribute cannot be edited here.");
+                      return;
+                    }
+                    const primary = secondDescriptorPrimary(attributeName);
+                    if (primary !== undefined && attributeOp !== "delete") {
+                      setFormError(`${attributeName.trim()} is another name for ${primary}. Delete it here, then add values under ${primary}.`);
                       return;
                     }
                     setFormError("");

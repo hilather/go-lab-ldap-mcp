@@ -331,14 +331,18 @@ func applyEntryChange(mod *ldap.ModifyRequest, ch directory.EntryChange) error {
 	if directory.ForbiddenEntryAttr(name) || config.CanonicalAttrType(name) == "objectclass" {
 		return cfgErr("changes.name", "forbidden_attribute", "attribute is not allowed")
 	}
+	// Replace and add send the primary descriptor (gn as givenName). Delete
+	// keeps the client's spelling (parity delta D35): 389 resolves the alias
+	// itself, and on native a legacy attribute stored under the alias stays
+	// removable without touching the primary attribute.
 	switch strings.ToLower(strings.TrimSpace(ch.Op)) {
 	case directory.EntryModReplace:
-		mod.Replace(name, ch.Values)
+		mod.Replace(config.PrimaryAttrDescription(name), ch.Values)
 	case directory.EntryModAdd:
 		if len(ch.Values) == 0 {
 			return cfgErr("changes.values", "required", "add requires values")
 		}
-		mod.Add(name, ch.Values)
+		mod.Add(config.PrimaryAttrDescription(name), ch.Values)
 	case directory.EntryModDelete:
 		mod.Delete(name, ch.Values)
 	default:
@@ -418,11 +422,12 @@ func entryAddAttrs(dn config.DN, class string, extra map[string]string) ([]ldap.
 	// Planned names are dropped in every spelling (option, OID, descriptor
 	// alias); the forbidden check runs first so a protected alias is still an
 	// error. Extras de-duplicate on AttrDuplicateKey, keeping the first name
-	// in sorted order (entry create drops duplicates; the user API rejects
-	// them with duplicate_attribute).
+	// in case-insensitive order (entry create drops duplicates; the user API
+	// rejects them with duplicate_attribute), and are sent under the primary
+	// descriptor (rfc822Mailbox as mail).
 	planned := map[string]struct{}{"objectclass": {}, strings.ToLower(attr): {}, "uid": {}, "cn": {}, "sn": {}, "dc": {}, "ou": {}}
 	seen := map[string]struct{}{}
-	for _, name := range sortedNames(extra) {
+	for _, name := range duplicateOrderNames(extra) {
 		val := extra[name]
 		if directory.ForbiddenEntryAttr(name) {
 			return nil, cfgErr("attributes."+name, "forbidden_attribute", "attribute is not allowed")
@@ -437,7 +442,7 @@ func entryAddAttrs(dn config.DN, class string, extra map[string]string) ([]ldap.
 		if strings.TrimSpace(val) == "" {
 			continue
 		}
-		out = append(out, ldap.Attribute{Type: name, Vals: []string{val}})
+		out = append(out, ldap.Attribute{Type: config.PrimaryAttrDescription(name), Vals: []string{val}})
 		seen[key] = struct{}{}
 	}
 	return out, nil
@@ -481,6 +486,15 @@ func hasChildren(e *ldap.Entry) bool {
 		return true
 	}
 	return false
+}
+
+// duplicateOrderNames lists m's keys in duplicate-detection order
+// (config.SortAttrNamesForDuplicates); sortedNames stays byte-ordered for
+// its other callers.
+func duplicateOrderNames(m map[string]string) []string {
+	out := sortedNames(m)
+	config.SortAttrNamesForDuplicates(out)
+	return out
 }
 
 func sortedNames(m map[string]string) []string {

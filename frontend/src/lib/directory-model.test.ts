@@ -32,6 +32,9 @@ import {
   toUserSpecBody,
   uniqueMembers,
   userPatchAttributes,
+  attrDuplicateKey,
+  canonicalAttrType,
+  secondDescriptorPrimary,
   wouldEmptyGroup,
 } from "./directory-model.ts";
 
@@ -258,4 +261,23 @@ test("member search results stay unique and empty lists explain themselves", () 
   assert.equal(members.length, 2);
   assert.match(emptyListMessage("users", true), /match/);
   assert.match(emptyListMessage("groups", false), /yet/);
+});
+
+test("second descriptors resolve like the server alias table", () => {
+  assert.equal(canonicalAttrType("rfc822Mailbox"), "mail");
+  assert.equal(canonicalAttrType("GN;lang-en"), "givenname");
+  assert.equal(attrDuplicateKey("gn"), attrDuplicateKey("givenName"));
+  assert.equal(attrDuplicateKey("mail;B;a"), "mail;a;b");
+  assert.notEqual(attrDuplicateKey("mail"), attrDuplicateKey("mail;lang-en"));
+  assert.equal(secondDescriptorPrimary("gn"), "givenName");
+  assert.equal(secondDescriptorPrimary("rfc822Mailbox;x-a"), "mail");
+  assert.equal(secondDescriptorPrimary("givenName"), undefined);
+});
+
+test("renaming a row to an alias does not also clear the primary", () => {
+  const patch = userPatchAttributes(
+    [{ name: "mail", value: "a@example.test" }],
+    [{ name: "rfc822Mailbox", value: "b@example.test" }],
+  );
+  assert.deepEqual(patch, { rfc822Mailbox: "b@example.test" });
 });

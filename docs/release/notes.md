@@ -84,6 +84,33 @@ optioned `cn`/`sn`/`uid` values, so a user that has them gets a new
 revision after upgrading, and later edits to those values through the
 entry API do not change the user revision.
 
+`rfc822Mailbox` and `gn` are now resolved as `mail` and `givenName`
+(#18 follow-up):
+
+- Users (REST, MCP, console, YAML) with both spellings of one attribute
+  (`mail` + `rfc822Mailbox`, `givenName` + `gn`) get `duplicate_attribute`.
+  Duplicate detection now walks names in case-insensitive order, so the
+  error lands on the later name in that order; for existing pairs the
+  field changes, e.g. `OU` + `organizationalUnitName` now flags `OU`.
+- User writes, YAML seeding, entry create and entry-update replace/add send
+  every resolved second descriptor (also `organizationalUnitName`,
+  `domainComponent`, `organizationName`) under its primary name. A
+  scenario that uses such keys gets a new directory revision, so a
+  persistent deployment in `startupMode: validate` needs one merge apply
+  after upgrading.
+- Entry create keeps the first of `mail` + `rfc822Mailbox` (`mail`) and of
+  `givenName` + `gn` (`givenName`).
+- `PATCH {"gn": ""}` now deletes `givenName` (it was silently skipped), and
+  the empty-value delete finds attributes stored under another case (a
+  YAML-seeded `givenname` on native).
+- Native persistent stores that already hold an unknown `rfc822Mailbox` or
+  `gn` attribute keep it. Those values are visible and removable only
+  through the entry API (delete of the alias spelling, which on native
+  leaves `mail`/`givenName` untouched; parity delta D35) or a reset, never
+  through the user view. On a native store seeded on an older release with
+  YAML `gn: X`, the first merge apply after upgrading adds `givenName: X`
+  and reports the user as Updated once.
+
 ## Migration guidance
 
 v0.4.0 → v0.4.1 is **additive**. `apiVersion` stays `labldap.dev/v1alpha1`.

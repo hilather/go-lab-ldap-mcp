@@ -383,7 +383,7 @@ func userNeedsUpdate(e *ldap.Entry, u config.NormalizedUser) bool {
 		if skipPlannedUserAttr(a.Name) {
 			continue
 		}
-		if !hasValue(e, a.Name, a.Value) {
+		if !hasAttrValue(e, a.Name, a.Value) {
 			return true
 		}
 	}
@@ -515,6 +515,26 @@ func hasValue(e *ldap.Entry, name, want string) bool {
 	for _, v := range e.GetAttributeValues(name) {
 		if strings.EqualFold(v, want) {
 			return true
+		}
+	}
+	return false
+}
+
+// hasAttrValue is hasValue by attribute type: it matches any returned
+// attribute whose config.AttrDuplicateKey (type plus option set) equals
+// name's. Native returns the stored spelling, not the requested one (a user
+// written by REST as givenName is compared against YAML's givenname), and
+// go-ldap's GetAttributeValues matches names exactly.
+func hasAttrValue(e *ldap.Entry, name, want string) bool {
+	key := config.AttrDuplicateKey(name)
+	for _, a := range e.Attributes {
+		if config.AttrDuplicateKey(a.Name) != key {
+			continue
+		}
+		for _, v := range a.Values {
+			if strings.EqualFold(v, want) {
+				return true
+			}
 		}
 	}
 	return false
