@@ -428,7 +428,8 @@ func (s *FakeSchema) sortedATKeys() []string {
 }
 
 // FakeACI is a programmable ACIEngine. It records every check and denies by
-// default; set Decide to answer.
+// default; set Decide to answer. Decide must also answer checks with
+// ACICheck.EntryDenyOnly set (true = not denied).
 type FakeACI struct {
 	Decide func(ctx context.Context, tx ReadTx, check ACICheck) (bool, error)
 

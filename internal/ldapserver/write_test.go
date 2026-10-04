@@ -463,10 +463,13 @@ func TestModifyDN(t *testing.T) {
 		t.Fatalf("rename onto existing = %v, want entryAlreadyExists", res)
 	}
 
-	// Missing source.
+	// Missing source: this client is not Directory Manager, so 389 answers
+	// insufficientAccessRights even with full write rights (oracle probes
+	// 27, 28; resolved CAND-36). Directory Manager gets noSuchObject
+	// (TestModifyDNMissingSourceAsRoot).
 	res = roundTrip(t, cl, &ModifyDNRequest{DN: "uid=ghost,dc=example,dc=test", NewRDN: "uid=x"})
-	if res.Code != ResultNoSuchObject {
-		t.Fatalf("missing moddn = %v, want noSuchObject", res)
+	if res.Code != ResultInsufficientAccessRights {
+		t.Fatalf("missing moddn = %v, want insufficientAccessRights", res)
 	}
 	// Missing newSuperior must not orphan the entry.
 	res = roundTrip(t, cl, &ModifyDNRequest{

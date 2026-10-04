@@ -44,6 +44,13 @@ type ACICheck struct {
 	// them; resolved CAND-34). Empty for entry-level checks.
 	Options []string
 	Perm    Permission
+	// EntryDenyOnly asks only whether a deny ACI without targetattr that
+	// lists Perm covers Target and matches Subject: the answer is false if
+	// one does, else true. Allow ACIs are ignored. This is 389's modrdn
+	// entry gate (oracle probes 25-27; resolved CAND-36): only a deny
+	// without targetattr blocks a rename, attribute-scoped denies
+	// (including targetattr!=) do not, and no allow is needed for it.
+	EntryDenyOnly bool
 }
 
 // ACIEngine evaluates the ACI text the LabLDAP compiler emits (parity

@@ -346,7 +346,7 @@ func TestFilterLeafSearchIdentityMatchesOracle(t *testing.T) {
 			if err := opts.Store.View(ctx, func(tx ReadTx) error {
 				got = matchingNames(t, entries, func(e *Entry) bool {
 					dn := mustDNA(t, e.DN)
-					return srv.searchResultVisible(ctx, tx, s, dn, e, f, filterHasAbsoluteSet(f))
+					return srv.searchResultVisible(ctx, tx, s, dn, e, f)
 				})
 				return nil
 			}); err != nil {

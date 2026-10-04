@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -687,6 +688,85 @@ spec:
 		found := false
 		for _, f := range mustFields(t, err) {
 			if f.Path == tc.path && f.Code == tc.code {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("%s: want %s %s, got %#v", tc.attrs, tc.path, tc.code, mustFields(t, err))
+		}
+	}
+}
+
+// TestACLAttributeListsAre389Lists pins the resolved DSL multi-element
+// follow-up (oracle probe 25): attributes.allow/deny compile to one 389
+// "a || b" list, a deny narrows the allow list, and combinations one ACI
+// cannot express are rejected.
+func TestACLAttributeListsAre389Lists(t *testing.T) {
+	many := make([]string, 65)
+	for i := range many {
+		many[i] = "cn;x-o" + strconv.Itoa(i)
+	}
+	for _, tc := range []struct {
+		attrs, clause, path, code string
+	}{
+		{`{ allow: [uid, sn] }`, `(targetattr="uid || sn")`, "", ""},
+		{`{ allow: [uid, UID, sn] }`, `(targetattr="uid || sn")`, "", ""},
+		{`{ allow: [uid, "*"] }`, `(targetattr="*")`, "", ""},
+		{`{}`, `(targetattr="*")`, "", ""},
+		{`{ deny: [mail, sn] }`, `(targetattr!="mail || sn")`, "", ""},
+		{`{ allow: ["*"], deny: [mail, sn] }`, `(targetattr!="mail || sn")`, "", ""},
+		{`{ allow: [uid, sn, mail], deny: [sn] }`, `(targetattr="uid || mail")`, "", ""},
+		{`{ allow: [uid, mail], deny: [rfc822Mailbox] }`, `(targetattr="uid")`, "", ""},
+		{`{ allow: [uid, "mail;lang-en"], deny: [mail] }`, `(targetattr="uid")`, "", ""},
+		{`{ allow: [uid, sn], deny: [mail] }`, `(targetattr="uid || sn")`, "", ""},
+		{`{ allow: [uid, mail], deny: ["mail;lang-en"] }`, "", "spec.acls.x.attributes.deny", "invalid_attribute_filter"},
+		{`{ allow: [sn], deny: [sn] }`, "", "spec.acls.x.attributes.deny", "invalid_attribute_filter"},
+		{`{ deny: ["*"] }`, "", "spec.acls.x.attributes.deny", "invalid_attribute_filter"},
+		{`{ allow: [uid], deny: ["*"] }`, "", "spec.acls.x.attributes.deny", "invalid_attribute_filter"},
+		{`{ allow: ["` + strings.Join(many, `", "`) + `"] }`, "", "spec.acls.x.attributes.allow", ""},
+	} {
+		src := []byte(`
+apiVersion: labldap.dev/v1alpha1
+kind: LabScenario
+metadata: { name: x }
+spec:
+  directory: { suffix: "dc=example,dc=test" }
+  transport: { ldaps: { enabled: true, port: 3636 } }
+  runtimeAccount: { id: rt, passwordFile: secrets/runtime-ldap }
+  users:
+    - id: alice
+      passwordFile: secrets/user-alice
+  acls:
+    - id: x
+      principal: { kind: user, ref: alice }
+      target: { kind: suffix }
+      permissions: [read]
+      attributes: ` + tc.attrs + `
+`)
+		c, err := config.Compile(t.Context(), src, "acl.yaml", config.LoadOptions{Secrets: fixtureSecrets(), Caller: config.CallerCLI})
+		if tc.clause != "" {
+			if err != nil {
+				t.Errorf("%s: %v", tc.attrs, err)
+				continue
+			}
+			var text string
+			for _, a := range c.Data.ACIs {
+				if strings.Contains(a.Text, `acl "labldap:x"`) {
+					text = a.Text
+				}
+			}
+			if !strings.Contains(text, tc.clause) || strings.Count(text, "targetattr") != 1 {
+				t.Errorf("%s: ACI %q, want one %s", tc.attrs, text, tc.clause)
+			}
+			continue
+		}
+		if err == nil {
+			t.Errorf("%s: compiled", tc.attrs)
+			continue
+		}
+		found := false
+		for _, f := range mustFields(t, err) {
+			if strings.HasPrefix(f.Path, tc.path) && (tc.code == "" || f.Code == tc.code) {
 				found = true
 			}
 		}

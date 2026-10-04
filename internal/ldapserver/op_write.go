@@ -535,16 +535,17 @@ func (s *Server) handleModifyDN(ctx context.Context, c *conn, m *Message, req *M
 	newDN := joinDN(newRDN, superior)
 
 	err = s.opts.Store.Update(ctx, func(tx UpdateTx) error {
-		if !s.allowed(ctx, tx, subj, dn, "", PermWrite) {
-			return errDenied
-		}
-		// The destination is an add-like check so a caller cannot rename
-		// into a subtree where they may not create entries.
-		if !s.allowed(ctx, tx, subj, newDN, "", PermAdd) {
-			return errDenied
-		}
+		// Ordering follows 389 (oracle probes 27-29): a missing source is
+		// noSuchObject only for Directory Manager and insufficientAccess
+		// for everyone else; a move beneath itself (53) and a rename onto
+		// an existing DN (68) are reported before any access check, for
+		// every subject including anonymous. That discloses existence as
+		// 389 does (contract C8 notes).
 		before, err := tx.Entry(ctx, dn)
 		if err != nil {
+			if errors.Is(err, ErrNoSuchObject) && !subj.BypassACI {
+				return errDenied
+			}
 			return err
 		}
 		// Moving beneath oneself makes the child index cyclic and detaches
@@ -552,21 +553,81 @@ func (s *Server) handleModifyDN(ctx context.Context, c *conn, m *Message, req *M
 		if aciTargetScopeA(superior, dn) {
 			return errRenameIntoSubtree
 		}
+		sameDN := newDN.FoldedKey() == dn.FoldedKey()
+		// noOp: the same DN, spelled identically (389 answers 0 and
+		// updates modifyTimestamp, probe 28). A sameDN rename that changes
+		// only value case is CAND-30 (open): it keeps today's gates and 68.
+		noOp := sameDN && dnValuesIdentical(dn, newDN)
+		if !sameDN {
+			if _, err := tx.Entry(ctx, newDN); err == nil {
+				return ErrEntryExists
+			} else if !errors.Is(err, ErrNoSuchObject) {
+				return err
+			}
+		}
+		newAttr, _, _ := newRDN.Leaf()
+		oldAttr, _, _ := dn.Leaf()
+		parent, _ := parentDN(dn)
+		isMove := superior.FoldedKey() != parent.FoldedKey()
+		if !isMove && (noOp || !sameDN) {
+			// A rename under the same parent follows 389 (resolved
+			// CAND-36, probes 25-28): only a deny-write ACI without
+			// targetattr on the old DN blocks at entry level, the new RDN
+			// attribute needs write (even when its value is unchanged)
+			// and, with deleteoldrdn, so does the old one, all on the old
+			// DN. No add right is needed.
+			if !s.entryWriteNotDenied(ctx, tx, subj, dn) {
+				return errDenied
+			}
+			if !s.clientModifiable(newAttr) {
+				return &operationalAttrError{attr: newAttr}
+			}
+			if !s.allowed(ctx, tx, subj, dn, newAttr, PermWrite) {
+				return errDenied
+			}
+			if req.DeleteOldRDN && !s.allowed(ctx, tx, subj, dn, oldAttr, PermWrite) {
+				return errDenied
+			}
+		} else {
+			// Cross-parent moves keep native's gates: 389 refuses every
+			// non-root move without a moddn grant, which native cannot
+			// parse (CAND-39, owner question). Case-only renames keep them
+			// too (CAND-30, open).
+			if !s.allowed(ctx, tx, subj, dn, "", PermWrite) {
+				return errDenied
+			}
+			// The destination is an add-like check so a caller cannot
+			// rename into a subtree where they may not create entries.
+			if !s.allowed(ctx, tx, subj, newDN, "", PermAdd) {
+				return errDenied
+			}
+			if !s.clientModifiable(newAttr) {
+				return &operationalAttrError{attr: newAttr}
+			}
+			if !s.allowed(ctx, tx, subj, dn, newAttr, PermWrite) || !s.allowed(ctx, tx, subj, newDN, newAttr, PermWrite) {
+				return errDenied
+			}
+			if req.DeleteOldRDN && !s.allowed(ctx, tx, subj, dn, oldAttr, PermWrite) {
+				return errDenied
+			}
+		}
 		// RFC 4511 4.9: newSuperior must name an existing entry. Moving
 		// under a missing parent orphans the entry from Subtree/Children.
 		if _, err := tx.Entry(ctx, superior); err != nil {
 			return err
 		}
-		newAttr, _, _ := newRDN.Leaf()
-		oldAttr, _, _ := dn.Leaf()
-		if !s.clientModifiable(newAttr) {
-			return &operationalAttrError{attr: newAttr}
-		}
-		if !s.allowed(ctx, tx, subj, dn, newAttr, PermWrite) || !s.allowed(ctx, tx, subj, newDN, newAttr, PermWrite) {
-			return errDenied
-		}
-		if req.DeleteOldRDN && !s.allowed(ctx, tx, subj, dn, oldAttr, PermWrite) {
-			return errDenied
+		if noOp {
+			// Nothing to rename and no RDN value to maintain (value order
+			// is preserved); the entry is still modified (probe 28).
+			after := cloneEntry(before)
+			if err := s.schemaCheckEntry(after); err != nil {
+				return err
+			}
+			s.applyModifyOpAttrs(after, subj)
+			if err := tx.Replace(ctx, after); err != nil {
+				return err
+			}
+			return s.runPlugins(ctx, tx, WriteEvent{Op: WriteRename, Before: before, After: after})
 		}
 		if err := tx.Rename(ctx, dn, newDN); err != nil {
 			return err
@@ -611,6 +672,33 @@ func (s *Server) handleModifyDN(ctx context.Context, c *conn, m *Message, req *M
 		return respond(mapWriteError(err))
 	}
 	return respond(Result{Code: ResultSuccess})
+}
+
+// dnValuesIdentical reports whether two fold-equal DNs spell every RDN
+// value byte-identically (attribute type names may differ in case).
+func dnValuesIdentical(a, b config.DN) bool {
+	for {
+		_, av, aok := a.Leaf()
+		_, bv, bok := b.Leaf()
+		if aok != bok {
+			return false
+		}
+		if !aok {
+			return true
+		}
+		if av != bv {
+			return false
+		}
+		ap, aHas := parentDN(a)
+		bp, bHas := parentDN(b)
+		if aHas != bHas {
+			return false
+		}
+		if !aHas {
+			return true
+		}
+		a, b = ap, bp
+	}
 }
 
 // joinDN concatenates a single-RDN DN with a parent DN.
