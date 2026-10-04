@@ -192,7 +192,7 @@ loopback, which compose already does.
 | [Operator guide](docs/operations/operator-guide.md) | Day-2 limits and failure modes |
 | [Troubleshooting](docs/operations/troubleshooting.md) | Ready checks, TLS, tokens, vanished entries |
 | [MCP catalog](docs/mcp/catalog.md) | Tools, resources, scopes |
-| [Release notes](docs/release/notes.md) | v0.4.1 contents and residuals |
+| [Release notes](docs/release/notes.md) | v0.6.0 contents and residuals (v0.5.0 and v0.4.1 summarized) |
 
 Architecture and design live under [`docs/`](docs/). Contributing:
 [`CONTRIBUTING.md`](CONTRIBUTING.md).
