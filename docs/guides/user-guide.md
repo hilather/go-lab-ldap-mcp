@@ -45,7 +45,14 @@ spec:
         - user: alice
 ```
 
-No inline passwords. Groups cannot be empty. YAML is the compiled baseline
+No inline passwords. Groups cannot be empty. User `attributes` follow the
+same write rule as the user API (below): `objectClass`, option or alias
+spellings of `uid`/`cn`/`sn` (`cn;lang-en`, `commonName`, `surname`,
+`userid`), numeric OIDs and protected names are rejected, and two keys that
+address the same attribute (`mail` and `Mail`, `ou` and
+`organizationalUnitName`) are a `duplicate_attribute` error.
+Earlier releases silently dropped some of these spellings during seeding; a
+scenario that used them now fails to compile until they are removed. YAML is the compiled baseline
 (`startupMode: merge`); UI / REST / MCP mutations are live until soft reset
 or `make compose-reset`. Changing the file requires a re-bootstrap.
 
@@ -117,9 +124,43 @@ and unknown numeric OIDs are rejected. Results expand to a redacted LDIF snippet
 
 Profile and structured attribute writes use attribute names. Numeric OIDs
 cannot bypass password, account-state, or ACI restrictions. Use the dedicated
-password and account actions for protected fields. User and account actions
+password and account actions for protected fields.
+
+User writes (REST, MCP, console, and scenario YAML) share one rule: protected
+and operational names in any spelling (attribute options, numeric OIDs),
+every `objectClass` spelling, and any non-bare spelling of `uid`, `cn` or
+`sn` are rejected with `forbidden_attribute`; bare `cn`, `sn` and `uid` stay
+writable through their normal fields. Names that address the same attribute
+(case variants, option order, or one of the resolved second descriptors
+`userid`, `commonName`, `surname`, `organizationalUnitName`,
+`domainComponent`, `organizationName`) are a `duplicate_attribute` error.
+Other second descriptors (`gn`, `rfc822Mailbox`, `localityName`, …) are not
+resolved, so do not send both spellings of one attribute. The user view shows only spellings this rule
+accepts: optioned values such as `cn;lang-en` are hidden there and managed
+through the entry API, and an engine-returned alias such as `commonName` is
+shown as `cn`. Because optioned values are not part of the user view, they
+do not contribute to the user revision. Entry create with `inetOrgPerson` differs: it does not reject
+option or alias spellings of the planned names, it drops them and writes the
+planned `uid`/`cn`/`sn` values, and it keeps only the first of two names
+that address the same attribute (protected names are still rejected). User and account actions
 share an opaque revision that changes when lock or password-expiry state
 changes; refresh existing revisions after upgrading.
+
+### Protected attribute spellings
+
+Protected attributes (passwords, account state, ACIs, operational
+attributes) are matched by attribute type, not exact name. Attribute
+options (`userPassword;lang-en`, `aci;x-tag`) and known OID spellings
+(`2.5.4.35`) of a protected name are rejected on user and entry writes
+with `forbidden_attribute`, and password-type attributes in any spelling
+are never returned by entry reads or search, or by export with
+`omitSecrets` (the default). Writes that name an attribute by numeric OID
+are rejected too. If a Directory Manager writes an option spelling such as
+`userPassword;lang-en` directly over LDAP, the native engine stores it
+hashed; 389 stores it as written (Delta D31). The same applies to any
+principal with direct LDAP write access (the runtime account or an operator
+ACI). Bind with that value fails on
+both engines.
 
 ### Reset and export
 
