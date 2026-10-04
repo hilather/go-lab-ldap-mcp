@@ -271,7 +271,7 @@ Build application images with the same `VERSION` so
 - **Advertised:** `linux/amd64`
 - **Not advertised:** `linux/arm64` (upstream dirsrv digest includes it;
   no arm64 smoke in this environment). See
-  [architectures.md](https://github.com/hilather/go-lab-ldap-mcp/blob/v0.4.1/deploy/docker/architectures.md).
+  [architectures.md](https://github.com/hilather/go-lab-ldap-mcp/blob/main/deploy/docker/architectures.md).
 - Host: Docker Engine 24+, Compose v2.24+.
 
 ## Known limitations
