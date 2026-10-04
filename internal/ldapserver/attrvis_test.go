@@ -279,7 +279,7 @@ func TestSearchVisibilityOperationalOverridesMatchOracle(t *testing.T) {
 	oc := StringAttribute("objectClass", "top", "person", "organizationalPerson", "inetOrgPerson")
 	entries := map[string]*Entry{
 		"v_m": NewEntry("uid=v_m,"+base, oc, StringAttribute("uid", "v_m"), StringAttribute("cn", "v_m"), StringAttribute("sn", "S"), StringAttribute("memberOf", "cn=g,dc=example,dc=test")),
-		"v_l": NewEntry("uid=v_l,"+base, oc, StringAttribute("uid", "v_l"), StringAttribute("cn", "v_l"), StringAttribute("sn", "S"), StringAttribute("nsAccountLock", "true")),
+		"v_l": NewEntry("uid=v_l,"+base, oc, StringAttribute("uid", "v_l"), StringAttribute("cn", "v_l"), StringAttribute("sn", "S"), StringAttribute("nsAccountLock", "true"), StringAttribute("2.16.840.1.113730.3.1.610", "true")),
 		"v_p": NewEntry("uid=v_p,"+base, oc, StringAttribute("uid", "v_p"), StringAttribute("cn", "v_p"), StringAttribute("sn", "S"),
 			StringAttribute("pwdChangedTime", "20261004000000Z"), StringAttribute("passwordHistory", "x"),
 			StringAttribute("aci", `(targetattr="cn")(version 3.0; acl "x"; allow (read) userdn="ldap:///anyone";)`)),
@@ -290,6 +290,9 @@ func TestSearchVisibilityOperationalOverridesMatchOracle(t *testing.T) {
 		"q_userid_pwdtime":  {"pwdChangedTime", ""},
 		"q_userid_pwdhist":  {"passwordHistory", ""},
 		"q_userid_aci":      {"aci", ""},
+		// v_l also stores nsAccountLock under its OID spelling (a direct
+		// LDAP write keeps the spelling); it must not count either.
+		"q_userid_acctoid": {"nsAccountLock", ""},
 	}
 	var texts []string
 	for subj, c := range subjects {

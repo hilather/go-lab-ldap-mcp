@@ -229,13 +229,19 @@ var visibilityOperational = map[string]bool{
 	"pwdchangedtime":  true,
 }
 
+// countsForVisibility resolves the stored spelling (options stripped, OIDs
+// and second descriptors to the registry name) before consulting the 389
+// usage table, then falls back to the registry flag.
 func (s *Server) countsForVisibility(name string) bool {
 	base, _, _ := strings.Cut(name, ";")
+	at, known := s.opts.Schema.AttributeType(base)
+	if known {
+		base = at.Name
+	}
 	if op, ok := visibilityOperational[strings.ToLower(base)]; ok {
 		return !op
 	}
-	at, ok := s.opts.Schema.AttributeType(base)
-	return !ok || !at.Operational
+	return !known || !at.Operational
 }
 
 // projectEntry applies attribute selection and per-attribute ACI read

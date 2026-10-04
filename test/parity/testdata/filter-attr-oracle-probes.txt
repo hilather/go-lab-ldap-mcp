@@ -1083,25 +1083,11 @@ try:
 finally:
   sp.run(['docker','rm','-f','-v',n],capture_output=True)
 
-# Probe 15 (2026-10-04): 389 cn=schema USAGE for every native registry name (object class names show ABSENT).
+# Probe 15 (2026-10-04): 389 cn=schema USAGE for every native registry attribute type (ABSENT: not in 389's schema).
 
 ===== probe 15 =====
-# NOTE: the attributeTypes/objectClasses/matchingRules lines marked 'differs' after the 'subschema' line are
-# false positives: the script's name extractor picked them up from the subschema class's MAY list, where native
-# shows 'user'. The registry attribute lines above them show native=op, matching 389. Real differences:
-# nsAccountLock, memberOf, aci.
 image quay.io/389ds/dirsrv@sha256:f2851654c5df545cd893d84bea8d08c28dc25f0930493fbfed1d8a6eacf657f7
 top                          native=user  389=ABSENT
-domain                       native=user  389=ABSENT
-organizationalUnit           native=user  389=ABSENT
-person                       native=user  389=ABSENT
-organizationalPerson         native=user  389=ABSENT
-inetOrgPerson                native=user  389=ABSENT
-groupOfNames                 native=user  389=ABSENT
-groupOfUniqueNames           native=user  389=ABSENT
-device                       native=user  389=ABSENT
-nsmemberof                   native=user  389=ABSENT
-subschema                    native=user  389=ABSENT
 objectClass                  native=user  389=userApplications
 cn                           native=user  389=userApplications
 sn                           native=user  389=userApplications
@@ -1160,9 +1146,6 @@ vendorVersion                native=op    389=dSAOperation
 attributeTypes               native=op    389=directoryOperation
 objectClasses                native=op    389=directoryOperation
 matchingRules                native=op    389=directoryOperation
-attributeTypes               native=user  389=directoryOperation  <-- differs
-objectClasses                native=user  389=directoryOperation  <-- differs
-matchingRules                native=user  389=directoryOperation  <-- differs
 exit=0
 
 ===== script filterprobe15.py =====
@@ -1183,8 +1166,10 @@ try:
     if not m: continue
     names=re.findall(r"'([^']+)'",m.group(1)); u=re.search(r'USAGE (\w+)',line)
     for nm in names: usage[nm.lower()]=u.group(1) if u else 'userApplications'
-  for l in open('native_usage.txt (name + native Operational flag from schema_registry.go)'):
-    nm,nat=l.split(); o=usage.get(nm.lower(),'ABSENT')
+  # Native list: attribute types (OID: "...", Name: "...") in schema_registry.go, run from the repo root.
+  reg=[(m.group(1),'op' if 'Operational: true' in m.group(0) else 'user') for m in re.finditer(r'\{OID: "[0-9.]+", Name: "([^"]+)"[^\n]*', open('internal/ldapserver/schema_registry.go').read())]
+  for nm,nat in reg:
+    o=usage.get(nm.lower(),'ABSENT')
     flag='' if (o=='ABSENT' or (o=='userApplications')==(nat=='user')) else '  <-- differs'
     print(f'{nm:28} native={nat:5} 389={o}{flag}')
 finally:
