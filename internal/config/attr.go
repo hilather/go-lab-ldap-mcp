@@ -28,6 +28,10 @@ var operationalDeny = map[string]struct{}{
 	"numsubordinates":        {},
 }
 
+// CanonicalAttr is the attribute-map and duplicate key: lowercase and trimmed,
+// with attribute options preserved so cn and cn;lang-en stay distinct values.
+// Policy decisions (deny lists, secret redaction) use CanonicalAttrType,
+// which strips options and resolves protected OIDs.
 func CanonicalAttr(name string) string {
 	return strings.ToLower(strings.TrimSpace(name))
 }

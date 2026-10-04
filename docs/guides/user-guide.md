@@ -146,6 +146,22 @@ that address the same attribute (protected names are still rejected). User and a
 share an opaque revision that changes when lock or password-expiry state
 changes; refresh existing revisions after upgrading.
 
+### Protected attribute spellings
+
+Protected attributes (passwords, account state, ACIs, operational
+attributes) are matched by attribute type, not exact name. Attribute
+options (`userPassword;lang-en`, `aci;x-tag`) and known OID spellings
+(`2.5.4.35`) of a protected name are rejected on user and entry writes
+with `forbidden_attribute`, and password-type attributes in any spelling
+are never returned by entry reads or search, or by export with
+`omitSecrets` (the default). Writes that name an attribute by numeric OID
+are rejected too. If a Directory Manager writes an option spelling such as
+`userPassword;lang-en` directly over LDAP, the native engine stores it
+hashed; 389 stores it as written (Delta D31). The same applies to any
+principal with direct LDAP write access (the runtime account or an operator
+ACI). Bind with that value fails on
+both engines.
+
 ### Reset and export
 
 Soft reset requires the `lab:reset` scope, the **exact** compiled scenario

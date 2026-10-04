@@ -107,6 +107,12 @@ What that becomes on the wire:
 | `groups[].id` | `cn=<id>,ou=groups,<suffix>` (`groupOfNames`) |
 | `members.user` | `member: uid=…` |
 
+`attributes` are checked by attribute type: option spellings
+(`userPassword;lang-en`, `aci;x-tag`) and numeric-OID names are rejected
+at compile time, like the bare protected names. Earlier releases accepted
+some of these spellings, so a scenario that used them now fails to compile
+until they are removed.
+
 Optional per user: `rdn` or `dn` if you need a non-default naming attribute.
 `uid` defaults to `id`.
 
