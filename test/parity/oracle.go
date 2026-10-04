@@ -241,7 +241,8 @@ func (e *oracleEngine) dial(t *testing.T, spec dialSpec) (*ldap.Conn, error) {
 // for its own LDAPI health check, and only then applies DS_DM_PASSWORD, so
 // waitReady (marker file, LDAPI socket, TCP, dsconf over LDAPI autobind) can
 // pass while a DM simple bind still returns 49. Only 49 is retried, within a
-// bound; any other error (TLS, network) is returned at once. The root DN is
+// bound, as are network errors; any other error (TLS, other codes) is
+// returned at once. Each attempt has its own dial and request timeout. The root DN is
 // exempt from the password policy configure389 applies, so these attempts
 // cannot lock it out. It runs after the instance CA and hostname are known,
 // over the same LDAPS dial the seed uses.
@@ -249,10 +250,18 @@ func (e *oracleEngine) dialDMReady(t *testing.T) (*ldap.Conn, error) {
 	t.Helper()
 	var conn *ldap.Conn
 	err := oracleRetryInvalidCredentials(60*time.Second, 500*time.Millisecond, func() error {
-		c, err := e.dial(t, dialSpec{ldaps: true, bindDN: "cn=Directory Manager", bindPass: e.password})
+		c, err := ldap.DialURL("ldaps://"+e.ldapsAddr,
+			ldap.DialWithDialer(&net.Dialer{Timeout: 5 * time.Second}),
+			ldap.DialWithTLSConfig(e.clientTLSFor(dialSpec{ldaps: true})))
 		if err != nil {
 			return err
 		}
+		c.SetTimeout(5 * time.Second)
+		if err := c.Bind("cn=Directory Manager", e.password); err != nil {
+			c.Close()
+			return err
+		}
+		c.SetTimeout(0) // seeding then uses the library default, as before
 		conn = c
 		return nil
 	})
@@ -271,7 +280,10 @@ func oracleRetryInvalidCredentials(limit, interval time.Duration, attempt func()
 		if err == nil {
 			return nil
 		}
-		if !ldap.IsErrorWithCode(err, ldap.LDAPResultInvalidCredentials) {
+		// 49 is the DS_DM_PASSWORD window; a network error (EOF or reset via
+		// docker-proxy) is retried within the same bound. Anything else (TLS,
+		// other result codes) is returned at once.
+		if !ldap.IsErrorWithCode(err, ldap.LDAPResultInvalidCredentials) && !ldap.IsErrorWithCode(err, ldap.ErrorNetwork) {
 			return err
 		}
 		if time.Now().Add(interval).After(deadline) {

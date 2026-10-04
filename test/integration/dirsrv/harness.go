@@ -165,8 +165,9 @@ func waitReady(t *testing.T, inst *Instance) {
 // random root password, starts ns-slapd, waits for its own LDAPI health
 // check, and only then applies DS_DM_PASSWORD. Every earlier readiness
 // signal (container.inf, the LDAPI socket, TCP, dsconf over LDAPI autobind)
-// can pass inside that window, so a DM simple bind fails with 49. Only 49 is
-// retried, within a bound; any other error fails at once. After docker
+// can pass inside that window, so a DM simple bind fails with 49. Only 49 (and
+// network errors) are retried, within a bound; any other error fails at
+// once. Each attempt has its own dial and request timeout. After docker
 // restart the password is already the persisted value, so this returns on
 // the first attempt. The root DN is exempt from password policy, so failed
 // binds here cannot lock it out. The bind runs from the host over LDAPS so
@@ -176,11 +177,13 @@ func waitDMBind(t *testing.T, inst *Instance) {
 	t.Helper()
 	err := retryInvalidCredentials(60*time.Second, 500*time.Millisecond, func() error {
 		conn, err := ldap.DialURL("ldaps://"+inst.LDAPSAddr,
+			ldap.DialWithDialer(&net.Dialer{Timeout: 5 * time.Second}),
 			ldap.DialWithTLSConfig(&tls.Config{InsecureSkipVerify: true, MinVersion: tls.VersionTLS12})) // readiness probe only; certificate trust is tested elsewhere
 		if err != nil {
 			return err
 		}
 		defer conn.Close()
+		conn.SetTimeout(5 * time.Second)
 		return conn.Bind("cn=Directory Manager", inst.password)
 	})
 	if err != nil {
@@ -202,7 +205,10 @@ func retryInvalidCredentials(limit, interval time.Duration, attempt func() error
 		if err == nil {
 			return nil
 		}
-		if !ldap.IsErrorWithCode(err, ldap.LDAPResultInvalidCredentials) {
+		// 49 is the DS_DM_PASSWORD window; a network error (EOF or reset via
+		// docker-proxy) is retried within the same bound. Anything else (TLS,
+		// other result codes) is returned at once.
+		if !ldap.IsErrorWithCode(err, ldap.LDAPResultInvalidCredentials) && !ldap.IsErrorWithCode(err, ldap.ErrorNetwork) {
 			return err
 		}
 		if time.Now().Add(interval).After(deadline) {

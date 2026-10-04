@@ -24,6 +24,8 @@ func TestDecodeSummary(t *testing.T) {
 		"summary only":          summary,
 		"logs before":           "time=2026-10-04T00:18:24Z level=INFO msg=starting\n" + summary,
 		"logs after (CI flake)": summary + "\ntime=2026-10-04T00:18:37Z level=INFO msg=\"bootstrap phase\" phase=drift ok=true\n",
+		"JSON log after":        summary + "\n{\"time\":\"2026-10-04T00:18:37Z\",\"level\":\"INFO\",\"msg\":\"bootstrap phase\",\"phase\":\"drift\",\"ok\":true}\n",
+		"JSON logs before":      "{\"time\":\"t\",\"level\":\"INFO\",\"msg\":\"starting\"}\n" + summary,
 		"earlier run skipped":   "{\"command\": \"verify\", \"ok\": false}\n" + summary + "\ntime=x level=INFO\n",
 	}
 	for name, out := range cases {
