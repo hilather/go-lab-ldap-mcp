@@ -1,6 +1,6 @@
 # Filter attribute-description oracle probes (contract C6, delta D34, CAND-31/32)
 # Pinned image quay.io/389ds/dirsrv@sha256:f2851654c5df545cd893d84bea8d08c28dc25f0930493fbfed1d8a6eacf657f7
-# Captured 2026-10-03/04 with throwaway lab credentials (none recorded here).
+# Captured 2026-10-03/04 in throwaway containers. Directory Manager passwords were random per run and are not recorded; the probe scripts below hard-code throwaway subject passwords (Probe-Pw-...) that exist only inside those containers. Password hashes in transcripts are redacted.
 
 ===== probe 1 =====
 0
@@ -336,3 +336,852 @@ DM               (!(cn=fa_bob))                               rc=0 ['uid=fa_alic
 DM               (description=hello)                          rc=0 ['uid=fa_bob']
 DM               (!(description=hello))                       rc=0 ['uid=fa_alice', 'uid=fa_carol']
 DM               READ fa_bob uid -> ['uid: fa_bob', 'uid;x-test: bobtag'] rc=0
+
+# Probes 8, 10, 11 (2026-10-04, CAND-31/32 resolution; probe 9 was a void run: its batched ACI add failed on targetattr="uid|sn").
+
+===== probe 8 =====
+image quay.io/389ds/dirsrv@sha256:f2851654c5df545cd893d84bea8d08c28dc25f0930493fbfed1d8a6eacf657f7
+backend 0
+add 0
+aci 0
+DM               (!(userid;x-test=bobtag))                    rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol']
+DM               (!(0.9.2342.19200300.100.1.1;x-test=bobtag)) rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol']
+DM               (sn=S)                                       rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol']
+DM               (!(sn=X))                                    rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol']
+DM               (uid=fa_bob)                                 rc=0 ['uid=fa_bob']
+DM               (!(uid=fa_bob))                              rc=0 ['uid=fa_alice', 'uid=fa_carol']
+DM               (cn=fa_bob)                                  rc=0 ['uid=fa_bob']
+DM               (!(cn=fa_bob))                               rc=0 ['uid=fa_alice', 'uid=fa_carol']
+DM               (2.5.4.4=S)                                  rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol']
+DM               (description=hello)                          rc=0 ['uid=fa_bob']
+DM               (!(description=hello))                       rc=0 ['uid=fa_alice', 'uid=fa_carol']
+DM               (!(userid;x-test=bobtag)) attrs=cn -> ['cn: fa_alice', 'cn: fa_bob', 'cn: fa_carol', 'dn: uid=fa_alice,ou=probe-fattr,dc=example,dc=test', 'dn: uid=fa_bob,ou=probe-fattr,dc=example,dc=test', 'dn: uid=fa_carol,ou=probe-fattr,dc=example,dc=test'] rc=0
+DM               READ fa_bob uid,sn,cn,description -> ['uid: fa_bob', 'uid;x-test: bobtag', 'sn: S', 'cn: fa_bob', 'description;lang-en: hello'] rc=0
+p_userid         (!(userid;x-test=bobtag))                    rc=0 []
+p_userid         (!(0.9.2342.19200300.100.1.1;x-test=bobtag)) rc=0 []
+p_userid         (sn=S)                                       rc=0 []
+p_userid         (!(sn=X))                                    rc=0 []
+p_userid         (uid=fa_bob)                                 rc=0 []
+p_userid         (!(uid=fa_bob))                              rc=0 []
+p_userid         (cn=fa_bob)                                  rc=0 []
+p_userid         (!(cn=fa_bob))                               rc=0 []
+p_userid         (2.5.4.4=S)                                  rc=0 []
+p_userid         (description=hello)                          rc=0 []
+p_userid         (!(description=hello))                       rc=0 []
+p_userid         (!(userid;x-test=bobtag)) attrs=cn -> [] rc=0
+p_userid         READ fa_bob uid,sn,cn,description -> [] rc=0
+p_userid_sn      (!(userid;x-test=bobtag))                    rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol']
+p_userid_sn      (!(0.9.2342.19200300.100.1.1;x-test=bobtag)) rc=0 []
+p_userid_sn      (sn=S)                                       rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol']
+p_userid_sn      (!(sn=X))                                    rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol']
+p_userid_sn      (uid=fa_bob)                                 rc=0 []
+p_userid_sn      (!(uid=fa_bob))                              rc=0 []
+p_userid_sn      (cn=fa_bob)                                  rc=0 []
+p_userid_sn      (!(cn=fa_bob))                               rc=0 []
+p_userid_sn      (2.5.4.4=S)                                  rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol']
+p_userid_sn      (description=hello)                          rc=0 []
+p_userid_sn      (!(description=hello))                       rc=0 []
+p_userid_sn      (!(userid;x-test=bobtag)) attrs=cn -> ['dn: uid=fa_alice,ou=probe-fattr,dc=example,dc=test', 'dn: uid=fa_bob,ou=probe-fattr,dc=example,dc=test', 'dn: uid=fa_carol,ou=probe-fattr,dc=example,dc=test'] rc=0
+p_userid_sn      READ fa_bob uid,sn,cn,description -> [] rc=0
+p_userid_snsearch (!(userid;x-test=bobtag))                    rc=0 []
+p_userid_snsearch (!(0.9.2342.19200300.100.1.1;x-test=bobtag)) rc=0 []
+p_userid_snsearch (sn=S)                                       rc=0 []
+p_userid_snsearch (!(sn=X))                                    rc=0 []
+p_userid_snsearch (uid=fa_bob)                                 rc=0 []
+p_userid_snsearch (!(uid=fa_bob))                              rc=0 []
+p_userid_snsearch (cn=fa_bob)                                  rc=0 []
+p_userid_snsearch (!(cn=fa_bob))                               rc=0 []
+p_userid_snsearch (2.5.4.4=S)                                  rc=0 []
+p_userid_snsearch (description=hello)                          rc=0 []
+p_userid_snsearch (!(description=hello))                       rc=0 []
+p_userid_snsearch (!(userid;x-test=bobtag)) attrs=cn -> [] rc=0
+p_userid_snsearch READ fa_bob uid,sn,cn,description -> [] rc=0
+p_userid_snread  (!(userid;x-test=bobtag))                    rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol']
+p_userid_snread  (!(0.9.2342.19200300.100.1.1;x-test=bobtag)) rc=0 []
+p_userid_snread  (sn=S)                                       rc=0 []
+p_userid_snread  (!(sn=X))                                    rc=0 []
+p_userid_snread  (uid=fa_bob)                                 rc=0 []
+p_userid_snread  (!(uid=fa_bob))                              rc=0 []
+p_userid_snread  (cn=fa_bob)                                  rc=0 []
+p_userid_snread  (!(cn=fa_bob))                               rc=0 []
+p_userid_snread  (2.5.4.4=S)                                  rc=0 []
+p_userid_snread  (description=hello)                          rc=0 []
+p_userid_snread  (!(description=hello))                       rc=0 []
+p_userid_snread  (!(userid;x-test=bobtag)) attrs=cn -> ['dn: uid=fa_alice,ou=probe-fattr,dc=example,dc=test', 'dn: uid=fa_bob,ou=probe-fattr,dc=example,dc=test', 'dn: uid=fa_carol,ou=probe-fattr,dc=example,dc=test'] rc=0
+p_userid_snread  READ fa_bob uid,sn,cn,description -> [] rc=0
+p_star_search    (!(userid;x-test=bobtag))                    rc=0 []
+p_star_search    (!(0.9.2342.19200300.100.1.1;x-test=bobtag)) rc=0 []
+p_star_search    (sn=S)                                       rc=0 []
+p_star_search    (!(sn=X))                                    rc=0 []
+p_star_search    (uid=fa_bob)                                 rc=0 []
+p_star_search    (!(uid=fa_bob))                              rc=0 []
+p_star_search    (cn=fa_bob)                                  rc=0 []
+p_star_search    (!(cn=fa_bob))                               rc=0 []
+p_star_search    (2.5.4.4=S)                                  rc=0 []
+p_star_search    (description=hello)                          rc=0 []
+p_star_search    (!(description=hello))                       rc=0 []
+p_star_search    (!(userid;x-test=bobtag)) attrs=cn -> [] rc=0
+p_star_search    READ fa_bob uid,sn,cn,description -> [] rc=0
+p_star_read      (!(userid;x-test=bobtag))                    rc=0 []
+p_star_read      (!(0.9.2342.19200300.100.1.1;x-test=bobtag)) rc=0 []
+p_star_read      (sn=S)                                       rc=0 []
+p_star_read      (!(sn=X))                                    rc=0 []
+p_star_read      (uid=fa_bob)                                 rc=0 []
+p_star_read      (!(uid=fa_bob))                              rc=0 []
+p_star_read      (cn=fa_bob)                                  rc=0 []
+p_star_read      (!(cn=fa_bob))                               rc=0 []
+p_star_read      (2.5.4.4=S)                                  rc=0 []
+p_star_read      (description=hello)                          rc=0 []
+p_star_read      (!(description=hello))                       rc=0 []
+p_star_read      (!(userid;x-test=bobtag)) attrs=cn -> [] rc=0
+p_star_read      READ fa_bob uid,sn,cn,description -> [] rc=0
+p_list           (!(userid;x-test=bobtag))                    rc=0 []
+p_list           (!(0.9.2342.19200300.100.1.1;x-test=bobtag)) rc=0 []
+p_list           (sn=S)                                       rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol']
+p_list           (!(sn=X))                                    rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol']
+p_list           (uid=fa_bob)                                 rc=0 ['uid=fa_bob']
+p_list           (!(uid=fa_bob))                              rc=0 ['uid=fa_alice', 'uid=fa_carol']
+p_list           (cn=fa_bob)                                  rc=0 []
+p_list           (!(cn=fa_bob))                               rc=0 []
+p_list           (2.5.4.4=S)                                  rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol']
+p_list           (description=hello)                          rc=0 []
+p_list           (!(description=hello))                       rc=0 []
+p_list           (!(userid;x-test=bobtag)) attrs=cn -> [] rc=0
+p_list           READ fa_bob uid,sn,cn,description -> [] rc=0
+p_list_nospace   (!(userid;x-test=bobtag))                    rc=0 []
+p_list_nospace   (!(0.9.2342.19200300.100.1.1;x-test=bobtag)) rc=0 []
+p_list_nospace   (sn=S)                                       rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol']
+p_list_nospace   (!(sn=X))                                    rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol']
+p_list_nospace   (uid=fa_bob)                                 rc=0 ['uid=fa_bob']
+p_list_nospace   (!(uid=fa_bob))                              rc=0 ['uid=fa_alice', 'uid=fa_carol']
+p_list_nospace   (cn=fa_bob)                                  rc=0 []
+p_list_nospace   (!(cn=fa_bob))                               rc=0 []
+p_list_nospace   (2.5.4.4=S)                                  rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol']
+p_list_nospace   (description=hello)                          rc=0 []
+p_list_nospace   (!(description=hello))                       rc=0 []
+p_list_nospace   (!(userid;x-test=bobtag)) attrs=cn -> [] rc=0
+p_list_nospace   READ fa_bob uid,sn,cn,description -> [] rc=0
+p_list_case      (!(userid;x-test=bobtag))                    rc=0 []
+p_list_case      (!(0.9.2342.19200300.100.1.1;x-test=bobtag)) rc=0 []
+p_list_case      (sn=S)                                       rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol']
+p_list_case      (!(sn=X))                                    rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol']
+p_list_case      (uid=fa_bob)                                 rc=0 ['uid=fa_bob']
+p_list_case      (!(uid=fa_bob))                              rc=0 ['uid=fa_alice', 'uid=fa_carol']
+p_list_case      (cn=fa_bob)                                  rc=0 []
+p_list_case      (!(cn=fa_bob))                               rc=0 []
+p_list_case      (2.5.4.4=S)                                  rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol']
+p_list_case      (description=hello)                          rc=0 []
+p_list_case      (!(description=hello))                       rc=0 []
+p_list_case      (!(userid;x-test=bobtag)) attrs=cn -> [] rc=0
+p_list_case      READ fa_bob uid,sn,cn,description -> [] rc=0
+p_oid_sn         (!(userid;x-test=bobtag))                    rc=0 []
+p_oid_sn         (!(0.9.2342.19200300.100.1.1;x-test=bobtag)) rc=0 []
+p_oid_sn         (sn=S)                                       rc=0 []
+p_oid_sn         (!(sn=X))                                    rc=0 []
+p_oid_sn         (uid=fa_bob)                                 rc=0 ['uid=fa_bob']
+p_oid_sn         (!(uid=fa_bob))                              rc=0 ['uid=fa_alice', 'uid=fa_carol']
+p_oid_sn         (cn=fa_bob)                                  rc=0 []
+p_oid_sn         (!(cn=fa_bob))                               rc=0 []
+p_oid_sn         (2.5.4.4=S)                                  rc=0 []
+p_oid_sn         (description=hello)                          rc=0 []
+p_oid_sn         (!(description=hello))                       rc=0 []
+p_oid_sn         (!(userid;x-test=bobtag)) attrs=cn -> [] rc=0
+p_oid_sn         READ fa_bob uid,sn,cn,description -> [] rc=0
+p_oid_only       (!(userid;x-test=bobtag))                    rc=0 []
+p_oid_only       (!(0.9.2342.19200300.100.1.1;x-test=bobtag)) rc=0 []
+p_oid_only       (sn=S)                                       rc=0 []
+p_oid_only       (!(sn=X))                                    rc=0 []
+p_oid_only       (uid=fa_bob)                                 rc=0 []
+p_oid_only       (!(uid=fa_bob))                              rc=0 []
+p_oid_only       (cn=fa_bob)                                  rc=0 []
+p_oid_only       (!(cn=fa_bob))                               rc=0 []
+p_oid_only       (2.5.4.4=S)                                  rc=0 []
+p_oid_only       (description=hello)                          rc=0 []
+p_oid_only       (!(description=hello))                       rc=0 []
+p_oid_only       (!(userid;x-test=bobtag)) attrs=cn -> [] rc=0
+p_oid_only       READ fa_bob uid,sn,cn,description -> [] rc=0
+p_deny_oid       (!(userid;x-test=bobtag))                    rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol']
+p_deny_oid       (!(0.9.2342.19200300.100.1.1;x-test=bobtag)) rc=0 []
+p_deny_oid       (sn=S)                                       rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol']
+p_deny_oid       (!(sn=X))                                    rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol']
+p_deny_oid       (uid=fa_bob)                                 rc=0 ['uid=fa_bob']
+p_deny_oid       (!(uid=fa_bob))                              rc=0 ['uid=fa_alice', 'uid=fa_carol']
+p_deny_oid       (cn=fa_bob)                                  rc=0 ['uid=fa_bob']
+p_deny_oid       (!(cn=fa_bob))                               rc=0 ['uid=fa_alice', 'uid=fa_carol']
+p_deny_oid       (2.5.4.4=S)                                  rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol']
+p_deny_oid       (description=hello)                          rc=0 ['uid=fa_bob']
+p_deny_oid       (!(description=hello))                       rc=0 ['uid=fa_alice', 'uid=fa_carol']
+p_deny_oid       (!(userid;x-test=bobtag)) attrs=cn -> ['cn: fa_alice', 'cn: fa_bob', 'cn: fa_carol', 'dn: uid=fa_alice,ou=probe-fattr,dc=example,dc=test', 'dn: uid=fa_bob,ou=probe-fattr,dc=example,dc=test', 'dn: uid=fa_carol,ou=probe-fattr,dc=example,dc=test'] rc=0
+p_deny_oid       READ fa_bob uid,sn,cn,description -> ['uid: fa_bob', 'uid;x-test: bobtag', 'sn: S', 'cn: fa_bob', 'description;lang-en: hello'] rc=0
+p_deny_list      (!(userid;x-test=bobtag))                    rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol']
+p_deny_list      (!(0.9.2342.19200300.100.1.1;x-test=bobtag)) rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol']
+p_deny_list      (sn=S)                                       rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol']
+p_deny_list      (!(sn=X))                                    rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol']
+p_deny_list      (uid=fa_bob)                                 rc=0 []
+p_deny_list      (!(uid=fa_bob))                              rc=0 []
+p_deny_list      (cn=fa_bob)                                  rc=0 ['uid=fa_bob']
+p_deny_list      (!(cn=fa_bob))                               rc=0 ['uid=fa_alice', 'uid=fa_carol']
+p_deny_list      (2.5.4.4=S)                                  rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol']
+p_deny_list      (description=hello)                          rc=0 []
+p_deny_list      (!(description=hello))                       rc=0 []
+p_deny_list      (!(userid;x-test=bobtag)) attrs=cn -> ['cn: fa_alice', 'cn: fa_bob', 'cn: fa_carol', 'dn: uid=fa_alice,ou=probe-fattr,dc=example,dc=test', 'dn: uid=fa_bob,ou=probe-fattr,dc=example,dc=test', 'dn: uid=fa_carol,ou=probe-fattr,dc=example,dc=test'] rc=0
+p_deny_list      READ fa_bob uid,sn,cn,description -> ['sn: S', 'cn: fa_bob'] rc=0
+exit=0
+
+===== probe 10 =====
+image quay.io/389ds/dirsrv@sha256:f2851654c5df545cd893d84bea8d08c28dc25f0930493fbfed1d8a6eacf657f7
+backend 0
+add 0
+aci q_oc 0 0
+aci q_oc 1 0
+aci q_creatorsname 0 0
+aci q_creatorsname 1 0
+aci q_modifiersname 0 0
+aci q_modifiersname 1 0
+aci q_createtimestamp 0 0
+aci q_createtimestamp 1 0
+aci q_modifytimestamp 0 0
+aci q_modifytimestamp 1 0
+aci q_nsuniqueid 0 0
+aci q_nsuniqueid 1 0
+aci q_entryuuid 0 0
+aci q_entryuuid 1 0
+aci q_entrydn 0 0
+aci q_entrydn 1 0
+aci q_parentid 0 0
+aci q_parentid 1 0
+aci q_entryid 0 0
+aci q_entryid 1 0
+aci q_aci 0 0
+aci q_aci 1 0
+aci q_numsubordinates 0 0
+aci q_numsubordinates 1 0
+SYNTAX 'uid|sn' 21 ldap_modify: Invalid syntax (21) 	additional info: targetattr "uid|sn" does not exist in schema. Please add attributeTypes "uid|sn" to schema if necessary. ACL
+SYNTAX 'uid ||sn' 0
+SYNTAX ' uid || sn ' 0
+SYNTAX 'fooBar' 21 ldap_modify: Invalid syntax (21) 	additional info: targetattr "fooBar" does not exist in schema. Please add attributeTypes "fooBar" to schema if necessary. ACL
+SYNTAX '1.2.3.4' 21 ldap_modify: Invalid syntax (21) 	additional info: targetattr "1.2.3.4" does not exist in schema. Please add attributeTypes "1.2.3.4" to schema if necessary. AC
+SYNTAX '2.5.4.4' 0
+SYNTAX '0.9.2342.19200300.100.1.1' 0
+SYNTAX 'uid;x-test' 0
+SYNTAX 'userid' 0
+SYNTAX 'uid || fooBar' 21 ldap_modify: Invalid syntax (21) 	additional info: targetattr "fooBar" does not exist in schema. Please add attributeTypes "fooBar" to schema if necessary. ACL
+SYNTAX 'UID' 0
+DM               (!(userid;x-test=bobtag))                    rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol']
+DM               (sn=S)                                       rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol']
+DM               (uid=fa_bob)                                 rc=0 ['uid=fa_bob']
+DM               READ fa_bob + -> ['creatorsName: cn=directory manager', 'modifiersName: cn=directory manager', 'createTimestamp: 20261004135547Z', 'modifyTimestamp: 20261004135547Z', 'nsUniqueId: 49bcc347-bffb11f1-8e92867b-8d375ddb', 'parentid: 15', 'entryid: 17', 'entryUUID: 31ad5b84-8e7e-4ee1-870a-2dcdb79163c1', 'dsEntryDN: uid=fa_bob,ou=probe-fattr,dc=example,dc=test', 'entrydn: uid=fa_bob,ou=probe-fattr,dc=example,dc=test'] rc=0
+q_oc             (!(userid;x-test=bobtag))                    rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol']
+q_oc             (sn=S)                                       rc=0 []
+q_oc             (uid=fa_bob)                                 rc=0 []
+q_oc             READ fa_bob + -> [] rc=0
+q_creatorsname   (!(userid;x-test=bobtag))                    rc=0 []
+q_creatorsname   (sn=S)                                       rc=0 []
+q_creatorsname   (uid=fa_bob)                                 rc=0 []
+q_creatorsname   READ fa_bob + -> [] rc=0
+q_modifiersname  (!(userid;x-test=bobtag))                    rc=0 []
+q_modifiersname  (sn=S)                                       rc=0 []
+q_modifiersname  (uid=fa_bob)                                 rc=0 []
+q_modifiersname  READ fa_bob + -> [] rc=0
+q_createtimestamp (!(userid;x-test=bobtag))                    rc=0 []
+q_createtimestamp (sn=S)                                       rc=0 []
+q_createtimestamp (uid=fa_bob)                                 rc=0 []
+q_createtimestamp READ fa_bob + -> [] rc=0
+q_modifytimestamp (!(userid;x-test=bobtag))                    rc=0 []
+q_modifytimestamp (sn=S)                                       rc=0 []
+q_modifytimestamp (uid=fa_bob)                                 rc=0 []
+q_modifytimestamp READ fa_bob + -> [] rc=0
+q_nsuniqueid     (!(userid;x-test=bobtag))                    rc=0 []
+q_nsuniqueid     (sn=S)                                       rc=0 []
+q_nsuniqueid     (uid=fa_bob)                                 rc=0 []
+q_nsuniqueid     READ fa_bob + -> [] rc=0
+q_entryuuid      (!(userid;x-test=bobtag))                    rc=0 []
+q_entryuuid      (sn=S)                                       rc=0 []
+q_entryuuid      (uid=fa_bob)                                 rc=0 []
+q_entryuuid      READ fa_bob + -> [] rc=0
+q_entrydn        (!(userid;x-test=bobtag))                    rc=0 []
+q_entrydn        (sn=S)                                       rc=0 []
+q_entrydn        (uid=fa_bob)                                 rc=0 []
+q_entrydn        READ fa_bob + -> [] rc=0
+q_parentid       (!(userid;x-test=bobtag))                    rc=0 []
+q_parentid       (sn=S)                                       rc=0 []
+q_parentid       (uid=fa_bob)                                 rc=0 []
+q_parentid       READ fa_bob + -> [] rc=0
+q_entryid        (!(userid;x-test=bobtag))                    rc=0 []
+q_entryid        (sn=S)                                       rc=0 []
+q_entryid        (uid=fa_bob)                                 rc=0 []
+q_entryid        READ fa_bob + -> [] rc=0
+q_aci            (!(userid;x-test=bobtag))                    rc=0 []
+q_aci            (sn=S)                                       rc=0 []
+q_aci            (uid=fa_bob)                                 rc=0 []
+q_aci            READ fa_bob + -> [] rc=0
+q_numsubordinates (!(userid;x-test=bobtag))                    rc=0 []
+q_numsubordinates (sn=S)                                       rc=0 []
+q_numsubordinates (uid=fa_bob)                                 rc=0 []
+q_numsubordinates READ fa_bob + -> [] rc=0
+exit=0
+
+===== probe 11 =====
+image quay.io/389ds/dirsrv@sha256:f2851654c5df545cd893d84bea8d08c28dc25f0930493fbfed1d8a6eacf657f7
+backend 0
+add 0
+aci r_deny_snoid 0 0
+aci r_deny_snoid 1 0
+aci r_deny_sn 0 0
+aci r_deny_sn 1 0
+aci r_deny_pwoid 0 0
+aci r_deny_pwoid 1 0
+DM               (sn=S)                                       rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol']
+DM               (!(sn=X))                                    rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol']
+DM               (userPassword=*)                             rc=0 ['uid=fa_bob']
+DM               (!(userPassword=*))                          rc=0 ['uid=fa_alice', 'uid=fa_carol']
+DM               (uid=fa_bob)                                 rc=0 ['uid=fa_bob']
+DM               READ fa_bob sn,uid,userPassword -> ['sn: S', 'uid: fa_bob', 'uid;x-test: bobtag', 'userPassword:: <redacted hash>'] rc=0
+r_deny_snoid     (sn=S)                                       rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol']
+r_deny_snoid     (!(sn=X))                                    rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol']
+r_deny_snoid     (userPassword=*)                             rc=0 ['uid=fa_bob']
+r_deny_snoid     (!(userPassword=*))                          rc=0 ['uid=fa_alice', 'uid=fa_carol']
+r_deny_snoid     (uid=fa_bob)                                 rc=0 ['uid=fa_bob']
+r_deny_snoid     READ fa_bob sn,uid,userPassword -> ['sn: S', 'uid: fa_bob', 'uid;x-test: bobtag', 'userPassword:: <redacted hash>'] rc=0
+r_deny_sn        (sn=S)                                       rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol']
+r_deny_sn        (!(sn=X))                                    rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol']
+r_deny_sn        (userPassword=*)                             rc=0 ['uid=fa_bob']
+r_deny_sn        (!(userPassword=*))                          rc=0 ['uid=fa_alice', 'uid=fa_carol']
+r_deny_sn        (uid=fa_bob)                                 rc=0 ['uid=fa_bob']
+r_deny_sn        READ fa_bob sn,uid,userPassword -> ['uid: fa_bob', 'uid;x-test: bobtag', 'userPassword:: <redacted hash>'] rc=0
+r_deny_pwoid     (sn=S)                                       rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol']
+r_deny_pwoid     (!(sn=X))                                    rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol']
+r_deny_pwoid     (userPassword=*)                             rc=0 ['uid=fa_bob']
+r_deny_pwoid     (!(userPassword=*))                          rc=0 ['uid=fa_alice', 'uid=fa_carol']
+r_deny_pwoid     (uid=fa_bob)                                 rc=0 ['uid=fa_bob']
+r_deny_pwoid     READ fa_bob sn,uid,userPassword -> ['sn: S', 'uid: fa_bob', 'uid;x-test: bobtag', 'userPassword:: <redacted hash>'] rc=0
+
+# Probes 12-14 (2026-10-04): base scope and options in targetattr (12), 389 attribute usage and visibility (13), attribute-scoped deny (14).
+
+===== probe 12 =====
+image quay.io/389ds/dirsrv@sha256:f2851654c5df545cd893d84bea8d08c28dc25f0930493fbfed1d8a6eacf657f7
+backend 0
+add 0 
+aci p_userid 0 0 
+aci p_userid_sn 0 0 
+aci p_userid_sn 1 0 
+aci t_uidopt 0 0 
+aci t_descopt 0 0 
+aci t_descopt 1 0 
+aci t_deny_uidopt 0 0 
+DM               (uid=fa_bob)                                 rc=0 ['uid=fa_bob'] 
+DM               (uid;x-test=bobtag)                          rc=0 ['uid=fa_bob'] 
+DM               (!(uid=fa_bob))                              rc=0 ['uid=fa_alice', 'uid=fa_carol'] 
+DM               (description=hello)                          rc=0 ['uid=fa_bob'] 
+DM               (sn=S)                                       rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol'] 
+DM               (cn=fa_bob)                                  rc=0 ['uid=fa_bob'] 
+DM               BASE fa_bob (objectClass=*)                    rc=0 ['uid=fa_bob']
+DM               BASE fa_bob (uid=fa_bob)                       rc=0 ['uid=fa_bob']
+DM               BASE fa_bob (!(userid;x-test=bobtag))          rc=0 ['uid=fa_bob']
+DM               BASE fa_bob (sn=S)                             rc=0 ['uid=fa_bob']
+DM               READ fa_bob uid,sn,description -> ['uid: fa_bob', 'uid;x-test: bobtag', 'sn: S', 'description;lang-en: hello'] rc=0
+p_userid         (uid=fa_bob)                                 rc=0 [] 
+p_userid         (uid;x-test=bobtag)                          rc=0 [] 
+p_userid         (!(uid=fa_bob))                              rc=0 [] 
+p_userid         (description=hello)                          rc=0 [] 
+p_userid         (sn=S)                                       rc=0 [] 
+p_userid         (cn=fa_bob)                                  rc=0 [] 
+p_userid         BASE fa_bob (objectClass=*)                    rc=0 []
+p_userid         BASE fa_bob (uid=fa_bob)                       rc=0 []
+p_userid         BASE fa_bob (!(userid;x-test=bobtag))          rc=0 []
+p_userid         BASE fa_bob (sn=S)                             rc=0 []
+p_userid         READ fa_bob uid,sn,description -> [] rc=0
+p_userid_sn      (uid=fa_bob)                                 rc=0 [] 
+p_userid_sn      (uid;x-test=bobtag)                          rc=0 [] 
+p_userid_sn      (!(uid=fa_bob))                              rc=0 [] 
+p_userid_sn      (description=hello)                          rc=0 [] 
+p_userid_sn      (sn=S)                                       rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol'] 
+p_userid_sn      (cn=fa_bob)                                  rc=0 [] 
+p_userid_sn      BASE fa_bob (objectClass=*)                    rc=0 []
+p_userid_sn      BASE fa_bob (uid=fa_bob)                       rc=0 []
+p_userid_sn      BASE fa_bob (!(userid;x-test=bobtag))          rc=0 ['uid=fa_bob']
+p_userid_sn      BASE fa_bob (sn=S)                             rc=0 ['uid=fa_bob']
+p_userid_sn      READ fa_bob uid,sn,description -> [] rc=0
+t_uidopt         (uid=fa_bob)                                 rc=0 [] 
+t_uidopt         (uid;x-test=bobtag)                          rc=0 ['uid=fa_bob'] 
+t_uidopt         (!(uid=fa_bob))                              rc=0 [] 
+t_uidopt         (description=hello)                          rc=0 [] 
+t_uidopt         (sn=S)                                       rc=0 [] 
+t_uidopt         (cn=fa_bob)                                  rc=0 [] 
+t_uidopt         BASE fa_bob (objectClass=*)                    rc=0 []
+t_uidopt         BASE fa_bob (uid=fa_bob)                       rc=0 []
+t_uidopt         BASE fa_bob (!(userid;x-test=bobtag))          rc=0 []
+t_uidopt         BASE fa_bob (sn=S)                             rc=0 []
+t_uidopt         READ fa_bob uid,sn,description -> [] rc=0
+t_descopt        (uid=fa_bob)                                 rc=0 [] 
+t_descopt        (uid;x-test=bobtag)                          rc=0 [] 
+t_descopt        (!(uid=fa_bob))                              rc=0 [] 
+t_descopt        (description=hello)                          rc=0 [] 
+t_descopt        (sn=S)                                       rc=0 [] 
+t_descopt        (cn=fa_bob)                                  rc=0 [] 
+t_descopt        BASE fa_bob (objectClass=*)                    rc=0 []
+t_descopt        BASE fa_bob (uid=fa_bob)                       rc=0 []
+t_descopt        BASE fa_bob (!(userid;x-test=bobtag))          rc=0 []
+t_descopt        BASE fa_bob (sn=S)                             rc=0 []
+t_descopt        READ fa_bob uid,sn,description -> [] rc=0
+t_deny_uidopt    (uid=fa_bob)                                 rc=0 ['uid=fa_bob'] 
+t_deny_uidopt    (uid;x-test=bobtag)                          rc=0 [] 
+t_deny_uidopt    (!(uid=fa_bob))                              rc=0 ['uid=fa_alice', 'uid=fa_carol'] 
+t_deny_uidopt    (description=hello)                          rc=0 ['uid=fa_bob'] 
+t_deny_uidopt    (sn=S)                                       rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol'] 
+t_deny_uidopt    (cn=fa_bob)                                  rc=0 ['uid=fa_bob'] 
+t_deny_uidopt    BASE fa_bob (objectClass=*)                    rc=0 ['uid=fa_bob']
+t_deny_uidopt    BASE fa_bob (uid=fa_bob)                       rc=0 ['uid=fa_bob']
+t_deny_uidopt    BASE fa_bob (!(userid;x-test=bobtag))          rc=0 ['uid=fa_bob']
+t_deny_uidopt    BASE fa_bob (sn=S)                             rc=0 ['uid=fa_bob']
+t_deny_uidopt    READ fa_bob uid,sn,description -> ['uid: fa_bob', 'sn: S', 'description;lang-en: hello'] rc=0
+exit=0
+
+===== probe 13 =====
+image quay.io/389ds/dirsrv@sha256:f2851654c5df545cd893d84bea8d08c28dc25f0930493fbfed1d8a6eacf657f7
+backend 0
+schema memberOf USAGE userApplications(default) 
+schema nsAccountLock USAGE directoryOperation 
+schema passwordHistory USAGE directoryOperation 
+schema pwdUpdateTime USAGE directoryOperation 
+schema passwordExpirationTime USAGE directoryOperation 
+add 0 
+aci q_userid_memberof 0 0
+aci q_userid_memberof 1 0
+aci q_userid_acctlock 0 0
+aci q_userid_acctlock 1 0
+DM                 (!(userid;x-test=x))         rc=0 ['uid=v_l', 'uid=v_m']
+DM                 READ memberOf,nsAccountLock -> ['dn: uid=v_m,ou=probe-vis13,dc=example,dc=test', 'memberOf: cn=g,dc=example,dc=test', 'dn: uid=v_l,ou=probe-vis13,dc=example,dc=test', 'nsAccountLock: true'] rc=0
+q_userid_memberof  (!(userid;x-test=x))         rc=0 ['uid=v_m']
+q_userid_memberof  READ memberOf,nsAccountLock -> [] rc=0
+q_userid_acctlock  (!(userid;x-test=x))         rc=0 []
+q_userid_acctlock  READ memberOf,nsAccountLock -> [] rc=0
+exit=0
+
+===== probe 14 =====
+image quay.io/389ds/dirsrv@sha256:f2851654c5df545cd893d84bea8d08c28dc25f0930493fbfed1d8a6eacf657f7
+backend 0
+add 0 
+aci r_deny_pw 0 0 
+aci r_deny_pw 1 0 
+aci r_deny_pw_search 0 0 
+aci r_deny_pw_search 1 0 
+aci r_deny_pwoid 0 0 
+aci r_deny_pwoid 1 0 
+DM               (sn=S)                                       rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol'] 
+DM               (!(sn=X))                                    rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol'] 
+DM               (userPassword=*)                             rc=0 ['uid=fa_bob'] 
+DM               (!(userPassword=*))                          rc=0 ['uid=fa_alice', 'uid=fa_carol'] 
+DM               (uid=fa_bob)                                 rc=0 ['uid=fa_bob'] 
+DM               READ fa_bob sn,uid,userPassword -> ['sn: S', 'uid: fa_bob', 'uid;x-test: bobtag', 'userPassword:: <redacted hash>'] rc=0
+r_deny_pw        (sn=S)                                       rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol'] 
+r_deny_pw        (!(sn=X))                                    rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol'] 
+r_deny_pw        (userPassword=*)                             rc=0 [] 
+r_deny_pw        (!(userPassword=*))                          rc=0 [] 
+r_deny_pw        (uid=fa_bob)                                 rc=0 ['uid=fa_bob'] 
+r_deny_pw        READ fa_bob sn,uid,userPassword -> ['sn: S', 'uid: fa_bob', 'uid;x-test: bobtag'] rc=0
+r_deny_pw_search (sn=S)                                       rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol'] 
+r_deny_pw_search (!(sn=X))                                    rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol'] 
+r_deny_pw_search (userPassword=*)                             rc=0 [] 
+r_deny_pw_search (!(userPassword=*))                          rc=0 [] 
+r_deny_pw_search (uid=fa_bob)                                 rc=0 ['uid=fa_bob'] 
+r_deny_pw_search READ fa_bob sn,uid,userPassword -> ['sn: S', 'uid: fa_bob', 'uid;x-test: bobtag', 'userPassword:: <redacted hash>'] rc=0
+r_deny_pwoid     (sn=S)                                       rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol'] 
+r_deny_pwoid     (!(sn=X))                                    rc=0 ['uid=fa_alice', 'uid=fa_bob', 'uid=fa_carol'] 
+r_deny_pwoid     (userPassword=*)                             rc=0 ['uid=fa_bob'] 
+r_deny_pwoid     (!(userPassword=*))                          rc=0 ['uid=fa_alice', 'uid=fa_carol'] 
+r_deny_pwoid     (uid=fa_bob)                                 rc=0 ['uid=fa_bob'] 
+r_deny_pwoid     READ fa_bob sn,uid,userPassword -> ['sn: S', 'uid: fa_bob', 'uid;x-test: bobtag', 'userPassword:: <redacted hash>'] rc=0
+exit=0
+
+# Probe scripts (subject -> ACI tables). Each starts a throwaway container from deploy/docker/dirsrv.digest with a random Directory Manager password.
+
+===== script filterprobe8.py =====
+import subprocess as sp, time, secrets
+ref=open('deploy/docker/dirsrv.digest').read().strip()
+pw=secrets.token_hex(16); n='muse-fprobe8-'+secrets.token_hex(3)
+def ex(*a, inp=None): return sp.run(['docker','exec','-i',n,*a],input=inp,capture_output=True,text=True)
+sp.run(['docker','run','-d','--name',n,'-e','DS_DM_PASSWORD='+pw,'-v','/data',ref],stdout=sp.DEVNULL,check=True)
+S='dc=example,dc=test'; B='ou=probe-fattr,'+S; P='ou=people,'+S
+def who(u): return f'uid={u},{P}'
+try:
+  for i in range(600):
+    l=sp.run(['docker','logs',n],capture_output=True,text=True)
+    if '389-ds-container started.' in l.stdout+l.stderr: break
+    time.sleep(0.5)
+  print('image',ref); print('backend',ex('dsconf','localhost','backend','create','--suffix',S,'--be-name','userroot','--create-suffix').returncode)
+  RSC='read,search,compare'
+  acis={
+   'p_userid':[('(targetattr="userid")',RSC)],
+   'p_userid_sn':[('(targetattr="userid")',RSC),('(targetattr="sn")',RSC)],
+   'p_userid_snsearch':[('(targetattr="userid")',RSC),('(targetattr="sn")','search')],
+   'p_userid_snread':[('(targetattr="userid")',RSC),('(targetattr="sn")','read')],
+   'p_star_search':[('(targetattr="*")','search')],
+   'p_star_read':[('(targetattr="*")','read')],
+   'p_list':[('(targetattr="uid || sn")',RSC)],
+   'p_list_nospace':[('(targetattr="uid||sn")',RSC)],
+   'p_list_case':[('(targetattr="UID || Sn")',RSC)],
+   'p_oid_sn':[('(targetattr="2.5.4.4 || uid")',RSC)],
+   'p_oid_only':[('(targetattr="0.9.2342.19200300.100.1.1")',RSC)],
+   'p_deny_oid':[('(targetattr!="0.9.2342.19200300.100.1.1")',RSC)],
+   'p_deny_list':[('(targetattr!="uid || description")',RSC)],
+  }
+  ldif=f"dn: {P}\nobjectClass: organizationalUnit\nou: people\n\n"
+  for s in acis: ldif+=f"dn: {who(s)}\nobjectClass: inetOrgPerson\nuid: {s}\ncn: {s}\nsn: S\nuserPassword: Probe-Pw-{s}-1\n\n"
+  ldif+=f"dn: {B}\nobjectClass: organizationalUnit\nou: probe-fattr\n\n"
+  for u,extra in [('fa_alice',''),('fa_bob','uid;x-test: bobtag\ndescription;lang-en: hello\n'),('fa_carol','description;lang-en;x-foo: multi\n')]:
+    ldif+=f"dn: uid={u},{B}\nobjectClass: inetOrgPerson\nuid: {u}\ncn: {u}\nsn: S\n{extra}\n"
+  r=ex('ldapadd','-x','-H','ldap://127.0.0.1:3389','-D','cn=Directory Manager','-w',pw,inp=ldif); print('add',r.returncode,r.stderr.strip()[:300])
+  mod=f"dn: {S}\nchangetype: modify\nadd: aci\n"
+  for s,lst in acis.items():
+    for k,(t,perm) in enumerate(lst): mod+=f'aci: (target="ldap:///{B}"){t}(version 3.0; acl "labldap:{s}-{k}"; allow ({perm}) userdn="ldap:///{who(s)}";)\n'
+
+  r=ex('ldapmodify','-x','-H','ldap://127.0.0.1:3389','-D','cn=Directory Manager','-w',pw,inp=mod+"\n"); print('aci',r.returncode,r.stderr.strip()[:300])
+  O='0.9.2342.19200300.100.1.1'
+  fl=['(!(userid;x-test=bobtag))',f'(!({O};x-test=bobtag))','(sn=S)','(!(sn=X))','(uid=fa_bob)','(!(uid=fa_bob))','(cn=fa_bob)','(!(cn=fa_bob))','(2.5.4.4=S)','(description=hello)','(!(description=hello))']
+  subs=[('DM','cn=Directory Manager',pw)]+[(s,who(s),f'Probe-Pw-{s}-1') for s in acis]
+  for name,dn,p in subs:
+    for f in fl:
+      r=ex('ldapsearch','-x','-LLL','-H','ldap://127.0.0.1:3389','-D',dn,'-w',p,'-b',B,'-s','one',f,'1.1')
+      dns=sorted(l.split(',')[0][4:] for l in r.stdout.splitlines() if l.startswith('dn:'))
+      print(f"{name:16} {f:44} rc={r.returncode} {dns} {r.stderr.strip()[:80]}")
+    r=ex('ldapsearch','-x','-LLL','-H','ldap://127.0.0.1:3389','-D',dn,'-w',p,'-b',B,'-s','one','(!(userid;x-test=bobtag))','cn')
+    print(f"{name:16} (!(userid;x-test=bobtag)) attrs=cn -> {sorted(l for l in r.stdout.splitlines() if l)} rc={r.returncode}")
+    r=ex('ldapsearch','-x','-LLL','-H','ldap://127.0.0.1:3389','-D',dn,'-w',p,'-b','uid=fa_bob,'+B,'-s','base','(objectClass=*)','uid','sn','cn','description')
+    print(f"{name:16} READ fa_bob uid,sn,cn,description -> {[l for l in r.stdout.splitlines() if l and not l.startswith('dn:')]} rc={r.returncode}")
+finally:
+  sp.run(['docker','rm','-f','-v',n],capture_output=True)
+
+===== script filterprobe10.py =====
+import subprocess as sp, time, secrets
+ref=open('deploy/docker/dirsrv.digest').read().strip()
+pw=secrets.token_hex(16); n='muse-fprobe10-'+secrets.token_hex(3)
+def ex(*a, inp=None): return sp.run(['docker','exec','-i',n,*a],input=inp,capture_output=True,text=True)
+sp.run(['docker','run','-d','--name',n,'-e','DS_DM_PASSWORD='+pw,'-v','/data',ref],stdout=sp.DEVNULL,check=True)
+S='dc=example,dc=test'; B='ou=probe-fattr,'+S; P='ou=people,'+S
+def who(u): return f'uid={u},{P}'
+try:
+  for i in range(600):
+    l=sp.run(['docker','logs',n],capture_output=True,text=True)
+    if '389-ds-container started.' in l.stdout+l.stderr: break
+    time.sleep(0.5)
+  print('image',ref); print('backend',ex('dsconf','localhost','backend','create','--suffix',S,'--be-name','userroot','--create-suffix').returncode)
+  RSC='read,search,compare'
+  RSC='read,search,compare'
+  U=('(targetattr="userid")',RSC)
+  acis={'q_oc':[U,('(targetattr="objectClass")','read')]}
+  for x in ['creatorsName','modifiersName','createTimestamp','modifyTimestamp','nsUniqueId','entryUUID','entrydn','parentid','entryid','aci','numSubordinates']:
+    acis['q_'+x.lower()]=[U,(f'(targetattr="{x}")','read')]
+
+  ldif=f"dn: {P}\nobjectClass: organizationalUnit\nou: people\n\n"
+  for s in acis: ldif+=f"dn: {who(s)}\nobjectClass: inetOrgPerson\nuid: {s}\ncn: {s}\nsn: S\nuserPassword: Probe-Pw-{s}-1\n\n"
+  ldif+=f"dn: {B}\nobjectClass: organizationalUnit\nou: probe-fattr\n\n"
+  for u,extra in [('fa_alice',''),('fa_bob','uid;x-test: bobtag\ndescription;lang-en: hello\n'),('fa_carol','description;lang-en;x-foo: multi\n')]:
+    ldif+=f"dn: uid={u},{B}\nobjectClass: inetOrgPerson\nuid: {u}\ncn: {u}\nsn: S\n{extra}\n"
+  r=ex('ldapadd','-x','-H','ldap://127.0.0.1:3389','-D','cn=Directory Manager','-w',pw,inp=ldif); print('add',r.returncode,r.stderr.strip()[:300])
+  def addaci(text):
+    r=ex('ldapmodify','-x','-H','ldap://127.0.0.1:3389','-D','cn=Directory Manager','-w',pw,inp=f"dn: {S}\nchangetype: modify\nadd: aci\naci: {text}\n\n")
+    return r.returncode, r.stderr.strip().replace('\n',' ')[:160]
+  for s_,lst in acis.items():
+    for k,(t,perm) in enumerate(lst):
+      print('aci',s_,k,*addaci(f'(target="ldap:///{B}"){t}(version 3.0; acl "labldap:{s_}-{k}"; allow ({perm}) userdn="ldap:///{who(s_)}";)'))
+  for t in ['uid|sn','uid ||sn',' uid || sn ','fooBar','1.2.3.4','2.5.4.4','0.9.2342.19200300.100.1.1','uid;x-test','userid','uid || fooBar','UID']:
+    print('SYNTAX',repr(t),*addaci(f'(target="ldap:///{B}")(targetattr="{t}")(version 3.0; acl "labldap:syn"; allow (read) userdn="ldap:///cn=nobody,{S}";)'))
+  O='0.9.2342.19200300.100.1.1'
+  fl=['(!(userid;x-test=bobtag))','(sn=S)','(uid=fa_bob)']
+  subs=[('DM','cn=Directory Manager',pw)]+[(s,who(s),f'Probe-Pw-{s}-1') for s in acis]
+  for name,dn,p in subs:
+    for f in fl:
+      r=ex('ldapsearch','-x','-LLL','-H','ldap://127.0.0.1:3389','-D',dn,'-w',p,'-b',B,'-s','one',f,'1.1')
+      dns=sorted(l.split(',')[0][4:] for l in r.stdout.splitlines() if l.startswith('dn:'))
+      print(f"{name:16} {f:44} rc={r.returncode} {dns} {r.stderr.strip()[:80]}")
+    r=ex('ldapsearch','-x','-LLL','-H','ldap://127.0.0.1:3389','-D',dn,'-w',p,'-b','uid=fa_bob,'+B,'-s','base','(objectClass=*)','+')
+    print(f"{name:16} READ fa_bob + -> {[l for l in r.stdout.splitlines() if l and not l.startswith('dn:')]} rc={r.returncode}")
+finally:
+  sp.run(['docker','rm','-f','-v',n],capture_output=True)
+
+===== script filterprobe11.py =====
+import subprocess as sp, time, secrets
+ref=open('deploy/docker/dirsrv.digest').read().strip()
+pw=secrets.token_hex(16); n='muse-fprobe11-'+secrets.token_hex(3)
+def ex(*a, inp=None): return sp.run(['docker','exec','-i',n,*a],input=inp,capture_output=True,text=True)
+sp.run(['docker','run','-d','--name',n,'-e','DS_DM_PASSWORD='+pw,'-v','/data',ref],stdout=sp.DEVNULL,check=True)
+S='dc=example,dc=test'; B='ou=probe-fattr,'+S; P='ou=people,'+S
+def who(u): return f'uid={u},{P}'
+try:
+  for i in range(600):
+    l=sp.run(['docker','logs',n],capture_output=True,text=True)
+    if '389-ds-container started.' in l.stdout+l.stderr: break
+    time.sleep(0.5)
+  print('image',ref); print('backend',ex('dsconf','localhost','backend','create','--suffix',S,'--be-name','userroot','--create-suffix').returncode)
+  RSC='read,search,compare'
+  RSC='read,search,compare'
+  U=('(targetattr="userid")',RSC)
+  acis={'r_deny_snoid':[('(targetattr="*")',RSC),('(targetattr="2.5.4.4")','DENYread')],
+        'r_deny_sn':[('(targetattr="*")',RSC),('(targetattr="sn")','DENYread')],
+        'r_deny_pwoid':[('(targetattr="*")',RSC),('(targetattr="2.5.4.35")','DENYread,search,compare')]}
+
+  ldif=f"dn: {P}\nobjectClass: organizationalUnit\nou: people\n\n"
+  for s in acis: ldif+=f"dn: {who(s)}\nobjectClass: inetOrgPerson\nuid: {s}\ncn: {s}\nsn: S\nuserPassword: Probe-Pw-{s}-1\n\n"
+  ldif+=f"dn: {B}\nobjectClass: organizationalUnit\nou: probe-fattr\n\n"
+  for u,extra in [('fa_alice',''),('fa_bob','userPassword: Probe-Bob-Pw-1\nuid;x-test: bobtag\ndescription;lang-en: hello\n'),('fa_carol','description;lang-en;x-foo: multi\n')]:
+    ldif+=f"dn: uid={u},{B}\nobjectClass: inetOrgPerson\nuid: {u}\ncn: {u}\nsn: S\n{extra}\n"
+  r=ex('ldapadd','-x','-H','ldap://127.0.0.1:3389','-D','cn=Directory Manager','-w',pw,inp=ldif); print('add',r.returncode,r.stderr.strip()[:300])
+  def addaci(text):
+    r=ex('ldapmodify','-x','-H','ldap://127.0.0.1:3389','-D','cn=Directory Manager','-w',pw,inp=f"dn: {S}\nchangetype: modify\nadd: aci\naci: {text}\n\n")
+    return r.returncode, r.stderr.strip().replace('\n',' ')[:160]
+  for s_,lst in acis.items():
+    for k,(t,perm) in enumerate(lst):
+      print('aci',s_,k,*addaci(f'(target="ldap:///{B}"){t}(version 3.0; acl "labldap:{s_}-{k}"; {"deny ("+perm[4:]+")" if perm.startswith("DENY") else "allow ("+perm+")"} userdn="ldap:///{who(s_)}";)'))
+  O='0.9.2342.19200300.100.1.1'
+  fl=['(sn=S)','(!(sn=X))','(userPassword=*)','(!(userPassword=*))','(uid=fa_bob)']
+  subs=[('DM','cn=Directory Manager',pw)]+[(s,who(s),f'Probe-Pw-{s}-1') for s in acis]
+  for name,dn,p in subs:
+    for f in fl:
+      r=ex('ldapsearch','-x','-LLL','-H','ldap://127.0.0.1:3389','-D',dn,'-w',p,'-b',B,'-s','one',f,'1.1')
+      dns=sorted(l.split(',')[0][4:] for l in r.stdout.splitlines() if l.startswith('dn:'))
+      print(f"{name:16} {f:44} rc={r.returncode} {dns} {r.stderr.strip()[:80]}")
+    r=ex('ldapsearch','-x','-LLL','-H','ldap://127.0.0.1:3389','-D',dn,'-w',p,'-b','uid=fa_bob,'+B,'-s','base','(objectClass=*)','sn','uid','userPassword')
+    print(f"{name:16} READ fa_bob sn,uid,userPassword -> {[l for l in r.stdout.splitlines() if l and not l.startswith('dn:')]} rc={r.returncode}")
+finally:
+  sp.run(['docker','rm','-f','-v',n],capture_output=True)
+
+===== script filterprobe12.py =====
+import subprocess as sp, time, secrets
+ref=open('deploy/docker/dirsrv.digest').read().strip()
+pw=secrets.token_hex(16); n='muse-fprobe12-'+secrets.token_hex(3)
+def ex(*a, inp=None): return sp.run(['docker','exec','-i',n,*a],input=inp,capture_output=True,text=True)
+sp.run(['docker','run','-d','--name',n,'-e','DS_DM_PASSWORD='+pw,'-v','/data',ref],stdout=sp.DEVNULL,check=True)
+S='dc=example,dc=test'; B='ou=probe-fattr,'+S; P='ou=people,'+S
+def who(u): return f'uid={u},{P}'
+try:
+  for i in range(600):
+    l=sp.run(['docker','logs',n],capture_output=True,text=True)
+    if '389-ds-container started.' in l.stdout+l.stderr: break
+    time.sleep(0.5)
+  print('image',ref); print('backend',ex('dsconf','localhost','backend','create','--suffix',S,'--be-name','userroot','--create-suffix').returncode)
+  RSC='read,search,compare'
+  RSC='read,search,compare'
+  U=('(targetattr="userid")',RSC)
+  acis={'p_userid':[U],'p_userid_sn':[U,('(targetattr="sn")',RSC)],
+        't_uidopt':[('(targetattr="uid;x-test")',RSC)],
+        't_descopt':[('(targetattr="description;lang-en")',RSC),('(targetattr="sn")','read')],
+        't_deny_uidopt':[('(targetattr!="uid;x-test")',RSC)]}
+
+  ldif=f"dn: {P}\nobjectClass: organizationalUnit\nou: people\n\n"
+  for s in acis: ldif+=f"dn: {who(s)}\nobjectClass: inetOrgPerson\nuid: {s}\ncn: {s}\nsn: S\nuserPassword: Probe-Pw-{s}-1\n\n"
+  ldif+=f"dn: {B}\nobjectClass: organizationalUnit\nou: probe-fattr\n\n"
+  for u,extra in [('fa_alice',''),('fa_bob','uid;x-test: bobtag\ndescription;lang-en: hello\n'),('fa_carol','description;lang-en;x-foo: multi\n')]:
+    ldif+=f"dn: uid={u},{B}\nobjectClass: inetOrgPerson\nuid: {u}\ncn: {u}\nsn: S\n{extra}\n"
+  r=ex('ldapadd','-x','-H','ldap://127.0.0.1:3389','-D','cn=Directory Manager','-w',pw,inp=ldif); print('add',r.returncode,r.stderr.strip()[:300])
+  def addaci(text):
+    r=ex('ldapmodify','-x','-H','ldap://127.0.0.1:3389','-D','cn=Directory Manager','-w',pw,inp=f"dn: {S}\nchangetype: modify\nadd: aci\naci: {text}\n\n")
+    return r.returncode, r.stderr.strip().replace('\n',' ')[:160]
+  for s_,lst in acis.items():
+    for k,(t,perm) in enumerate(lst):
+      print('aci',s_,k,*addaci(f'(target="ldap:///{B}"){t}(version 3.0; acl "labldap:{s_}-{k}"; allow ({perm}) userdn="ldap:///{who(s_)}";)'))
+  O='0.9.2342.19200300.100.1.1'
+  fl=['(uid=fa_bob)','(uid;x-test=bobtag)','(!(uid=fa_bob))','(description=hello)','(sn=S)','(cn=fa_bob)']
+  subs=[('DM','cn=Directory Manager',pw)]+[(s,who(s),f'Probe-Pw-{s}-1') for s in acis]
+  for name,dn,p in subs:
+    for f in fl:
+      r=ex('ldapsearch','-x','-LLL','-H','ldap://127.0.0.1:3389','-D',dn,'-w',p,'-b',B,'-s','one',f,'1.1')
+      dns=sorted(l.split(',')[0][4:] for l in r.stdout.splitlines() if l.startswith('dn:'))
+      print(f"{name:16} {f:44} rc={r.returncode} {dns} {r.stderr.strip()[:80]}")
+    for f in ['(objectClass=*)','(uid=fa_bob)','(!(userid;x-test=bobtag))','(sn=S)']:
+      r=ex('ldapsearch','-x','-LLL','-H','ldap://127.0.0.1:3389','-D',dn,'-w',p,'-b','uid=fa_bob,'+B,'-s','base',f,'1.1')
+      dns=sorted(l.split(',')[0][4:] for l in r.stdout.splitlines() if l.startswith('dn:'))
+      print(f"{name:16} BASE fa_bob {f:34} rc={r.returncode} {dns}")
+    r=ex('ldapsearch','-x','-LLL','-H','ldap://127.0.0.1:3389','-D',dn,'-w',p,'-b','uid=fa_bob,'+B,'-s','base','(objectClass=*)','uid','sn','description')
+    print(f"{name:16} READ fa_bob uid,sn,description -> {[l for l in r.stdout.splitlines() if l and not l.startswith('dn:')]} rc={r.returncode}")
+finally:
+  sp.run(['docker','rm','-f','-v',n],capture_output=True)
+
+===== script filterprobe13.py =====
+import subprocess as sp, time, secrets, re
+ref=open('deploy/docker/dirsrv.digest').read().strip()
+pw=secrets.token_hex(16); n='muse-fprobe13-'+secrets.token_hex(3)
+def ex(*a, inp=None): return sp.run(['docker','exec','-i',n,*a],input=inp,capture_output=True,text=True)
+sp.run(['docker','run','-d','--name',n,'-e','DS_DM_PASSWORD='+pw,'-v','/data',ref],stdout=sp.DEVNULL,check=True)
+S='dc=example,dc=test'; B='ou=probe-vis13,'+S; P='ou=people,'+S
+def who(u): return f'uid={u},{P}'
+def lm(ldif): r=ex('ldapmodify','-x','-a','-c','-H','ldap://127.0.0.1:3389','-D','cn=Directory Manager','-w',pw,inp=ldif); return r.returncode, r.stderr.strip()[:120]
+try:
+  for i in range(600):
+    l=sp.run(['docker','logs',n],capture_output=True,text=True)
+    if '389-ds-container started.' in l.stdout+l.stderr: break
+    time.sleep(0.5)
+  print('image',ref); print('backend',ex('dsconf','localhost','backend','create','--suffix',S,'--be-name','userroot','--create-suffix').returncode)
+  r=ex('ldapsearch','-x','-LLL','-o','ldif-wrap=no','-H','ldap://127.0.0.1:3389','-D','cn=Directory Manager','-w',pw,'-b','cn=schema','-s','base','(objectClass=*)','attributeTypes')
+  for name in ['memberOf','nsAccountLock','pwdChangedTime','passwordHistory','pwdUpdateTime','passwordExpirationTime']:
+    for line in r.stdout.splitlines():
+      if re.search(r"NAME \(?\s*'"+name+"'",line,re.I):
+        u=re.search(r'USAGE (\w+)',line); nm=re.search(r'NO-USER-MODIFICATION',line)
+        print('schema',name,'USAGE',u.group(1) if u else 'userApplications(default)','NO-USER-MOD' if nm else '')
+  acis={'q_userid_memberof':'memberOf','q_userid_acctlock':'nsAccountLock'}
+  ldif=f"dn: {P}\nobjectClass: organizationalUnit\nou: people\n\ndn: {B}\nobjectClass: organizationalUnit\nou: probe-vis13\n\n"
+  ldif+=f"dn: uid=v_m,{B}\nobjectClass: inetOrgPerson\nobjectClass: inetUser\nuid: v_m\ncn: v_m\nsn: S\nmemberOf: cn=g,{S}\n\n"
+  ldif+=f"dn: uid=v_l,{B}\nobjectClass: inetOrgPerson\nuid: v_l\ncn: v_l\nsn: S\nnsAccountLock: true\n\n"
+  for s in acis: ldif+=f"dn: {who(s)}\nobjectClass: inetOrgPerson\nuid: {s}\ncn: {s}\nsn: S\nuserPassword: Probe-Pw-{s}-1\n\n"
+  print('add',*lm(ldif))
+  for s,a in acis.items():
+    for k,(t,perm) in enumerate([('(targetattr="userid")','read,search,compare'),(f'(targetattr="{a}")','read')]):
+      print('aci',s,k,*ex('ldapmodify','-x','-H','ldap://127.0.0.1:3389','-D','cn=Directory Manager','-w',pw,inp=f"dn: {S}\nchangetype: modify\nadd: aci\naci: (target=\"ldap:///{B}\"){t}(version 3.0; acl \"labldap:{s}-{k}\"; allow ({perm}) userdn=\"ldap:///{who(s)}\";)\n\n").returncode.__str__().split())
+  for name,dn,p in [('DM','cn=Directory Manager',pw)]+[(s,who(s),f'Probe-Pw-{s}-1') for s in acis]:
+    for f in ['(!(userid;x-test=x))']:
+      r=ex('ldapsearch','-x','-LLL','-H','ldap://127.0.0.1:3389','-D',dn,'-w',p,'-b',B,'-s','one',f,'1.1')
+      dns=sorted(l.split(',')[0][4:] for l in r.stdout.splitlines() if l.startswith('dn:'))
+      print(f"{name:18} {f:28} rc={r.returncode} {dns}")
+    r=ex('ldapsearch','-x','-LLL','-H','ldap://127.0.0.1:3389','-D',dn,'-w',p,'-b',B,'-s','one','(objectClass=*)','memberOf','nsAccountLock')
+    print(f"{name:18} READ memberOf,nsAccountLock -> {[l for l in r.stdout.splitlines() if l]} rc={r.returncode}")
+finally:
+  sp.run(['docker','rm','-f','-v',n],capture_output=True)
+
+===== script filterprobe14.py =====
+import subprocess as sp, time, secrets
+ref=open('deploy/docker/dirsrv.digest').read().strip()
+pw=secrets.token_hex(16); n='muse-fprobe14-'+secrets.token_hex(3)
+def ex(*a, inp=None): return sp.run(['docker','exec','-i',n,*a],input=inp,capture_output=True,text=True)
+sp.run(['docker','run','-d','--name',n,'-e','DS_DM_PASSWORD='+pw,'-v','/data',ref],stdout=sp.DEVNULL,check=True)
+S='dc=example,dc=test'; B='ou=probe-fattr,'+S; P='ou=people,'+S
+def who(u): return f'uid={u},{P}'
+try:
+  for i in range(600):
+    l=sp.run(['docker','logs',n],capture_output=True,text=True)
+    if '389-ds-container started.' in l.stdout+l.stderr: break
+    time.sleep(0.5)
+  print('image',ref); print('backend',ex('dsconf','localhost','backend','create','--suffix',S,'--be-name','userroot','--create-suffix').returncode)
+  RSC='read,search,compare'
+  RSC='read,search,compare'
+  U=('(targetattr="userid")',RSC)
+  acis={'r_deny_pw':[('(targetattr="*")',RSC),('(targetattr="userPassword")','DENYread,search,compare')],
+        'r_deny_pw_search':[('(targetattr="*")',RSC),('(targetattr="userPassword")','DENYsearch')],
+        'r_deny_pwoid':[('(targetattr="*")',RSC),('(targetattr="2.5.4.35")','DENYread,search,compare')]}
+
+  ldif=f"dn: {P}\nobjectClass: organizationalUnit\nou: people\n\n"
+  for s in acis: ldif+=f"dn: {who(s)}\nobjectClass: inetOrgPerson\nuid: {s}\ncn: {s}\nsn: S\nuserPassword: Probe-Pw-{s}-1\n\n"
+  ldif+=f"dn: {B}\nobjectClass: organizationalUnit\nou: probe-fattr\n\n"
+  for u,extra in [('fa_alice',''),('fa_bob','userPassword: Probe-Bob-Pw-1\nuid;x-test: bobtag\ndescription;lang-en: hello\n'),('fa_carol','description;lang-en;x-foo: multi\n')]:
+    ldif+=f"dn: uid={u},{B}\nobjectClass: inetOrgPerson\nuid: {u}\ncn: {u}\nsn: S\n{extra}\n"
+  r=ex('ldapadd','-x','-H','ldap://127.0.0.1:3389','-D','cn=Directory Manager','-w',pw,inp=ldif); print('add',r.returncode,r.stderr.strip()[:300])
+  def addaci(text):
+    r=ex('ldapmodify','-x','-H','ldap://127.0.0.1:3389','-D','cn=Directory Manager','-w',pw,inp=f"dn: {S}\nchangetype: modify\nadd: aci\naci: {text}\n\n")
+    return r.returncode, r.stderr.strip().replace('\n',' ')[:160]
+  for s_,lst in acis.items():
+    for k,(t,perm) in enumerate(lst):
+      print('aci',s_,k,*addaci(f'(target="ldap:///{B}"){t}(version 3.0; acl "labldap:{s_}-{k}"; {"deny ("+perm[4:]+")" if perm.startswith("DENY") else "allow ("+perm+")"} userdn="ldap:///{who(s_)}";)'))
+  O='0.9.2342.19200300.100.1.1'
+  fl=['(sn=S)','(!(sn=X))','(userPassword=*)','(!(userPassword=*))','(uid=fa_bob)']
+  subs=[('DM','cn=Directory Manager',pw)]+[(s,who(s),f'Probe-Pw-{s}-1') for s in acis]
+  for name,dn,p in subs:
+    for f in fl:
+      r=ex('ldapsearch','-x','-LLL','-H','ldap://127.0.0.1:3389','-D',dn,'-w',p,'-b',B,'-s','one',f,'1.1')
+      dns=sorted(l.split(',')[0][4:] for l in r.stdout.splitlines() if l.startswith('dn:'))
+      print(f"{name:16} {f:44} rc={r.returncode} {dns} {r.stderr.strip()[:80]}")
+    r=ex('ldapsearch','-x','-LLL','-H','ldap://127.0.0.1:3389','-D',dn,'-w',p,'-b','uid=fa_bob,'+B,'-s','base','(objectClass=*)','sn','uid','userPassword')
+    print(f"{name:16} READ fa_bob sn,uid,userPassword -> {[l for l in r.stdout.splitlines() if l and not l.startswith('dn:')]} rc={r.returncode}")
+finally:
+  sp.run(['docker','rm','-f','-v',n],capture_output=True)
+
+# Probe 15 (2026-10-04): 389 cn=schema USAGE for every native registry name (object class names show ABSENT).
+
+===== probe 15 =====
+image quay.io/389ds/dirsrv@sha256:f2851654c5df545cd893d84bea8d08c28dc25f0930493fbfed1d8a6eacf657f7
+top                          native=user  389=ABSENT
+domain                       native=user  389=ABSENT
+organizationalUnit           native=user  389=ABSENT
+person                       native=user  389=ABSENT
+organizationalPerson         native=user  389=ABSENT
+inetOrgPerson                native=user  389=ABSENT
+groupOfNames                 native=user  389=ABSENT
+groupOfUniqueNames           native=user  389=ABSENT
+device                       native=user  389=ABSENT
+nsmemberof                   native=user  389=ABSENT
+subschema                    native=user  389=ABSENT
+objectClass                  native=user  389=userApplications
+cn                           native=user  389=userApplications
+sn                           native=user  389=userApplications
+serialNumber                 native=user  389=userApplications
+l                            native=user  389=userApplications
+st                           native=user  389=userApplications
+street                       native=user  389=userApplications
+o                            native=user  389=userApplications
+ou                           native=user  389=userApplications
+title                        native=user  389=userApplications
+description                  native=user  389=userApplications
+businessCategory             native=user  389=userApplications
+postalAddress                native=user  389=userApplications
+telephoneNumber              native=user  389=userApplications
+destinationIndicator         native=user  389=userApplications
+member                       native=user  389=userApplications
+owner                        native=user  389=userApplications
+seeAlso                      native=user  389=userApplications
+userPassword                 native=user  389=userApplications
+givenName                    native=user  389=userApplications
+initials                     native=user  389=userApplications
+uniqueMember                 native=user  389=userApplications
+uid                          native=user  389=userApplications
+mail                         native=user  389=userApplications
+roomNumber                   native=user  389=userApplications
+manager                      native=user  389=userApplications
+homePhone                    native=user  389=userApplications
+dc                           native=user  389=userApplications
+mobile                       native=user  389=userApplications
+pager                        native=user  389=userApplications
+jpegPhoto                    native=user  389=userApplications
+carLicense                   native=user  389=userApplications
+departmentNumber             native=user  389=userApplications
+employeeNumber               native=user  389=userApplications
+employeeType                 native=user  389=userApplications
+displayName                  native=user  389=userApplications
+nsAccountLock                native=user  389=directoryOperation  <-- differs
+memberOf                     native=op    389=userApplications  <-- differs
+pwdAccountLockedTime         native=op    389=ABSENT
+pwdReset                     native=op    389=directoryOperation
+passwordExpirationTime       native=op    389=directoryOperation
+accountUnlockTime            native=op    389=directoryOperation
+aci                          native=user  389=directoryOperation  <-- differs
+createTimestamp              native=op    389=directoryOperation
+modifyTimestamp              native=op    389=directoryOperation
+creatorsName                 native=op    389=directoryOperation
+modifiersName                native=op    389=directoryOperation
+entryUUID                    native=op    389=directoryOperation
+namingContexts               native=op    389=dSAOperation
+subschemaSubentry            native=op    389=directoryOperation
+supportedControl             native=op    389=dSAOperation
+supportedExtension           native=op    389=dSAOperation
+supportedLDAPVersion         native=op    389=dSAOperation
+vendorName                   native=op    389=dSAOperation
+vendorVersion                native=op    389=dSAOperation
+attributeTypes               native=op    389=directoryOperation
+objectClasses                native=op    389=directoryOperation
+matchingRules                native=op    389=directoryOperation
+attributeTypes               native=user  389=directoryOperation  <-- differs
+objectClasses                native=user  389=directoryOperation  <-- differs
+matchingRules                native=user  389=directoryOperation  <-- differs
+exit=0
+
+===== script filterprobe15.py =====
+import subprocess as sp, time, secrets, re
+ref=open('deploy/docker/dirsrv.digest').read().strip()
+pw=secrets.token_hex(16); n='muse-fprobe15-'+secrets.token_hex(3)
+sp.run(['docker','run','-d','--name',n,'-e','DS_DM_PASSWORD='+pw,'-v','/data',ref],stdout=sp.DEVNULL,check=True)
+try:
+  for i in range(600):
+    l=sp.run(['docker','logs',n],capture_output=True,text=True)
+    if '389-ds-container started.' in l.stdout+l.stderr: break
+    time.sleep(0.5)
+  print('image',ref)
+  r=sp.run(['docker','exec',n,'ldapsearch','-x','-LLL','-o','ldif-wrap=no','-H','ldap://127.0.0.1:3389','-D','cn=Directory Manager','-w',pw,'-b','cn=schema','-s','base','(objectClass=*)','attributeTypes'],capture_output=True,text=True)
+  usage={}
+  for line in r.stdout.splitlines():
+    m=re.search(r"NAME (\(([^)]*)\)|'([^']*)')",line)
+    if not m: continue
+    names=re.findall(r"'([^']+)'",m.group(1)); u=re.search(r'USAGE (\w+)',line)
+    for nm in names: usage[nm.lower()]=u.group(1) if u else 'userApplications'
+  for l in open('native_usage.txt (name + native Operational flag from schema_registry.go)'):
+    nm,nat=l.split(); o=usage.get(nm.lower(),'ABSENT')
+    flag='' if (o=='ABSENT' or (o=='userApplications')==(nat=='user')) else '  <-- differs'
+    print(f'{nm:28} native={nat:5} 389={o}{flag}')
+finally:
+  sp.run(['docker','rm','-f','-v',n],capture_output=True)

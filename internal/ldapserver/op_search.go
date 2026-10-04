@@ -95,6 +95,11 @@ func (s *Server) runSearch(ctx context.Context, c *conn, m *Message, req *Search
 			if s.matchSearchFilter(ctx, tx, subj, entryDN, e, req.Filter) != filterTrue {
 				return nil
 			}
+			// C8 visibility runs after the filter so only matching
+			// entries pay the per-attribute read checks.
+			if !s.entryReadable(ctx, tx, subj, entryDN, e) {
+				return nil
+			}
 			if len(matched) >= sizeLimit {
 				code = ResultSizeLimitExceeded
 				return errSearchLimit
@@ -181,6 +186,59 @@ func (s *Server) runSearch(ctx context.Context, c *conn, m *Message, req *Search
 	}
 	sendDone(Result{Code: code}, pageControls)
 	return code
+}
+
+// searchEntryVisible is the full entry-level access check for a search
+// result (contract C8): the entry-level search grant plus entryReadable.
+// runSearch runs the two halves around the filter; tests use this form.
+func (s *Server) searchEntryVisible(ctx context.Context, tx ReadTx, subj Subject, dn config.DN, e *Entry) bool {
+	return s.allowed(ctx, tx, subj, dn, "", PermSearch) && s.entryReadable(ctx, tx, subj, dn, e)
+}
+
+// entryReadable reports whether subj may read at least one attribute of e
+// that counts for search-result visibility. 389 returns an entry only if
+// the subject may read such an attribute (oracle probes 8, 10 and 13: read
+// on nothing but operational attributes, or search without read, hides the
+// entry even when the filter is True; objectClass and memberOf count,
+// nsAccountLock does not). Unknown attributes count, as in
+// clientModifiable.
+func (s *Server) entryReadable(ctx context.Context, tx ReadTx, subj Subject, dn config.DN, e *Entry) bool {
+	for _, a := range e.Attributes {
+		if !s.countsForVisibility(a.Name) {
+			continue
+		}
+		if s.allowed(ctx, tx, subj, dn, a.Name, PermRead) {
+			return true
+		}
+	}
+	return false
+}
+
+// visibilityOperational lists stored attributes whose 389 usage differs
+// from the native registry's Operational flag, keyed by lowercase base name
+// (probes 13 and 15 compared every registry attribute with the pinned
+// image's cn=schema): true means 389 treats the attribute as operational,
+// false as a user attribute. pwdChangedTime and passwordHistory are not in
+// the registry; pwdChangedTime is native-only (389's counterpart
+// pwdUpdateTime is directoryOperation).
+var visibilityOperational = map[string]bool{
+	"memberof":        false,
+	"nsaccountlock":   true,
+	"aci":             true,
+	"attributetypes":  true,
+	"objectclasses":   true,
+	"matchingrules":   true,
+	"passwordhistory": true,
+	"pwdchangedtime":  true,
+}
+
+func (s *Server) countsForVisibility(name string) bool {
+	base, _, _ := strings.Cut(name, ";")
+	if op, ok := visibilityOperational[strings.ToLower(base)]; ok {
+		return !op
+	}
+	at, ok := s.opts.Schema.AttributeType(base)
+	return !ok || !at.Operational
 }
 
 // projectEntry applies attribute selection and per-attribute ACI read

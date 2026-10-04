@@ -73,6 +73,8 @@ engine fails as an undecided divergence.
 | CAND-13 | ACI evaluation order | order-independent deny-wins on the T-036 set | `delta-ledger.json` verdict `match` |
 | CAND-14 | `userPassword` read under `ou=people` as runtime | granted by `runtime-people-write` on a person entry | `delta-ledger.json` verdict `match` |
 | CAND-16 | ACI entry-level add/delete `targetattr` scope | add/delete ignore `targetattr`; missing entry → `noSuchObject(32)` | `delta-ledger.json` verdict `match` |
+| CAND-31 | Search result visibility (filter leaf on a literal `targetattr="userid"`) | an entry is returned only if the subject may read at least one non-operational attribute it holds (389 usage); the CAND-31 row returns none on both engines | oracle probes 6, 8, 10, 12, 13, 15 (`test/parity/testdata/filter-attr-oracle-probes.txt`); `TestDualEngineFilterAttributeDescriptionParity`, `TestACIEntryVisibilityAndTargetAttrLists` (2026-10-04, owner: "We keep parity") |
+| CAND-32 | `targetattr` list syntax | `\|\|`-separated lists and numeric-OID names accepted and compared literally; single `\|` rejected | oracle probes 8, 10, 11, 14; `TestTargetAttrListsMatchOracle`, `TestDualEngineFilterAttributeDescriptionParity`, `TestACIEntryVisibilityAndTargetAttrLists` (2026-10-04) |
 | CAND-19 | Assertion control scope on non-Modify ops | `unavailableCriticalExtension(12)` on critical non-Modify; `assertionFailed(122)` on mismatch | `delta-ledger.json` verdict `match` |
 
 ## Deltas adjudicated by T-147's oracle probes

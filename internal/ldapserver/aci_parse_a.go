@@ -7,7 +7,8 @@ package ldapserver
 // inside the same grammar:
 //
 //	(target="ldap:///<dn>")
-//	(targetattr="<attr>[|<attr>...]" | "*" | targetattr!="<attr>[|<attr>...]")
+//	(targetattr="<attr>[ || <attr>...]" | "*" | targetattr!="<attr>[ || <attr>...]")
+//	<attr> = name or numeric OID, optional ;options; compared literally (C8)
 //	(version 3.0; acl "<name>"; allow|deny (<perm>[,<perm>...]) <who>;)
 //	<who> = userdn="ldap:///<dn>|all|anyone|self" | groupdn="ldap:///<dn>"
 //
@@ -80,9 +81,9 @@ const (
 	// ACITargetAttrAllA covers targetattr="*" and an omitted targetattr
 	// clause (389 semantics: all attributes).
 	ACITargetAttrAllA ACITargetAttrModeA = iota
-	// ACITargetAttrAllowA covers targetattr="a|b": only Attrs are targeted.
+	// ACITargetAttrAllowA covers targetattr="a || b": only Attrs are targeted.
 	ACITargetAttrAllowA
-	// ACITargetAttrDenyA covers targetattr!="a|b": every attribute except
+	// ACITargetAttrDenyA covers targetattr!="a || b": every attribute except
 	// Attrs is targeted.
 	ACITargetAttrDenyA
 )
@@ -207,10 +208,16 @@ var aciPermsA = map[string]Permission{
 	"write":   PermWrite,
 }
 
-// aciAttrNameReA mirrors the compiler's aciAttrRe so the parser accepts
-// exactly the attribute tokens the emitter can produce (including ";" for
-// attribute options such as userCertificate;binary).
+// aciAttrNameReA mirrors the compiler's aciAttrRe (including ";" for
+// attribute options such as userCertificate;binary). The compiler emits
+// only these names; raw ACIs may also use numeric OIDs (aciAttrOIDReA).
 var aciAttrNameReA = regexp.MustCompile(`^(\*|[A-Za-z][A-Za-z0-9-;]*)$`)
+
+// aciAttrOIDReA accepts a numeric-OID targetattr name (with optional
+// attribute options), as the pinned 389 image does (CAND-32, oracle probes
+// 8 and 10). The name is compared literally, like any other entry: no
+// resolution to the descriptor.
+var aciAttrOIDReA = regexp.MustCompile(`^[0-9]+(\.[0-9]+)+(;[A-Za-z0-9-]+)*$`)
 
 // aciTokKindA classifies lexer tokens.
 type aciTokKindA int
@@ -519,7 +526,12 @@ func (p *aciParserA) parseTargetAttrClauseA(out *ParsedACI) error {
 	if err != nil {
 		return err
 	}
-	parts := strings.Split(v.text, "|")
+	// 389 separates names with "||" (any surrounding spaces); a single "|"
+	// is not a separator, so "uid|sn" fails the name check, as on 389.
+	parts := strings.Split(v.text, "||")
+	for i := range parts {
+		parts[i] = strings.TrimSpace(parts[i])
+	}
 	if len(parts) > aciMaxAttrsA {
 		return aciErrA(v.pos, "targetattr list exceeds %d attributes", aciMaxAttrsA)
 	}
@@ -530,7 +542,7 @@ func (p *aciParserA) parseTargetAttrClauseA(out *ParsedACI) error {
 			star = true
 			continue
 		}
-		if !aciAttrNameReA.MatchString(a) {
+		if !aciAttrNameReA.MatchString(a) && !aciAttrOIDReA.MatchString(a) {
 			return aciErrA(v.pos, "invalid attribute name %q in targetattr", aciTruncA(a))
 		}
 		attrs = append(attrs, a)

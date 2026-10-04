@@ -277,7 +277,8 @@ func probe6ACIs() []string {
 // (userid=fa_bob) and its NOT (main checked the literal userid, so the leaf
 // was allowed and False); fa_allow_uid userid/OID rows (main: False);
 // fa_deny_uid (!(OID;x-test=bobtag)) (main resolved OID;x-test to uid:
-// Undefined, oracle False so its NOT returns all three).
+// Undefined, oracle False so its NOT returns all three); fa_allow_userid
+// (!(userid;x-test=bobtag)) (CAND-31: main returned all three).
 func TestFilterLeafSearchIdentityMatchesOracle(t *testing.T) {
 	t.Parallel()
 	const base = "ou=probe-fattr,dc=example,dc=test"
@@ -332,11 +333,9 @@ func TestFilterLeafSearchIdentityMatchesOracle(t *testing.T) {
 	want["fa_deny_uid"]["(!(userid;x-test=bobtag))"] = all
 	want["fa_deny_uid"]["(!("+oid+";x-test=bobtag))"] = all
 	want["fa_deny_userid"]["(!("+oid+";x-test=bobtag))"] = all
-	// CAND-31 (open, excluded): 389 returns no entries for fa_allow_userid
-	// (!(userid;x-test=bobtag)) (reason not probed); native checks the leaf
-	// under the literal base userid, which matches the literal allow list,
-	// so the leaf is allowed, False, and its NOT returns all three.
-	delete(want["fa_allow_userid"], "(!(userid;x-test=bobtag))")
+	// CAND-31 (resolved as Contract): fa_allow_userid can read no attribute
+	// the entries hold, so 389 returns none even for the True NOT row; the
+	// entry-level visibility check (searchEntryVisible) matches that.
 
 	ctx := context.Background()
 	for subj, rows := range want {
@@ -346,7 +345,8 @@ func TestFilterLeafSearchIdentityMatchesOracle(t *testing.T) {
 			var got string
 			if err := opts.Store.View(ctx, func(tx ReadTx) error {
 				got = matchingNames(t, entries, func(e *Entry) bool {
-					return srv.matchSearchFilter(ctx, tx, s, mustDNA(t, e.DN), e, f) == filterTrue
+					dn := mustDNA(t, e.DN)
+					return srv.searchEntryVisible(ctx, tx, s, dn, e) && srv.matchSearchFilter(ctx, tx, s, dn, e, f) == filterTrue
 				})
 				return nil
 			}); err != nil {

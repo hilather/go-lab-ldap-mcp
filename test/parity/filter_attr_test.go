@@ -23,22 +23,235 @@ const (
 	fattrOID      = "0.9.2342.19200300.100.1.1"
 )
 
-var fattrSubjects = []struct{ id, targetattr string }{
-	{"fa_allow_uid", `(targetattr="uid")`},
-	{"fa_allow_userid", `(targetattr="userid")`},
-	{"fa_deny_uid", `(targetattr!="uid")`},
-	{"fa_deny_userid", `(targetattr!="userid")`},
+const fattrRSC = "read,search,compare"
+
+// fattrSubjects are the probe-6 subjects plus the probe 8/10 subjects
+// (entry visibility, targetattr list syntax). Each ACI is a targetattr
+// clause and a permission list.
+var fattrSubjects = []struct {
+	id   string
+	acis [][2]string
+}{
+	{"fa_allow_uid", [][2]string{{`(targetattr="uid")`, fattrRSC}}},
+	{"fa_allow_userid", [][2]string{{`(targetattr="userid")`, fattrRSC}}},
+	{"fa_deny_uid", [][2]string{{`(targetattr!="uid")`, fattrRSC}}},
+	{"fa_deny_userid", [][2]string{{`(targetattr!="userid")`, fattrRSC}}},
+	{"p_userid", [][2]string{{`(targetattr="userid")`, fattrRSC}}},
+	{"p_star_read", [][2]string{{`(targetattr="*")`, "read"}}},
+	{"p_list_case", [][2]string{{`(targetattr="UID || Sn")`, fattrRSC}}},
+	{"p_oid_only", [][2]string{{`(targetattr="0.9.2342.19200300.100.1.1")`, fattrRSC}}},
+	{"p_userid_sn", [][2]string{{`(targetattr="userid")`, fattrRSC}, {`(targetattr="sn")`, fattrRSC}}},
+	{"p_userid_snsearch", [][2]string{{`(targetattr="userid")`, fattrRSC}, {`(targetattr="sn")`, "search"}}},
+	{"p_userid_snread", [][2]string{{`(targetattr="userid")`, fattrRSC}, {`(targetattr="sn")`, "read"}}},
+	{"p_star_search", [][2]string{{`(targetattr="*")`, "search"}}},
+	{"p_list", [][2]string{{`(targetattr="uid || sn")`, fattrRSC}}},
+	{"p_list_nospace", [][2]string{{`(targetattr="uid||sn")`, fattrRSC}}},
+	{"p_oid_sn", [][2]string{{`(targetattr="2.5.4.4 || uid")`, fattrRSC}}},
+	{"p_deny_oid", [][2]string{{`(targetattr!="0.9.2342.19200300.100.1.1")`, fattrRSC}}},
+	{"p_deny_list", [][2]string{{`(targetattr!="uid || description")`, fattrRSC}}},
+	{"q_oc", [][2]string{{`(targetattr="userid")`, fattrRSC}, {`(targetattr="objectClass")`, "read"}}},
+	{"q_entryuuid", [][2]string{{`(targetattr="userid")`, fattrRSC}, {`(targetattr="entryUUID")`, "read"}}},
+}
+
+// fattrVisRows are the probe 8/10 rows (389 DN sets, generated from the
+// transcripts) for the subjects added with CAND-31/32.
+var fattrVisRows = map[string][]fattrRow{
+	"p_userid": {
+		{`(!(userid;x-test=bobtag))`, ""},
+		{`(!(0.9.2342.19200300.100.1.1;x-test=bobtag))`, ""},
+		{`(sn=S)`, ""},
+		{`(!(sn=X))`, ""},
+		{`(uid=fa_bob)`, ""},
+		{`(!(uid=fa_bob))`, ""},
+		{`(cn=fa_bob)`, ""},
+		{`(!(cn=fa_bob))`, ""},
+		{`(2.5.4.4=S)`, ""},
+		{`(description=hello)`, ""},
+		{`(!(description=hello))`, ""},
+	},
+	"p_userid_sn": {
+		{`(!(userid;x-test=bobtag))`, "fa_alice,fa_bob,fa_carol"},
+		{`(!(0.9.2342.19200300.100.1.1;x-test=bobtag))`, ""},
+		{`(sn=S)`, "fa_alice,fa_bob,fa_carol"},
+		{`(!(sn=X))`, "fa_alice,fa_bob,fa_carol"},
+		{`(uid=fa_bob)`, ""},
+		{`(!(uid=fa_bob))`, ""},
+		{`(cn=fa_bob)`, ""},
+		{`(!(cn=fa_bob))`, ""},
+		{`(2.5.4.4=S)`, "fa_alice,fa_bob,fa_carol"},
+		{`(description=hello)`, ""},
+		{`(!(description=hello))`, ""},
+	},
+	"p_userid_snsearch": {
+		{`(!(userid;x-test=bobtag))`, ""},
+		{`(!(0.9.2342.19200300.100.1.1;x-test=bobtag))`, ""},
+		{`(sn=S)`, ""},
+		{`(!(sn=X))`, ""},
+		{`(uid=fa_bob)`, ""},
+		{`(!(uid=fa_bob))`, ""},
+		{`(cn=fa_bob)`, ""},
+		{`(!(cn=fa_bob))`, ""},
+		{`(2.5.4.4=S)`, ""},
+		{`(description=hello)`, ""},
+		{`(!(description=hello))`, ""},
+	},
+	"p_userid_snread": {
+		{`(!(userid;x-test=bobtag))`, "fa_alice,fa_bob,fa_carol"},
+		{`(!(0.9.2342.19200300.100.1.1;x-test=bobtag))`, ""},
+		{`(sn=S)`, ""},
+		{`(!(sn=X))`, ""},
+		{`(uid=fa_bob)`, ""},
+		{`(!(uid=fa_bob))`, ""},
+		{`(cn=fa_bob)`, ""},
+		{`(!(cn=fa_bob))`, ""},
+		{`(2.5.4.4=S)`, ""},
+		{`(description=hello)`, ""},
+		{`(!(description=hello))`, ""},
+	},
+	"p_star_search": {
+		{`(!(userid;x-test=bobtag))`, ""},
+		{`(!(0.9.2342.19200300.100.1.1;x-test=bobtag))`, ""},
+		{`(sn=S)`, ""},
+		{`(!(sn=X))`, ""},
+		{`(uid=fa_bob)`, ""},
+		{`(!(uid=fa_bob))`, ""},
+		{`(cn=fa_bob)`, ""},
+		{`(!(cn=fa_bob))`, ""},
+		{`(2.5.4.4=S)`, ""},
+		{`(description=hello)`, ""},
+		{`(!(description=hello))`, ""},
+	},
+	"p_star_read": {
+		{`(!(userid;x-test=bobtag))`, ""},
+		{`(!(0.9.2342.19200300.100.1.1;x-test=bobtag))`, ""},
+		{`(sn=S)`, ""},
+		{`(!(sn=X))`, ""},
+		{`(uid=fa_bob)`, ""},
+		{`(!(uid=fa_bob))`, ""},
+		{`(cn=fa_bob)`, ""},
+		{`(!(cn=fa_bob))`, ""},
+		{`(2.5.4.4=S)`, ""},
+		{`(description=hello)`, ""},
+		{`(!(description=hello))`, ""},
+	},
+	"p_list": {
+		{`(!(userid;x-test=bobtag))`, ""},
+		{`(!(0.9.2342.19200300.100.1.1;x-test=bobtag))`, ""},
+		{`(sn=S)`, "fa_alice,fa_bob,fa_carol"},
+		{`(!(sn=X))`, "fa_alice,fa_bob,fa_carol"},
+		{`(uid=fa_bob)`, "fa_bob"},
+		{`(!(uid=fa_bob))`, "fa_alice,fa_carol"},
+		{`(cn=fa_bob)`, ""},
+		{`(!(cn=fa_bob))`, ""},
+		{`(2.5.4.4=S)`, "fa_alice,fa_bob,fa_carol"},
+		{`(description=hello)`, ""},
+		{`(!(description=hello))`, ""},
+	},
+	"p_list_nospace": {
+		{`(!(userid;x-test=bobtag))`, ""},
+		{`(!(0.9.2342.19200300.100.1.1;x-test=bobtag))`, ""},
+		{`(sn=S)`, "fa_alice,fa_bob,fa_carol"},
+		{`(!(sn=X))`, "fa_alice,fa_bob,fa_carol"},
+		{`(uid=fa_bob)`, "fa_bob"},
+		{`(!(uid=fa_bob))`, "fa_alice,fa_carol"},
+		{`(cn=fa_bob)`, ""},
+		{`(!(cn=fa_bob))`, ""},
+		{`(2.5.4.4=S)`, "fa_alice,fa_bob,fa_carol"},
+		{`(description=hello)`, ""},
+		{`(!(description=hello))`, ""},
+	},
+	"p_list_case": {
+		{`(!(userid;x-test=bobtag))`, ""},
+		{`(!(0.9.2342.19200300.100.1.1;x-test=bobtag))`, ""},
+		{`(sn=S)`, "fa_alice,fa_bob,fa_carol"},
+		{`(!(sn=X))`, "fa_alice,fa_bob,fa_carol"},
+		{`(uid=fa_bob)`, "fa_bob"},
+		{`(!(uid=fa_bob))`, "fa_alice,fa_carol"},
+		{`(cn=fa_bob)`, ""},
+		{`(!(cn=fa_bob))`, ""},
+		{`(2.5.4.4=S)`, "fa_alice,fa_bob,fa_carol"},
+		{`(description=hello)`, ""},
+		{`(!(description=hello))`, ""},
+	},
+	"p_oid_sn": {
+		{`(!(userid;x-test=bobtag))`, ""},
+		{`(!(0.9.2342.19200300.100.1.1;x-test=bobtag))`, ""},
+		{`(sn=S)`, ""},
+		{`(!(sn=X))`, ""},
+		{`(uid=fa_bob)`, "fa_bob"},
+		{`(!(uid=fa_bob))`, "fa_alice,fa_carol"},
+		{`(cn=fa_bob)`, ""},
+		{`(!(cn=fa_bob))`, ""},
+		{`(2.5.4.4=S)`, ""},
+		{`(description=hello)`, ""},
+		{`(!(description=hello))`, ""},
+	},
+	"p_oid_only": {
+		{`(!(userid;x-test=bobtag))`, ""},
+		{`(!(0.9.2342.19200300.100.1.1;x-test=bobtag))`, ""},
+		{`(sn=S)`, ""},
+		{`(!(sn=X))`, ""},
+		{`(uid=fa_bob)`, ""},
+		{`(!(uid=fa_bob))`, ""},
+		{`(cn=fa_bob)`, ""},
+		{`(!(cn=fa_bob))`, ""},
+		{`(2.5.4.4=S)`, ""},
+		{`(description=hello)`, ""},
+		{`(!(description=hello))`, ""},
+	},
+	"p_deny_oid": {
+		{`(!(userid;x-test=bobtag))`, "fa_alice,fa_bob,fa_carol"},
+		{`(!(0.9.2342.19200300.100.1.1;x-test=bobtag))`, ""},
+		{`(sn=S)`, "fa_alice,fa_bob,fa_carol"},
+		{`(!(sn=X))`, "fa_alice,fa_bob,fa_carol"},
+		{`(uid=fa_bob)`, "fa_bob"},
+		{`(!(uid=fa_bob))`, "fa_alice,fa_carol"},
+		{`(cn=fa_bob)`, "fa_bob"},
+		{`(!(cn=fa_bob))`, "fa_alice,fa_carol"},
+		{`(2.5.4.4=S)`, "fa_alice,fa_bob,fa_carol"},
+		{`(description=hello)`, "fa_bob"},
+		{`(!(description=hello))`, "fa_alice,fa_carol"},
+	},
+	"p_deny_list": {
+		{`(!(userid;x-test=bobtag))`, "fa_alice,fa_bob,fa_carol"},
+		{`(!(0.9.2342.19200300.100.1.1;x-test=bobtag))`, "fa_alice,fa_bob,fa_carol"},
+		{`(sn=S)`, "fa_alice,fa_bob,fa_carol"},
+		{`(!(sn=X))`, "fa_alice,fa_bob,fa_carol"},
+		{`(uid=fa_bob)`, ""},
+		{`(!(uid=fa_bob))`, ""},
+		{`(cn=fa_bob)`, "fa_bob"},
+		{`(!(cn=fa_bob))`, "fa_alice,fa_carol"},
+		{`(2.5.4.4=S)`, "fa_alice,fa_bob,fa_carol"},
+		{`(description=hello)`, ""},
+		{`(!(description=hello))`, ""},
+	},
+	"q_oc": {
+		{`(!(userid;x-test=bobtag))`, "fa_alice,fa_bob,fa_carol"},
+		{`(sn=S)`, ""},
+		{`(uid=fa_bob)`, ""},
+	},
+	"q_entryuuid": {
+		{`(!(userid;x-test=bobtag))`, ""},
+		{`(sn=S)`, ""},
+		{`(uid=fa_bob)`, ""},
+	},
 }
 
 func filterAttrFixture(t *testing.T) *fixture {
 	t.Helper()
 	var acls strings.Builder
 	for _, s := range fattrSubjects {
-		// Probe-6 rawACI text verbatim (single-attribute targetattr with a
-		// target clause; the multi-attribute and numeric-OID shapes 389
-		// also accepts are CAND-32).
-		fmt.Fprintf(&acls, "    - id: %s\n      rawACI: '(target=\"ldap:///%s\")%s(version 3.0; acl \"labldap:%s\"; allow (read,search,compare) userdn=\"ldap:///uid=%s,%s\";)'\n",
-			strings.ReplaceAll(s.id, "_", "-"), fattrOU, s.targetattr, s.id, s.id, peopleDN)
+		// Probe 6/8/10 rawACI texts verbatim (target clause, one targetattr).
+		for i, a := range s.acis {
+			id := strings.ReplaceAll(s.id, "_", "-")
+			acl := s.id
+			if len(s.acis) > 1 {
+				id = fmt.Sprintf("%s-%d", id, i)
+				acl = fmt.Sprintf("%s-%d", s.id, i)
+			}
+			fmt.Fprintf(&acls, "    - id: %s\n      rawACI: '(target=\"ldap:///%s\")%s(version 3.0; acl \"labldap:%s\"; allow (%s) userdn=\"ldap:///uid=%s,%s\";)'\n",
+				id, fattrOU, a[0], acl, a[1], s.id, peopleDN)
+		}
 	}
 	scenario := append(scenarioYAML(), []byte(acls.String())...)
 	secrets := config.MapResolver{"secrets/runtime": runtimePassword}
@@ -131,11 +344,13 @@ func fattrDMRows() []fattrRow {
 	}
 }
 
-// fattrSubjectRows are the probe-6 rows per subject. The CAND-31 row
-// (fa_allow_userid (!(userid;x-test=bobtag)): 389 none, native all three)
-// is excluded until the owner adjudicates it. Native checks that leaf under
-// the literal base userid, which matches the literal allow list.
+// fattrSubjectRows are the probe-6 rows per subject, then the probe 8/10
+// rows. The CAND-31 row (fa_allow_userid (!(userid;x-test=bobtag)): none,
+// because the subject can read no attribute the entries hold) is included.
 func fattrSubjectRows(subject string) []fattrRow {
+	if rows, ok := fattrVisRows[subject]; ok {
+		return rows
+	}
 	uidRows := []fattrRow{
 		{"(uid=fa_bob)", "fa_bob"}, {"(!(uid=fa_bob))", fattrNotBob},
 		{"(userid=fa_bob)", "fa_bob"}, {"(!(userid=fa_bob))", fattrNotBob},
@@ -171,9 +386,7 @@ func fattrSubjectRows(subject string) []fattrRow {
 		fattrRow{"(" + fattrOID + ";x-test=bobtag)", ""},
 		fattrRow{"(!(" + fattrOID + ";x-test=bobtag))", notOID},
 	)
-	if subject != "fa_allow_userid" { // CAND-31
-		out = append(out, fattrRow{"(!(userid;x-test=bobtag))", notUserid})
-	}
+	out = append(out, fattrRow{"(!(userid;x-test=bobtag))", notUserid})
 	return out
 }
 

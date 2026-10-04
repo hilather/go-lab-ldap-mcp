@@ -103,6 +103,19 @@ rebuild, and indexed searches can miss subtype values written by the older
 binary. Recover with a reset or a fresh store volume (there is no rebuild
 command).
 
+Native ACI evaluation now follows 389 in two more places. Search results
+leave out an entry unless the subject can read at least one
+non-operational attribute it holds; before, native returned such entries
+with only their DN. `targetattr` lists are separated by `||`, numeric OIDs
+are accepted, and every name is compared literally, so a numeric OID does
+not cover the attribute's name (a deny on `2.5.4.35` does not deny
+`userPassword`). Native logs a warning at startup for each numeric-OID
+`targetattr` name; use attribute names instead. A raw ACI that used a
+single `|` as a separator (`"cn|sn"`) is now rejected at startup, as 389
+already rejected it: the server exits with a configuration error on
+`aciTexts` ("ACI text failed to parse: ... invalid attribute name
+\"cn|sn\" in targetattr"). Rewrite it as `"cn || sn"`.
+
 ## Migration guidance
 
 v0.4.0 → v0.4.1 is **additive**. `apiVersion` stays `labldap.dev/v1alpha1`.

@@ -63,6 +63,15 @@ func NewACIEngine(texts []string, logger *slog.Logger) (ACIEngine, error) {
 		if err != nil {
 			return nil, fmt.Errorf("ldapserver: aci set: %w", err)
 		}
+		for _, a := range p.Attrs {
+			if aciAttrOIDReA.MatchString(a) {
+				// CAND-32 parity: compared literally, as on 389, so the
+				// OID never covers its descriptor (a deny on 2.5.4.35 does
+				// not deny userPassword). Warn: this is rarely intended.
+				logger.Warn("aci targetattr names a numeric OID; it is compared literally and does not cover the attribute's name",
+					slog.String("acl", p.ID), slog.String("targetattr", a))
+			}
+		}
 		eng.acis = append(eng.acis, p)
 	}
 	return eng, nil
