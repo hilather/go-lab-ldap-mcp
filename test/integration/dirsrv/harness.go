@@ -5,7 +5,9 @@ package dirsrv
 import (
 	"bytes"
 	"crypto/rand"
+	"crypto/tls"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -14,6 +16,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	ldap "github.com/go-ldap/ldap/v3"
 
 	"github.com/hilather/go-lab-ldap-mcp/internal/observability"
 )
@@ -146,6 +150,7 @@ func waitReady(t *testing.T, inst *Instance) {
 				waitTCP(t, inst.LDAPAddr, inst)
 				waitTCP(t, inst.LDAPSAddr, inst)
 				waitDSConf(t, inst)
+				waitDMBind(t, inst)
 				return
 			}
 		}
@@ -153,6 +158,64 @@ func waitReady(t *testing.T, inst *Instance) {
 	}
 	logs, _ := exec.Command("docker", "logs", inst.Name).CombinedOutput()
 	t.Fatalf("instance marker or LDAPI socket missing\n%s", redactLogs(string(logs), inst.password))
+}
+
+// waitDMBind blocks until the Directory Manager password the tests use is
+// live. On first boot the image's dscontainer creates the instance with a
+// random root password, starts ns-slapd, waits for its own LDAPI health
+// check, and only then applies DS_DM_PASSWORD. Every earlier readiness
+// signal (container.inf, the LDAPI socket, TCP, dsconf over LDAPI autobind)
+// can pass inside that window, so a DM simple bind fails with 49. Only 49 (and
+// network errors) are retried, within a bound; any other error fails at
+// once. Each attempt has its own dial and request timeout. After docker
+// restart the password is already the persisted value, so this returns on
+// the first attempt. The root DN is exempt from password policy, so failed
+// binds here cannot lock it out. The bind runs from the host over LDAPS so
+// the password never appears on a command line, and it works both before
+// and after bootstrap enables require-secure-authentication.
+func waitDMBind(t *testing.T, inst *Instance) {
+	t.Helper()
+	err := retryInvalidCredentials(60*time.Second, 500*time.Millisecond, func() error {
+		conn, err := ldap.DialURL("ldaps://"+inst.LDAPSAddr,
+			ldap.DialWithDialer(&net.Dialer{Timeout: 5 * time.Second}),
+			ldap.DialWithTLSConfig(&tls.Config{InsecureSkipVerify: true, MinVersion: tls.VersionTLS12})) // readiness probe only; certificate trust is tested elsewhere
+		if err != nil {
+			return err
+		}
+		defer conn.Close()
+		conn.SetTimeout(5 * time.Second)
+		return conn.Bind("cn=Directory Manager", inst.password)
+	})
+	if err != nil {
+		logs, _ := exec.Command("docker", "logs", inst.Name).CombinedOutput()
+		t.Fatalf("Directory Manager bind not ready: %v\n%s", err, redactLogs(string(logs), inst.password))
+	}
+}
+
+// errDMBindTimeout reports that every attempt within the bound returned 49.
+var errDMBindTimeout = errors.New("DS_DM_PASSWORD was not applied in time (bind kept returning 49)")
+
+// retryInvalidCredentials calls attempt until it succeeds, retrying only on
+// LDAP result 49 until the deadline. It is separate from waitDMBind so the
+// retry policy is unit-testable without Docker.
+func retryInvalidCredentials(limit, interval time.Duration, attempt func() error) error {
+	deadline := time.Now().Add(limit)
+	for {
+		err := attempt()
+		if err == nil {
+			return nil
+		}
+		// 49 is the DS_DM_PASSWORD window; a network error (EOF or reset via
+		// docker-proxy) is retried within the same bound. Anything else (TLS,
+		// other result codes) is returned at once.
+		if !ldap.IsErrorWithCode(err, ldap.LDAPResultInvalidCredentials) && !ldap.IsErrorWithCode(err, ldap.ErrorNetwork) {
+			return err
+		}
+		if time.Now().Add(interval).After(deadline) {
+			return errDMBindTimeout
+		}
+		time.Sleep(interval)
+	}
 }
 
 func waitDSConf(t *testing.T, inst *Instance) {

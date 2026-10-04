@@ -190,21 +190,8 @@ func assertBackendPhaseOK(t *testing.T, out string) {
 		} `json:"phases"`
 	}
 	// JSON summary is written to stdout; docker CombinedOutput may include stderr logs.
-	start := strings.LastIndex(out, "{")
-	if start < 0 {
-		t.Fatalf("no JSON in:\n%s", out)
-	}
-	// find matching start of the summary: last occurrence of "command"
-	idx := strings.LastIndex(out, `"command"`)
-	if idx < 0 {
-		t.Fatalf("no summary:\n%s", out)
-	}
-	brace := strings.LastIndex(out[:idx], "{")
-	if err := json.Unmarshal([]byte(out[brace:]), &sum); err != nil {
-		// try from last top-level pretty JSON
-		if err2 := json.Unmarshal([]byte(out[strings.LastIndex(out, "{\n"):]), &sum); err2 != nil {
-			t.Fatalf("json: %v / %v\n%s", err, err2, out)
-		}
+	if err := decodeSummary(out, &sum); err != nil {
+		t.Fatalf("summary: %v\n%s", err, out)
 	}
 	if !sum.OK {
 		t.Fatalf("summary not ok:\n%s", out)
