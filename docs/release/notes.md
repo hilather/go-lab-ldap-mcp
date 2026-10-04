@@ -12,8 +12,13 @@ behavior aligned with the pinned 389 image. Earlier releases are summarized at t
 
 ## Upgrade risks (read first)
 
-These affect deployments that use raw ACIs (`allowRawACI: true` with `aciTexts`) on the
-native engine, or that relied on the older attribute spellings. **The default lab
+Risks 1–4 affect deployments that use raw ACIs (`allowRawACI: true` with `aciTexts`)
+on the native engine, or that rely on the older attribute spellings. Risks 5–8 can
+also hit the default lab and any other deployment: 5 and 6 apply to every persistent
+native store (`storageMode: persistent`, for example `make compose-up-persistent`);
+7 applies to any TLS files minted by an earlier `setuptls`, including the default
+lab's `make compose-up`, whose `setup-tls` step keeps existing PEMs; 8 applies to
+every client that holds cached user/account revisions. **The default lab
 profile is not affected by risks 1 and 2:** `deploy/compose/scenario*.yaml` and
 `config/examples/example-lab.yaml` set `allowRawACI: false` and use one DSL ACL with
 explicit attributes (`attributes.allow: ["*"]`, `deny: [userPassword]`), which the
@@ -59,7 +64,8 @@ compiler always emits with an explicit, schema-known `targetattr`.
 8. **Cached revision tokens rotate** ([#18](https://github.com/hilather/go-lab-ldap-mcp/pull/18)). User and account endpoints share one
    opaque revision that now includes the public lock and must-change state, so
    existing cached tokens rotate after upgrading; clients must refresh before their
-   next mutation.
+   next mutation. The design is in ADR-0012, which is still proposed for owner
+   review.
 
 **Still open, not decided here:** whether the stricter user attribute names ([#27](https://github.com/hilather/go-lab-ldap-mcp/pull/27),
 [#18](https://github.com/hilather/go-lab-ldap-mcp/pull/18)) need an `apiVersion` bump. This tag keeps `apiVersion: labldap.dev/v1alpha1`
@@ -72,8 +78,7 @@ Security and correctness
 - Directory policy and reset isolation: protected attribute aliases and secret-bearing
   filters are rejected before LDAP; reset drains admitted operations and restores the
   full baseline across all managed suffixes; export and rate-limit resources are
-  bounded; bootstrap keeps the configured LDAP dial timeout ([#18](https://github.com/hilather/go-lab-ldap-mcp/pull/18); proposed
-  ADR-0012).
+  bounded; bootstrap keeps the configured LDAP dial timeout ([#18](https://github.com/hilather/go-lab-ldap-mcp/pull/18)).
 - Native LDAP authorization and rename safety: per-assertion search checks in filters
   and RFC 4528 assertions, self/descendant ModifyDN rejected, RDN attribute write
   checks, structural DN identity with an atomic index migration, bounded search size
