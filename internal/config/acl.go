@@ -237,7 +237,14 @@ func dslTargetAttr(a v1alpha1.ACL) (allow, deny string, err error) {
 		allow, err = join("allow", a.Attributes.Allow)
 		return allow, "", err
 	case allowAll:
-		deny, err = join("deny", a.Attributes.Deny)
+		// targetattr names are compared literally on both engines, so a
+		// deny names the primary descriptor (rfc822Mailbox -> mail) or it
+		// would not deny the stored attribute.
+		names := make([]string, len(a.Attributes.Deny))
+		for i, n := range a.Attributes.Deny {
+			names[i] = PrimaryAttrDescription(n)
+		}
+		deny, err = join("deny", names)
 		return "", deny, err
 	}
 	var kept []string

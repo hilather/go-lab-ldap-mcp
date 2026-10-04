@@ -28,9 +28,8 @@ import (
 //
 // 389's answer for option-bearing names depends on what the connection
 // evaluated before (D36); rows use fresh connections and one row pins it.
-// Not asserted here (open, see the parity contract): modrdn under an
-// attribute-scoped deny-write (CAND-36), targetattr!="*" (CAND-37) and
-// absolute filters such as (&), which 389 rejects (CAND-38).
+// Modrdn gates (CAND-36), targetattr!="*" (CAND-37) and absolute filters
+// (CAND-38) are asserted in TestACIModRDNStarListsAbsoluteFilters.
 func TestACITargetAttrOptionsAndEntryLevel(t *testing.T) {
 	const (
 		suffix = "dc=example,dc=test"

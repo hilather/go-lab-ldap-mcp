@@ -36,8 +36,8 @@ the pinned 389 image in four more places (contract C8; oracle probes
   must use `(objectClass=*)`.
 - **`targetattr!="*"` loads.** `"*"` is accepted in `targetattr` lists
   and after `!=`. A negated list holding `"*"` covers no attribute (the
-  ACI then applies only to add, delete and the modrdn entry gate); a
-  positive one covers every attribute. Raw ACIs that stopped labldapd
+  ACI then applies only to add, delete and cross-parent moves, and never
+  blocks a same-parent rename); a positive one covers every attribute. Raw ACIs that stopped labldapd
   with `invalid_aci` now load.
 - **DSL attribute lists compile to one 389 list.** `attributes.allow:
   [uid, sn]` now emits `targetattr="uid || sn"` instead of

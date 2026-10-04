@@ -557,7 +557,13 @@ func (s *Server) handleModifyDN(ctx context.Context, c *conn, m *Message, req *M
 		// noOp: the same DN, spelled identically (389 answers 0 and
 		// updates modifyTimestamp, probe 28). A sameDN rename that changes
 		// only value case is CAND-30 (open): it keeps today's gates and 68.
-		noOp := sameDN && dnValuesIdentical(dn, newDN)
+		// Compared with the stored DN, so a request spelling the source in
+		// another case is not a no-op either.
+		storedDN, err := config.ParseDN(before.DN)
+		if err != nil {
+			return err
+		}
+		noOp := sameDN && dnValuesIdentical(storedDN, newDN)
 		if !sameDN {
 			if _, err := tx.Entry(ctx, newDN); err == nil {
 				return ErrEntryExists
@@ -579,14 +585,14 @@ func (s *Server) handleModifyDN(ctx context.Context, c *conn, m *Message, req *M
 			if !s.entryWriteNotDenied(ctx, tx, subj, dn) {
 				return errDenied
 			}
-			if !s.clientModifiable(newAttr) {
-				return &operationalAttrError{attr: newAttr}
-			}
 			if !s.allowed(ctx, tx, subj, dn, newAttr, PermWrite) {
 				return errDenied
 			}
 			if req.DeleteOldRDN && !s.allowed(ctx, tx, subj, dn, oldAttr, PermWrite) {
 				return errDenied
+			}
+			if !s.clientModifiable(newAttr) {
+				return &operationalAttrError{attr: newAttr}
 			}
 		} else {
 			// Cross-parent moves keep native's gates: 389 refuses every

@@ -715,6 +715,7 @@ func TestACLAttributeListsAre389Lists(t *testing.T) {
 		{`{}`, `(targetattr="*")`, "", ""},
 		{`{ deny: [mail, sn] }`, `(targetattr!="mail || sn")`, "", ""},
 		{`{ allow: ["*"], deny: [mail, sn] }`, `(targetattr!="mail || sn")`, "", ""},
+		{`{ deny: [rfc822Mailbox, "surname;lang-en", mail] }`, `(targetattr!="mail || sn;lang-en")`, "", ""},
 		{`{ allow: [uid, sn, mail], deny: [sn] }`, `(targetattr="uid || mail")`, "", ""},
 		{`{ allow: [uid, mail], deny: [rfc822Mailbox] }`, `(targetattr="uid")`, "", ""},
 		{`{ allow: [uid, "mail;lang-en"], deny: [mail] }`, `(targetattr="uid")`, "", ""},
