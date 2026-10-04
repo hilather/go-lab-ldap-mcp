@@ -82,6 +82,9 @@ func Open(path string) (*Store, error) {
 			return err
 		}
 		if version != indexVersion {
+			if err := rebuildDNIndexes(tx); err != nil {
+				return err
+			}
 			// Database predates the equality indices or the posting format
 			// changed: rebuild from id2entry once, inside this transaction.
 			if err := RebuildIndexes(tx, storeEntryIter(tx)); err != nil {
@@ -602,4 +605,37 @@ func idUint64(id []byte) uint64 {
 		return 0
 	}
 	return binary.BigEndian.Uint64(id)
+}
+
+// rebuildDNIndexes migrates old unescaped DN keys from stored entries in the
+// same transaction as equality postings. Invalid or duplicate DNs abort the
+// complete migration, preserving the prior database for operator recovery.
+func rebuildDNIndexes(tx *bolt.Tx) error {
+	for _, name := range [][]byte{bucketDN2ID, bucketChildren} {
+		if err := tx.DeleteBucket(name); err != nil {
+			return err
+		}
+		if _, err := tx.CreateBucket(name); err != nil {
+			return err
+		}
+	}
+	u := updateTx{readTx: readTx{tx: tx}}
+	return tx.Bucket(bucketID2Entry).ForEach(func(id, blob []byte) error {
+		entry, err := decodeEntry(blob)
+		if err != nil {
+			return fmt.Errorf("store: migrate DN index: invalid entry")
+		}
+		dn, err := config.ParseDN(entry.DN)
+		if err != nil {
+			return fmt.Errorf("store: migrate DN index: invalid DN")
+		}
+		key := []byte(dn.FoldedKey())
+		if tx.Bucket(bucketDN2ID).Get(key) != nil {
+			return fmt.Errorf("store: migrate DN index: duplicate DN")
+		}
+		if err := tx.Bucket(bucketDN2ID).Put(key, id); err != nil {
+			return err
+		}
+		return u.linkChild(dn, id)
+	})
 }

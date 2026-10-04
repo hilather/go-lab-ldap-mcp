@@ -315,3 +315,23 @@ func TestBindUnbindClosesAfterBind(t *testing.T) {
 		t.Fatalf("read after unbind = %v, want EOF", err)
 	}
 }
+
+func TestDispatchedOperationKeepsOriginalIdentityAcrossBind(t *testing.T) {
+	t.Parallel()
+	opts := bindOptions(t)
+	opts.ACI = &FakeACI{}
+	s, err := New(opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := s.newConn(t.Context(), nil, false)
+	defer c.cancel()
+	c.setSubject(Subject{Anonymous: true})
+	dispatched := c.operationContext()
+	// Deterministically delay handler execution until a later DM bind succeeds.
+	c.setSubject(Subject{BypassACI: true})
+	res := s.handleCompare(dispatched, c, &Message{ID: 1}, &CompareRequest{DN: "uid=alice,ou=people,dc=example,dc=test", Attr: "uid", Value: []byte("alice")})
+	if res != ResultInsufficientAccessRights {
+		t.Fatalf("earlier anonymous op gained later bind privileges: %v", res)
+	}
+}

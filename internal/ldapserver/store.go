@@ -95,3 +95,16 @@ type UpdateTx interface {
 	// when to is taken.
 	Rename(ctx context.Context, from, to config.DN) error
 }
+
+// SearchWalker optionally streams candidates inside a read snapshot. The
+// callback error must stop traversal immediately, allowing Search limits to
+// bound decoding and memory use before materializing the naming context.
+type SearchWalker interface {
+	WalkSearch(context.Context, config.DN, Scope, func(*Entry) error) error
+}
+
+// SearchEqualWalker streams indexed equality candidates without materializing
+// a postings list. indexed=false preserves the ordinary scope traversal.
+type SearchEqualWalker interface {
+	WalkEqual(context.Context, string, []byte, func(*Entry) error) (indexed bool, err error)
+}

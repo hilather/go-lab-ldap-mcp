@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"strings"
 
 	"github.com/hilather/go-lab-ldap-mcp/internal/config"
 )
@@ -99,6 +100,7 @@ func (s *Server) checkControls(m *Message) (Result, bool) {
 // allowed evaluates one ACI check as the connection's subject inside the
 // operation's store transaction. ACI engine errors fail closed.
 func (s *Server) allowed(ctx context.Context, tx ReadTx, subj Subject, target config.DN, attr string, perm Permission) bool {
+	attr = s.attributeIdentity(attr)
 	ok, err := s.opts.ACI.Allowed(ctx, tx, ACICheck{
 		Subject:   subj,
 		Target:    target,
@@ -153,4 +155,15 @@ func (s *Server) handleExtended(ctx context.Context, c *conn, m *Message, req *E
 		}})
 	}
 	return code
+}
+
+// attributeIdentity resolves options and schema OID aliases before security
+// policy decisions. Attribute options never create a new writable/readable
+// type distinct from the protected underlying attribute.
+func (s *Server) attributeIdentity(attr string) string {
+	base, _, _ := strings.Cut(attr, ";")
+	if at, ok := s.opts.Schema.AttributeType(base); ok {
+		return at.Name
+	}
+	return base
 }

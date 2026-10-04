@@ -1,10 +1,9 @@
 package config
 
 import (
+	"encoding/hex"
 	"strings"
 	"unicode/utf8"
-
-	"github.com/hilather/go-lab-ldap-mcp/internal/apperr"
 )
 
 // DN is a parsed distinguished name. Comparison is structural, not a string suffix.
@@ -27,14 +26,17 @@ func ParseDN(s string) (DN, error) {
 	parts := splitUnescaped(s, ',')
 	out := DN{rdns: make([]rdn, 0, len(parts))}
 	for _, p := range parts {
-		p = strings.TrimSpace(p)
+		p = trimRDNWhitespace(p)
 		eq := indexUnescaped(p, '=')
 		if eq <= 0 {
 			return DN{}, fieldErr("dn", "invalid_dn", "RDN is missing '='")
 		}
 		attr := strings.ToLower(strings.TrimSpace(p[:eq]))
-		if attr == "" {
-			return DN{}, fieldErr("dn", "invalid_dn", "RDN attribute is empty")
+		if !validDNAttribute(attr) {
+			return DN{}, fieldErr("dn", "invalid_dn", "RDN attribute is invalid")
+		}
+		if indexUnescaped(p[eq+1:], '+') >= 0 {
+			return DN{}, fieldErr("dn", "invalid_dn", "multi-valued RDN is not supported")
 		}
 		val, err := unescapeValue(p[eq+1:])
 		if err != nil {
@@ -69,8 +71,8 @@ func EscapeAttributeValue(s string) string {
 }
 
 func BuildRDN(attr, value string) (string, error) {
-	if attr == "" {
-		return "", fieldErr("rdn", "invalid_rdn", "attribute is empty")
+	if !validDNAttribute(attr) {
+		return "", fieldErr("rdn", "invalid_rdn", "attribute is invalid")
 	}
 	if strings.ContainsRune(value, 0) {
 		return "", fieldErr("rdn", "invalid_rdn", "value contains NUL")
@@ -126,7 +128,7 @@ func (d DN) EqualFold(o DN) bool {
 func (d DN) FoldedKey() string {
 	parts := make([]string, len(d.rdns))
 	for i, r := range d.rdns {
-		parts[i] = r.attr + "=" + strings.ToLower(r.value)
+		parts[i] = r.attr + "=" + EscapeAttributeValue(strings.ToLower(r.value))
 	}
 	return strings.Join(parts, ",")
 }
@@ -204,29 +206,83 @@ func indexUnescaped(s string, sep rune) int {
 	return -1
 }
 
-func unescapeValue(s string) (string, error) {
-	var b strings.Builder
-	esc := false
-	rs := []rune(s)
-	for i := 0; i < len(rs); i++ {
-		r := rs[i]
-		if !esc {
-			if r == '\\' {
-				esc = true
-				continue
+func validDNAttribute(s string) bool {
+	if s == "" {
+		return false
+	}
+	if s[0] >= '0' && s[0] <= '9' {
+		parts := strings.Split(s, ".")
+		if len(parts) < 2 {
+			return false
+		}
+		for _, part := range parts {
+			if part == "" {
+				return false
 			}
-			b.WriteRune(r)
+			for _, c := range part {
+				if c < '0' || c > '9' {
+					return false
+				}
+			}
+		}
+		return true
+	}
+	for i, c := range s {
+		if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') {
 			continue
 		}
-		esc = false
-		if r == '0' && i+1 < len(rs) && rs[i+1] == '0' {
-			return "", apperr.New(apperr.CodeConfiguration, "invalid DN").
-				WithField(apperr.Field{Path: "dn", Code: "invalid_dn", Message: "DN contains NUL"})
+		if i > 0 && ((c >= '0' && c <= '9') || c == '-') {
+			continue
 		}
-		b.WriteRune(r)
+		return false
 	}
-	if esc {
-		return "", fieldErr("dn", "invalid_dn", "dangling escape")
+	return true
+}
+
+func unescapeValue(s string) (string, error) {
+	var b strings.Builder
+	for i := 0; i < len(s); i++ {
+		if s[i] != '\\' {
+			b.WriteByte(s[i])
+			continue
+		}
+		i++
+		if i >= len(s) {
+			return "", fieldErr("dn", "invalid_dn", "dangling escape")
+		}
+		if i+1 < len(s) {
+			var decoded [1]byte
+			if _, err := hex.Decode(decoded[:], []byte(s[i:i+2])); err == nil {
+				if decoded[0] == 0 {
+					return "", fieldErr("dn", "invalid_dn", "DN contains NUL")
+				}
+				b.WriteByte(decoded[0])
+				i++
+				continue
+			}
+		}
+		if !strings.ContainsRune(" ,+\"\\<>;=#", rune(s[i])) {
+			return "", fieldErr("dn", "invalid_dn", "invalid DN escape")
+		}
+		b.WriteByte(s[i])
+	}
+	if !utf8.ValidString(b.String()) {
+		return "", fieldErr("dn", "invalid_dn", "DN contains invalid UTF-8")
 	}
 	return b.String(), nil
+}
+
+func trimRDNWhitespace(s string) string {
+	s = strings.TrimLeft(s, " \t")
+	for len(s) > 0 && (s[len(s)-1] == ' ' || s[len(s)-1] == '\t') {
+		escapes := 0
+		for i := len(s) - 2; i >= 0 && s[i] == '\\'; i-- {
+			escapes++
+		}
+		if escapes%2 == 1 {
+			break
+		}
+		s = s[:len(s)-1]
+	}
+	return s
 }

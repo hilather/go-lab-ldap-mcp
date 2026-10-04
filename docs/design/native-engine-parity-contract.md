@@ -239,6 +239,7 @@ is `docs/design/parity-delta-log.md` (T-150).
 | 2026-08-15 | Initial contract (`labldap.parity.v1`) accepted with ADR-0008 / ADR-0009. |
 | 2026-08-15 | Wave 1 (T-125–T-128) recorded Delta **candidates** below; none are promoted to section 3 until adjudicated against the 389 oracle in T-147/T-150. |
 | 2026-08-15 | T-150 differential harness (`internal/ldapserver/differential_test.go`) adjudicated CAND-1, CAND-3, CAND-4, CAND-5, CAND-18, CAND-20 against the pinned 389 oracle: CAND-3 resolved as Contract; the rest promoted to section 3 as D8–D14 (with newly observed D10). Record: `docs/design/parity-delta-log.md`. |
+| 2026-10-03 | CAND-29 (ModifyDN deleteoldrdn equality) resolved as Contract against the pinned 389 image; CAND-30 (case-only rename 68 vs 0) recorded as open. |
 
 ### Delta candidates observed in Wave 1 (pending adjudication, T-147/T-150)
 
@@ -252,7 +253,9 @@ is `docs/design/parity-delta-log.md` (T-150).
 
 When adjudicated, each moves into section 3 (accepted Delta) with the test name that proves the difference, or is fixed to match the oracle (Contract).
 
-| CAND-6 | ModifyDN rename into own subtree | bbolt store allows it; index-based Subtree walks can detach the subtree (no store sentinel exists) — needs a dispatch guard | 389 rejects (LDAP-illegal) | T-129 `store.go`; guard belongs in ModifyDN dispatch (T-143/T-144 hardening) |
+| ~~CAND-6~~ → Contract | ModifyDN rename into own subtree | rejects with `unwillingToPerform(53)` without changing the tree, including case variants | 389 also rejects with 53 | resolved 2026-10-03; `TestDualEngineParity`, `TestNativeReviewDirectoryRegressions` |
+| ~~CAND-29~~ → Contract | ModifyDN `deleteoldrdn` with a rule-equal old/new RDN value | removes old RDN value(s) by the equality rule, then appends the new RDN value unless an equal value remains (a respelled or differently cased RDN no longer empties the naming attribute; a pure move with deleteoldrdn stores the request spelling last) | 389 observed identical value lists for respell, pure move, multi-valued equal and keep-old cases | resolved 2026-10-03; `TestModifyDNDeleteOldRDNEquality`, `TestNativeReviewDirectoryRegressions/rename-deleteoldrdn-equality`, `TestDualEngineParity` (C1 `modifydn-semantics`: whitespace respell-with-move, which discriminates the fix, and multi-valued-equal rename) |
+| CAND-30 | Case-only ModifyDN (`uid=keeper` → `uid=Keeper`), and DNs differing only in internal spaces | `entryAlreadyExists(68)` for case-only (DN identity folds case but not spaces, so `uid=a b` and `uid=a  b` are distinct entries) | 389 observed `success(0)` for case-only and returns space-normalised DNs (local probe 2026-10-03 against the pinned image; output in the PR #19 comment) | open; owner adjudication pending; needs a tagged differential probe |
 | CAND-17 | groupdn membership scope | direct `member`/`uniqueMember` only, no nesting; group objectClass not required | confirm vs 389 | T-139 `aci_eval.go` |
 | ~~CAND-18~~ → D12 | Paged-cookie tamper result code | `unwillingToPerform(53)`; cookie is HMAC-SHA256 (offset + base DN + scope + filter), per-server random secret | Oracle 2026-08-15: 389 accepts a tampered cookie (`success`); accepted as D12 | T-140 `ctrl_paged.go` |
 | CAND-19 | Assertion control scope | Modify-only; critical assertion on non-Modify → `unavailableCriticalExtension`; `assertionFailed(122)` on mismatch | 389 assertion-on-Add / non-critical behavior unverified | T-141 `ctrl_assert.go`; adjudicate in T-147 |

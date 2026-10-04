@@ -33,7 +33,7 @@ func (s *Server) handleWhoAmI(ctx context.Context, c *conn, m *Message, req *Ext
 			DiagnosticMessage: "whoami request value must be absent",
 		}, nil)
 	}
-	subj := c.subject()
+	subj := operationSubject(ctx, c)
 	// Anonymous covers both the pre-bind zero Subject (no DN) and the
 	// post-anonymous-bind Subject (Anonymous set). Only a bound,
 	// DN-carrying identity yields a "dn:" authzId.

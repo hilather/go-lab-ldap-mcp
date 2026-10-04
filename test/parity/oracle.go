@@ -167,10 +167,14 @@ func (e *oracleEngine) configure389(t *testing.T) {
 		"--pwdmaxfailures", itoa(p.MaxFailures),
 		"--pwdlockoutduration", itoa(int(p.LockoutDuration.Seconds())))
 
-	// Bind policy (tls.go applyBindPolicy): deny anonymous, require secure
+	// Bind policy (tls.go applyBindPolicy): honor anonymous policy, require secure
 	// authentication (the fixture sets allowCleartextBind=false).
 	e.dsconf(t, "security", "set", "--require-secure-authentication", "on")
-	e.dsconf(t, "config", "replace", "nsslapd-allow-anonymous-access=off")
+	anonymous := "off"
+	if e.fx.compiled.Public.Spec.Transport.AllowAnonymousBind {
+		anonymous = "on"
+	}
+	e.dsconf(t, "config", "replace", "nsslapd-allow-anonymous-access="+anonymous)
 }
 
 // dsconf runs an argument vector inside the container (never a shell),

@@ -186,7 +186,9 @@ func (p *ParsedACI) TargetsAttr(attr string) bool {
 }
 
 func aciAttrInA(list []string, attr string) bool {
+	attr, _, _ = strings.Cut(attr, ";")
 	for _, a := range list {
+		a, _, _ = strings.Cut(a, ";")
 		if strings.EqualFold(a, attr) {
 			return true
 		}
