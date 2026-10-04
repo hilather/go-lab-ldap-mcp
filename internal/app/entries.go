@@ -188,6 +188,9 @@ func (s *Entries) Move(ctx context.Context, p Principal, move directory.EntryMov
 }
 
 func entryLockKey(dn string) string {
+	if parsed, err := config.ParseDN(dn); err == nil {
+		return "entry:" + parsed.FoldedKey()
+	}
 	return "entry:" + strings.ToLower(strings.TrimSpace(dn))
 }
 

@@ -361,3 +361,15 @@ with one value per line. Passwords, object classes, managed and operational
 attributes, and protected suffix/container entries cannot be edited here. Move,
 delete, and attribute edits preserve optimistic concurrency; refresh explicitly
 after a revision conflict before retrying.
+
+### Concurrent directory mutations
+
+Each control process serializes directory mutations across the user, group,
+and structured entry workflows before reading the live revision. Requests using
+DN aliases therefore share the same mutation boundary. Waiting requests honor
+cancellation and recheck their revision after earlier mutations finish.
+
+This conservative serialization trades parallel write throughput for protection
+against stale updates across workflows. Reads remain concurrent. LDAP writes
+outside this control process, including another control instance, retain the
+residual search-to-write race when the engine lacks assertion controls (KD-R24).
