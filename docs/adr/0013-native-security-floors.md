@@ -36,10 +36,10 @@ On LDAP, a runtime account holding the compiled people-write ACI can modify
 
 - 389 returns `success(0)`.
 - Current native also accepts it. `clientModifiable` and `AttributeType` do
-  not strip options (`internal/ldapserver/op_attrs.go:103-111`,
+  not strip options (`internal/ldapserver/op_attrs.go:103-112`,
   `schema_registry.go:83-86`), and the schema check does not reject the
   unknown name (`schema_registry.go:305-340`).
-- Native stores the value under that exact name (`op_write.go:323-329`). The
+- Native stores the value under that exact name (`op_write.go:326-332`). The
   canonical `modifyTimestamp` stays server-owned (`op_attrs.go:94-96`).
 
 Until options are resolved, native's acceptance of this write is D17
@@ -49,9 +49,9 @@ different reason: it treats `;lang-en` as an option on a known type. So there
 is no client-visible split on this case today.
 
 The bare OID `2.5.18.2` is a separate case. Native rejects it with
-`constraintViolation(19)` (`op_write.go:153-162`); 389 returns
+`constraintViolation(19)` (`op_write.go:156-165`); 389 returns
 `unwillingToPerform(53)`. That 19-vs-53 split is the existing unadjudicated
-note at `op_write.go:153-156`. D32 does not decide it, and it remains open.
+note at `op_write.go:156-159`. D32 does not decide it, and it remains open.
 
 The control plane could reach this case too, and on `main` at `4f05463` it
 had an exact-name gap: `ForbiddenEntryAttr`, `ForbiddenUserAttr` and read
@@ -116,7 +116,7 @@ hardening. It is separate from D32 and D33:
   `aci` OID both return `insufficientAccessRights(50)`) have shared 389/native
   denial tests. That is matched Contract behaviour, separate from D32.
   `clientModifiable` on main still does not strip options
-  (`op_attrs.go:103-111`).
+  (`op_attrs.go:103-112`).
 - Nothing here weakens 389-mode access controls or claims that the pinned 389
   implementation changes. Mode-specific security floors must be documented and
   tested explicitly.
@@ -190,10 +190,10 @@ Proposed:
   That adds two accepted Deltas, each with per-engine controlling tests.
 - The control-plane tightening this ADR relies on (PR #18, on main)
   already changed the callers of the deny checks, including read redaction
-  (`app/directory.go:227`), user create and update
-  (`app/users.go:245`, `ds389/runtime.go:297`), entry create and update
-  (`ds389/entries.go:423`, `:330`), the seed (`ds389/seed.go:335`), and
-  config validation of `users[].attributes` (`internal/config/user.go:54`).
+  (`app/directory.go:244`), user create and update
+  (`app/users.go:270`, `ds389/runtime.go:298`), entry create and update
+  (`ds389/entries.go:427`, `:331`), the seed (`ds389/seed.go:339`), and
+  config validation of `users[].attributes` (`internal/config/user.go:57`).
   REST and MCP on the 389 engine reject option spellings of protected names
   that 389 itself accepts, and every numeric-OID attribute name, and scenarios or imports that used them fail validation. That
   compatibility note shipped with PR #18; D32 adds only the direct LDAP
@@ -228,6 +228,5 @@ Proposed:
 - On 2026-10-03 the owner asked for a proposal-only review. Current parity is
   unchanged.
 - The 19-vs-53 code split for `2.5.18.2` is not decided here.
-- Code line references are to `main` at `4f05463`, except `conn.go`,
-  `op_attrs.go` and `config/attr.go` references, which are to `main` at
-  `4cfc057`.
+- Code line references are to `main` at `4cfc057`. Commit `4f05463` is cited
+  only as the pre-#18 state of the control plane.
