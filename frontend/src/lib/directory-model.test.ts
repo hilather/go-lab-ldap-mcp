@@ -34,6 +34,7 @@ import {
   userPatchAttributes,
   attrDuplicateKey,
   canonicalAttrType,
+  legacyAliasPrimary,
   secondDescriptorPrimary,
   wouldEmptyGroup,
 } from "./directory-model.ts";
@@ -272,6 +273,11 @@ test("second descriptors resolve like the server alias table", () => {
   assert.equal(secondDescriptorPrimary("gn"), "givenName");
   assert.equal(secondDescriptorPrimary("rfc822Mailbox;x-a"), "mail");
   assert.equal(secondDescriptorPrimary("givenName"), undefined);
+  assert.equal(legacyAliasPrimary("GN"), "givenName");
+  assert.equal(legacyAliasPrimary("rfc822Mailbox"), "mail");
+  for (const name of ["commonName", "userid", "organizationalUnitName", "mail"]) {
+    assert.equal(legacyAliasPrimary(name), undefined, name);
+  }
 });
 
 test("renaming a row to an alias does not also clear the primary", () => {

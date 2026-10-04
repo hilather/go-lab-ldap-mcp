@@ -46,6 +46,7 @@ func TestMCPMailAndGivenNameAliasesAreDuplicates(t *testing.T) {
 	}{
 		{map[string]string{"mail": "a@example.test", "rfc822Mailbox": "b@example.test"}, "attributes.rfc822Mailbox"},
 		{map[string]string{"givenName": "A", "gn": "B"}, "attributes.gn"},
+		{map[string]string{"GN": "A", "givenName": "B"}, "attributes.givenName"},
 	} {
 		upd := callTool(t, sess, ToolUpdateUser, UpdateUserInput{ID: "alice", Revision: string(user.Revision), Attributes: tc.attrs})
 		crt := callTool(t, sess, ToolCreateUser, CreateUserInput{ID: "bob", Password: mcpUserPass, Attributes: tc.attrs})

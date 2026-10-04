@@ -92,6 +92,8 @@ entry API do not change the user revision.
   Duplicate detection now walks names in case-insensitive order, so the
   error lands on the later name in that order; for existing pairs the
   field changes, e.g. `OU` + `organizationalUnitName` now flags `OU`.
+  Forbidden-name checks share that walk, so when a request or scenario
+  has several forbidden names, the first one reported can change too.
 - User writes, YAML seeding, entry create and entry-update replace/add send
   every resolved second descriptor (also `organizationalUnitName`,
   `domainComponent`, `organizationName`) under its primary name. A

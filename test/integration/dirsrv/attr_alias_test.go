@@ -206,6 +206,9 @@ func TestLegacyAliasAttributeDelete(t *testing.T) {
 		t.Fatal(err)
 	}
 	dm := dialDM(t, env)
+	// Native stores this as an unknown attribute (D17). When PR-2C retires
+	// D17, native will resolve or reject it: update this native branch and
+	// the D35 row together.
 	mod := ldap.NewModifyRequest(aliceDN, nil)
 	mod.Add("rfc822Mailbox", []string{"legacy@example.test"})
 	if err := dm.Modify(mod); err != nil {

@@ -178,6 +178,18 @@ export function secondDescriptorPrimary(name: string): string | undefined {
   return ATTRIBUTE_PRIMARY_NAMES[type] ?? type;
 }
 
+// LEGACY_ALIAS_BASES are the second descriptors that native may hold as
+// stored rows written before #18 (rfc822Mailbox, gn). Other aliases
+// (commonName, userid, organizationalUnitName, ...) are not guarded.
+const LEGACY_ALIAS_BASES = new Set(["rfc822mailbox", "gn"]);
+
+// legacyAliasPrimary is secondDescriptorPrimary limited to the legacy alias
+// rows the tree page keeps to Delete only.
+export function legacyAliasPrimary(name: string): string | undefined {
+  const base = name.trim().toLowerCase().split(";")[0] ?? "";
+  return LEGACY_ALIAS_BASES.has(base) ? secondDescriptorPrimary(name) : undefined;
+}
+
 // attrDuplicateKey mirrors config.AttrDuplicateKey: resolved type plus the
 // sorted lowercase option set.
 export function attrDuplicateKey(name: string): string {
