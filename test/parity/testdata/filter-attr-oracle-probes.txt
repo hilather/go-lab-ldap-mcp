@@ -1,4 +1,4 @@
-# Filter attribute-description oracle probes (contract C6, delta D34, CAND-31/32, CAND-33/34/35)
+# Filter attribute-description oracle probes (contract C6, delta D34, CAND-31/32, CAND-33/34/35, D36)
 # Pinned image quay.io/389ds/dirsrv@sha256:f2851654c5df545cd893d84bea8d08c28dc25f0930493fbfed1d8a6eacf657f7
 # Captured 2026-10-03/04 in throwaway containers. Directory Manager passwords were random per run and are not recorded; the probe scripts below hard-code throwaway subject passwords (Probe-Pw-...) that exist only inside those containers. Password hashes in transcripts are redacted.
 
@@ -2166,3 +2166,302 @@ for i,(attr,val) in enumerate([(a.split('=')[0],a.split('=')[1]) for a in sys.ar
             k=j+1; ln=b[k]; k+=1
             if ln&0x80: k+=ln&0x7f
             print(f'({attr}={val}) entries={dns} result={b[k+2]}'); break
+
+# Probes 21-24 (2026-10-04): ACI placement does not change option handling (21, 23); go-ldap adds and searches behave like ldapsearch on fresh connections (22); on ONE connection 389 reuses an earlier decision for the base type when it later checks an option-bearing description (24, recorded as D36).
+
+===== probe 21 =====
+image quay.io/389ds/dirsrv@sha256:f2851654c5df545cd893d84bea8d08c28dc25f0930493fbfed1d8a6eacf657f7
+backend 0
+add people 0
+add 0 
+sfx_before   (uid;x-test=bobtag)    rc=0 ['uid=fa_bob']
+sfx_before   (uid;x-test=two)       rc=0 ['uid=fa_carol']
+sfx_before   (uid=fa_bob)           rc=0 []
+sfx_after    (uid;x-test=bobtag)    rc=0 ['uid=fa_bob']
+sfx_after    (uid;x-test=two)       rc=0 ['uid=fa_carol']
+sfx_after    (uid=fa_bob)           rc=0 []
+ou_after     (uid;x-test=bobtag)    rc=0 ['uid=fa_bob']
+ou_after     (uid;x-test=two)       rc=0 ['uid=fa_carol']
+ou_after     (uid=fa_bob)           rc=0 []
+
+===== probe 23no =====
+image quay.io/389ds/dirsrv@sha256:f2851654c5df545cd893d84bea8d08c28dc25f0930493fbfed1d8a6eacf657f7
+backend 0
+add 0 
+variant nosemi
+d_uidopt       (uid;x-test=bobtag)    rc=0 []
+d_uidopt       (uid;x-test=two)       rc=0 []
+d_uidopt       (uid=fa_bob)           rc=0 ['uid=fa_bob']
+t_deny_uidopt  (uid;x-test=bobtag)    rc=0 []
+t_deny_uidopt  (uid;x-test=two)       rc=0 []
+t_deny_uidopt  (uid=fa_bob)           rc=0 ['uid=fa_bob']
+t_uidopt       (uid;x-test=bobtag)    rc=0 ['uid=fa_bob']
+t_uidopt       (uid;x-test=two)       rc=0 ['uid=fa_carol']
+t_uidopt       (uid=fa_bob)           rc=0 []
+
+===== probe 23semi =====
+image quay.io/389ds/dirsrv@sha256:f2851654c5df545cd893d84bea8d08c28dc25f0930493fbfed1d8a6eacf657f7
+backend 0
+add 0 
+variant semi
+d_uidopt       (uid;x-test=bobtag)    rc=0 []
+d_uidopt       (uid;x-test=two)       rc=0 []
+d_uidopt       (uid=fa_bob)           rc=0 ['uid=fa_bob']
+t_deny_uidopt  (uid;x-test=bobtag)    rc=0 []
+t_deny_uidopt  (uid;x-test=two)       rc=0 []
+t_deny_uidopt  (uid=fa_bob)           rc=0 ['uid=fa_bob']
+t_uidopt       (uid;x-test=bobtag)    rc=0 ['uid=fa_bob']
+t_uidopt       (uid;x-test=two)       rc=0 ['uid=fa_carol']
+t_uidopt       (uid=fa_bob)           rc=0 []
+t_uidsemi      (uid;x-test=bobtag)    rc=0 []
+t_uidsemi      (uid;x-test=two)       rc=0 []
+t_uidsemi      (uid=fa_bob)           rc=0 []
+
+===== probe 24 =====
+image quay.io/389ds/dirsrv@sha256:f2851654c5df545cd893d84bea8d08c28dc25f0930493fbfed1d8a6eacf657f7
+backend 0
+add 0 
+d_uidopt       same-conn plain-first: (uid=fa_bob)=[fa_bob] (uid;x-test=bobtag)=[fa_bob] (uid;x-test=two)=[fa_carol] 
+d_uidopt       same-conn opt-first: (uid;x-test=bobtag)=[] (uid;x-test=two)=[] (uid=fa_bob)=[fa_bob] 
+t_deny_uidopt  same-conn plain-first: (uid=fa_bob)=[fa_bob] (uid;x-test=bobtag)=[fa_bob] (uid;x-test=two)=[fa_carol] 
+t_deny_uidopt  same-conn opt-first: (uid;x-test=bobtag)=[] (uid;x-test=two)=[] (uid=fa_bob)=[fa_bob] 
+t_uidopt       same-conn plain-first: (uid=fa_bob)=[] (uid;x-test=bobtag)=[] (uid;x-test=two)=[] 
+t_uidopt       same-conn opt-first: (uid;x-test=bobtag)=[fa_bob] (uid;x-test=two)=[fa_carol] (uid=fa_bob)=[] 
+
+===== probe 22 =====
+image quay.io/389ds/dirsrv@sha256:f2851654c5df545cd893d84bea8d08c28dc25f0930493fbfed1d8a6eacf657f7
+backend 0
+add people 0
+add 0 
+(uid;x-test=bobtag) [uid=fa_bob] <nil>
+(uid;x-test=two) [uid=fa_carol] <nil>
+(uid;x-test=gbobtag) [] <nil>
+(uid;x-test=gtwo) [] <nil>
+(uid=fa_bob) [] <nil>
+ 
+DM-add add g_bob <nil>
+add g_carol <nil>
+ 
+after go add (uid;x-test=bobtag) [uid=fa_bob] <nil>
+(uid;x-test=two) [uid=fa_carol] <nil>
+(uid;x-test=gbobtag) [uid=g_bob] <nil>
+(uid;x-test=gtwo) [uid=g_carol] <nil>
+(uid=fa_bob) [] <nil>
+ 
+
+===== script filterprobe21.py =====
+import subprocess as sp, time, secrets, re
+ref=open('deploy/docker/dirsrv.digest').read().strip()
+pw=secrets.token_hex(16); n='muse-fprobe21-'+secrets.token_hex(3)
+def ex(*a, inp=None): return sp.run(['docker','exec','-i',n,*a],input=inp,capture_output=True,text=True)
+sp.run(['docker','run','-d','--name',n,'-e','DS_DM_PASSWORD='+pw,'-v','/data',ref],stdout=sp.DEVNULL,check=True)
+S='dc=example,dc=test'; B='ou=probe-fattr,'+S; P='ou=people,'+S
+def who(u): return f'uid={u},{P}'
+H=['-H','ldap://127.0.0.1:3389']
+def red(t): return re.sub(r'(userPassword[^:]*::?) .*', r'\1 <redacted>', t)
+try:
+  for i in range(600):
+    l=sp.run(['docker','logs',n],capture_output=True,text=True)
+    if '389-ds-container started.' in l.stdout+l.stderr: break
+    time.sleep(0.5)
+  print('image',ref); print('backend',ex('dsconf','localhost','backend','create','--suffix',S,'--be-name','userroot','--create-suffix').returncode)
+  RSC='read,search,compare'
+  def addaci(dn,text):
+    r=ex('ldapmodify','-x',*H,'-D','cn=Directory Manager','-w',pw,inp=f"dn: {dn}\nchangetype: modify\nadd: aci\naci: {text}\n\n")
+    return r.returncode, r.stderr.strip().replace('\n',' ')[:200]
+  subs=['sfx_before','sfx_after','ou_after']
+  ldif=f"dn: {P}\nobjectClass: organizationalUnit\nou: people\n\n"
+  for s_ in subs: ldif+=f"dn: {who(s_)}\nobjectClass: inetOrgPerson\nuid: {s_}\ncn: {s_}\nsn: S\nuserPassword: Probe-Pw-{s_}-1\n\n"
+  r=ex('ldapadd','-x',*H,'-D','cn=Directory Manager','-w',pw,inp=ldif); print('add people',r.returncode)
+  T=lambda s_: f'(target="ldap:///{B}")(targetattr="uid;x-test")(version 3.0; acl "labldap:{s_}"; allow (read,search,compare) userdn="ldap:///{who(s_)}";)'
+  print('aci sfx_before', *addaci(S,T('sfx_before')))
+  ldif=f"dn: {B}\nobjectClass: organizationalUnit\nou: probe-fattr\n\n"
+  for u,extra in [('fa_alice',''),('fa_bob','uid;x-test: bobtag\n'),('fa_carol','uid;x-test;x-two: two\n')]:
+    ldif+=f"dn: uid={u},{B}\nobjectClass: inetOrgPerson\nuid: {u}\ncn: {u}\nsn: S\n{extra}\n"
+  r=ex('ldapadd','-x',*H,'-D','cn=Directory Manager','-w',pw,inp=ldif); print('add',r.returncode,r.stderr.strip()[:300])
+  print('aci sfx_after', *addaci(S,T('sfx_after')))
+  print('aci ou_after', *addaci(B,T('ou_after')))
+  for s_ in subs:
+    for f in ['(uid;x-test=bobtag)','(uid;x-test=two)','(uid=fa_bob)']:
+      r=ex('ldapsearch','-x','-LLL',*H,'-D',who(s_),'-w',f'Probe-Pw-{s_}-1','-b',B,'-s','one',f,'1.1')
+      dns=sorted(l.split(',')[0][4:] for l in r.stdout.splitlines() if l.startswith('dn:'))
+      print(f"{s_:12} {f:22} rc={r.returncode} {dns}")
+finally:
+  sp.run(['docker','rm','-f','-v',n],capture_output=True)
+
+===== script filterprobe22.py =====
+import subprocess as sp, time, secrets, re
+ref=open('deploy/docker/dirsrv.digest').read().strip()
+pw=secrets.token_hex(16); n='muse-fprobe22-'+secrets.token_hex(3)
+def ex(*a, inp=None): return sp.run(['docker','exec','-i',n,*a],input=inp,capture_output=True,text=True)
+sp.run(['docker','run','-d','--name',n,'-e','DS_DM_PASSWORD='+pw,'-v','/data',ref],stdout=sp.DEVNULL,check=True)
+S='dc=example,dc=test'; B='ou=probe-fattr,'+S; P='ou=people,'+S
+def who(u): return f'uid={u},{P}'
+H=['-H','ldap://127.0.0.1:3389']
+def red(t): return re.sub(r'(userPassword[^:]*::?) .*', r'\1 <redacted>', t)
+try:
+  for i in range(600):
+    l=sp.run(['docker','logs',n],capture_output=True,text=True)
+    if '389-ds-container started.' in l.stdout+l.stderr: break
+    time.sleep(0.5)
+  print('image',ref); print('backend',ex('dsconf','localhost','backend','create','--suffix',S,'--be-name','userroot','--create-suffix').returncode)
+  RSC='read,search,compare'
+  def addaci(dn,text):
+    r=ex('ldapmodify','-x',*H,'-D','cn=Directory Manager','-w',pw,inp=f"dn: {dn}\nchangetype: modify\nadd: aci\naci: {text}\n\n")
+    return r.returncode, r.stderr.strip().replace('\n',' ')[:200]
+  subs=['sfx_before','sfx_after','ou_after']
+  ldif=f"dn: {P}\nobjectClass: organizationalUnit\nou: people\n\n"
+  for s_ in subs: ldif+=f"dn: {who(s_)}\nobjectClass: inetOrgPerson\nuid: {s_}\ncn: {s_}\nsn: S\nuserPassword: Probe-Pw-{s_}-1\n\n"
+  r=ex('ldapadd','-x',*H,'-D','cn=Directory Manager','-w',pw,inp=ldif); print('add people',r.returncode)
+  T=lambda s_: f'(target="ldap:///{B}")(targetattr="uid;x-test")(version 3.0; acl "labldap:{s_}"; allow (read,search,compare) userdn="ldap:///{who(s_)}";)'
+  print('aci sfx_before', *addaci(S,T('sfx_before')))
+  ldif=f"dn: {B}\nobjectClass: organizationalUnit\nou: probe-fattr\n\n"
+  for u,extra in [('fa_alice',''),('fa_bob','uid;x-test: bobtag\n'),('fa_carol','uid;x-test;x-two: two\n')]:
+    ldif+=f"dn: uid={u},{B}\nobjectClass: inetOrgPerson\nuid: {u}\ncn: {u}\nsn: S\n{extra}\n"
+  r=ex('ldapadd','-x',*H,'-D','cn=Directory Manager','-w',pw,inp=ldif); print('add',r.returncode,r.stderr.strip()[:300])
+  print('aci sfx_after', *addaci(S,T('sfx_after')))
+  print('aci ou_after', *addaci(B,T('ou_after')))
+  ip=sp.run(['docker','inspect','-f','{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}',n],capture_output=True,text=True).stdout.strip()
+  open('/tmp/probe22.env','w').write(f"{ip}\n{n}\n")
+  r=sp.run(['go','run','./tmpprobe22',ip,who('ou_after'),'Probe-Pw-ou_after-1',B],capture_output=True,text=True,cwd='.')
+  print(r.stdout, r.stderr[-800:])
+  r=sp.run(['go','run','./tmpprobe22',ip,'cn=Directory Manager',pw,B,'add'],capture_output=True,text=True,cwd='.')
+  print('DM-add', r.stdout, r.stderr[-800:])
+  r=sp.run(['go','run','./tmpprobe22',ip,who('ou_after'),'Probe-Pw-ou_after-1',B],capture_output=True,text=True,cwd='.')
+  print('after go add', r.stdout, r.stderr[-800:])
+  r=ex('ldapsearch','-x','-LLL','-o','ldif-wrap=no',*H,'-D','cn=Directory Manager','-w',pw,'-b',B,'-s','one','(uid=g_*)','*')
+  print('stored', r.stdout)
+finally:
+  sp.run(['docker','rm','-f','-v',n],capture_output=True)
+
+===== script filterprobe23.py =====
+import subprocess as sp, time, secrets, re
+ref=open('deploy/docker/dirsrv.digest').read().strip()
+pw=secrets.token_hex(16); n='muse-fprobe23-'+secrets.token_hex(3)
+def ex(*a, inp=None): return sp.run(['docker','exec','-i',n,*a],input=inp,capture_output=True,text=True)
+sp.run(['docker','run','-d','--name',n,'-e','DS_DM_PASSWORD='+pw,'-v','/data',ref],stdout=sp.DEVNULL,check=True)
+S='dc=example,dc=test'; B='ou=probe-fattr,'+S; P='ou=people,'+S
+def who(u): return f'uid={u},{P}'
+H=['-H','ldap://127.0.0.1:3389']
+def red(t): return re.sub(r'(userPassword[^:]*::?) .*', r'\1 <redacted>', t)
+try:
+  for i in range(600):
+    l=sp.run(['docker','logs',n],capture_output=True,text=True)
+    if '389-ds-container started.' in l.stdout+l.stderr: break
+    time.sleep(0.5)
+  print('image',ref); print('backend',ex('dsconf','localhost','backend','create','--suffix',S,'--be-name','userroot','--create-suffix').returncode)
+  RSC='read,search,compare'
+  import sys
+  variant=sys.argv[1]
+  acis={
+    'd_uidopt':[('(targetattr="*")',RSC),('(targetattr="uid;x-test")','DENY'+RSC)],
+    't_deny_uidopt':[('(targetattr!="uid;x-test")',RSC)],
+    't_uidopt':[('(targetattr="uid;x-test")',RSC)],
+  }
+  if variant=='semi': acis['t_uidsemi']=[('(targetattr="uid;")',RSC)]
+  ldif=f"dn: {P}\nobjectClass: organizationalUnit\nou: people\n\n"
+  for s in acis: ldif+=f"dn: {who(s)}\nobjectClass: inetOrgPerson\nuid: {s}\ncn: {s}\nsn: S\nuserPassword: Probe-Pw-{s}-1\n\n"
+  ldif+=f"dn: {B}\nobjectClass: organizationalUnit\nou: probe-fattr\n\n"
+  for u,extra in [('fa_alice',''),('fa_bob','userPassword: Probe-Bob-Pw-1\nuid;x-test: bobtag\ndescription;lang-en: hello\n'),('fa_carol','description;lang-en;x-foo: multi\nuid;x-test;x-two: two\n')]:
+    ldif+=f"dn: uid={u},{B}\nobjectClass: inetOrgPerson\nuid: {u}\ncn: {u}\nsn: S\n{extra}\n"
+  r=ex('ldapadd','-x',*H,'-D','cn=Directory Manager','-w',pw,inp=ldif); print('add',r.returncode,r.stderr.strip()[:300])
+  def addaci(text):
+    r=ex('ldapmodify','-x',*H,'-D','cn=Directory Manager','-w',pw,inp=f"dn: {B}\nchangetype: modify\nadd: aci\naci: {text}\n\n")
+    return r.returncode, r.stderr.strip().replace('\n',' ')[:200]
+  for s_,lst in acis.items():
+    for k,(t,perm) in enumerate(lst):
+      act="deny ("+perm[4:]+")" if perm.startswith("DENY") else "allow ("+perm+")"
+      print('aci',s_,k,*addaci(f'(target="ldap:///{B}"){t}(version 3.0; acl "labldap:{s_}-{k}"; {act} userdn="ldap:///{who(s_)}";)'))
+  print('variant',variant)
+  for name in acis:
+    for f in ['(uid;x-test=bobtag)','(uid;x-test=two)','(uid=fa_bob)']:
+      r=ex('ldapsearch','-x','-LLL',*H,'-D',who(name),'-w',f'Probe-Pw-{name}-1','-b',B,'-s','one',f,'1.1')
+      dns=sorted(l.split(',')[0][4:] for l in r.stdout.splitlines() if l.startswith('dn:'))
+      print(f"{name:14} {f:22} rc={r.returncode} {dns}")
+finally:
+  sp.run(['docker','rm','-f','-v',n],capture_output=True)
+
+===== script filterprobe24.py =====
+import subprocess as sp, time, secrets, re
+ref=open('deploy/docker/dirsrv.digest').read().strip()
+pw=secrets.token_hex(16); n='muse-fprobe24-'+secrets.token_hex(3)
+def ex(*a, inp=None): return sp.run(['docker','exec','-i',n,*a],input=inp,capture_output=True,text=True)
+sp.run(['docker','run','-d','--name',n,'-e','DS_DM_PASSWORD='+pw,'-v','/data',ref],stdout=sp.DEVNULL,check=True)
+S='dc=example,dc=test'; B='ou=probe-fattr,'+S; P='ou=people,'+S
+def who(u): return f'uid={u},{P}'
+H=['-H','ldap://127.0.0.1:3389']
+def red(t): return re.sub(r'(userPassword[^:]*::?) .*', r'\1 <redacted>', t)
+try:
+  for i in range(600):
+    l=sp.run(['docker','logs',n],capture_output=True,text=True)
+    if '389-ds-container started.' in l.stdout+l.stderr: break
+    time.sleep(0.5)
+  print('image',ref); print('backend',ex('dsconf','localhost','backend','create','--suffix',S,'--be-name','userroot','--create-suffix').returncode)
+  RSC='read,search,compare'
+  import sys
+  variant=sys.argv[1]
+  acis={
+    'd_uidopt':[('(targetattr="*")',RSC),('(targetattr="uid;x-test")','DENY'+RSC)],
+    't_deny_uidopt':[('(targetattr!="uid;x-test")',RSC)],
+    't_uidopt':[('(targetattr="uid;x-test")',RSC)],
+  }
+  if variant=='semi': acis['t_uidsemi']=[('(targetattr="uid;")',RSC)]
+  ldif=f"dn: {P}\nobjectClass: organizationalUnit\nou: people\n\n"
+  for s in acis: ldif+=f"dn: {who(s)}\nobjectClass: inetOrgPerson\nuid: {s}\ncn: {s}\nsn: S\nuserPassword: Probe-Pw-{s}-1\n\n"
+  ldif+=f"dn: {B}\nobjectClass: organizationalUnit\nou: probe-fattr\n\n"
+  for u,extra in [('fa_alice',''),('fa_bob','userPassword: Probe-Bob-Pw-1\nuid;x-test: bobtag\ndescription;lang-en: hello\n'),('fa_carol','description;lang-en;x-foo: multi\nuid;x-test;x-two: two\n')]:
+    ldif+=f"dn: uid={u},{B}\nobjectClass: inetOrgPerson\nuid: {u}\ncn: {u}\nsn: S\n{extra}\n"
+  r=ex('ldapadd','-x',*H,'-D','cn=Directory Manager','-w',pw,inp=ldif); print('add',r.returncode,r.stderr.strip()[:300])
+  def addaci(text):
+    r=ex('ldapmodify','-x',*H,'-D','cn=Directory Manager','-w',pw,inp=f"dn: {B}\nchangetype: modify\nadd: aci\naci: {text}\n\n")
+    return r.returncode, r.stderr.strip().replace('\n',' ')[:200]
+  for s_,lst in acis.items():
+    for k,(t,perm) in enumerate(lst):
+      act="deny ("+perm[4:]+")" if perm.startswith("DENY") else "allow ("+perm+")"
+      print('aci',s_,k,*addaci(f'(target="ldap:///{B}"){t}(version 3.0; acl "labldap:{s_}-{k}"; {act} userdn="ldap:///{who(s_)}";)'))
+  ip=sp.run(['docker','inspect','-f','{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}',n],capture_output=True,text=True).stdout.strip()
+  for name in acis:
+    for order in ['plain-first','opt-first']:
+      fl=['(uid=fa_bob)','(uid;x-test=bobtag)','(uid;x-test=two)'] if order=='plain-first' else ['(uid;x-test=bobtag)','(uid;x-test=two)','(uid=fa_bob)']
+      r=sp.run(['go','run','./tmpprobe24',ip,who(name),f'Probe-Pw-{name}-1',B,*fl],capture_output=True,text=True,cwd='.')
+      print(f"{name:14} same-conn {order}: {r.stdout.strip()} {r.stderr[-300:]}")
+finally:
+  sp.run(['docker','rm','-f','-v',n],capture_output=True)
+
+===== go helper for probe 24 (tmpprobe24/main.go, run from the repo root, then removed) =====
+// Binds as os.Args[2] and runs each filter in os.Args[5:] in order on ONE connection
+// (one-level search under os.Args[4], attributes 1.1), printing filter=[rdn values].
+package main
+
+import (
+	"fmt"
+	"os"
+	"strings"
+
+	ldap "github.com/go-ldap/ldap/v3"
+)
+
+func main() {
+	ip, dn, pw, base := os.Args[1], os.Args[2], os.Args[3], os.Args[4]
+	c, err := ldap.DialURL("ldap://" + ip + ":3389")
+	if err != nil {
+		fmt.Println("dial", err)
+		return
+	}
+	if err := c.Bind(dn, pw); err != nil {
+		fmt.Println("bind", err)
+		return
+	}
+	var out []string
+	for _, f := range os.Args[5:] {
+		res, err := c.Search(ldap.NewSearchRequest(base, ldap.ScopeSingleLevel, ldap.NeverDerefAliases, 0, 0, false, f, []string{"1.1"}, nil))
+		var got []string
+		if res != nil {
+			for _, e := range res.Entries {
+				got = append(got, strings.TrimPrefix(strings.Split(e.DN, ",")[0], "uid="))
+			}
+		}
+		out = append(out, fmt.Sprintf("%s=%v%v", f, got, map[bool]string{true: "", false: fmt.Sprint(err)}[err == nil]))
+	}
+	fmt.Println(strings.Join(out, " "))
+}

@@ -14,7 +14,7 @@ Decision: OD-006 / T-024
 | ns-slapd | `389-Directory/2.4.6 B2024.212.0000` |
 | Label `version` | `39` (Fedora 39 container) |
 
-The immutable digest is also in `deploy/docker/dirsrv.digest`. Harness code must read that file. Do **not** put a floating `quay.io/389ds/dirsrv:<tag>` in Compose, Dockerfiles, or Makefile release paths.
+The immutable digest is also in `deploy/docker/dirsrv.digest`. Harness code must read that file. The native engine embeds this image's `attributeTypes` list (`internal/schema389/attributetypes.txt`, used to reject unknown ACI `targetattr` names); regenerate it with oracle probe 17 whenever the digest changes (`TestDataMatchesPinnedImage` enforces the match). Do **not** put a floating `quay.io/389ds/dirsrv:<tag>` in Compose, Dockerfiles, or Makefile release paths.
 
 T-041 copies a static `labldap-bootstrap` onto this image (`labldap-bootstrap:dev`). `/etc/dirsrv/slapd-localhost` is a symlink to `/data/config`. A separate bootstrap container may mount `/data` **read-only** for the instance CA (`/data/config/ca.crt`) and the LDAPI socket used by `dsconf localhost`.
 
