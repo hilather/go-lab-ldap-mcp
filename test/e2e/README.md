@@ -8,8 +8,8 @@ under `test/integration` remain the engine suite.
 
 ## Live stack
 
-When a release-like Compose topology exists (T-042 / T-110), point the
-suite at it:
+The repository provides native and 389 DS Compose topologies. To use an
+external stack, configure its URL and fixture credentials:
 
 ```text
 export LABLDAP_E2E_BASE_URL=https://127.0.0.1:8443
@@ -23,10 +23,14 @@ make test-e2e
 
 ## Residual
 
-T-042 Compose targets are still pending on this branch, so this milestone
-does **not** run against a real 389 DS Compose topology by default. The
-product-acceptance and outage specs execute against the mock; outage
-injection (`POST /__e2e/outage`) is mock-only.
+The default and CI browser suites run against the contract mock. This does
+not establish live Compose browser acceptance or engine parity. External-URL
+mode requires matching fixture data and trusted management TLS; mock-specific
+assertions and outage injection (`POST /__e2e/outage`) need a corresponding
+live fixture strategy. Real-engine integration and dual-engine parity remain
+separate release gates. The complete acceptance/outage suite still needs a live CI fixture strategy;
+the focused native Compose smoke below is automated: `make verify` runs it when
+Docker is available, and CI runs it in the `e2e-live` job.
 
 ## Secrets in artifacts
 
@@ -40,3 +44,29 @@ still contain a secret as UTF-8 bytes are replaced with a 1x1 placeholder.
 `clearPasswordFields` in `afterEach` is not the redaction path (Playwright
 attaches traces after hooks). Do not attach `test-results/` from a run
 that failed before teardown finished.
+
+## Isolated live native smoke
+
+`make test-e2e-live` builds candidate images, generates restricted temporary
+credentials and TLS files, starts a unique native Compose project, and exercises
+account lock/unlock, password expiry, password setting with must-change, and
+structured entry create/edit/move/delete through the UI. Independent `ldapsearch`
+checks prove the edited and moved entries exist in the actual directory, and that
+the deleted entry is gone (exit status 32, `noSuchObject`). `make verify` runs it
+when Docker is available and CI runs it in the `e2e-live` job; on failure CI
+uploads the Compose service logs (set `LABLDAP_E2E_LIVE_LOG_FILE` locally for the
+same). It
+requires Docker, Compose 2.24.4+, host `ldapsearch`, Go, pnpm, and Playwright
+Chromium (`pnpm exec playwright install chromium` from this directory).
+
+Use `LABLDAP_E2E_LIVE_STORAGE=persistent make test-e2e-live` for named-volume mode.
+The default uses ephemeral storage. Both remove only their own Compose project,
+volumes, and generated credentials on completion. Default host ports are 18443
+(management) and 13636 (LDAPS), configurable with `LABLDAP_E2E_LIVE_PORT` and
+`LABLDAP_E2E_LIVE_LDAP_PORT`.
+
+The harness validates the generated management certificate chain and localhost
+name, then trusts only its exact public-key pin in Chromium; it never disables
+all certificate checks or edits your browser trust database. LDAP checks require
+the generated CA with certificate verification enabled. This focused smoke is
+separate from the mock-dependent full acceptance/outage suite.

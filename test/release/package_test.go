@@ -205,8 +205,8 @@ func TestMakefileVerifyIsReleaseGate(t *testing.T) {
 			t.Fatalf("Makefile missing %q", want)
 		}
 	}
-	if !strings.Contains(mk, "verify: format lint generate generate-drift test-unit test-security sbom checksums archcheck") {
-		t.Fatal("make verify must include SBOM, checksums, and archcheck")
+	if !strings.Contains(mk, "verify: format lint generate generate-drift test-unit test-security sbom checksums archcheck test-e2e test-integration-native") {
+		t.Fatal("make verify must include SBOM, checksums, archcheck, browser workflows, and native integration")
 	}
 }
 

@@ -9,24 +9,17 @@ const BG = "rgb(11, 12, 14)";
 const ELEVATED = "rgb(18, 19, 23)";
 const PANEL = "rgb(24, 26, 31)";
 
-async function paintedBackground(locator: Locator): Promise<string> {
-  return locator.evaluate((el) => getComputedStyle(el).backgroundColor);
-}
-
 async function expectSurface(locator: Locator, rgb: string): Promise<void> {
-  const bg = await paintedBackground(locator);
-  expect(bg, `expected ${rgb}`).toBe(rgb);
+  await expect(locator).toHaveCSS("background-color", rgb);
 }
 
 async function expectMutedCopy(locator: Locator): Promise<void> {
   await expect(locator).toBeVisible();
-  const color = await locator.evaluate((el) => getComputedStyle(el).color);
-  expect(color).toBe("rgb(154, 155, 151)");
+  await expect(locator).toHaveCSS("color", "rgb(154, 155, 151)");
 }
 
 async function expectPlex(page: Page): Promise<void> {
-  const family = await page.locator("body").evaluate((el) => getComputedStyle(el).fontFamily);
-  expect(family).toMatch(/IBM Plex/);
+  await expect(page.locator("body")).toHaveCSS("font-family", /IBM Plex/);
 }
 
 async function expectLeftoverChrome(page: Page, surface: Locator): Promise<void> {

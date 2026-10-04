@@ -23,5 +23,5 @@ Do not claim completion when integration or acceptance tests were skipped.
 - [ ] Task report uses the format above ([docs/task-report.md](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/task-report.md)).
 - [ ] No secrets, tokens, passwords, session IDs, or generated lab credentials committed; `/secrets` and `.env` stay untracked.
 - [ ] Public contract changes (config, REST, MCP) include documentation **and** tests; generated files were produced by `make generate`, not hand-edited.
-- [ ] Architecture: no LDAP wire protocol in Go, no Docker socket mount, no Directory Manager credentials in the long-running control service.
+- [ ] Architecture: LDAP listeners exist only in `cmd/labldapd` / `internal/ldapserver`, never control or bootstrap; no Docker socket mount or Directory Manager credentials in the long-running control service (ADR-0008 / ADR-0009).
 - [ ] `make verify` passes locally.
