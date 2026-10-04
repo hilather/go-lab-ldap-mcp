@@ -24,10 +24,8 @@ var visProbeACIs = map[string][][2]string{
 	"p_deny_list":       {{`(targetattr!="uid || description")`, "read,search,compare"}},
 	"q_oc":              {{`(targetattr="userid")`, "read,search,compare"}, {`(targetattr="objectClass")`, "read"}},
 	"q_entryuuid":       {{`(targetattr="userid")`, "read,search,compare"}, {`(targetattr="entryUUID")`, "read"}},
-	// Probe 12 (options inside targetattr: t_uidopt, t_descopt,
-	// t_deny_uidopt) is committed but not asserted here: native strips
-	// options from targetattr names, 389 compares them literally. That
-	// pre-existing difference is open as CAND-34.
+	// Probe 12 (options inside targetattr) is replayed by
+	// TestTargetAttrOptionsMatchProbe12 (resolved CAND-34).
 }
 
 // visProbeRows are the probe 8/10 one-level search rows, generated from the

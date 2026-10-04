@@ -49,10 +49,12 @@ func cand3335Entries() map[string]*Entry {
 	}
 }
 
-func cand3335Server(t *testing.T) *Server {
+func cand3335Server(t *testing.T) *Server { return probeACIServer(t, cand3335ACIs) }
+
+func probeACIServer(t *testing.T, table map[string][][2]string) *Server {
 	t.Helper()
 	var texts []string
-	for subj, acis := range cand3335ACIs {
+	for subj, acis := range table {
 		for i, a := range acis {
 			rule := "allow (" + a[1] + ")"
 			if p, ok := strings.CutPrefix(a[1], "DENY"); ok {
@@ -94,14 +96,45 @@ var (
 
 func TestTargetAttrOptionsAndEntryLevelSearchMatchOracle(t *testing.T) {
 	t.Parallel()
-	srv := cand3335Server(t)
+	rows, compares := replayOracleRows(t, []string{"16", "18"}, cand3335ACIs, cand3335Entries())
+	if rows < 200 || compares < 50 {
+		t.Fatalf("replayed %d filter and %d compare rows; transcript format changed?", rows, compares)
+	}
+}
+
+// TestTargetAttrOptionsMatchProbe12 replays probe 12 (its own ACI table and
+// seed: no userPassword, carol without uid;x-test;x-two).
+func TestTargetAttrOptionsMatchProbe12(t *testing.T) {
+	t.Parallel()
+	u := [2]string{`(targetattr="userid")`, rscPerms}
+	table := map[string][][2]string{
+		"p_userid":      {u},
+		"p_userid_sn":   {u, {`(targetattr="sn")`, rscPerms}},
+		"t_uidopt":      {{`(targetattr="uid;x-test")`, rscPerms}},
+		"t_descopt":     {{`(targetattr="description;lang-en")`, rscPerms}, {`(targetattr="sn")`, "read"}},
+		"t_deny_uidopt": {{`(targetattr!="uid;x-test")`, rscPerms}},
+	}
 	entries := cand3335Entries()
+	oc := StringAttribute("objectClass", "top", "person", "organizationalPerson", "inetOrgPerson")
+	entries["fa_bob"] = NewEntry("uid=fa_bob,"+cand3335Base, oc, StringAttribute("uid", "fa_bob"), StringAttribute("cn", "fa_bob"), StringAttribute("sn", "S"),
+		StringAttribute("uid;x-test", "bobtag"), StringAttribute("description;lang-en", "hello"))
+	entries["fa_carol"] = NewEntry("uid=fa_carol,"+cand3335Base, oc, StringAttribute("uid", "fa_carol"), StringAttribute("cn", "fa_carol"), StringAttribute("sn", "S"),
+		StringAttribute("description;lang-en;x-foo", "multi"))
+	if rows, _ := replayOracleRows(t, []string{"12"}, table, entries); rows < 30 {
+		t.Fatalf("replayed %d rows", rows)
+	}
+}
+
+// replayOracleRows checks every one-level filter row and fa_bob compare row
+// of the given probe transcripts for the subjects in table.
+func replayOracleRows(t *testing.T, probes []string, table map[string][][2]string, entries map[string]*Entry) (rows, compares int) {
+	t.Helper()
+	srv := probeACIServer(t, table)
 	ctx := context.Background()
-	rows, compares := 0, 0
-	for _, probe := range []string{"16", "18"} {
+	for _, probe := range probes {
 		for _, line := range oracleSection(t, probe) {
 			if m := oracleFilterRowRe.FindStringSubmatch(line); m != nil {
-				if _, ok := cand3335ACIs[m[1]]; !ok {
+				if _, ok := table[m[1]]; !ok {
 					continue
 				}
 				want := strings.NewReplacer("'", "", " ", "", "uid=", "").Replace(m[3])
@@ -123,7 +156,7 @@ func TestTargetAttrOptionsAndEntryLevelSearchMatchOracle(t *testing.T) {
 				continue
 			}
 			if m := oracleCompareRowRe.FindStringSubmatch(line); m != nil {
-				if _, ok := cand3335ACIs[m[1]]; !ok {
+				if _, ok := table[m[1]]; !ok {
 					continue
 				}
 				s := Subject{DN: mustDNA(t, "uid="+m[1]+",ou=people,dc=example,dc=test")}
@@ -141,9 +174,7 @@ func TestTargetAttrOptionsAndEntryLevelSearchMatchOracle(t *testing.T) {
 			}
 		}
 	}
-	if rows < 200 || compares < 50 {
-		t.Fatalf("replayed %d filter and %d compare rows; transcript format changed?", rows, compares)
-	}
+	return rows, compares
 }
 
 // TestAbsoluteFilterKeepsEntryLevelSearchCheck: 389 rejects (&) and (|)
