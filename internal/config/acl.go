@@ -173,6 +173,12 @@ func emitACI(a v1alpha1.ACL, n *Normalized) (string, string, error) {
 			if !aciAttrRe.MatchString(name) {
 				return "", "", fieldErr("spec.acls."+a.ID+".attributes."+l.field, "invalid_attribute", "attribute name is not allowed")
 			}
+			// An empty option ("userPassword;", "mail;;x") covers nothing
+			// in targetattr (CAND-34), so such a deny would exclude
+			// nothing and such an allow would grant nothing.
+			if _, opts, ok := strings.Cut(name, ";"); ok && slices.Contains(strings.Split(opts, ";"), "") {
+				return "", "", fieldErr("spec.acls."+a.ID+".attributes."+l.field, "invalid_attribute", "attribute name has an empty option")
+			}
 			if name != "*" && !schema389.Known(name) {
 				return "", "", fieldErr("spec.acls."+a.ID+".attributes."+l.field, "unknown_attribute", "attribute is not defined in the 389 schema")
 			}
@@ -223,8 +229,16 @@ func dslTargetAttr(a v1alpha1.ACL) (allow, deny string, err error) {
 			return "", "", fieldErr(path+"deny", "invalid_attribute_filter", `deny "*" leaves no attribute; remove the ACL or narrow it`)
 		}
 	}
+	// targetattr names are compared literally on both engines, so every
+	// emitted name is the 389 NAME (userid -> uid, rfc822Mailbox -> mail,
+	// pwdHistory -> passwordHistory) with its options; otherwise an allow
+	// would grant nothing and a deny would exclude nothing.
 	join := func(field string, names []string) (string, error) {
-		names = dedupFold(names)
+		canon := make([]string, len(names))
+		for i, n := range names {
+			canon[i] = schema389.Primary(PrimaryAttrDescription(n))
+		}
+		names = dedupFold(canon)
 		if len(names) > MaxACIAttrs {
 			return "", fieldErr(path+field, "too_many_attributes", "too many attribute names in one list")
 		}
@@ -237,15 +251,7 @@ func dslTargetAttr(a v1alpha1.ACL) (allow, deny string, err error) {
 		allow, err = join("allow", a.Attributes.Allow)
 		return allow, "", err
 	case allowAll:
-		// targetattr names are compared literally on both engines, so a
-		// deny names the 389 NAME (rfc822Mailbox -> mail, pwdHistory ->
-		// passwordHistory) or it would not deny the stored
-		// attribute.
-		names := make([]string, len(a.Attributes.Deny))
-		for i, n := range a.Attributes.Deny {
-			names[i] = schema389.Primary(PrimaryAttrDescription(n))
-		}
-		deny, err = join("deny", names)
+		deny, err = join("deny", a.Attributes.Deny)
 		return "", deny, err
 	}
 	var kept []string
@@ -254,8 +260,7 @@ func dslTargetAttr(a v1alpha1.ACL) (allow, deny string, err error) {
 		drop := false
 		for _, dn := range a.Attributes.Deny {
 			dBase, dOpts := splitDSLAttr(dn)
-			if !strings.EqualFold(aBase, dBase) || slices.Contains(dOpts, "") {
-				// A name with an empty option ("mail;") covers nothing.
+			if !strings.EqualFold(aBase, dBase) {
 				continue
 			}
 			if !optionSubset(dOpts, aOpts) {

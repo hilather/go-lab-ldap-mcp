@@ -43,16 +43,21 @@ the pinned 389 image in four more places (contract C8; oracle probes
   [uid, sn]` now emits `targetattr="uid || sn"` instead of
   `targetattr="*"` (the v0.6.0 over-grant listed under Known limitations is fixed), `attributes.deny`
   with no allow list emits `targetattr!="a || b"`, and both lists emit
-  the allow names that no deny name covers. Deny names that are 389
-  aliases (`pwdHistory`, `homeTelephoneNumber`, `rfc822Mailbox`) are
-  resolved to the stored attribute's NAME; before, such a deny was
-  emitted literally and denied nothing. New validation errors on
+  the allow names that no deny name covers. New validation errors on
   `spec.acls.<id>.attributes.deny`: `invalid_attribute_filter` for a deny
   name with options narrower than a same-attribute allow name, for a
   combination that leaves no attribute, and for `deny: ["*"]` (it used to
   compile; remove the ACL or narrow it). More than 64 names in one list
-  fail with `too_many_attributes`. A deny name with an empty option
-  (`"mail;"`) covers nothing and does not narrow the allow list.
+  fail with `too_many_attributes`. A name with an empty option
+  (`"userPassword;"`) now fails with `invalid_attribute` (it used to
+  compile to a targetattr that covers nothing, so such a deny excluded
+  nothing).
+- **DSL names are emitted as the 389 NAME.** Allow and deny names that
+  are aliases (`userid`, `pwdHistory`, `rfc822Mailbox`,
+  `homeTelephoneNumber`) compile to the stored attribute's name (`uid`,
+  `passwordHistory`, `mail`, `homePhone`). Before, they were emitted
+  literally, so such an allow granted nothing and such a deny excluded
+  nothing; affected ACLs now grant or deny what they name.
 - **REST, MCP and the console reject absolute filters up front.** A
   search filter holding `(&)` or `(|)` is a `filter` / `invalid` field
   error ("use (objectClass=*)") instead of an engine protocolError shown

@@ -190,14 +190,16 @@ That compiles to 389 ACIs on the suffix. Seed user `alice` can search
 people and groups, bind as herself, and cannot read `userPassword` or
 write `cn=config`.
 
-Names in `attributes.allow` and `attributes.deny` must be attribute types
-the pinned 389 image defines (a name, alias or numeric OID; options such
-as `;lang-en` are allowed and narrow the rule to values carrying them,
-so `attributes.deny: [userPassword;lang-en]` no longer excludes plain
-`userPassword`, only `userPassword;lang-en` values).
-Anything else, such as a typo or an object class, fails validation with
-`unknown_attribute` on `spec.acls.<id>.attributes.allow` or `.deny`,
-because 389 refuses an ACI that names it.
+Names in `attributes.allow` and `attributes.deny` must be attribute type
+names or aliases the pinned 389 image defines. Numeric OIDs and names
+with an empty option (`userPassword;`) fail validation with
+`invalid_attribute`. Options such as `;lang-en` are allowed and narrow
+the rule to values carrying them, so `attributes.deny:
+[userPassword;lang-en]` does not exclude plain `userPassword`, only
+`userPassword;lang-en` values. Anything else, such as a typo or an object
+class, fails validation with `unknown_attribute` on
+`spec.acls.<id>.attributes.allow` or `.deny`, because 389 refuses an ACI
+that names it.
 
 Each list compiles to one 389 `targetattr` list. `allow` alone gives
 `targetattr="uid || sn"` (`"*"` or no list means every attribute);
@@ -205,7 +207,8 @@ Each list compiles to one 389 `targetattr` list. `allow` alone gives
 `targetattr!="userPassword"`; both lists give the `allow` names that no
 `deny` name covers (`allow: [uid, sn, mail]`, `deny: [sn]` →
 `targetattr="uid || mail"`; aliases such as `rfc822Mailbox` count as
-`mail`, and a `deny` name is emitted as its primary descriptor). Validation rejects with `invalid_attribute_filter` a `deny`
+`mail`). Every emitted name is the attribute's 389 NAME, so `allow:
+[userid, pwdHistory]` compiles to `targetattr="uid || passwordHistory"`. Validation rejects with `invalid_attribute_filter` a `deny`
 name with options narrower than an `allow` name of the same attribute
 (`allow: [mail]`, `deny: [mail;lang-en]`), a combination that leaves no
 attribute, and `deny: ["*"]`; each list holds at most 64 names.

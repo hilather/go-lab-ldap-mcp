@@ -59,7 +59,11 @@ func TestACIModRDNStarListsAbsoluteFilters(t *testing.T) {
 		"p_star_sn":        {`(targetattr="* || sn")|` + rsc},
 	}
 	yaml := strings.Replace(workflowYAML(), `directory: { suffix: "dc=example,dc=test" }`, `directory: { suffix: "dc=example,dc=test", allowRawACI: true }`, 1)
+	// Two more DSL principals for the alias rows (same password as alice).
+	yaml = strings.Replace(yaml, "  groups:\n", "    - id: dsldeny\n      uid: dsldeny\n      passwordFile: secrets/user-alice\n      enabled: true\n      attributes: { sn: Seed }\n    - id: dslallow\n      uid: dslallow\n      passwordFile: secrets/user-alice\n      enabled: true\n      attributes: { sn: Seed }\n  groups:\n", 1)
 	yaml += "  acls:\n"
+	yaml += "    - id: dsl-alias-deny\n      principal: { kind: user, ref: dsldeny }\n      target: { kind: suffix }\n      permissions: [read, search, compare]\n      attributes: { deny: [homeTelephoneNumber] }\n"
+	yaml += "    - id: dsl-alias-allow\n      principal: { kind: user, ref: dslallow }\n      target: { kind: suffix }\n      permissions: [read, search, compare]\n      attributes: { allow: [userid, homeTelephoneNumber] }\n"
 	yaml += "    - id: dsl-list\n      principal: { kind: user, ref: alice }\n      target: { kind: suffix }\n      permissions: [read, search]\n      attributes: { allow: [uid, sn, description], deny: [description] }\n"
 	names := make([]string, 0, len(subjects))
 	for s := range subjects {
@@ -129,7 +133,7 @@ func TestACIModRDNStarListsAbsoluteFilters(t *testing.T) {
 	}
 	add(ou, orgUnit("probe-acl38")...)
 	add(dest, orgUnit("probe-acl38-dest")...)
-	add("uid=fa_bob,"+ou, person("fa_bob", [2]string{"description", "hello"})...)
+	add("uid=fa_bob,"+ou, person("fa_bob", [2]string{"description", "hello"}, [2]string{"homePhone", "+1 555 0100"})...)
 	for _, s := range names {
 		add("uid="+s+","+people, person(s, [2]string{"userPassword", pw})...)
 	}
@@ -312,6 +316,21 @@ func TestACIModRDNStarListsAbsoluteFilters(t *testing.T) {
 	}
 	if got := search(dial("uid=alice,"+people, seedCanary), "(description=hello)"); got != "" {
 		t.Errorf("%s: DSL list (description=hello): got [%s], want none", env.engine, got)
+	}
+	// DSL aliases are emitted as the 389 NAME: deny [homeTelephoneNumber]
+	// is targetattr!="homePhone" and allow [userid, homeTelephoneNumber]
+	// is targetattr="uid || homePhone". Emitted literally, the deny hid
+	// nothing and the allow granted nothing.
+	for _, tc := range []struct{ subject, filter, want string }{
+		{"dsldeny", "(homePhone=*)", ""},
+		{"dsldeny", "(uid=fa_bob)", "uid=fa_bob"},
+		{"dslallow", "(homePhone=*)", "uid=fa_bob"},
+		{"dslallow", "(uid=fa_bob)", "uid=fa_bob"},
+		{"dslallow", "(sn=S)", ""},
+	} {
+		if got := search(dial("uid="+tc.subject+","+people, seedCanary), tc.filter); got != tc.want {
+			t.Errorf("%s: DSL alias %s %s: got [%s], want [%s]", env.engine, tc.subject, tc.filter, got, tc.want)
+		}
 	}
 	// cn is outside the list; the pre-fix compiler emitted
 	// targetattr!="description", which granted it.
