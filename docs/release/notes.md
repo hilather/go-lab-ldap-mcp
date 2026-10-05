@@ -57,7 +57,10 @@ runtime ACI text changes.
    list and the `runtime-password` scope; a group moved out of groups leaves the
    Groups list. `target_from`/`target_to` are not supported on native (D38).
 
-`apiVersion` stays `labldap.dev/v1alpha1`. REST and MCP shapes are unchanged; only
+`apiVersion` stays `labldap.dev/v1alpha1`. The owner question left open in v0.6.0,
+whether the stricter user attribute names ([#27](https://github.com/hilather/go-lab-ldap-mcp/pull/27),
+[#18](https://github.com/hilather/go-lab-ldap-mcp/pull/18)) need an `apiVersion` bump, is still open; #33 does not
+change it. REST and MCP shapes are unchanged; only
 the `ldap_move_entry` / move description text now says the new DN must stay under
 the same managed suffix as the entry.
 
@@ -208,8 +211,9 @@ shapes are unchanged. Read "Upgrade risks" first.
 8. Upgrading from v0.5.0 or earlier: first apply the v0.6.0 migration guidance and
    upgrade risks in the
    [v0.6.0 notes](https://github.com/hilather/go-lab-ldap-mcp/blob/v0.6.0/docs/release/notes.md)
-   (raw ACI `targetattr` schema check and `||` lists, DSL attribute lists, index
-   formats 2 and 3, TLS re-mint, revision tokens, absolute filters).
+   (all ten risks, including the raw ACI `targetattr` schema check and `||` lists,
+   DSL attribute lists, index formats 2 and 3, TLS re-mint, revision tokens and
+   absolute filters).
 
 ## Acceptance
 
@@ -265,7 +269,8 @@ Its upgrade risks were: unknown ACL/ACI attribute names fail startup; an ACI wit
 stricter user attribute names; filter matching and index format 3; persistent store
 index format 2; generated TLS leaves need re-minting; cached revision tokens rotate;
 DSL attribute lists compile to real 389 lists; absolute filters and ModRDN result
-codes. `apiVersion` stayed `labldap.dev/v1alpha1`.
+codes. `apiVersion` stayed `labldap.dev/v1alpha1`, with the `apiVersion`-bump question for
+the stricter user attribute names left open for the owner.
 
 ### v0.5.0 (2026-08-29)
 
