@@ -1,7 +1,7 @@
 # LabLDAP v0.7.0 release notes
 
 Date: 2026-10-05  
-Tag: **v0.7.0** (`main` at `359b208` plus this notes PR; the tag goes on the squash of this PR)  
+Tag: **v0.7.0** (on the squash commit of the v0.7.0 notes PR)  
 Prior: [v0.6.0](https://github.com/hilather/go-lab-ldap-mcp/releases/tag/v0.6.0)  
 Images: `labldap-control:dev`, `labldap-bootstrap:dev`, `labldapd:dev` (OD-004; do not push)
 
@@ -46,8 +46,9 @@ runtime ACI text changes.
 6. **Cross-suffix moves and result codes.** Moves between managed suffixes are
    refused with affectsMultipleDSAs(71) on both engines (native used to allow them),
    and REST/MCP refuse them up front with a `newDN` / `forbidden` field error. A
-   missing modrdn source or new superior is 32 for a subject holding `moddn` there,
-   else 50. Case-only renames now succeed on native instead of returning 68.
+   missing modrdn source or new superior is 32 for Directory Manager (even without
+   `moddn`) and for a subject holding `moddn` there, else 50. Case-only renames now
+   succeed on native instead of returning 68.
 7. **Security.** The runtime credential can now move entries under people and groups
    over raw LDAP on both engines, including a whole subtree. That includes
    `ou=groups` under `ou=people`, and the credential's own entry out of people (which
@@ -71,7 +72,7 @@ the same managed suffix as the entry.
   work through REST, MCP and the console on both engines ([#33](https://github.com/hilather/go-lab-ldap-mcp/pull/33); CAND-39
   resolved).
 - Case-only renames (`uid=keeper` → `uid=Keeper`) respell the DN on native as on 389
-  ([#33](https://github.com/hilather/go-lab-ldap-mcp/pull/33); CAND-30 resolved; the internal-spaces half is split off as CAND-40,
+  ([#33](https://github.com/hilather/go-lab-ldap-mcp/pull/33); CAND-30 resolved; only its internal-spaces half is split off, into CAND-40,
   still open).
 - Moves between managed suffixes are refused with 71 on both engines and up front on
   REST/MCP ([#33](https://github.com/hilather/go-lab-ldap-mcp/pull/33)).
@@ -86,7 +87,8 @@ of 2026-10-04 to add `moddn` and grant it in the runtime ACIs).
 
 - **Moves to a different parent work on both engines (`moddn`).** Native
   now supports 389's `moddn` permission: a move needs `moddn` on the new
-  superior (entry level) plus write on the RDN attribute on the old DN; no
+  superior (entry level) plus write on the new RDN attribute on the old DN
+  and, when `deleteoldrdn` is set, write on the old RDN attribute too; no
   add or delete right is checked any more. The runtime ACIs
   `runtime-people-write`, `runtime-groups-write` and
   `runtime-addsuffix-N-write` now include `moddn`, so REST, MCP and the
