@@ -96,7 +96,7 @@ const (
 	ResultObjectClassViolation         ResultCode = 65
 	ResultNotAllowedOnNonLeaf          ResultCode = 66
 	ResultEntryAlreadyExists           ResultCode = 68
-	ResultAffectsMultipleDSAs          ResultCode = 71 // unused by LabLDAP; reserved for parity
+	ResultAffectsMultipleDSAs          ResultCode = 71 // moves between managed suffixes (CAND-39)
 	ResultAssertionFailed              ResultCode = 122
 )
 

@@ -188,7 +188,10 @@ func (r *Runtime) MoveEntry(ctx context.Context, move directory.EntryMove) (dire
 		if e := r.requireParent(ctx, c, to); e != nil {
 			return e
 		}
-		req := ldap.NewModifyDNRequest(from.String(), newRDN, move.DeleteOld, newParent.String())
+		// The stored DN is the source so a rename keeps the stored parent
+		// spelling (both engines take a rename's parent spelling from the
+		// request DN; resolved CAND-30).
+		req := ldap.NewModifyDNRequest(live.DN, newRDN, move.DeleteOld, newParent.String())
 		if e := c.ModifyDN(ctx, req); e != nil {
 			return e
 		}

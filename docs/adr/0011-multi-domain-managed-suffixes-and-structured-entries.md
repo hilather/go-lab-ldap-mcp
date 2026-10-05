@@ -6,6 +6,9 @@ Accepted
 
 Date: 2026-08-19
 
+Amended: 2026-10-04 (items 7 and 8: `moddn` and same-suffix moves;
+owner decision, resolved CAND-39)
+
 Deciders: repository owner
 
 Related tasks: GitHub issue #5
@@ -93,6 +96,11 @@ groupOfNames) and also lacks `container`.
    the people and groups containers by engine ACI. Use
    `additionalSuffixes` for extra OU trees.
 
+   *Amended 2026-10-04 (CAND-39, owner decision):* the people, groups
+   and additional-suffix write ACIs also grant 389's `moddn` right, so
+   the runtime account can move entries within and between people and
+   groups and within each additional suffix on both engines.
+
 8. **Structured entry API (allowlisted classes only).** No free-form BER
    mods, no pass-through modify, no raw ACI dump except the existing
    `allowRawACI` ACL path.
@@ -114,8 +122,12 @@ groupOfNames) and also lacks `container`.
    - `ldap_update_entry` / `PATCH /api/v1/entries?dn=`
    - `ldap_delete_entry` / `DELETE /api/v1/entries?dn=` (revision +
      confirm; refuse non-empty containers unless `recursive` + confirm)
-   - `ldap_move_entry` / `POST /api/v1/entries/move` (new DN stays under
-     a managed suffix; referint/memberof update `member` / `memberOf`)
+   - `ldap_move_entry` / `POST /api/v1/entries/move` (new DN stays in
+     the same managed suffix as the entry; referint/memberof update
+     `member` / `memberOf`). *Amended 2026-10-04 (CAND-39):* a move
+     between managed suffixes is refused with a `newDN` / `forbidden`
+     field error; over LDAP both engines answer affectsMultipleDSAs(71),
+     as 389 keeps each suffix in its own backend.
    - `ldap_list_tree` / `POST /api/v1/tree`
    - `GET /api/v1/suffixes` lists compiled managed suffixes
 

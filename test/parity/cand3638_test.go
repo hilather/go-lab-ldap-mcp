@@ -2,6 +2,7 @@ package parity
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
@@ -202,6 +203,93 @@ func c38Outcomes(t *testing.T, e engine) []opOutcome {
 		record(codeOutcome(conn.ModifyDN(ldap.NewModifyDNRequest("uid=ghost,"+c38OU, "uid=ghost", true, c38Dst))), r.want, r.subject+" move missing source")
 		conn.Close()
 	}
+	// CAND-39/30 spelling and plugins (probes 31, 33, 34), compared as raw
+	// strings: canonical outcomes fold DNs, so the resulting spelling is
+	// asserted here. Request attribute types stay lowercase: 389 keeps
+	// their case in the DN and native lowercases them (D37).
+	raw := func(dn string, attrs ...string) string {
+		t.Helper()
+		res, err := dm.Search(ldap.NewSearchRequest(dn, ldap.ScopeBaseObject, ldap.NeverDerefAliases, 0, 0, false, "(objectClass=*)", attrs, nil))
+		if err != nil || len(res.Entries) != 1 {
+			t.Fatalf("%s read %s: %v", e.name(), dn, err)
+		}
+		parts := []string{res.Entries[0].DN}
+		for _, a := range attrs {
+			v := res.Entries[0].GetAttributeValues(a)
+			slices.Sort(v)
+			parts = append(parts, a+"="+strings.Join(v, ";"))
+		}
+		return strings.Join(parts, " ")
+	}
+	spell := func(note, op, dn, want string, attrs ...string) {
+		t.Helper()
+		got := raw(dn, attrs...)
+		if !strings.HasPrefix(op, "0") {
+			t.Errorf("%s %s: modrdn code %s", e.name(), note, op)
+		}
+		if got != want {
+			t.Errorf("%s %s: got %q, oracle %q", e.name(), note, got, want)
+		}
+		out = append(out, opOutcome{Value: got, Note: "spelling " + note})
+	}
+	mdn := func(dn, rdn string, del bool, sup string) string {
+		return fmt.Sprint(codeOutcome(dm.ModifyDN(ldap.NewModifyDNRequest(dn, rdn, del, sup))).Code)
+	}
+	mix := "ou=MixCase," + c38Dst
+	add(mix, map[string][]string{"objectClass": {"top", "organizationalUnit"}, "ou": {"MixCase"}})
+	add("uid=c38sp1,"+c38OU, map[string][]string{"objectClass": person, "uid": {"c38sp1"}, "cn": {"c38sp1"}, "sn": {"S"}})
+	op := mdn("uid=c38sp1,"+c38OU, "uid=c38sp1", true, "ou=mixcase,"+c38Dst)
+	created[0] = "uid=c38sp1," + mix
+	spell("move takes stored superior spelling", op, "uid=c38sp1,"+mix, "uid=c38sp1,"+mix)
+	add("uid=c38sp2,"+c38OU, map[string][]string{"objectClass": person, "uid": {"c38sp2"}, "cn": {"c38sp2"}, "sn": {"S"}})
+	op = mdn("uid=c38sp2,"+c38OU, "uid=C38SP2", true, "ou=PROBE-C38,"+suffixDN)
+	spell("rename ignores equal explicit superior", op, "uid=c38sp2,"+c38OU, "uid=C38SP2,"+c38OU+" uid=C38SP2", "uid")
+	add("uid=c38sp3,"+c38OU, map[string][]string{"objectClass": person, "uid": {"c38sp3"}, "cn": {"c38sp3"}, "sn": {"S"}})
+	op = mdn("uid=c38sp3,ou=PROBE-C38,"+suffixDN, "uid=c38sp3", true, "")
+	spell("rename takes request parent spelling", op, "uid=c38sp3,"+c38OU, "uid=c38sp3,ou=PROBE-C38,"+suffixDN)
+	op = mdn("uid=c38sp3,"+c38OU, "uid=c38sp3", true, "")
+	spell("parent-only respell back", op, "uid=c38sp3,"+c38OU, "uid=c38sp3,"+c38OU)
+	add("uid=c38sp4,"+c38OU, map[string][]string{"objectClass": person, "uid": {"c38sp4"}, "cn": {"c38sp4"}, "sn": {"S"}})
+	op = mdn("uid=c38sp4,"+c38OU, "uid=C38SP4", false, "")
+	spell("case-only del0 keeps value", op, "uid=c38sp4,"+c38OU, "uid=C38SP4,"+c38OU+" uid=c38sp4", "uid")
+
+	// Case-only renames leave member/memberOf as written; a group move
+	// respells memberOf; a subtree move carries member values.
+	grp := "cn=c38grp," + c38OU
+	add("uid=c38mem,"+c38OU, map[string][]string{"objectClass": person, "uid": {"c38mem"}, "cn": {"c38mem"}, "sn": {"S"}})
+	if err := dm.Add(func() *ldap.AddRequest {
+		r := ldap.NewAddRequest(grp, nil)
+		r.Attribute("objectClass", []string{"top", "groupOfNames"})
+		r.Attribute("cn", []string{"c38grp"})
+		r.Attribute("member", []string{"uid=c38mem," + c38OU})
+		return r
+	}()); err != nil {
+		t.Fatalf("seed group: %v", err)
+	}
+	created = append([]string{grp}, created...)
+	op = mdn("uid=c38mem,"+c38OU, "uid=C38MEM", true, "")
+	spell("case-only member keeps member value", op, grp, grp+" member=uid=c38mem,"+c38OU, "member")
+	spell("case-only member keeps memberOf", op, "uid=c38mem,"+c38OU, "uid=C38MEM,"+c38OU+" memberOf="+grp, "memberOf")
+	op = mdn(grp, "cn=C38GRP", true, "")
+	spell("case-only group keeps memberOf", op, "uid=c38mem,"+c38OU, "uid=C38MEM,"+c38OU+" memberOf="+grp, "memberOf")
+	op = mdn(grp, "cn=C38GRP", true, c38Dst)
+	created[0] = "cn=C38GRP," + c38Dst
+	spell("group move respells memberOf", op, "uid=c38mem,"+c38OU, "uid=C38MEM,"+c38OU+" memberOf=cn=C38GRP,"+c38Dst, "memberOf")
+	unit := "ou=c38unit," + c38OU
+	add(unit, map[string][]string{"objectClass": {"top", "organizationalUnit"}, "ou": {"c38unit"}})
+	add("uid=c38in,"+unit, map[string][]string{"objectClass": person, "uid": {"c38in"}, "cn": {"c38in"}, "sn": {"S"}})
+	if err := dm.Modify(func() *ldap.ModifyRequest {
+		r := ldap.NewModifyRequest("cn=C38GRP,"+c38Dst, nil)
+		r.Add("member", []string{"uid=c38in," + unit})
+		return r
+	}()); err != nil {
+		t.Fatalf("add member: %v", err)
+	}
+	op = mdn(unit, "ou=c38unit", true, c38Dst)
+	created[0], created[1] = "uid=c38in,ou=c38unit,"+c38Dst, "ou=c38unit,"+c38Dst
+	spell("subtree move carries member", op, "cn=C38GRP,"+c38Dst, "cn=C38GRP,"+c38Dst+" member=uid=c38in,ou=c38unit,"+c38Dst+";uid=c38mem,"+c38OU, "member")
+	spell("subtree move memberOf", op, "uid=c38in,ou=c38unit,"+c38Dst, "uid=c38in,ou=c38unit,"+c38Dst+" memberOf=cn=C38GRP,"+c38Dst, "memberOf")
+
 	conn := as("c38_ad")
 	addReq := ldap.NewAddRequest("uid=c38new,"+c38OU, nil)
 	addReq.Attribute("objectClass", person)
