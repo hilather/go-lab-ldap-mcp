@@ -514,7 +514,7 @@ export interface paths {
         put?: never;
         /**
          * Rename or re-parent an entry
-         * @description Sibling of ldap_move_entry. New DN must stay under a managed suffix.
+         * @description Sibling of ldap_move_entry. New DN must stay under the same managed suffix as the entry.
          */
         post: operations["moveEntry"];
         delete?: never;

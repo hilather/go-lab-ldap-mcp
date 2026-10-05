@@ -390,7 +390,9 @@ func (t updateTx) Rename(ctx context.Context, from, to config.DN) error {
 	if t.tx.Bucket(bucketDN2ID).Get([]byte(fromKey)) == nil {
 		return fmt.Errorf("store: rename: %w", ldapserver.ErrNoSuchObject)
 	}
-	if t.tx.Bucket(bucketDN2ID).Get([]byte(toKey)) != nil {
+	// Equal folded keys are a respell (resolved CAND-30): keys, ids and
+	// index links stay; only the DN strings of the subtree change.
+	if toKey != fromKey && t.tx.Bucket(bucketDN2ID).Get([]byte(toKey)) != nil {
 		return fmt.Errorf("store: rename: %w", ldapserver.ErrEntryExists)
 	}
 	moves, err := t.collectMoves(from, to)
@@ -445,12 +447,11 @@ type move struct {
 }
 
 // collectMoves walks the children index from from and computes each
-// descendant's destination. Canonical stored DNs end with from's canonical
-// string (folding lowercases without changing length), so the destination
-// is a prefix swap on both forms.
+// descendant's destination by rebasing its parsed DN (config.DN.Rebase),
+// which keeps the descendants' own RDN spelling and is safe when folding
+// changes a value's byte length.
 func (t updateTx) collectMoves(from, to config.DN) ([]move, error) {
-	fromKey, toKey := from.FoldedKey(), to.FoldedKey()
-	fromDN, toDN := from.String(), to.String()
+	fromKey := from.FoldedKey()
 	var moves []move
 	queue := []string{fromKey}
 	for len(queue) > 0 {
@@ -464,10 +465,18 @@ func (t updateTx) collectMoves(from, to config.DN) ([]move, error) {
 		if err != nil {
 			return nil, fmt.Errorf("store: rename: %w", err)
 		}
+		d, err := config.ParseDN(e.DN)
+		if err != nil {
+			return nil, fmt.Errorf("store: rename: %w", err)
+		}
+		nd, ok := d.Rebase(from, to)
+		if !ok {
+			return nil, fmt.Errorf("store: rename: %q is not under the renamed entry", e.DN)
+		}
 		moves = append(moves, move{
 			oldKey: key,
-			newKey: key[:len(key)-len(fromKey)] + toKey,
-			newDN:  e.DN[:len(e.DN)-len(fromDN)] + toDN,
+			newKey: nd.FoldedKey(),
+			newDN:  nd.String(),
 			id:     append([]byte(nil), id...),
 			entry:  e,
 		})

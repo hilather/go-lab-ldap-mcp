@@ -13,7 +13,9 @@ import (
 // (targetattr!="*" and star lists) and CAND-38 (absolute filters), oracle
 // probes 25-29 in testdata/filter-attr-oracle-probes.txt. Own fixture, so
 // the shared ledger fixture never sees these ACIs. Cross-parent moves
-// (CAND-39) and case-only renames (CAND-30) stay open and are not run here.
+// (CAND-39) and case-only renames (CAND-30), resolved later, are pinned on
+// both engines by TestModDNMatchesOracle and TestRESTMovesWithRuntimeGrant
+// (test/integration/dirsrv).
 
 const (
 	c38OU       = "ou=probe-c38," + suffixDN

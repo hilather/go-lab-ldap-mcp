@@ -413,7 +413,7 @@ func Catalog() []ToolDef {
 		},
 		{
 			Name: ToolMoveEntry, Contract: ContractProposed, Task: "issue-5",
-			Description: "Rename or re-parent an entry. New DN must stay under a managed suffix.",
+			Description: "Rename or re-parent an entry. New DN must stay under the same managed suffix as the entry.",
 			Scope:       auth.ScopeDirectoryWrite, Flag: flagMutations,
 			Input: MoveEntryInput{}, Output: directory.DirectoryEntry{},
 		},

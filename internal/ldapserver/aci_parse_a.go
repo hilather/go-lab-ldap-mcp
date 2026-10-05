@@ -10,6 +10,8 @@ package ldapserver
 //	(targetattr="<attr>[ || <attr>...]" | "*" | targetattr!="<attr>[ || <attr>...]")
 //	<attr> = name or numeric OID, optional ;options; compared literally (C8)
 //	(version 3.0; acl "<name>"; allow|deny (<perm>[,<perm>...]) <who>;)
+//	<perm> = read | search | compare | add | delete | write | moddn
+//	(target_from / target_to are not supported: a parse error, D38)
 //	<who> = userdn="ldap:///<dn>|all|anyone|self" | groupdn="ldap:///<dn>"
 //
 // Fail-closed rule (C8): any clause, keyword, permission, bind rule, or
@@ -22,6 +24,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 	"unicode/utf8"
 
@@ -197,6 +200,22 @@ func (p *ParsedACI) TargetsAttr(base string, opts []string) bool {
 	return false
 }
 
+// CoversAnyAttr reports whether the targetattr clause covers an arbitrary
+// attribute, the filter of ACICheck.Existence: an omitted clause, "*", a
+// positive list holding "*", or a negated list without "*" (oracle probes
+// 30-34). A positive list of names or a negated list holding "*" does not.
+func (p *ParsedACI) CoversAnyAttr() bool {
+	switch p.AttrMode {
+	case ACITargetAttrNoneA, ACITargetAttrAllA:
+		return true
+	case ACITargetAttrAllowA:
+		return slices.Contains(p.Attrs, "*")
+	case ACITargetAttrDenyA:
+		return !slices.Contains(p.Attrs, "*")
+	}
+	return false
+}
+
 // aciAttrInA reports whether a targetattr name in list covers base;opts,
 // as on 389 (oracle probes 12, 16, 18; resolved CAND-34): the name's base
 // equals base literally (case-insensitive, no alias or OID resolution) and
@@ -254,6 +273,7 @@ var aciPermsA = map[string]Permission{
 	"add":     PermAdd,
 	"delete":  PermDelete,
 	"write":   PermWrite,
+	"moddn":   PermModDN,
 }
 
 // aciAttrNameReA mirrors the compiler's aciAttrRe (including ";" for

@@ -50,7 +50,7 @@ type EntryDelete struct {
 	Recursive bool     `json:"recursive,omitempty"`
 }
 
-// EntryMove is a rename or re-parent. NewDN must stay under a managed suffix.
+// EntryMove is a rename or re-parent. NewDN must stay under the same managed suffix as DN.
 type EntryMove struct {
 	DN        string   `json:"dn"`
 	NewDN     string   `json:"newDN"`

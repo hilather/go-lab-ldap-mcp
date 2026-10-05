@@ -26,6 +26,18 @@ func (s *Server) inSuffix(dn config.DN) bool {
 	return config.UnderAny(dn, s.suffixes)
 }
 
+// suffixIndex returns the index of the deepest managed suffix holding dn,
+// or -1. Each managed suffix is its own naming context (a 389 backend).
+func (s *Server) suffixIndex(dn config.DN) int {
+	best, depth := -1, -1
+	for i, suf := range s.suffixes {
+		if config.UnderAny(dn, []config.DN{suf}) && suf.Depth() > depth {
+			best, depth = i, suf.Depth()
+		}
+	}
+	return best
+}
+
 func (s *Server) isSuffixRoot(dn config.DN) bool {
 	for _, suf := range s.suffixes {
 		if dn.Equal(suf) {
@@ -532,19 +544,46 @@ func (s *Server) handleModifyDN(ctx context.Context, c *conn, m *Message, req *M
 		// for the T-147 oracle).
 		return respond(Result{Code: ResultUnwillingToPerform, DiagnosticMessage: "rename must stay within the managed suffix"})
 	}
+	parent, _ := parentDN(dn)
+	isMove := superior.FoldedKey() != parent.FoldedKey()
+	if isMove && s.suffixIndex(dn) != s.suffixIndex(superior) {
+		// 389 keeps every managed suffix in its own backend and refuses a
+		// move between them with affectsMultipleDSAs for every subject,
+		// before any existence or access check (oracle probe 34; resolved
+		// CAND-39).
+		return respond(Result{Code: ResultAffectsMultipleDSAs, DiagnosticMessage: "cannot move entries across suffixes"})
+	}
+	if !isMove {
+		// A same-parent rename builds the new DN from the request's own
+		// parent spelling; an explicit newSuperior equal to the parent is
+		// ignored, as on 389 (oracle probes 30, 31, 33, 34).
+		superior = parent
+	}
 	newDN := joinDN(newRDN, superior)
+	newAttr, _, _ := newRDN.Leaf()
+	oldAttr, _, _ := dn.Leaf()
 
 	err = s.opts.Store.Update(ctx, func(tx UpdateTx) error {
-		// Ordering follows 389 (oracle probes 27-29): a missing source is
-		// noSuchObject only for Directory Manager and insufficientAccess
-		// for everyone else; a move beneath itself (53) and a rename onto
-		// an existing DN (68) are reported before any access check, for
-		// every subject including anonymous. That discloses existence as
-		// 389 does (contract C8 notes).
+		// missing answers a missing source or new superior as 389 does
+		// (oracle probes 27, 30-34; resolved CAND-39): noSuchObject for
+		// Directory Manager and for subjects holding moddn on that DN under
+		// the existence filter (ACICheck.Existence), else
+		// insufficientAccessRights.
+		missing := func(target config.DN) error {
+			if subj.BypassACI || s.allowedCheck(ctx, tx, ACICheck{Subject: subj, Target: target, Perm: PermModDN, Existence: true}) {
+				return ErrNoSuchObject
+			}
+			return errDenied
+		}
+		// Ordering follows 389 (oracle probes 27-34): the missing-source
+		// answer above; then a move beneath itself (53) and a rename onto
+		// an existing DN (68), both before any access check, for every
+		// subject including anonymous. That discloses existence as 389
+		// does (contract C8 notes).
 		before, err := tx.Entry(ctx, dn)
 		if err != nil {
-			if errors.Is(err, ErrNoSuchObject) && !subj.BypassACI {
-				return errDenied
+			if errors.Is(err, ErrNoSuchObject) {
+				return missing(dn)
 			}
 			return err
 		}
@@ -553,78 +592,69 @@ func (s *Server) handleModifyDN(ctx context.Context, c *conn, m *Message, req *M
 		if aciTargetScopeA(superior, dn) {
 			return errRenameIntoSubtree
 		}
-		sameDN := newDN.FoldedKey() == dn.FoldedKey()
-		// noOp: the same DN with the new RDN value spelled exactly as the
-		// stored one (389 answers 0 and updates modifyTimestamp, probe 28).
-		// The stored leaf is the reference, so neither the request's
-		// spelling of the source nor of its parent matters. A sameDN rename
-		// that changes the RDN value's case is CAND-30 (open): it keeps
-		// today's gates and 68.
-		storedDN, err := config.ParseDN(before.DN)
-		if err != nil {
-			return err
-		}
-		_, storedVal, _ := storedDN.Leaf()
-		_, newRDNVal, _ := newRDN.Leaf()
-		noOp := sameDN && storedVal == newRDNVal
-		if !sameDN {
+		// A rename to a DN with the same folded key is a respell (resolved
+		// CAND-30): the entry keeps its identity and only its spelling
+		// changes, so it never collides with itself.
+		if newDN.FoldedKey() != dn.FoldedKey() {
 			if _, err := tx.Entry(ctx, newDN); err == nil {
 				return ErrEntryExists
 			} else if !errors.Is(err, ErrNoSuchObject) {
 				return err
 			}
 		}
-		newAttr, _, _ := newRDN.Leaf()
-		oldAttr, _, _ := dn.Leaf()
-		parent, _ := parentDN(dn)
-		isMove := superior.FoldedKey() != parent.FoldedKey()
-		if !isMove && (noOp || !sameDN) {
-			// A rename under the same parent follows 389 (resolved
-			// CAND-36, probes 25-28): only a deny-write ACI without
-			// targetattr on the old DN blocks at entry level, the new RDN
-			// attribute needs write (even when its value is unchanged)
-			// and, with deleteoldrdn, so does the old one, all on the old
-			// DN. No add right is needed.
-			if !s.entryWriteNotDenied(ctx, tx, subj, dn) {
+		if isMove {
+			// RFC 4511 4.9: newSuperior must name an existing entry. 389
+			// reports a missing one before the write checks (probe 32).
+			sup, err := tx.Entry(ctx, superior)
+			if err != nil {
+				if errors.Is(err, ErrNoSuchObject) {
+					return missing(superior)
+				}
+				return err
+			}
+			// The moved entry takes the stored spelling of its new parent,
+			// as on 389 (probes 33, 34).
+			storedSup, err := config.ParseDN(sup.DN)
+			if err != nil {
+				return err
+			}
+			newDN = joinDN(newRDN, storedSup)
+			// 389 with nsslapd-moddn-aci on (resolved CAND-39, probes 26,
+			// 30-34): a move needs moddn on the new superior at entry level
+			// (targetattr is ignored). The source needs no moddn, and no add
+			// or delete right is checked.
+			if !s.allowedCheck(ctx, tx, ACICheck{Subject: subj, Target: superior, Perm: PermModDN}) {
 				return errDenied
 			}
-			if !s.allowed(ctx, tx, subj, dn, newAttr, PermWrite) {
-				return errDenied
-			}
-			if req.DeleteOldRDN && !s.allowed(ctx, tx, subj, dn, oldAttr, PermWrite) {
-				return errDenied
-			}
-			if !s.clientModifiable(newAttr) {
-				return &operationalAttrError{attr: newAttr}
-			}
-		} else {
-			// Cross-parent moves keep native's gates: 389 refuses every
-			// non-root move without a moddn grant, which native cannot
-			// parse (CAND-39, owner question). Case-only renames keep them
-			// too (CAND-30, open).
-			if !s.allowed(ctx, tx, subj, dn, "", PermWrite) {
-				return errDenied
-			}
-			// The destination is an add-like check so a caller cannot
-			// rename into a subtree where they may not create entries.
-			if !s.allowed(ctx, tx, subj, newDN, "", PermAdd) {
-				return errDenied
-			}
-			if !s.clientModifiable(newAttr) {
-				return &operationalAttrError{attr: newAttr}
-			}
-			if !s.allowed(ctx, tx, subj, dn, newAttr, PermWrite) || !s.allowed(ctx, tx, subj, newDN, newAttr, PermWrite) {
-				return errDenied
-			}
-			if req.DeleteOldRDN && !s.allowed(ctx, tx, subj, dn, oldAttr, PermWrite) {
-				return errDenied
-			}
-		}
-		// RFC 4511 4.9: newSuperior must name an existing entry. Moving
-		// under a missing parent orphans the entry from Subtree/Children.
-		if _, err := tx.Entry(ctx, superior); err != nil {
+		} else if _, err := tx.Entry(ctx, superior); err != nil {
 			return err
 		}
+		// Renames and moves share 389's modrdn gates on the old DN
+		// (resolved CAND-36 and CAND-39, probes 25-27, 30, 34): only a
+		// deny-write ACI without targetattr blocks at entry level; the new
+		// RDN attribute needs write (even when its value is unchanged)
+		// and, with deleteoldrdn, so does the old one. Nothing is checked
+		// on the new DN.
+		if !s.entryWriteNotDenied(ctx, tx, subj, dn) {
+			return errDenied
+		}
+		if !s.allowed(ctx, tx, subj, dn, newAttr, PermWrite) {
+			return errDenied
+		}
+		if req.DeleteOldRDN && !s.allowed(ctx, tx, subj, dn, oldAttr, PermWrite) {
+			return errDenied
+		}
+		if !s.clientModifiable(newAttr) {
+			return &operationalAttrError{attr: newAttr}
+		}
+		storedDN, err := config.ParseDN(before.DN)
+		if err != nil {
+			return err
+		}
+		// noOp: the resulting DN is spelled exactly as the stored one. 389
+		// answers 0 and updates modifyTimestamp (probe 28). A request that
+		// spells the parent differently respells it instead (probe 34).
+		noOp := newDN.String() == storedDN.String()
 		if noOp {
 			// Nothing to rename and no RDN value to maintain (value order
 			// is preserved); the entry is still modified (probe 28).

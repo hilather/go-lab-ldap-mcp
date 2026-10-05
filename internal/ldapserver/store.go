@@ -92,7 +92,8 @@ type UpdateTx interface {
 	Delete(ctx context.Context, dn config.DN) error
 	// Rename moves the entry at from to to, atomically rewriting every
 	// descendant DN. ErrNoSuchObject when from is absent, ErrEntryExists
-	// when to is taken.
+	// when to is taken by another entry. from and to with equal folded
+	// keys respell the subtree's DN strings in place (resolved CAND-30).
 	Rename(ctx context.Context, from, to config.DN) error
 }
 

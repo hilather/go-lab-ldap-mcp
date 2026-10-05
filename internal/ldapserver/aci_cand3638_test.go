@@ -197,39 +197,6 @@ func TestModifyDNNoOpRename(t *testing.T) {
 	}
 }
 
-// TestModifyDNKeepsOpenCandidates pins the behaviour left for the owner:
-// case-only renames keep native's gates and 68 (CAND-30), and cross-parent
-// moves keep native's entry write and add gates (CAND-39; 389 refuses
-// every non-root move without a moddn grant).
-func TestModifyDNKeepsOpenCandidates(t *testing.T) {
-	t.Parallel()
-	S := "dc=example,dc=test"
-	for _, tc := range []struct {
-		name string
-		acis []string
-		req  ModifyDNRequest
-		want ResultCode
-	}{
-		{"case-only, write and add", []string{c3638ACI(S, `(targetattr="*")`, "write,add")}, ModifyDNRequest{DN: c3638Alice, NewRDN: "uid=ALICE", DeleteOldRDN: true}, ResultEntryAlreadyExists},
-		{"source spelled in another case, case-only", []string{c3638ACI(S, `(targetattr="*")`, "write,add")}, ModifyDNRequest{DN: "uid=ALICE," + c3638People, NewRDN: "uid=ALICE", DeleteOldRDN: true}, ResultEntryAlreadyExists},
-		{"parent spelled in another case, no-op", []string{c3638ACI(S, `(targetattr="uid")`, "write")}, ModifyDNRequest{DN: "uid=alice,OU=People,DC=example,dc=test", NewRDN: "uid=alice"}, ResultSuccess},
-		{"source spelled in another case, no-op", []string{c3638ACI(S, `(targetattr="uid")`, "write")}, ModifyDNRequest{DN: "uid=ALICE," + c3638People, NewRDN: "uid=alice", DeleteOldRDN: true}, ResultSuccess},
-		{"case-only, write without add", []string{c3638ACI(S, `(targetattr="*")`, "write")}, ModifyDNRequest{DN: c3638Alice, NewRDN: "uid=ALICE", DeleteOldRDN: true}, ResultInsufficientAccessRights},
-		{"move, write and add", []string{c3638ACI(S, `(targetattr="*")`, "write,add")}, ModifyDNRequest{DN: c3638Alice, NewRDN: "uid=alice", NewSuperior: "ou=groups," + S}, ResultSuccess},
-		{"move, write without add", []string{c3638ACI(S, `(targetattr="*")`, "write")}, ModifyDNRequest{DN: c3638Alice, NewRDN: "uid=alice", NewSuperior: "ou=groups," + S}, ResultInsufficientAccessRights},
-		{"move, attribute-scoped deny still blocks", []string{c3638ACI(S, `(targetattr="*")`, "write,add"), c3638ACI(S, `(targetattr="description")`, "DENYwrite")}, ModifyDNRequest{DN: c3638Alice, NewRDN: "uid=alice", NewSuperior: "ou=groups," + S}, ResultInsufficientAccessRights},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			cl, _ := c3638Server(t, tc.acis)
-			req := tc.req
-			if res := roundTrip(t, cl, &req); res.Code != tc.want {
-				t.Fatalf("got %v, want %d", res, tc.want)
-			}
-		})
-	}
-}
-
 // TestEntryDenyOnlyFailsClosed: an evaluation error on the rename entry
 // gate denies the rename.
 func TestEntryDenyOnlyFailsClosed(t *testing.T) {

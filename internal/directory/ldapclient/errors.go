@@ -63,7 +63,7 @@ func mapLDAP(le *ldap.Error) error {
 		ldap.LDAPResultNotAllowedOnRDN, ldap.LDAPResultObjectClassModsProhibited,
 		ldap.LDAPResultUndefinedAttributeType, ldap.LDAPResultInvalidAttributeSyntax,
 		ldap.LDAPResultInvalidDNSyntax, ldap.LDAPResultSizeLimitExceeded,
-		ldap.LDAPResultTimeLimitExceeded:
+		ldap.LDAPResultTimeLimitExceeded, ldap.LDAPResultAffectsMultipleDSAs:
 		return directory.Error("entry", directory.FieldConstraint, "directory constraint violation").Wrap(le)
 	case ldap.LDAPResultInsufficientAccessRights, ldap.LDAPResultConfidentialityRequired,
 		ldap.LDAPResultStrongAuthRequired, ldap.LDAPResultAuthMethodNotSupported,

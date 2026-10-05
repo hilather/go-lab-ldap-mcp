@@ -112,10 +112,14 @@ A membership cycle is rejected and the group is left unchanged.
 inspect its attributes. Create allowlisted child entries
 (`organizationalUnit`, `domain`, or `container` stored as
 `organizationalUnit`) under the selected DN. Move or rename and delete
-with a typed-DN confirm still apply to that selected DN. A move to a
-different parent works on the native engine but is refused (50) on 389,
-which needs a `moddn` grant no compiled ACI has (open parity candidate
-CAND-39); a rename under the same parent works on both. Create users
+with a typed-DN confirm still apply to that selected DN. Moves to a
+different parent work on both engines within and between people and
+groups and within each additional suffix (the runtime account holds 389's
+`moddn` right there); other destinations are refused (50), and a move
+between managed suffixes is refused with a `newDN` error. A user moved out
+of people leaves the Users list and can no longer have its password set
+through LabLDAP; a group moved out of groups leaves the Groups list. A
+case-only rename (`uid=keeper` to `uid=Keeper`) respells the DN. Create users
 and groups on `/users/new` and `/groups/new` — the tree does not host
 those forms. Writes outside the configured suffixes are rejected.
 Multi-domain here means multiple suffixes in one lab, not an AD forest.

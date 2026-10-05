@@ -18,6 +18,9 @@ const (
 	PermAdd     Permission = "add"
 	PermDelete  Permission = "delete"
 	PermWrite   Permission = "write"
+	// PermModDN is 389's moddn right (nsslapd-moddn-aci on): a move to a
+	// different parent needs it on the new superior (resolved CAND-39).
+	PermModDN Permission = "moddn"
 )
 
 // Subject is the bound identity an operation runs as. The zero DN with
@@ -51,6 +54,14 @@ type ACICheck struct {
 	// without targetattr blocks a rename, attribute-scoped denies
 	// (including targetattr!=) do not, and no allow is needed for it.
 	EntryDenyOnly bool
+	// Existence is 389's check before answering noSuchObject(32) for a
+	// missing ModifyDN source or new superior (oracle probes 30-34;
+	// resolved CAND-39): Perm (moddn) on Target counting only ACIs whose
+	// targetattr covers an arbitrary attribute (none, "*", a list holding
+	// "*", or a negated list without "*"), allows and denies alike. The
+	// caller answers 32 if it passes and insufficientAccessRights(50)
+	// otherwise. Attribute must be empty.
+	Existence bool
 }
 
 // ACIEngine evaluates the ACI text the LabLDAP compiler emits (parity

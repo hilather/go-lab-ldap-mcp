@@ -564,7 +564,7 @@ func caseModifyDN(c *caseCtx) []opOutcome {
 	// adds the new RDN value only if no equal value remains (CAND-29,
 	// resolved Contract). Only attribute values are compared: whether DNs
 	// differing only in internal spaces name the same entry, and how each
-	// engine spells the returned DN, stays open under CAND-30.
+	// engine spells the returned DN, stays open under CAND-40.
 	wsAdd := func(rdn string, cns ...string) {
 		a := ldap.NewAddRequest(rdn+","+suffixDN, nil)
 		a.Attribute("objectClass", []string{"top", "device"})
@@ -574,7 +574,7 @@ func caseModifyDN(c *caseCtx) []opOutcome {
 	// Respell: the old value "ws src" equals the new "ws  src", so it is
 	// removed and the new spelling stored. The respell is also a move to
 	// a new parent so the step never renames onto a DN that differs only
-	// in internal spaces (that DN-identity question is CAND-30).
+	// in internal spaces (that DN-identity question is CAND-40).
 	wsAdd("cn=ws-src", "ws-src")
 	out = append(out, codeOutcome(dm.ModifyDN(ldap.NewModifyDNRequest("cn=ws-src,"+suffixDN, "cn=ws src", true, ""))))
 	out = append(out, codeOutcome(dm.ModifyDN(ldap.NewModifyDNRequest("cn=ws src,"+suffixDN, "cn=ws  src", true, peopleDN))))

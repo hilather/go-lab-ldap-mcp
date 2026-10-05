@@ -29,9 +29,9 @@ import (
 //   - filters holding (&) or (|) get protocolError(2) for every subject;
 //   - DSL attributes.allow/deny compile to one 389 list.
 //
-// Engine-conditional rows pin the open candidates: a cross-parent move
-// with write and add (CAND-39: 389 needs a moddn grant) and a case-only
-// rename (CAND-30). Every row uses a fresh connection (D36).
+// A cross-parent move with write and add but no moddn is refused and a
+// case-only rename succeeds (resolved CAND-39 and CAND-30; the full move
+// matrix is TestModDNMatchesOracle). Every row uses a fresh connection (D36).
 func TestACIModRDNStarListsAbsoluteFilters(t *testing.T) {
 	const (
 		suffix = "dc=example,dc=test"
@@ -217,22 +217,14 @@ func TestACIModRDNStarListsAbsoluteFilters(t *testing.T) {
 		t.Errorf("%s: no-op rename without write on uid: got %d, oracle 50", env.engine, got)
 	}
 
-	// Open candidates, engine-conditional.
+	// Resolved CAND-39 and CAND-30 (probes 26-34).
 	add("uid=mv,"+ou, person("mv")...)
-	wantMove := uint16(0) // native: entry write + add on the new DN
-	if env.engine == Engine389DS {
-		wantMove = 50 // CAND-39: 389 needs the moddn right
-	}
-	if got := code(as("m_rt").ModifyDN(ldap.NewModifyDNRequest("uid=mv,"+ou, "uid=mv", true, dest))); got != wantMove {
-		t.Errorf("%s: CAND-39 runtime-like cross-parent move: got %d, want %d", env.engine, got, wantMove)
+	if got := code(as("m_rt").ModifyDN(ldap.NewModifyDNRequest("uid=mv,"+ou, "uid=mv", true, dest))); got != 50 {
+		t.Errorf("%s: cross-parent move with write and add, no moddn: got %d, oracle 50", env.engine, got)
 	}
 	add("uid=casey,"+ou, person("casey")...)
-	wantCase := uint16(68) // native: case-only rename is entryAlreadyExists
-	if env.engine == Engine389DS {
-		wantCase = 0 // CAND-30: 389 respells the DN
-	}
-	if got := code(dm.ModifyDN(ldap.NewModifyDNRequest("uid=casey,"+ou, "uid=CASEY", true, ""))); got != wantCase {
-		t.Errorf("%s: CAND-30 case-only rename: got %d, want %d", env.engine, got, wantCase)
+	if got := code(dm.ModifyDN(ldap.NewModifyDNRequest("uid=casey,"+ou, "uid=CASEY", true, ""))); got != 0 {
+		t.Errorf("%s: case-only rename: got %d, oracle 0", env.engine, got)
 	}
 
 	// CAND-37 (probe 25): targetattr!="*" and lists holding "*".
