@@ -216,9 +216,9 @@ not pushed to a public registry.
 
 **v0.6.0** — security and correctness fixes from the review series,
 complete console account and entry workflows, and native attribute,
-filter and ACI behavior aligned with the pinned 389 image (read the
-upgrade risks in the release notes before upgrading raw-ACI or
-persistent deployments). Native
+filter, ACI, ModRDN and DSL attribute-list behavior aligned with the
+pinned 389 image (read the upgrade risks in the release notes before
+upgrading raw-ACI, DSL-ACL or persistent deployments). Native
 `labldapd` remains the default engine; 389 DS is `engine: 389ds` /
 `make compose-up-389ds`. See [release notes](docs/release/notes.md).
 

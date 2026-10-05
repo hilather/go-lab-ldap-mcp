@@ -1,14 +1,14 @@
 # LabLDAP v0.6.0 release notes
 
 Date: 2026-10-04  
-Tag: **v0.6.0** (`main` at `db0bee4`)  
+Tag: **v0.6.0** (`main` at `3adb1d9` plus this notes PR; the tag goes on the squash of this PR)  
 Prior: [v0.5.0](https://github.com/hilather/go-lab-ldap-mcp/releases/tag/v0.5.0)  
 Images: `labldap-control:dev`, `labldap-bootstrap:dev`, `labldapd:dev` (OD-004; do not push)
 
-v0.6.0 contains everything merged after v0.5.0 ([#14](https://github.com/hilather/go-lab-ldap-mcp/pull/14)–[#29](https://github.com/hilather/go-lab-ldap-mcp/pull/29)): security and
+v0.6.0 contains everything merged after v0.5.0 ([#14](https://github.com/hilather/go-lab-ldap-mcp/pull/14)–[#31](https://github.com/hilather/go-lab-ldap-mcp/pull/31); [#30](https://github.com/hilather/go-lab-ldap-mcp/pull/30) was the first draft of these notes): security and
 correctness fixes from the 2026-10-03 review series, complete console account and entry
-workflows, stricter release gates, and native-engine attribute, filter and ACI
-behavior aligned with the pinned 389 image. Earlier releases are summarized at the end.
+workflows, stricter release gates, and native-engine attribute, filter, ACI,
+ModRDN and DSL attribute-list behavior aligned with the pinned 389 image. Earlier releases are summarized at the end.
 
 ## Unreleased (after v0.6.0): moves (moddn) and case-only renames
 
@@ -16,7 +16,7 @@ Not in v0.6.0; for the next release. Native now matches the pinned 389
 image for cross-parent moves and case-only renames (contract C8; oracle
 probes 30-34; CAND-39 and CAND-30 resolved by the owner decision of
 2026-10-04 to add `moddn` and grant it in the runtime ACIs). This
-supersedes the open CAND-39/CAND-30 sentences in the next section:
+supersedes the CAND-39 and CAND-30 entries under Known limitations below:
 
 - **Moves to a different parent work on both engines (`moddn`).** Native
   now supports 389's `moddn` permission: a move needs `moddn` on the new
@@ -52,7 +52,7 @@ supersedes the open CAND-39/CAND-30 sentences in the next section:
   subject other than Directory Manager gets 32 for a missing source entry
   or new superior only if it holds `moddn` on that DN through an ACI whose
   `targetattr` covers an arbitrary attribute; otherwise 50 (refines the
-  CAND-36 rule below, which answered 50 for every such subject).
+  v0.6.0 CAND-36 rule, which answered 50 for every such subject).
 - **`targetattr!="*"` ACIs and moves.** A negated list holding `"*"`
   still covers no attribute, but when it lists `moddn` it does grant the
   entry-level move gate on the new superior.
@@ -82,75 +82,12 @@ leaves the Users list and the `runtime-password` scope; a group moved out
 of groups leaves the Groups list. `target_from`/`target_to` are not
 supported on native (D38).
 
-## Unreleased (after v0.6.0): modrdn gates, star lists, absolute filters and DSL attribute lists
-
-Not in v0.6.0; for the next release. Native now matches
-the pinned 389 image in four more places (contract C8; oracle probes
-25-29; CAND-36, CAND-37, CAND-38 and the DSL list follow-up resolved):
-
-- **ModRDN (same-parent rename) uses 389's gates.** The subject needs
-  write on the new RDN attribute on the old DN (and on the old RDN
-  attribute with deleteoldrdn); only a deny-write ACI without
-  `targetattr` blocks at entry level, and no add right is needed. A
-  rename is no longer blocked by an unrelated attribute-scoped deny such
-  as `deny (write) targetattr="description;lang-en"`.
-- **ModRDN result codes follow 389.** A subject other than Directory
-  Manager now gets 50 instead of 32 for a missing source entry. A rename
-  onto an existing DN (68) and a move beneath itself (53) are answered
-  before any access check, so these codes now tell a subject without
-  rights that the entry exists, as on 389. Renaming an entry to its own
-  DN now succeeds (it was 68) and only updates `modifyTimestamp` and
-  `modifiersName`.
-- **Absolute filters are rejected.** A search whose filter holds `(&)` or
-  `(|)` anywhere (RFC 4526) now fails with protocolError(2) "Bad search
-  filter" for every subject and base, before controls are checked; the
-  connection stays open. Clients that used `(&)` as "match everything"
-  must use `(objectClass=*)`.
-- **`targetattr!="*"` loads.** `"*"` is accepted in `targetattr` lists
-  and after `!=`. A negated list holding `"*"` covers no attribute (the
-  ACI then applies only to add, delete and cross-parent moves, and never
-  blocks a same-parent rename); a positive one covers every attribute. Raw ACIs that stopped labldapd
-  with `invalid_aci` now load.
-- **DSL attribute lists compile to one 389 list.** `attributes.allow:
-  [uid, sn]` now emits `targetattr="uid || sn"` instead of
-  `targetattr="*"` (the v0.6.0 over-grant listed under Known limitations is fixed), `attributes.deny`
-  with no allow list emits `targetattr!="a || b"`, and both lists emit
-  the allow names that no deny name covers. New validation errors on
-  `spec.acls.<id>.attributes.deny`: `invalid_attribute_filter` for a deny
-  name with options narrower than a same-attribute allow name, for a
-  combination that leaves no attribute, and for `deny: ["*"]` (it used to
-  compile; remove the ACL or narrow it). More than 64 names in one list
-  fail with `too_many_attributes`. A name with an empty option
-  (`"userPassword;"`) now fails with `invalid_attribute` (it used to
-  compile to a targetattr that covers nothing, so such a deny excluded
-  nothing).
-- **DSL names are emitted as the 389 NAME.** Allow and deny names that
-  are aliases (`userid`, `pwdHistory`, `rfc822Mailbox`,
-  `homeTelephoneNumber`) compile to the stored attribute's name (`uid`,
-  `passwordHistory`, `mail`, `homePhone`). Before, they were emitted
-  literally, so such an allow granted nothing and such a deny excluded
-  nothing; affected ACLs now grant or deny what they name.
-- **REST, MCP and the console reject absolute filters up front.** A
-  search filter holding `(&)` or `(|)` is a `filter` / `invalid` field
-  error ("use (objectClass=*)") instead of an engine protocolError shown
-  as "directory unavailable" (this also fixes the 389 engine).
-
-Upgrade risk: DSL ACLs with more than one attribute name now grant
-**less** than before (only the listed attributes). The compiled
-directory revision changes for such scenarios, so the first write-mode
-bootstrap rewrites their ACIs; until then `verify`/`inspect` report a
-mismatch and `reset.Compare` fails, on both engines. Renames under an
-attribute-scoped deny now succeed where native refused them, and
-existence of rename targets is disclosed by 68/53 as on 389. Cross-parent
-moves are unchanged: native still allows them with entry write and add,
-while 389 refuses them for every account without a `moddn` grant,
-including the runtime account (open CAND-39, owner decision pending).
-Case-only renames still return 68 on native (open CAND-30).
-
 ## Upgrade risks (read first)
 
 Risks 1–4 affect deployments that use raw ACIs (`allowRawACI: true` with `aciTexts`)
-on the native engine, or that rely on the older attribute spellings. Risks 5–8 can
+on the native engine, or that rely on the older attribute spellings. Risk 9 affects
+DSL ACLs that list more than one attribute name or an alias name, and risk 10 affects
+LDAP, REST and MCP clients (absolute filters on both engines, ModRDN codes on native). Risks 5–8 can
 also hit the default lab and any other deployment: 5 and 6 apply to every persistent
 native store (`storageMode: persistent`, for example `make compose-up-persistent`);
 7 applies to any TLS files minted by an earlier `setuptls`, including the default
@@ -159,11 +96,13 @@ every client that holds cached user/account revisions. **The default lab
 profile is not affected by risks 1 and 2:** `deploy/compose/scenario*.yaml` and
 `config/examples/example-lab.yaml` set `allowRawACI: false` and use one DSL ACL with
 explicit attributes (`attributes.allow: ["*"]`, `deny: [userPassword]`), which the
-compiler always emits with an explicit, schema-known `targetattr`.
+compiler always emits with an explicit, schema-known `targetattr`. Risk 9 does not
+change them either: that ACL compiles to `targetattr!="userPassword"` before and after
+[#31](https://github.com/hilather/go-lab-ldap-mcp/pull/31), so its compiled revision is unchanged.
 
 1. **Unknown attribute names in ACLs and ACIs now fail startup** ([#29](https://github.com/hilather/go-lab-ldap-mcp/pull/29)). A
    `targetattr` name must exist in the pinned 389 schema (type, alias, numeric OID or
-   `-oid` placeholder). A raw ACI naming anything else (a typo, an object class such as
+   `-oid` placeholder; DSL lists take type names or aliases only). A raw ACI naming anything else (a typo, an object class such as
    `person`, the native-only `pwdChangedTime`) stops labldapd with `aciTexts` /
    `invalid_aci`. A DSL ACL naming one in `attributes.allow` or `attributes.deny` fails
    `labldap` config validation with `unknown_attribute`, and every element of the list
@@ -204,6 +143,29 @@ compiler always emits with an explicit, schema-known `targetattr`.
    next mutation. The design is in ADR-0012, which is still proposed for owner
    review.
 
+9. **DSL attribute lists compile to real 389 lists** ([#31](https://github.com/hilather/go-lab-ldap-mcp/pull/31)). This cuts both
+   ways. A DSL ACL with more than one name in `attributes.allow` or `attributes.deny`
+   used to compile to `targetattr="*"` and now grants **less** (only the listed
+   attributes). A single-name alias allow such as `allow: [userid]` used to be emitted
+   literally and grant nothing; it now grants the real attribute (`uid`), so it grants
+   **more**, and an alias deny such as `deny: [pwdHistory]` now excludes the real
+   attribute (`passwordHistory`). Affected scenarios get a new compiled directory
+   revision, so the first write-mode bootstrap rewrites their ACIs; until then
+   `verify`/`inspect` report a mismatch and `reset.Compare` fails, on both engines.
+   `deny: ["*"]`, a deny narrower than a same-attribute allow, and a combination that
+   leaves no attribute now fail with `invalid_attribute_filter`; more than 64 names fail
+   with `too_many_attributes`; a name with an empty option (`"userPassword;"`) fails
+   with `invalid_attribute`.
+10. **Absolute filters and ModRDN result codes** ([#31](https://github.com/hilather/go-lab-ldap-mcp/pull/31)). A search filter holding
+    `(&)` or `(|)` anywhere now fails with protocolError(2) "Bad search filter" over LDAP,
+    and with a `filter` / `invalid` field error on REST, MCP and the console; clients
+    that used `(&)` as "match everything" must use `(objectClass=*)`. ModRDN follows
+    389: a missing source entry returns 50 instead of 32 for every subject except
+    Directory Manager; 68 (target exists) and 53 (move beneath itself) are answered
+    before any access check, so they disclose that an entry exists, as on 389; renaming
+    an entry to its own DN now succeeds. Same-parent renames under an attribute-scoped
+    deny now succeed where native refused them.
+
 **Still open, not decided here:** whether the stricter user attribute names ([#27](https://github.com/hilather/go-lab-ldap-mcp/pull/27),
 [#18](https://github.com/hilather/go-lab-ldap-mcp/pull/18)) need an `apiVersion` bump. This tag keeps `apiVersion: labldap.dev/v1alpha1`
 and leaves that owner decision open.
@@ -233,6 +195,10 @@ Native parity with the pinned 389 image
   ([#28](https://github.com/hilather/go-lab-ldap-mcp/pull/28); CAND-31 and CAND-32 resolved).
 - `targetattr` schema check, options and omitted `targetattr` ([#29](https://github.com/hilather/go-lab-ldap-mcp/pull/29); CAND-33,
   CAND-34 and CAND-35 resolved; delta D36).
+- Same-parent ModRDN gates and result codes, `*` in `targetattr` lists, absolute
+  filters rejected, and DSL allow/deny lists compiled to 389 lists with alias names
+  canonicalised ([#31](https://github.com/hilather/go-lab-ldap-mcp/pull/31); CAND-36, CAND-37, CAND-38 and the DSL list follow-up
+  resolved).
 
 Console
 
@@ -385,12 +351,66 @@ a `deny (search)` or `deny (write)` scoped to some attributes no longer
 hides or locks whole entries. They can also **narrow** access: an allow
 ACI without `targetattr`, or with an option-bearing name, stops granting
 reads, searches and writes on the plain attribute. Review raw ACIs before
-upgrading (DSL ACLs always emit an explicit `targetattr`). ModRDN keeps
-the stricter native entry gates (CAND-36), and absolute filters such as
-`(&)` keep the entry-level search check (CAND-38). Separately, a DSL ACL
-with more than one name in `attributes.allow` or `attributes.deny` still
-compiles to `targetattr="*"`; this pre-existing over-grant is tracked as a
-follow-up and not changed here.
+upgrading (DSL ACLs always emit an explicit `targetattr`). ModRDN entry
+gates (CAND-36), absolute filters such as `(&)` (CAND-38) and DSL lists
+with more than one name were changed afterwards by [#31](https://github.com/hilather/go-lab-ldap-mcp/pull/31); see the
+next section.
+
+## Details: ModRDN gates, star lists, absolute filters and DSL attribute lists ([#31](https://github.com/hilather/go-lab-ldap-mcp/pull/31))
+
+Native now matches
+the pinned 389 image in four more places (contract C8; oracle probes
+25-29; CAND-36, CAND-37, CAND-38 and the DSL list follow-up resolved):
+
+- **ModRDN (same-parent rename) uses 389's gates.** The subject needs
+  write on the new RDN attribute on the old DN (and on the old RDN
+  attribute with deleteoldrdn); only a deny-write ACI without
+  `targetattr` blocks at entry level, and no add right is needed. A
+  rename is no longer blocked by an unrelated attribute-scoped deny such
+  as `deny (write) targetattr="description;lang-en"`.
+- **ModRDN result codes follow 389.** A subject other than Directory
+  Manager now gets 50 instead of 32 for a missing source entry. A rename
+  onto an existing DN (68) and a move beneath itself (53) are answered
+  before any access check, so these codes now tell a subject without
+  rights that the entry exists, as on 389. Renaming an entry to its own
+  DN now succeeds (it was 68) and only updates `modifyTimestamp` and
+  `modifiersName`.
+- **Absolute filters are rejected.** A search whose filter holds `(&)` or
+  `(|)` anywhere (RFC 4526) now fails with protocolError(2) "Bad search
+  filter" for every subject and base, before controls are checked; the
+  connection stays open. Clients that used `(&)` as "match everything"
+  must use `(objectClass=*)`.
+- **`targetattr!="*"` loads.** `"*"` is accepted in `targetattr` lists
+  and after `!=`. A negated list holding `"*"` covers no attribute (the
+  ACI then applies only to add, delete and cross-parent moves, and never
+  blocks a same-parent rename); a positive one covers every attribute. Raw ACIs that stopped labldapd
+  with `invalid_aci` now load.
+- **DSL attribute lists compile to one 389 list.** `attributes.allow:
+  [uid, sn]` now emits `targetattr="uid || sn"` instead of
+  `targetattr="*"` (the earlier multi-name over-grant), `attributes.deny`
+  with no allow list emits `targetattr!="a || b"`, and both lists emit
+  the allow names that no deny name covers. New validation errors on
+  `spec.acls.<id>.attributes.deny`: `invalid_attribute_filter` for a deny
+  name with options narrower than a same-attribute allow name, for a
+  combination that leaves no attribute, and for `deny: ["*"]` (it used to
+  compile; remove the ACL or narrow it). More than 64 names in one list
+  fail with `too_many_attributes`. A name with an empty option
+  (`"userPassword;"`) now fails with `invalid_attribute` (it used to
+  compile to a targetattr that covers nothing, so such a deny excluded
+  nothing).
+- **DSL names are emitted as the 389 NAME.** Allow and deny names that
+  are aliases (`userid`, `pwdHistory`, `rfc822Mailbox`,
+  `homeTelephoneNumber`) compile to the stored attribute's name (`uid`,
+  `passwordHistory`, `mail`, `homePhone`). Before, they were emitted
+  literally, so such an allow granted nothing and such a deny excluded
+  nothing; affected ACLs now grant or deny what they name.
+- **REST, MCP and the console reject absolute filters up front.** A
+  search filter holding `(&)` or `(|)` is a `filter` / `invalid` field
+  error ("use (objectClass=*)") instead of an engine protocolError shown
+  as "directory unavailable" (this also fixes the 389 engine).
+
+Upgrade risks 9 and 10 above cover the compiled-revision change and the
+client-visible result codes.
 
 ## Versions
 
@@ -424,11 +444,11 @@ Build application images with the same `VERSION` so
   `docs/mcp/catalog.md`.
 - Residual LabLDAP-surface deltas vs 389 remain in
   `docs/design/native-engine-parity-contract.md` and `test/parity`.
-  389 is still the oracle. Open candidates: CAND-36 (modrdn entry gates with an
-  attribute-scoped deny-write), CAND-37 (`targetattr!="*"`), CAND-38 (absolute
-  filters keep the entry-level search check).
-- A DSL ACL with more than one name in `attributes.allow` or `attributes.deny` still
-  compiles to `targetattr="*"`; this pre-existing over-grant is a tracked follow-up.
+  389 is still the oracle.
+- Cross-parent moves differ: native allows them with entry write and add, while 389
+  refuses them for every account without a `moddn` grant, including the runtime
+  account (CAND-39, owner decision pending).
+- Case-only renames return 68 on native and succeed on 389 (CAND-30).
 - Native Bind does not yet complete or abandon outstanding operations first
   (proposed ADR-0014).
 - Directory writes are serialized within one control process; external LDAP writers
@@ -465,7 +485,11 @@ labldapd starts.
    without `targetattr` was meant to cover attributes, and review option-bearing names
    and attribute-scoped search/write denies.
 3. DSL ACLs: every name in `attributes.allow` / `attributes.deny` must exist in the
-   389 schema.
+   389 schema. Review ACLs that list more than one name or an alias name (risk 9);
+   remove or narrow `deny: ["*"]`; remove empty options (`"name;"`, `"name;;…"`) from
+   allow and deny lists. One merge apply after upgrading covers both the #27
+   second-descriptor and the #31 DSL revision changes (persistent
+   `startupMode: validate`).
 4. Scenario YAML: remove forbidden or duplicate user attribute spellings; a scenario
    that uses second descriptors (`rfc822Mailbox`, `gn`, `organizationalUnitName`, …)
    gets a new directory revision, so a persistent deployment in
@@ -476,6 +500,7 @@ labldapd starts.
 6. Re-mint generated TLS with `setuptls generate --force` (rotates the lab CA) if
    strict clients reject the old leaves.
 7. Clients holding user/account revision tokens must re-read before mutating.
+   Clients that search with `(&)` or `(|)` must switch to `(objectClass=*)`.
 8. Tokens, TLS file layout, ports, MCP flags and password-policy YAML are unchanged.
 
 ## Acceptance
@@ -494,7 +519,7 @@ Product acceptance:
 - Native engine unit/integration and `verify-native`.
 - Playwright default remains the contract mock.
 - Structured entry / tree UI path for additional suffixes.
-- Dual-engine parity for the attribute, filter and ACI changes ([#27](https://github.com/hilather/go-lab-ldap-mcp/pull/27)–[#29](https://github.com/hilather/go-lab-ldap-mcp/pull/29)).
+- Dual-engine parity for the attribute, filter, ACI and ModRDN changes ([#27](https://github.com/hilather/go-lab-ldap-mcp/pull/27)–[#29](https://github.com/hilather/go-lab-ldap-mcp/pull/29), [#31](https://github.com/hilather/go-lab-ldap-mcp/pull/31)).
 
 Security: the toolchain is `go1.26.8`, which fixes the five standard-library
 advisories that v0.4.1 and v0.5.0 carried as dated exceptions; there are no approved
