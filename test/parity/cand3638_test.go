@@ -21,6 +21,7 @@ const (
 	c38OU       = "ou=probe-c38," + suffixDN
 	c38Password = "parity-c38-secret-0001"
 	c38RSC      = "read,search,compare"
+	c38Dst      = "ou=dst," + c38OU
 )
 
 var c38Subjects = []struct {
@@ -38,6 +39,10 @@ var c38Subjects = []struct {
 	{"c38_negmix", [][2]string{{`(targetattr!="* || sn")`, c38RSC}}},
 	{"c38_negdeny", [][2]string{{`(targetattr="*")`, c38RSC}, {`(targetattr!="*")`, "deny:" + c38RSC}}},
 	{"c38_ad", [][2]string{{`(targetattr="*")`, c38RSC}, {`(targetattr!="*")`, "add,delete"}}},
+	// CAND-39 (probes 30-34): moddn on the new superior; targetattr is
+	// ignored for the move gate but restricts the existence check.
+	{"c38_mv", [][2]string{{`(targetattr="*")`, "read,search"}, {`(targetattr="uid")`, "write"}, {``, "moddn"}}},
+	{"c38_mvattr", [][2]string{{`(targetattr="uid")`, "write,moddn"}}},
 }
 
 func c38Fixture(t *testing.T) *fixture {
@@ -162,6 +167,40 @@ func c38Outcomes(t *testing.T, e engine) []opOutcome {
 		}
 		o.Note = r.subject + " " + r.filter
 		out = append(out, o)
+	}
+	// CAND-39 moves and CAND-30 case-only renames (probes 30-34).
+	add(c38Dst, map[string][]string{"objectClass": {"top", "organizationalUnit"}, "ou": {"dst"}})
+	for i, r := range []struct {
+		subject, newRDN, sup string // newRDN/sup may hold one %s for the uid
+		want                 int
+	}{
+		{"c38_mv", "uid=%s", c38Dst, 0},
+		{"c38_mvattr", "uid=%s", c38Dst, 0},
+		{"c38_uid", "uid=%s", c38Dst, 50},
+		{"c38_none", "uid=%s", c38Dst, 50},
+		{"c38_mv", "uid=%s", "ou=nosuch," + c38OU, 32},
+		{"c38_mvattr", "uid=%s", "ou=nosuch," + c38OU, 50},
+		{"c38_uid", "uid=%S", "", 0}, // case-only rename, gated like a rename
+		{"c38_none", "uid=%S", "", 50},
+	} {
+		uid := fmt.Sprintf("c38mv%02d", i)
+		add("uid="+uid+","+c38OU, map[string][]string{"objectClass": person, "uid": {uid}, "cn": {uid}, "sn": {"S"}})
+		newRDN := strings.ReplaceAll(strings.ReplaceAll(r.newRDN, "%S", strings.ToUpper(uid)), "%s", uid)
+		conn := as(r.subject)
+		o := codeOutcome(conn.ModifyDN(ldap.NewModifyDNRequest("uid="+uid+","+c38OU, newRDN, true, r.sup)))
+		conn.Close()
+		if o.Code == 0 && r.sup != "" {
+			created[0] = newRDN + "," + r.sup
+		}
+		record(o, r.want, fmt.Sprintf("%s move %s under %q", r.subject, newRDN, r.sup))
+	}
+	for _, r := range []struct {
+		subject string
+		want    int
+	}{{"c38_mv", 32}, {"c38_mvattr", 50}, {"c38_none", 50}} {
+		conn := as(r.subject)
+		record(codeOutcome(conn.ModifyDN(ldap.NewModifyDNRequest("uid=ghost,"+c38OU, "uid=ghost", true, c38Dst))), r.want, r.subject+" move missing source")
+		conn.Close()
 	}
 	conn := as("c38_ad")
 	addReq := ldap.NewAddRequest("uid=c38new,"+c38OU, nil)

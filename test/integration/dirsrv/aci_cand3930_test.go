@@ -272,6 +272,62 @@ func TestModDNMatchesOracle(t *testing.T) {
 		t.Errorf("%s: rename via respelled parent: DN %q, oracle request parent spelling", env.engine, dn)
 	}
 
+	// Explicit newSuperior equal to the parent is ignored for the spelling
+	// (probe 33), and a case-only deleteoldrdn=0 rename keeps the old
+	// value (probe 31).
+	uid = fresh(B)
+	if got := code(dm.ModifyDN(ldap.NewModifyDNRequest("uid="+uid+","+B, "uid="+strings.ToUpper(uid), true, "OU=C39SRC,"+suffix))); got != 0 {
+		t.Fatalf("%s: DM case-only with explicit sup: got %d", env.engine, got)
+	}
+	if dn, _ := read("uid="+uid+","+B, "uid"); dn != "uid="+strings.ToUpper(uid)+","+B {
+		t.Errorf("%s: case-only with respelled explicit sup: DN %q, oracle request parent spelling", env.engine, dn)
+	}
+	uid = fresh(B)
+	if got := code(as("c_w_uid").ModifyDN(ldap.NewModifyDNRequest("uid="+uid+","+B, "uid="+strings.ToUpper(uid), false, ""))); got != 0 {
+		t.Fatalf("%s: case-only del0: got %d", env.engine, got)
+	}
+	if dn, a := read("uid="+uid+","+B, "uid"); dn != "uid="+strings.ToUpper(uid)+","+B || !slices.Equal(a["uid"], []string{uid}) {
+		t.Errorf("%s: case-only del0: DN %q uid %q, oracle respelled DN, value kept", env.engine, dn, a["uid"])
+	}
+
+	// Case-only subtree rename respells the children's DNs (probe 31).
+	tree := "ou=c39tree," + B
+	add(tree, orgUnit("c39tree"))
+	add("uid=c39kid,"+tree, person("c39kid"))
+	if got := code(dm.ModifyDN(ldap.NewModifyDNRequest(tree, "ou=C39TREE", true, ""))); got != 0 {
+		t.Fatalf("%s: case-only subtree rename: got %d", env.engine, got)
+	}
+	if dn, _ := read("uid=c39kid,"+tree, "uid"); dn != "uid=c39kid,ou=C39TREE,"+B {
+		t.Errorf("%s: child after case-only subtree rename: DN %q, oracle respelled parent", env.engine, dn)
+	}
+
+	// Case-only renames leave member and memberOf as written; moving a
+	// group respells memberOf (probes 31, 33, 34).
+	add("uid=c39mm,"+B, person("c39mm"))
+	grp := "cn=c39g," + groups
+	add(grp, map[string][]string{"objectClass": {"top", "groupOfNames"}, "cn": {"c39g"}, "member": {"uid=c39mm," + B}})
+	if got := code(dm.ModifyDN(ldap.NewModifyDNRequest("uid=c39mm,"+B, "uid=C39MM", true, ""))); got != 0 {
+		t.Fatalf("%s: case-only rename of member: got %d", env.engine, got)
+	}
+	if _, a := read(grp, "member"); !slices.Equal(a["member"], []string{"uid=c39mm," + B}) {
+		t.Errorf("%s: member after case-only rename of member = %q, oracle as written", env.engine, a["member"])
+	}
+	if _, a := read("uid=c39mm,"+B, "memberOf"); !slices.Equal(a["memberOf"], []string{grp}) {
+		t.Errorf("%s: memberOf after case-only rename of member = %q, oracle unchanged", env.engine, a["memberOf"])
+	}
+	if got := code(dm.ModifyDN(ldap.NewModifyDNRequest(grp, "cn=C39G", true, ""))); got != 0 {
+		t.Fatalf("%s: case-only rename of group: got %d", env.engine, got)
+	}
+	if _, a := read("uid=c39mm,"+B, "memberOf"); !slices.Equal(a["memberOf"], []string{grp}) {
+		t.Errorf("%s: memberOf after case-only rename of group = %q, oracle as written", env.engine, a["memberOf"])
+	}
+	if got := code(dm.ModifyDN(ldap.NewModifyDNRequest(grp, "cn=C39G", true, D))); got != 0 {
+		t.Fatalf("%s: group move: got %d", env.engine, got)
+	}
+	if _, a := read("uid=c39mm,"+B, "memberOf"); !slices.Equal(a["memberOf"], []string{"cn=C39G," + D}) {
+		t.Errorf("%s: memberOf after group move = %q, oracle new group DN", env.engine, a["memberOf"])
+	}
+
 	// Plugins on a subtree move (probe 34).
 	unit := "ou=c39unit," + B
 	add(unit, orgUnit("c39unit"))

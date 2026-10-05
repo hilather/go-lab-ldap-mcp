@@ -3,12 +3,17 @@
 package dirsrv
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"testing"
 
+	ldap "github.com/go-ldap/ldap/v3"
 	"github.com/hilather/go-lab-ldap-mcp/internal/directory"
 )
 
@@ -76,6 +81,36 @@ func TestRESTMovesWithRuntimeGrant(t *testing.T) {
 	if got := string(move("ou=c39x,ou=c39b,"+r1, "ou=c39x,"+people, http.StatusForbidden)); !strings.Contains(got, "newDN") {
 		t.Fatalf("cross-suffix move problem: %s", got)
 	}
+	// Over LDAP, even Directory Manager gets affectsMultipleDSAs(71)
+	// before any other check, also for a missing source (probe 34).
+	pem, err := os.ReadFile(env.caFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cas := x509.NewCertPool()
+	if !cas.AppendCertsFromPEM(pem) {
+		t.Fatal("parse test CA")
+	}
+	dm, err := ldap.DialURL("ldaps://"+env.ldapsAddr, ldap.DialWithTLSConfig(&tls.Config{RootCAs: cas, ServerName: env.serverName, MinVersion: tls.VersionTLS12}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer dm.Close()
+	if err := dm.Bind("cn=Directory Manager", env.dmPassword); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct{ dn, sup string }{
+		{"ou=c39x,ou=c39b," + r1, people},
+		{"ou=C39MV," + people, r1},
+		{"ou=ghost,ou=c39b," + r1, people},
+	} {
+		var le *ldap.Error
+		err := dm.ModifyDN(ldap.NewModifyDNRequest(tc.dn, strings.SplitN(tc.dn, ",", 2)[0], true, tc.sup))
+		if !errors.As(err, &le) || le.ResultCode != ldap.LDAPResultAffectsMultipleDSAs {
+			t.Errorf("%s: DM move %s under %s: %v, oracle 71", env.engine, tc.dn, tc.sup, err)
+		}
+	}
+
 	// To the suffix root: no moddn grant there.
 	restRaw(t, h, http.MethodPost, "/api/v1/entries/move", mdAdminToken, `"`+string(get("ou=C39MV,"+people).Revision)+`"`,
 		`{"dn":"ou=C39MV,`+people+`","newDN":"ou=c39mv,dc=example,dc=test","deleteOldRdn":true}`, http.StatusForbidden)

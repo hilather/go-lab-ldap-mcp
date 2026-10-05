@@ -77,8 +77,10 @@ follow-up resolved):
   affectsMultipleDSAs(71) on both engines (389 keeps each suffix in its
   own backend; native used to allow the move). REST and MCP refuse it up
   front with a `newDN` / `forbidden` field error ("moves across managed
-  suffixes are not supported") after the revision check; on 389 this used
-  to be a `constraint` error from the 71.
+  suffixes are not supported") once an If-Match revision is present and
+  before it is compared, so a stale revision on such a move still gets the
+  403; on 389 this used to be a misleading "directory unavailable" error
+  from the 71.
 - **Case-only renames succeed (`uid=keeper` -> `uid=Keeper`).** Native
   used to answer 68; it now respells the DN (and its children's DNs), as
   on 389. With deleteoldrdn the RDN value is respelled too. Member values

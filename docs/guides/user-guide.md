@@ -115,7 +115,7 @@ inspect its attributes. Create allowlisted child entries
 with a typed-DN confirm still apply to that selected DN. Moves to a
 different parent work on both engines within and between people and
 groups and within each additional suffix (the runtime account holds 389's
-`moddn` right there); other destinations are refused (50), and a move
+`moddn` right there); other destinations are refused as forbidden, and a move
 between managed suffixes is refused with a `newDN` error. A user moved out
 of people leaves the Users list and can no longer have its password set
 through LabLDAP; a group moved out of groups leaves the Groups list. A

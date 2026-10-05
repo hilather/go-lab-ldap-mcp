@@ -538,10 +538,10 @@ func (s *Server) handleModifyDN(ctx context.Context, c *conn, m *Message, req *M
 		return respond(Result{Code: ResultUnwillingToPerform, DiagnosticMessage: "cannot rename the suffix root"})
 	}
 	if !s.inSuffix(dn) || !s.inSuffix(superior) {
-		// Moves outside the managed suffix are refused; 389 answers
-		// affectsMultipleDSAs for cross-backend moves — pinned as reserved
-		// for parity — so unwillingToPerform stands here (Delta candidate
-		// for the T-147 oracle).
+		// Moves to or from a DN outside every managed suffix are refused
+		// with unwillingToPerform (accepted Delta D11; 389 answers
+		// affectsMultipleDSAs). Moves between two managed suffixes are
+		// handled below with 389's affectsMultipleDSAs.
 		return respond(Result{Code: ResultUnwillingToPerform, DiagnosticMessage: "rename must stay within the managed suffix"})
 	}
 	parent, _ := parentDN(dn)

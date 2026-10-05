@@ -85,9 +85,11 @@ func (p *MemberOfPlugin) AfterWrite(ctx context.Context, tx UpdateTx, ev WriteEv
 	// and after: every entry whose derived memberOf could have changed.
 	seeds := map[string]config.DN{}
 	// moved maps a member value naming the renamed entry or one of its
-	// descendants to the new DN. This plugin runs before referint, so
-	// member values still carry the old DNs here; 389 ends with memberOf
-	// computed from the moved graph (oracle probe 34).
+	// descendants to the new DN. In production this plugin runs before
+	// referint (config/plan.go), so member values may still carry the old
+	// DNs here; mapping them makes the result independent of plugin
+	// order. 389 ends with memberOf computed from the moved graph (oracle
+	// probe 34).
 	moved := func(d config.DN) config.DN { return d }
 	var movedTo config.DN
 	if ev.Op == WriteRename && ev.Before != nil && ev.After != nil {

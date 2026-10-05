@@ -24,10 +24,10 @@ import (
 // Recorded as a Delta candidate for the T-147 oracle to confirm.
 //
 // Rename (modrdn) support mirrors 389's plugin: member/uniqueMember values
-// naming the old DN are rewritten to the new DN in the same commit. When
-// both plugins are registered, run referint before memberof in
-// Options.Plugins so memberOf recompute sees the repaired forward
-// references.
+// naming the old DN, or a descendant of a moved subtree, are rewritten to
+// the new DN in the same commit. The production order is memberof then
+// referint (config/plan.go); memberOf maps old member DNs to their moved
+// DNs itself, so its result does not depend on the order.
 //
 // Scope: repairs touch only group entries inside the managed suffix.
 // Deletes and renames of entries outside the suffix are ignored entirely,

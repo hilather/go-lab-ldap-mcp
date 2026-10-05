@@ -71,10 +71,21 @@ test("live native console account and structured-entry workflows affect the real
   await page.getByRole("button", { name: "Move entry", exact: true }).click();
   await expect(page.locator("#main").getByRole("status")).toContainText("Moved to ou=browser-moved");
   expect(searchLDAP("ou=browser-moved,ou=people,dc=example,dc=test")).toContain("description: Live browser edit");
-  await page.getByLabel("Type the exact DN to confirm").fill("ou=browser-moved,ou=people,dc=example,dc=test");
+  // Cross-parent move people -> groups (runtime moddn grant, CAND-39), then
+  // a case-only rename that respells the DN (CAND-30).
+  await page.locator("#tree-move-to").fill("ou=browser-moved,ou=groups,dc=example,dc=test");
+  await page.getByRole("button", { name: "Move entry", exact: true }).click();
+  await expect(page.locator("#main").getByRole("status")).toContainText("Moved to ou=browser-moved,ou=groups,dc=example,dc=test");
+  expect(searchLDAP("ou=browser-moved,ou=groups,dc=example,dc=test")).toContain("description: Live browser edit");
+  expect(searchLDAPStatus("ou=browser-moved,ou=people,dc=example,dc=test")).toBe(LDAP_NO_SUCH_OBJECT);
+  await page.locator("#tree-move-to").fill("ou=Browser-Moved,ou=groups,dc=example,dc=test");
+  await page.getByRole("button", { name: "Move entry", exact: true }).click();
+  await expect(page.locator("#main").getByRole("status")).toContainText("Moved to ou=Browser-Moved,ou=groups,dc=example,dc=test");
+  expect(searchLDAP("ou=browser-moved,ou=groups,dc=example,dc=test")).toContain("dn: ou=Browser-Moved,ou=groups,dc=example,dc=test");
+  await page.getByLabel("Type the exact DN to confirm").fill("ou=Browser-Moved,ou=groups,dc=example,dc=test");
   await page.getByRole("button", { name: "Delete entry", exact: true }).click();
   await expect(page.locator("#main").getByRole("status")).toContainText("Deleted entry.");
   // The real directory must no longer hold the entry: exactly noSuchObject,
   // not a bind, TLS, or timeout failure.
-  expect(searchLDAPStatus("ou=browser-moved,ou=people,dc=example,dc=test")).toBe(LDAP_NO_SUCH_OBJECT);
+  expect(searchLDAPStatus("ou=browser-moved,ou=groups,dc=example,dc=test")).toBe(LDAP_NO_SUCH_OBJECT);
 });
