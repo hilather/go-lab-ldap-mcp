@@ -89,7 +89,8 @@ func (p *MemberOfPlugin) AfterWrite(ctx context.Context, tx UpdateTx, ev WriteEv
 	// referint (config/plan.go), so member values may still carry the old
 	// DNs here; mapping them makes the result independent of plugin
 	// order. 389 ends with memberOf computed from the moved graph (oracle
-	// probe 34).
+	// probe 34). This assumes referint also rewrites the member values;
+	// config/plan.go always enables both plugins.
 	moved := func(d config.DN) config.DN { return d }
 	var movedTo config.DN
 	if ev.Op == WriteRename && ev.Before != nil && ev.After != nil {
