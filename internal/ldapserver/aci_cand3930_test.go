@@ -431,4 +431,3 @@ func TestModDNPluginsMatchOracle(t *testing.T) {
 		t.Errorf("memberOf after case-only member rename = %q, want %q", got, want)
 	}
 }
-
