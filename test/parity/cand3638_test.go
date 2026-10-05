@@ -13,10 +13,12 @@ import (
 // Resolved CAND-36 (modrdn ACL gates and result-code ordering), CAND-37
 // (targetattr!="*" and star lists) and CAND-38 (absolute filters), oracle
 // probes 25-29 in testdata/filter-attr-oracle-probes.txt. Own fixture, so
-// the shared ledger fixture never sees these ACIs. Cross-parent moves
-// (CAND-39) and case-only renames (CAND-30), resolved later, are pinned on
-// both engines by TestModDNMatchesOracle and TestRESTMovesWithRuntimeGrant
-// (test/integration/dirsrv).
+// the shared ledger fixture never sees these ACIs. The fixture also runs
+// resolved CAND-39 (cross-parent moves, moddn, existence) and CAND-30
+// (case-only renames) rows from probes 30-34, including raw DN spelling and
+// member/memberOf values. The cross-suffix 71 needs a second suffix, which
+// this harness lacks; TestRESTMovesWithRuntimeGrant (test/integration/dirsrv)
+// pins it on both engines.
 
 const (
 	c38OU       = "ou=probe-c38," + suffixDN

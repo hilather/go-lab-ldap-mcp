@@ -445,10 +445,14 @@ Build application images with the same `VERSION` so
 - Residual LabLDAP-surface deltas vs 389 remain in
   `docs/design/native-engine-parity-contract.md` and `test/parity`.
   389 is still the oracle.
-- Cross-parent moves differ: native allows them with entry write and add, while 389
-  refuses them for every account without a `moddn` grant, including the runtime
-  account (CAND-39, owner decision pending).
-- Case-only renames return 68 on native and succeed on 389 (CAND-30).
+- ~~Cross-parent moves differ (CAND-39)~~ and ~~case-only renames return 68 on
+  native (CAND-30)~~: resolved after v0.6.0 (see "Unreleased (after v0.6.0)" above).
+  Moves need `moddn` on the new superior on both engines, the runtime ACIs grant it,
+  and case-only renames respell the DN.
+- A ModifyDN request that spells the suffix value in a different case
+  (`uid=keeper,ou=src,DC=EXAMPLE,dc=test`) is refused with 53 on native, while 389
+  accepts it and stores that spelling: native's suffix check compares RDNs exactly
+  (CAND-40, pending a fold-aware fix).
 - Native Bind does not yet complete or abandon outstanding operations first
   (proposed ADR-0014).
 - Directory writes are serialized within one control process; external LDAP writers

@@ -65,6 +65,8 @@ D8 onward are adjudicated against the running oracle.
 
 D35 covers entry-update writes only. Native search filters resolve second descriptors as 389 does (contract C6, #28): `(rfc822Mailbox=x)` matches `mail` values, and a stored legacy `rfc822Mailbox` row also resolves to `mail`, so `(mail=x)` matches it too. Compare (D34) and search attribute lists still match the attribute name literally and do not resolve aliases.
 
+Open, not yet a Delta: **CAND-40 (suffix-value case in ModifyDN).** A request DN that spells the suffix value in a different case (probe 30 `dm parentcase`: `uid=keeper,OU=SRC,DC=EXAMPLE,dc=test`) succeeds on 389 and stores that spelling. Native answers unwillingToPerform(53), because its managed-suffix checks use `config.DN.IsDescendantOf`/`Equal`, which compare RDN values exactly (`internal/config/dn.go`). Pending a fold-aware fix together with the rest of CAND-40 (internal spaces); not asserted by any test yet.
+
 ## Resolved candidates (Contract, not Delta)
 
 These were adjudicated and the engines **agree**; the behavior is Contract

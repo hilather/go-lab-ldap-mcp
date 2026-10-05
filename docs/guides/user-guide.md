@@ -119,7 +119,9 @@ groups and within each additional suffix (the runtime account holds 389's
 between managed suffixes is refused with a `newDN` error. A user moved out
 of people leaves the Users list and can no longer have its password set
 through LabLDAP; a group moved out of groups leaves the Groups list. A
-case-only rename (`uid=keeper` to `uid=Keeper`) respells the DN. Create users
+case-only rename (`uid=keeper` to `uid=Keeper`) respells the DN. Operator
+ACLs written in the scenario DSL cannot grant moves, because the DSL has no
+`moddn` permission; a raw ACI (`allowRawACI`) can. Create users
 and groups on `/users/new` and `/groups/new` — the tree does not host
 those forms. Writes outside the configured suffixes are rejected.
 Multi-domain here means multiple suffixes in one lab, not an AD forest.
