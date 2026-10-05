@@ -97,6 +97,10 @@ func (eng *aciEngine) Allowed(ctx context.Context, tx ReadTx, check ACICheck) (b
 			if !aci.Deny || aci.AttrMode != ACITargetAttrNoneA {
 				continue
 			}
+		} else if check.Existence {
+			if !aci.CoversAnyAttr() {
+				continue
+			}
 		} else if check.Attribute != "" && !aci.TargetsAttr(check.Attribute, check.Options) {
 			continue
 		}

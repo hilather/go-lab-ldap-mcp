@@ -2670,6 +2670,189 @@ badcookie (objectClass=*) rc=12 Simple Paged Results Search failed
 
 exit=0
 
+===== probe 30 =====
+image quay.io/389ds/dirsrv@sha256:f2851654c5df545cd893d84bea8d08c28dc25f0930493fbfed1d8a6eacf657f7
+backend 0
+dynplugins 0
+plugin referential-integrity 0
+plugin memberof 0
+nsslapd-moddn-aci: on
+== moves B->D (same rdn, del0) | B->D rename uid del1 | B->E | B->B/sub | D->B | missing superior ==
+plain_S              BD=0 BDren=0 BDcn=50 BE=0 Bsub=0 DB=0 nosup=32 ghost=32
+plain_S_ta_notaci    BD=0 BDren=0 BDcn=50 BE=0 Bsub=0 DB=0 nosup=32 ghost=32
+plain_S_ta_cn        BD=0 BDren=0 BDcn=50 BE=0 Bsub=0 DB=0 nosup=50 ghost=50
+plain_B              BD=50 BDren=50 BDcn=50 BE=50 Bsub=0 DB=0 nosup=50 ghost=32
+plain_D              BD=0 BDren=0 BDcn=50 BE=50 Bsub=50 DB=50 nosup=50 ghost=50
+plain_BD             BD=0 BDren=0 BDcn=50 BE=50 Bsub=0 DB=0 nosup=50 ghost=32
+tf_only              BD=0 BDren=0 BDcn=50 BE=0 Bsub=0 DB=50 nosup=32 ghost=32
+tt_only              BD=0 BDren=0 BDcn=50 BE=50 Bsub=50 DB=50 nosup=50 ghost=50
+tf_tt                BD=0 BDren=0 BDcn=50 BE=50 Bsub=50 DB=50 nosup=50 ghost=50
+tf_tt_rev            BD=50 BDren=50 BDcn=50 BE=50 Bsub=50 DB=0 nosup=50 ghost=50
+tf_tt_kids           BD=0 BDren=0 BDcn=50 BE=50 Bsub=50 DB=50 nosup=50 ghost=50
+S_deny_add_D         BD=0 BDren=0 BDcn=50 BE=0 Bsub=0 DB=0 nosup=32 ghost=32
+S_deny_del_B         BD=0 BDren=0 BDcn=50 BE=0 Bsub=0 DB=0 nosup=32 ghost=32
+S_deny_moddn_D       BD=50 BDren=50 BDcn=50 BE=0 Bsub=0 DB=0 nosup=32 ghost=32
+S_deny_moddn_B       BD=0 BDren=0 BDcn=50 BE=0 Bsub=50 DB=50 nosup=32 ghost=50
+S_deny_write_B       BD=50 BDren=50 BDcn=50 BE=50 Bsub=50 DB=0 nosup=32 ghost=32
+S_deny_write_D       BD=0 BDren=0 BDcn=50 BE=0 Bsub=0 DB=50 nosup=32 ghost=32
+S_nowrite            BD=50 BDren=50 BDcn=50 BE=50 Bsub=50 DB=50 nosup=32 ghost=32
+S_writecn            BD=50 BDren=50 BDcn=0 BE=50 Bsub=50 DB=50 nosup=32 ghost=32
+S_addD               BD=50 BDren=50 BDcn=50 BE=50 Bsub=50 DB=50 nosup=50 ghost=50
+w_uid                BD=50 BDren=50 BDcn=50 BE=50 Bsub=50 DB=50 nosup=50 ghost=50
+== runtime-like ==
+rt_PG                PG=0 GP=0 Pteam=0 PB=50 BP=50 Pren=0
+rt_P                 PG=50 GP=50 Pteam=0 PB=50 BP=50 Pren=0
+== subtree move ==
+plain_S subtree move (0, '') kid at new place rc 0
+tf_tt subtree move (0, '') kid at new place rc 0
+DM subtree move (0, '') kid at new place rc 0
+== case-only rename (CAND-30) ==
+before ('uid=keeper,ou=src,dc=example,dc=test', {'uid': ['keeper', 'keeper-alt'], 'modifyTimestamp': ['20261004235820Z'], 'entrydn': ['uid=keeper,ou=src,dc=example,dc=test']})
+dm del0 (0, '') ('uid=Keeper,ou=src,dc=example,dc=test', {'uid': ['keeper', 'keeper-alt'], 'modifyTimestamp': ['20261004235821Z'], 'memberOf': ['cn=team,ou=groups,dc=example,dc=test'], 'entrydn': ['uid=keeper,ou=src,dc=example,dc=test']})
+group {'member': [b'uid=keeper,ou=src,dc=example,dc=test']}
+dm del1 (0, '') ('uid=KEEPER,ou=src,dc=example,dc=test', {'uid': ['keeper-alt', 'KEEPER'], 'modifyTimestamp': ['20261004235821Z'], 'memberOf': ['cn=team,ou=groups,dc=example,dc=test'], 'entrydn': ['uid=keeper,ou=src,dc=example,dc=test']})
+group {'member': [b'uid=keeper,ou=src,dc=example,dc=test']}
+dm parentcase (0, '') ('uid=Keeper,OU=SRC,DC=EXAMPLE,dc=test', {'uid': ['keeper-alt', 'Keeper'], 'modifyTimestamp': ['20261004235821Z'], 'memberOf': ['cn=team,ou=groups,dc=example,dc=test'], 'entrydn': ['uid=keeper,ou=src,dc=example,dc=test']})
+dm same spelling (0, '') ('uid=Keeper,ou=src,dc=example,dc=test', {'uid': ['keeper-alt', 'Keeper'], 'modifyTimestamp': ['20261004235821Z'], 'memberOf': ['cn=team,ou=groups,dc=example,dc=test'], 'entrydn': ['uid=keeper,ou=src,dc=example,dc=test']})
+nonroot case-only w_uid 0 uid=CASEWUID,ou=src,dc=example,dc=test
+nonroot case-only S_writecn 50 uid=caseSwritecn,ou=src,dc=example,dc=test
+nonroot case-only S_deny_write_B 50 uid=caseSdenywriteB,ou=src,dc=example,dc=test
+nonroot case-only plain_S 0 uid=CASEPLAINS,ou=src,dc=example,dc=test
+case+move plain_S 0
+after (0, '')
+[('uid=CASEMOVE,ou=dst,dc=example,dc=test', {'uid': [b'CASEMOVE']})]
+
+exit=0
+
+===== probe 31 =====
+image quay.io/389ds/dirsrv@sha256:f2851654c5df545cd893d84bea8d08c28dc25f0930493fbfed1d8a6eacf657f7
+backend 0
+dynplugins 0
+plugin referential-integrity 0
+plugin memberof 0
+nsslapd-moddn-aci: on
+cols: gRen=ghost same-parent rename | gMv=ghost move B->D | gMvCn=ghost cn= move | gMvE=ghost move B->E | nosupS=real B->ou=nope,S | nosupD=real B->ou=nope,D | ren=real same-parent rename | renSup=rename w/ explicit same sup | taken=move onto existing DN in D | self=move under itself
+m_S            gRen=32 gMv=32 gMvCn=32 gMvE=32 nosupS=32 nosupD=32 ren=0 renSup=0 taken=68 self=53
+m_S_tacn       gRen=50 gMv=50 gMvCn=50 gMvE=50 nosupS=50 nosupD=50 ren=0 renSup=0 taken=68 self=53
+m_S_tauid      gRen=50 gMv=50 gMvCn=50 gMvE=50 nosupS=50 nosupD=50 ren=0 renSup=0 taken=68 self=53
+m_S_tacn_wc    gRen=50 gMv=50 gMvCn=50 gMvE=50 nosupS=50 nosupD=50 ren=0 renSup=0 taken=68 self=53
+m_B            gRen=32 gMv=32 gMvCn=32 gMvE=32 nosupS=50 nosupD=50 ren=0 renSup=0 taken=68 self=53
+m_D            gRen=50 gMv=50 gMvCn=50 gMvE=50 nosupS=50 nosupD=32 ren=0 renSup=0 taken=68 self=53
+none           gRen=50 gMv=50 gMvCn=50 gMvE=50 nosupS=50 nosupD=50 ren=0 renSup=0 taken=68 self=53
+denyM_B        gRen=50 gMv=50 gMvCn=50 gMvE=50 nosupS=32 nosupD=32 ren=0 renSup=0 taken=68 self=53
+denyM_S        gRen=50 gMv=50 gMvCn=50 gMvE=50 nosupS=50 nosupD=50 ren=0 renSup=0 taken=68 self=53
+readonly       gRen=50 gMv=50 gMvCn=50 gMvE=50 nosupS=50 nosupD=50 ren=50 renSup=50 taken=68 self=53
+== case-only subtree (DM) ==
+rename (0, '')
+  ou=TREE,ou=src,dc=example,dc=test {'ou': ['TREE'], 'entrydn': ['ou=tree,ou=src,dc=example,dc=test']}
+  uid=kid,ou=TREE,ou=src,dc=example,dc=test {'uid': ['kid'], 'entrydn': ['uid=kid,ou=tree,ou=src,dc=example,dc=test']}
+== case-only with explicit newSuperior respelled (m_S, none) ==
+m_S 0 ('uid=COMS,ou=src,dc=example,dc=test', {'uid': [b'COMS']})
+none 0 ('uid=CONONE,ou=src,dc=example,dc=test', {'uid': [b'CONONE']})
+denyM_B 0 ('uid=CODENYMB,ou=src,dc=example,dc=test', {'uid': [b'CODENYMB']})
+denyM_S 0 ('uid=CODENYMS,ou=src,dc=example,dc=test', {'uid': [b'CODENYMS']})
+== case-only, non-root, deleteoldrdn 0 ==
+m_S del0 0 ('uid=CoZero,ou=src,dc=example,dc=test', {'uid': [b'cozero']})
+== case-only of a group (memberOf on member) ==
+rename (0, '')
+ member memberOf {'memberOf': [b'cn=crew,ou=groups,dc=example,dc=test']}
+== move of a group member (refint) ==
+move (0, '')
+ group {'member': [b'uid=mem,ou=people,dc=example,dc=test', b'uid=mover,ou=groups,dc=example,dc=test']}
+ memberOf {'memberOf': [b'cn=Crew,ou=groups,dc=example,dc=test']}
+
+exit=0
+
+===== probe 32 =====
+image quay.io/389ds/dirsrv@sha256:f2851654c5df545cd893d84bea8d08c28dc25f0930493fbfed1d8a6eacf657f7
+backend 0
+dynplugins 0
+plugin referential-integrity 0
+plugin memberof 0
+nsslapd-moddn-aci: on
+cols: gRen=ghost same-parent rename | gMv=ghost move B->D | gMvCn=ghost cn= move | gMvE=ghost move B->E | nosupS=real B->ou=nope,S | nosupD=real B->ou=nope,D | ren=real same-parent rename | renSup=rename w/ explicit same sup | taken=move onto existing DN in D | self=move under itself
+m_S_nowrite    gRen=32 gMv=32 gMvCn=32 gMvE=32 nosupS=32 nosupD=32 ren=50 renSup=50 taken=68 self=53
+m_S_denywB     gRen=32 gMv=32 gMvCn=32 gMvE=32 nosupS=32 nosupD=32 ren=50 renSup=50 taken=68 self=53
+m_S_writecn    gRen=32 gMv=32 gMvCn=32 gMvE=32 nosupS=32 nosupD=32 ren=50 renSup=50 taken=68 self=53
+m_S_tastar     gRen=32 gMv=32 gMvCn=32 gMvE=32 nosupS=32 nosupD=32 ren=0 renSup=0 taken=68 self=53
+m_S_tanotstar  gRen=50 gMv=50 gMvCn=50 gMvE=50 nosupS=50 nosupD=50 ren=0 renSup=0 taken=68 self=53
+m_S_tanotuid   gRen=32 gMv=32 gMvCn=32 gMvE=32 nosupS=32 nosupD=32 ren=0 renSup=0 taken=68 self=53
+m_S_tastaruid  gRen=32 gMv=32 gMvCn=32 gMvE=32 nosupS=32 nosupD=32 ren=0 renSup=0 taken=68 self=53
+m_S_ta_uidcn   gRen=32 gMv=32 gMvCn=32 gMvE=32 nosupS=32 nosupD=32 ren=0 renSup=0 taken=68 self=53
+
+exit=0
+
+===== probe 33 =====
+image quay.io/389ds/dirsrv@sha256:f2851654c5df545cd893d84bea8d08c28dc25f0930493fbfed1d8a6eacf657f7
+backend 0
+dynplugins 0
+plugin referential-integrity 0
+plugin memberof 0
+nsslapd-moddn-aci: on
+m_S_tanotstar    BD=0 exact=0 Dsub=0
+m_S_tauid        BD=0 exact=68 Dsub=0
+m_S_tanotuid     BD=0 exact=68 Dsub=0
+m_S_denyta       BD=50 exact=68 Dsub=50
+m_S_denynotstar  BD=50 exact=68 Dsub=50
+m_newdn          BD=50 exact=68 Dsub=50
+m_S              BD=0 exact=68 Dsub=0
+== spelling ==
+rename explicit sup respelled 0 ['uid=sa2,ou=src,dc=example,dc=test']
+rename src respelled no sup 0 ['uid=sb2,OU=SRC,dc=example,dc=test']
+rename src respelled + sup lower 0 ['uid=sc2,OU=SRC,dc=example,dc=test']
+move sup respelled 0 ['uid=sd,ou=dst,dc=example,dc=test']
+== memberOf after case-only rename of member ==
+(0, '')
+{'member': [b'uid=mm,ou=people,dc=example,dc=test']} ('uid=MM,ou=people,dc=example,dc=test', {'memberOf': [b'cn=grp,ou=groups,dc=example,dc=test']})
+
+exit=0
+
+===== probe 34 =====
+image quay.io/389ds/dirsrv@sha256:f2851654c5df545cd893d84bea8d08c28dc25f0930493fbfed1d8a6eacf657f7
+backend 0
+backend2 0 
+dynplugins 0
+plugin referential-integrity 0
+plugin memberof 0
+nsslapd-moddn-aci: on
+== cross-backend ==
+DM S->N (71, 'Operation affects multiple DSAs Cannot move entries across backends')
+DM N->S (71, 'Operation affects multiple DSAs Cannot move entries across backends')
+m_both S->N (71, 'Operation affects multiple DSAs Cannot move entries across backends')
+m_both N->S (71, 'Operation affects multiple DSAs Cannot move entries across backends')
+DM ghost S->N (71, 'Operation affects multiple DSAs Cannot move entries across backends')
+m_both ghost S->N (71, 'Operation affects multiple DSAs Cannot move entries across backends')
+m_both S->N missing sup (71, 'Operation affects multiple DSAs Cannot move entries across backends')
+m_S S->N (71, 'Operation affects multiple DSAs Cannot move entries across backends')
+== gates ==
+newdn            BD=50 BDren=50
+w_src            BD=0 BDren=0
+w_dst            BD=50 BDren=50
+denyw_dst_uid    BD=0 BDren=0
+denyw_src_uid    BD=50 BDren=50
+== existence with targeted denies ==
+denyM_B_uid      ghostInB=32 realBD=0 DB=50
+denyM_B_ns       ghostInB=32 realBD=0 DB=50
+denyM_B_star     ghostInB=50 realBD=0 DB=50
+== group move: memberOf ==
+move group (0, '')
+ memberOf {'memberOf': [b'cn=mob,ou=groups,dc=example,dc=test']}
+== subtree move with group+member inside, and outside group ==
+move subtree (0, '')
+ outgrp {'member': [b'uid=inner,ou=unit,ou=dst,dc=example,dc=test']}
+ ingrp {'member': [b'uid=inner,ou=unit,ou=dst,dc=example,dc=test']}
+ inner memberOf {'memberOf': [b'cn=ingrp,ou=unit,ou=dst,dc=example,dc=test', b'cn=outgrp,ou=groups,dc=example,dc=test']}
+== move under mixed-case stored superior ==
+move (0, '') ['uid=e28,ou=MixCase,ou=dst,dc=example,dc=test']
+move typeupper (0, '') ['UID=e29,ou=MixCase,ou=dst,dc=example,dc=test']
+== same spelling no-op vs respell of parent ==
+rename via OU=SRC (0, '') ['uid=nop,OU=SRC,dc=example,dc=test']
+rename back lower (0, '') ['uid=nop,ou=src,dc=example,dc=test']
+== non-ASCII case-only ==
+(probe stopped here: 389 rejected the non-ASCII uid with rc=19 'The value is not 7-bit clean: été'; non-ASCII case-only renames stay unprobed)
+
+exit=0
+
 ===== script probe25.py =====
 # Oracle probe 25: CAND-36 (modrdn ACL), CAND-37 (targetattr!="*"), CAND-38 (absolute filters),
 # DSL multi-element targetattr lists. Runs a throwaway pinned 389 container; inner script uses python-ldap.
@@ -3153,3 +3336,581 @@ for flt in ['(&)','(objectClass=*)']:
   try: dm.search_ext_s(B,ldap.SCOPE_ONELEVEL,flt,['1.1'],serverctrls=[c]); out='rc=0'
   except ldap.LDAPError as e: d=e.args[0]; out=f"rc={d.get('result')} {d.get('info','')}"
   print('badcookie',flt,out)
+
+===== script probe30.py =====
+# Oracle probe 30: moddn right semantics (CAND-39) and case-only rename (CAND-30).
+# DSL multi-element targetattr lists. Runs a throwaway pinned 389 container; inner script uses python-ldap.
+import subprocess as sp, time, secrets, sys
+ref=open(sys.argv[1]).read().strip()
+pw=secrets.token_hex(16); n='muse-probe30-'+secrets.token_hex(3)
+sp.run(['docker','run','-d','--name',n,'-e','DS_DM_PASSWORD='+pw,'-v','/data',ref],stdout=sp.DEVNULL,check=True)
+try:
+  for i in range(600):
+    l=sp.run(['docker','logs',n],capture_output=True,text=True)
+    if '389-ds-container started.' in l.stdout+l.stderr: break
+    time.sleep(0.5)
+  print('image',ref)
+  r=sp.run(['docker','exec',n,'dsconf','localhost','backend','create','--suffix','dc=example,dc=test','--be-name','userroot','--create-suffix'],capture_output=True,text=True); print('backend',r.returncode)
+  r=sp.run(['docker','exec',n,'dsconf','localhost','config','replace','nsslapd-dynamic-plugins=on'],capture_output=True,text=True); print('dynplugins',r.returncode)
+  for plug in ['referential-integrity','memberof']:
+    r=sp.run(['docker','exec',n,'dsconf','localhost','plugin',plug,'enable'],capture_output=True,text=True); print('plugin',plug,r.returncode)
+  r=sp.run(['docker','exec',n,'dsconf','localhost','config','get','nsslapd-moddn-aci'],capture_output=True,text=True); print(r.stdout.strip())
+  time.sleep(3)
+  sp.run(['docker','cp','probe30_inner.py',n+':/tmp/p.py'],check=True)
+  r=sp.run(['docker','exec','-e','DMPW='+pw,n,'python3','/tmp/p.py'],capture_output=True,text=True)
+  print(r.stdout); print(r.stderr[-3000:])
+finally:
+  sp.run(['docker','rm','-f','-v',n],capture_output=True)
+
+===== script probe30_inner.py =====
+import ldap, os, time
+U='ldap://127.0.0.1:3389'; S='dc=example,dc=test'
+B='ou=src,'+S; D='ou=dst,'+S; E='ou=other,'+S; P='ou=people,'+S; G='ou=groups,'+S; X='ou=subjects,'+S
+dmpw=os.environ['DMPW']
+def conn(dn=None,pw=None):
+  c=ldap.initialize(U); c.protocol_version=3; c.set_option(ldap.OPT_REFERRALS,0)
+  if dn: c.simple_bind_s(dn,pw)
+  return c
+dm=conn('cn=Directory Manager',dmpw)
+def who(s): return f'uid={s},{X}'
+def pwd(s): return f'Probe-Pw-{s}-1'
+def rc(f):
+  try: f(); return 0, ''
+  except ldap.LDAPError as e:
+    d=e.args[0] if e.args else {}
+    return d.get('result', -1), (d.get('desc','')+' '+d.get('info','')).strip()[:100]
+for dn,ou in [(X,'subjects'),(P,'people'),(B,'src'),(D,'dst'),(E,'other'),(G,'groups')]:
+  dm.add_s(dn,[('objectClass',[b'organizationalUnit']),('ou',[ou.encode()])])
+def T(b): return f'(target="ldap:///{b}")'
+WU=(S,T(S)+'(targetattr="uid || ou")','write')
+A={
+ 'plain_S':[WU,(S,T(S),'moddn')],
+ 'plain_S_ta_notaci':[WU,(S,T(S)+'(targetattr!="aci")','moddn')],
+ 'plain_S_ta_cn':[WU,(S,T(S)+'(targetattr="cn")','moddn')],
+ 'plain_B':[WU,(B,T(B),'moddn')],
+ 'plain_D':[WU,(D,T(D),'moddn')],
+ 'plain_BD':[WU,(B,T(B),'moddn'),(D,T(D),'moddn')],
+ 'tf_only':[WU,(S,f'(target_from="ldap:///{B}")','moddn')],
+ 'tt_only':[WU,(S,f'(target_to="ldap:///{D}")','moddn')],
+ 'tf_tt':[WU,(S,f'(target_from="ldap:///{B}")(target_to="ldap:///{D}")','moddn')],
+ 'tf_tt_rev':[WU,(S,f'(target_from="ldap:///{D}")(target_to="ldap:///{B}")','moddn')],
+ 'tf_tt_kids':[WU,(S,f'(target_from="ldap:///uid=*,{B}")(target_to="ldap:///{D}")','moddn')],
+ 'S_deny_add_D':[WU,(S,T(S),'moddn'),(D,T(D),'DENYadd')],
+ 'S_deny_del_B':[WU,(S,T(S),'moddn'),(B,T(B),'DENYdelete')],
+ 'S_deny_moddn_D':[WU,(S,T(S),'moddn'),(D,T(D),'DENYmoddn')],
+ 'S_deny_moddn_B':[WU,(S,T(S),'moddn'),(B,T(B),'DENYmoddn')],
+ 'S_deny_write_B':[WU,(S,T(S),'moddn'),(B,T(B),'DENYwrite')],
+ 'S_deny_write_D':[WU,(S,T(S),'moddn'),(D,T(D),'DENYwrite')],
+ 'S_nowrite':[(S,T(S),'moddn')],
+ 'S_writecn':[(S,T(S)+'(targetattr="cn")','write'),(S,T(S),'moddn')],
+ 'S_addD':[WU,(D,T(D),'add')],
+ 'rt_PG':[(P,T(P)+'(targetattr!="aci")','add,delete,write,read,search,compare,moddn'),(G,T(G)+'(targetattr!="aci")','add,delete,write,read,search,compare,moddn'),(S,T(S)+'(targetattr!="userPassword")','read,search,compare')],
+ 'rt_P':[(P,T(P)+'(targetattr!="aci")','add,delete,write,read,search,compare,moddn'),(S,T(S)+'(targetattr!="userPassword")','read,search,compare')],
+ 'w_uid':[WU],
+}
+for s in A:
+  dm.add_s(who(s),[('objectClass',[b'inetOrgPerson']),('uid',[s.encode()]),('cn',[s.encode()]),('sn',[b'S']),('userPassword',[pwd(s).encode()])])
+for s,lst in A.items():
+  for k,(base,ta,perm) in enumerate(lst):
+    act='deny ('+perm[4:]+')' if perm.startswith('DENY') else 'allow ('+perm+')'
+    t=f'{ta}(version 3.0; acl "p30:{s}-{k}"; {act} userdn="ldap:///{who(s)}";)'
+    r=rc(lambda: dm.modify_s(base,[(ldap.MOD_ADD,'aci',[t.encode()])]))
+    if r[0]: print('aci',s,k,r)
+n=[0]
+def mkent(base,uid=None):
+  n[0]+=1; uid=uid or f'e{n[0]}'
+  dn=f'uid={uid},{base}'
+  dm.add_s(dn,[('objectClass',[b'inetOrgPerson']),('uid',[uid.encode()]),('cn',[uid.encode()]),('sn',[b'S'])])
+  return dn,uid
+def mv(s,dn,newrdn,sup,dold):
+  c=conn(who(s),pwd(s)); r=rc(lambda: c.rename_s(dn,newrdn,sup,dold)); c.unbind_s(); return r
+print('== moves B->D (same rdn, del0) | B->D rename uid del1 | B->E | B->B/sub | D->B | missing superior ==')
+dm.add_s('ou=sub,'+B,[('objectClass',[b'organizationalUnit']),('ou',[b'sub'])])
+for s in A:
+  if s.startswith('rt_'): continue
+  out=[]
+  dn,u=mkent(B); out.append('BD=%s'%mv(s,dn,f'uid={u}',D,0)[0])
+  dn,u=mkent(B); out.append('BDren=%s'%mv(s,dn,f'uid={u}r',D,1)[0])
+  dn,u=mkent(B); out.append('BDcn=%s'%mv(s,dn,f'cn={u}c',D,0)[0])
+  dn,u=mkent(B); out.append('BE=%s'%mv(s,dn,f'uid={u}',E,0)[0])
+  dn,u=mkent(B); out.append('Bsub=%s'%mv(s,dn,f'uid={u}','ou=sub,'+B,0)[0])
+  dn,u=mkent(D); out.append('DB=%s'%mv(s,dn,f'uid={u}',B,0)[0])
+  dn,u=mkent(B); out.append('nosup=%s'%mv(s,dn,f'uid={u}','ou=nope,'+S,0)[0])
+  dn,u=mkent(B); out.append('ghost=%s'%mv(s,f'uid=ghost{n[0]},{B}',f'uid=ghost{n[0]}',D,0)[0])
+  print(f'{s:20}',' '.join(out))
+print('== runtime-like ==')
+dm.add_s('ou=team,'+P,[('objectClass',[b'organizationalUnit']),('ou',[b'team'])])
+for s in ['rt_PG','rt_P']:
+  out=[]
+  dn,u=mkent(P); out.append('PG=%s'%mv(s,dn,f'uid={u}',G,0)[0])
+  dn,u=mkent(G); out.append('GP=%s'%mv(s,dn,f'uid={u}',P,0)[0])
+  dn,u=mkent(P); out.append('Pteam=%s'%mv(s,dn,f'uid={u}','ou=team,'+P,0)[0])
+  dn,u=mkent(P); out.append('PB=%s'%mv(s,dn,f'uid={u}',B,0)[0])
+  dn,u=mkent(B); out.append('BP=%s'%mv(s,dn,f'uid={u}',P,0)[0])
+  dn,u=mkent(P); out.append('Pren=%s'%mv(s,dn,f'uid={u}r',None,1)[0])
+  print(f'{s:20}',' '.join(out))
+print('== subtree move ==')
+for s in ['plain_S','tf_tt',None]:
+  ou=f'ou=tree{n[0]},{B}'; n[0]+=1
+  dm.add_s(ou,[('objectClass',[b'organizationalUnit']),('ou',[ou.split(',')[0][3:].encode()])])
+  kid,_=mkent(ou)
+  if s: r=mv(s,ou,ou.split(',')[0],D,0)
+  else: r=rc(lambda: dm.rename_s(ou,ou.split(',')[0],D,0))
+  newkid=kid.replace(B,D)
+  ok=rc(lambda: dm.search_s(newkid,ldap.SCOPE_BASE,'(objectClass=*)',['1.1']))[0]
+  print(s or 'DM', 'subtree move', r, 'kid at new place rc', ok)
+print('== case-only rename (CAND-30) ==')
+grp='cn=team,'+G
+dm.add_s(grp,[('objectClass',[b'groupOfNames']),('cn',[b'team']),('member',[b'uid=keeper,'+B.encode()])])
+dm.add_s('uid=keeper,'+B,[('objectClass',[b'inetOrgPerson']),('uid',[b'keeper',b'keeper-alt']),('cn',[b'k']),('sn',[b'S'])])
+def show(dn):
+  r=dm.search_s(dn,ldap.SCOPE_BASE,'(objectClass=*)',['uid','modifyTimestamp','memberOf','entrydn'])
+  return r[0][0], {k:[v.decode() for v in vs] for k,vs in r[0][1].items()}
+print('before', show('uid=keeper,'+B))
+time.sleep(1.1)
+print('dm del0', rc(lambda: dm.rename_s('uid=keeper,'+B,'uid=Keeper',None,0)), show('uid=keeper,'+B))
+print('group', dm.search_s(grp,ldap.SCOPE_BASE,'(objectClass=*)',['member'])[0][1])
+print('dm del1', rc(lambda: dm.rename_s('uid=Keeper,'+B,'uid=KEEPER',None,1)), show('uid=keeper,'+B))
+print('group', dm.search_s(grp,ldap.SCOPE_BASE,'(objectClass=*)',['member'])[0][1])
+print('dm parentcase', rc(lambda: dm.rename_s('uid=keeper,OU=SRC,DC=EXAMPLE,dc=test','uid=Keeper',None,1)), show('uid=keeper,'+B))
+print('dm same spelling', rc(lambda: dm.rename_s('uid=Keeper,'+B,'uid=Keeper',None,1)), show('uid=keeper,'+B))
+# non-root
+for s in ['w_uid','S_writecn','S_deny_write_B','plain_S']:
+  dn,u=mkent(B, f'case{s.replace("_","")}')
+  r=mv(s,dn,f'uid={u.upper()}',None,1)
+  print('nonroot case-only',s,r[0], show(dn)[0])
+# case-only + move
+dn,u=mkent(B,'casemove')
+r=mv('plain_S',dn,'uid=CASEMOVE',D,1); print('case+move plain_S',r[0])
+r=rc(lambda: dm.search_s('uid=casemove,'+D,ldap.SCOPE_BASE,'(objectClass=*)',['uid'])); print('after', r)
+print(dm.search_s('uid=casemove,'+D,ldap.SCOPE_BASE,'(objectClass=*)',['uid']))
+
+===== script probe31.py =====
+# Oracle probe 30: moddn right semantics (CAND-39) and case-only rename (CAND-30).
+# DSL multi-element targetattr lists. Runs a throwaway pinned 389 container; inner script uses python-ldap.
+import subprocess as sp, time, secrets, sys
+ref=open(sys.argv[1]).read().strip()
+pw=secrets.token_hex(16); n='muse-probe31-'+secrets.token_hex(3)
+sp.run(['docker','run','-d','--name',n,'-e','DS_DM_PASSWORD='+pw,'-v','/data',ref],stdout=sp.DEVNULL,check=True)
+try:
+  for i in range(600):
+    l=sp.run(['docker','logs',n],capture_output=True,text=True)
+    if '389-ds-container started.' in l.stdout+l.stderr: break
+    time.sleep(0.5)
+  print('image',ref)
+  r=sp.run(['docker','exec',n,'dsconf','localhost','backend','create','--suffix','dc=example,dc=test','--be-name','userroot','--create-suffix'],capture_output=True,text=True); print('backend',r.returncode)
+  r=sp.run(['docker','exec',n,'dsconf','localhost','config','replace','nsslapd-dynamic-plugins=on'],capture_output=True,text=True); print('dynplugins',r.returncode)
+  for plug in ['referential-integrity','memberof']:
+    r=sp.run(['docker','exec',n,'dsconf','localhost','plugin',plug,'enable'],capture_output=True,text=True); print('plugin',plug,r.returncode)
+  r=sp.run(['docker','exec',n,'dsconf','localhost','config','get','nsslapd-moddn-aci'],capture_output=True,text=True); print(r.stdout.strip())
+  time.sleep(3)
+  sp.run(['docker','cp','probe31_inner.py',n+':/tmp/p.py'],check=True)
+  r=sp.run(['docker','exec','-e','DMPW='+pw,n,'python3','/tmp/p.py'],capture_output=True,text=True)
+  print(r.stdout); print(r.stderr[-3000:])
+finally:
+  sp.run(['docker','rm','-f','-v',n],capture_output=True)
+
+===== script probe31_inner.py =====
+import ldap, os, time
+U='ldap://127.0.0.1:3389'; S='dc=example,dc=test'
+B='ou=src,'+S; D='ou=dst,'+S; E='ou=other,'+S; P='ou=people,'+S; G='ou=groups,'+S; X='ou=subjects,'+S
+dmpw=os.environ['DMPW']
+def conn(dn=None,pw=None):
+  c=ldap.initialize(U); c.protocol_version=3; c.set_option(ldap.OPT_REFERRALS,0)
+  if dn: c.simple_bind_s(dn,pw)
+  return c
+dm=conn('cn=Directory Manager',dmpw)
+def who(s): return f'uid={s},{X}'
+def pwd(s): return f'Probe-Pw-{s}-1'
+def rc(f):
+  try: f(); return 0, ''
+  except ldap.LDAPError as e:
+    d=e.args[0] if e.args else {}
+    return d.get('result', -1), (d.get('desc','')+' '+d.get('info','')).strip()[:100]
+for dn,ou in [(X,'subjects'),(P,'people'),(B,'src'),(D,'dst'),(E,'other'),(G,'groups')]:
+  dm.add_s(dn,[('objectClass',[b'organizationalUnit']),('ou',[ou.encode()])])
+def T(b): return f'(target="ldap:///{b}")'
+WU=(S,T(S)+'(targetattr="uid || ou")','write')
+WC=(S,T(S)+'(targetattr="cn || uid || ou")','write')
+A={
+ 'm_S':[WU,(S,T(S),'moddn')],
+ 'm_S_tacn':[WU,(S,T(S)+'(targetattr="cn")','moddn')],
+ 'm_S_tauid':[WU,(S,T(S)+'(targetattr="uid")','moddn')],
+ 'm_S_tacn_wc':[WC,(S,T(S)+'(targetattr="cn")','moddn')],
+ 'm_B':[WU,(B,T(B),'moddn')],
+ 'm_D':[WU,(D,T(D),'moddn')],
+ 'none':[WU],
+ 'denyM_B':[WU,(S,T(S),'moddn'),(B,T(B),'DENYmoddn')],
+ 'denyM_S':[WU,(S,T(S),'DENYmoddn')],
+ 'readonly':[(S,T(S),'read,search')],
+}
+for s in A:
+  dm.add_s(who(s),[('objectClass',[b'inetOrgPerson']),('uid',[s.encode()]),('cn',[s.encode()]),('sn',[b'S']),('userPassword',[pwd(s).encode()])])
+for s,lst in A.items():
+  for k,(base,ta,perm) in enumerate(lst):
+    act='deny ('+perm[4:]+')' if perm.startswith('DENY') else 'allow ('+perm+')'
+    t=f'{ta}(version 3.0; acl "p31:{s}-{k}"; {act} userdn="ldap:///{who(s)}";)'
+    r=rc(lambda: dm.modify_s(base,[(ldap.MOD_ADD,'aci',[t.encode()])]))
+    if r[0]: print('aci',s,k,r)
+n=[0]
+def mkent(base,uid=None):
+  n[0]+=1; uid=uid or f'e{n[0]}'
+  dn=f'uid={uid},{base}'
+  dm.add_s(dn,[('objectClass',[b'inetOrgPerson']),('uid',[uid.encode()]),('cn',[uid.encode()]),('sn',[b'S'])])
+  return dn,uid
+def mv(s,dn,newrdn,sup,dold):
+  c=conn(who(s),pwd(s)); r=rc(lambda: c.rename_s(dn,newrdn,sup,dold)); c.unbind_s(); return r
+dm.add_s('uid=taken,'+D,[('objectClass',[b'inetOrgPerson']),('uid',[b'taken']),('cn',[b'taken']),('sn',[b'S'])])
+print('cols: gRen=ghost same-parent rename | gMv=ghost move B->D | gMvCn=ghost cn= move | gMvE=ghost move B->E | nosupS=real B->ou=nope,S | nosupD=real B->ou=nope,D | ren=real same-parent rename | renSup=rename w/ explicit same sup | taken=move onto existing DN in D | self=move under itself')
+for s in A:
+  o=[]
+  n[0]+=1; o.append('gRen=%s'%mv(s,f'uid=g{n[0]},{B}',f'uid=g{n[0]}r',None,0)[0])
+  n[0]+=1; o.append('gMv=%s'%mv(s,f'uid=g{n[0]},{B}',f'uid=g{n[0]}',D,0)[0])
+  n[0]+=1; o.append('gMvCn=%s'%mv(s,f'cn=g{n[0]},{B}',f'cn=g{n[0]}',D,0)[0])
+  n[0]+=1; o.append('gMvE=%s'%mv(s,f'uid=g{n[0]},{B}',f'uid=g{n[0]}',E,0)[0])
+  dn,u=mkent(B); o.append('nosupS=%s'%mv(s,dn,f'uid={u}','ou=nope,'+S,0)[0])
+  dn,u=mkent(B); o.append('nosupD=%s'%mv(s,dn,f'uid={u}','ou=nope,'+D,0)[0])
+  dn,u=mkent(B); o.append('ren=%s'%mv(s,dn,f'uid={u}r',None,1)[0])
+  dn,u=mkent(B); o.append('renSup=%s'%mv(s,dn,f'uid={u}r',B,1)[0])
+  dn,u=mkent(B); o.append('taken=%s'%mv(s,dn,'uid=taken',D,1)[0])
+  ou=f'ou=t{n[0]},{B}'; dm.add_s(ou,[('objectClass',[b'organizationalUnit']),('ou',[f't{n[0]}'.encode()])])
+  o.append('self=%s'%mv(s,ou,ou.split(',')[0],ou,0)[0])
+  print(f'{s:14}',' '.join(o))
+print('== case-only subtree (DM) ==')
+dm.add_s('ou=tree,'+B,[('objectClass',[b'organizationalUnit']),('ou',[b'tree'])])
+mkent('ou=tree,'+B,'kid')
+print('rename', rc(lambda: dm.rename_s('ou=tree,'+B,'ou=TREE',None,1)))
+for dn,a in dm.search_s(B,ldap.SCOPE_SUBTREE,'(|(ou=tree)(uid=kid))',['ou','uid','entrydn']): print(' ',dn,{k:[v.decode() for v in vs] for k,vs in a.items()})
+print('== case-only with explicit newSuperior respelled (m_S, none) ==')
+for s in ['m_S','none','denyM_B','denyM_S']:
+  dn,u=mkent(B,'co'+s.replace('_','').lower())
+  r=mv(s,dn,f'uid={u.upper()}','OU=SRC,'+S,1)
+  print(s, r[0], dm.search_s(B,ldap.SCOPE_ONELEVEL,f'(uid={u})',['uid'])[0])
+print('== case-only, non-root, deleteoldrdn 0 ==')
+dn,u=mkent(B,'cozero'); print('m_S del0', mv('m_S',dn,'uid=CoZero',None,0)[0], dm.search_s(B,ldap.SCOPE_ONELEVEL,'(uid=cozero)',['uid'])[0])
+print('== case-only of a group (memberOf on member) ==')
+mkent(P,'mem')
+dm.add_s('cn=crew,'+G,[('objectClass',[b'groupOfNames']),('cn',[b'crew']),('member',[b'uid=mem,'+P.encode()])])
+print('rename', rc(lambda: dm.rename_s('cn=crew,'+G,'cn=Crew',None,1)))
+time.sleep(1)
+print(' member memberOf', dm.search_s('uid=mem,'+P,ldap.SCOPE_BASE,'(objectClass=*)',['memberOf'])[0][1])
+print('== move of a group member (refint) ==')
+mkent(P,'mover')
+dm.modify_s('cn=crew,'+G,[(ldap.MOD_ADD,'member',[b'uid=mover,'+P.encode()])])
+print('move', rc(lambda: dm.rename_s('uid=mover,'+P,'uid=mover',G,0)))
+time.sleep(2)
+print(' group', dm.search_s('cn=crew,'+G,ldap.SCOPE_BASE,'(objectClass=*)',['member'])[0][1])
+print(' memberOf', dm.search_s('uid=mover,'+G,ldap.SCOPE_BASE,'(objectClass=*)',['memberOf'])[0][1])
+
+===== script probe32.py =====
+# Oracle probe 30: moddn right semantics (CAND-39) and case-only rename (CAND-30).
+# DSL multi-element targetattr lists. Runs a throwaway pinned 389 container; inner script uses python-ldap.
+import subprocess as sp, time, secrets, sys
+ref=open(sys.argv[1]).read().strip()
+pw=secrets.token_hex(16); n='muse-probe32-'+secrets.token_hex(3)
+sp.run(['docker','run','-d','--name',n,'-e','DS_DM_PASSWORD='+pw,'-v','/data',ref],stdout=sp.DEVNULL,check=True)
+try:
+  for i in range(600):
+    l=sp.run(['docker','logs',n],capture_output=True,text=True)
+    if '389-ds-container started.' in l.stdout+l.stderr: break
+    time.sleep(0.5)
+  print('image',ref)
+  r=sp.run(['docker','exec',n,'dsconf','localhost','backend','create','--suffix','dc=example,dc=test','--be-name','userroot','--create-suffix'],capture_output=True,text=True); print('backend',r.returncode)
+  r=sp.run(['docker','exec',n,'dsconf','localhost','config','replace','nsslapd-dynamic-plugins=on'],capture_output=True,text=True); print('dynplugins',r.returncode)
+  for plug in ['referential-integrity','memberof']:
+    r=sp.run(['docker','exec',n,'dsconf','localhost','plugin',plug,'enable'],capture_output=True,text=True); print('plugin',plug,r.returncode)
+  r=sp.run(['docker','exec',n,'dsconf','localhost','config','get','nsslapd-moddn-aci'],capture_output=True,text=True); print(r.stdout.strip())
+  time.sleep(3)
+  sp.run(['docker','cp','probe32_inner.py',n+':/tmp/p.py'],check=True)
+  r=sp.run(['docker','exec','-e','DMPW='+pw,n,'python3','/tmp/p.py'],capture_output=True,text=True)
+  print(r.stdout); print(r.stderr[-3000:])
+finally:
+  sp.run(['docker','rm','-f','-v',n],capture_output=True)
+
+===== script probe32_inner.py =====
+import ldap, os, time
+U='ldap://127.0.0.1:3389'; S='dc=example,dc=test'
+B='ou=src,'+S; D='ou=dst,'+S; E='ou=other,'+S; P='ou=people,'+S; G='ou=groups,'+S; X='ou=subjects,'+S
+dmpw=os.environ['DMPW']
+def conn(dn=None,pw=None):
+  c=ldap.initialize(U); c.protocol_version=3; c.set_option(ldap.OPT_REFERRALS,0)
+  if dn: c.simple_bind_s(dn,pw)
+  return c
+dm=conn('cn=Directory Manager',dmpw)
+def who(s): return f'uid={s},{X}'
+def pwd(s): return f'Probe-Pw-{s}-1'
+def rc(f):
+  try: f(); return 0, ''
+  except ldap.LDAPError as e:
+    d=e.args[0] if e.args else {}
+    return d.get('result', -1), (d.get('desc','')+' '+d.get('info','')).strip()[:100]
+for dn,ou in [(X,'subjects'),(P,'people'),(B,'src'),(D,'dst'),(E,'other'),(G,'groups')]:
+  dm.add_s(dn,[('objectClass',[b'organizationalUnit']),('ou',[ou.encode()])])
+def T(b): return f'(target="ldap:///{b}")'
+WU=(S,T(S)+'(targetattr="uid || ou")','write')
+WC=(S,T(S)+'(targetattr="cn || uid || ou")','write')
+A={
+ 'm_S_nowrite':[(S,T(S),'moddn')],
+ 'm_S_denywB':[WU,(S,T(S),'moddn'),(B,T(B),'DENYwrite')],
+ 'm_S_writecn':[(S,T(S)+'(targetattr="cn")','write'),(S,T(S),'moddn')],
+ 'm_S_tastar':[WU,(S,T(S)+'(targetattr="*")','moddn')],
+ 'm_S_tanotstar':[WU,(S,T(S)+'(targetattr!="*")','moddn')],
+ 'm_S_tanotuid':[WU,(S,T(S)+'(targetattr!="uid")','moddn')],
+ 'm_S_tastaruid':[WU,(S,T(S)+'(targetattr="* || uid")','moddn')],
+ 'm_S_ta_uidcn':[WU,(S,T(S)+'(targetattr!="uid || cn || ou || objectClass || entrydn")','moddn')],
+}
+for s in A:
+  dm.add_s(who(s),[('objectClass',[b'inetOrgPerson']),('uid',[s.encode()]),('cn',[s.encode()]),('sn',[b'S']),('userPassword',[pwd(s).encode()])])
+for s,lst in A.items():
+  for k,(base,ta,perm) in enumerate(lst):
+    act='deny ('+perm[4:]+')' if perm.startswith('DENY') else 'allow ('+perm+')'
+    t=f'{ta}(version 3.0; acl "p32:{s}-{k}"; {act} userdn="ldap:///{who(s)}";)'
+    r=rc(lambda: dm.modify_s(base,[(ldap.MOD_ADD,'aci',[t.encode()])]))
+    if r[0]: print('aci',s,k,r)
+n=[0]
+def mkent(base,uid=None):
+  n[0]+=1; uid=uid or f'e{n[0]}'
+  dn=f'uid={uid},{base}'
+  dm.add_s(dn,[('objectClass',[b'inetOrgPerson']),('uid',[uid.encode()]),('cn',[uid.encode()]),('sn',[b'S'])])
+  return dn,uid
+def mv(s,dn,newrdn,sup,dold):
+  c=conn(who(s),pwd(s)); r=rc(lambda: c.rename_s(dn,newrdn,sup,dold)); c.unbind_s(); return r
+dm.add_s('uid=taken,'+D,[('objectClass',[b'inetOrgPerson']),('uid',[b'taken']),('cn',[b'taken']),('sn',[b'S'])])
+print('cols: gRen=ghost same-parent rename | gMv=ghost move B->D | gMvCn=ghost cn= move | gMvE=ghost move B->E | nosupS=real B->ou=nope,S | nosupD=real B->ou=nope,D | ren=real same-parent rename | renSup=rename w/ explicit same sup | taken=move onto existing DN in D | self=move under itself')
+for s in A:
+  o=[]
+  n[0]+=1; o.append('gRen=%s'%mv(s,f'uid=g{n[0]},{B}',f'uid=g{n[0]}r',None,0)[0])
+  n[0]+=1; o.append('gMv=%s'%mv(s,f'uid=g{n[0]},{B}',f'uid=g{n[0]}',D,0)[0])
+  n[0]+=1; o.append('gMvCn=%s'%mv(s,f'cn=g{n[0]},{B}',f'cn=g{n[0]}',D,0)[0])
+  n[0]+=1; o.append('gMvE=%s'%mv(s,f'uid=g{n[0]},{B}',f'uid=g{n[0]}',E,0)[0])
+  dn,u=mkent(B); o.append('nosupS=%s'%mv(s,dn,f'uid={u}','ou=nope,'+S,0)[0])
+  dn,u=mkent(B); o.append('nosupD=%s'%mv(s,dn,f'uid={u}','ou=nope,'+D,0)[0])
+  dn,u=mkent(B); o.append('ren=%s'%mv(s,dn,f'uid={u}r',None,1)[0])
+  dn,u=mkent(B); o.append('renSup=%s'%mv(s,dn,f'uid={u}r',B,1)[0])
+  dn,u=mkent(B); o.append('taken=%s'%mv(s,dn,'uid=taken',D,1)[0])
+  ou=f'ou=t{n[0]},{B}'; dm.add_s(ou,[('objectClass',[b'organizationalUnit']),('ou',[f't{n[0]}'.encode()])])
+  o.append('self=%s'%mv(s,ou,ou.split(',')[0],ou,0)[0])
+  print(f'{s:14}',' '.join(o))
+
+===== script probe33.py =====
+# Oracle probe 30: moddn right semantics (CAND-39) and case-only rename (CAND-30).
+# DSL multi-element targetattr lists. Runs a throwaway pinned 389 container; inner script uses python-ldap.
+import subprocess as sp, time, secrets, sys
+ref=open(sys.argv[1]).read().strip()
+pw=secrets.token_hex(16); n='muse-probe33-'+secrets.token_hex(3)
+sp.run(['docker','run','-d','--name',n,'-e','DS_DM_PASSWORD='+pw,'-v','/data',ref],stdout=sp.DEVNULL,check=True)
+try:
+  for i in range(600):
+    l=sp.run(['docker','logs',n],capture_output=True,text=True)
+    if '389-ds-container started.' in l.stdout+l.stderr: break
+    time.sleep(0.5)
+  print('image',ref)
+  r=sp.run(['docker','exec',n,'dsconf','localhost','backend','create','--suffix','dc=example,dc=test','--be-name','userroot','--create-suffix'],capture_output=True,text=True); print('backend',r.returncode)
+  r=sp.run(['docker','exec',n,'dsconf','localhost','config','replace','nsslapd-dynamic-plugins=on'],capture_output=True,text=True); print('dynplugins',r.returncode)
+  for plug in ['referential-integrity','memberof']:
+    r=sp.run(['docker','exec',n,'dsconf','localhost','plugin',plug,'enable'],capture_output=True,text=True); print('plugin',plug,r.returncode)
+  r=sp.run(['docker','exec',n,'dsconf','localhost','config','get','nsslapd-moddn-aci'],capture_output=True,text=True); print(r.stdout.strip())
+  time.sleep(3)
+  sp.run(['docker','cp','probe33_inner.py',n+':/tmp/p.py'],check=True)
+  r=sp.run(['docker','exec','-e','DMPW='+pw,n,'python3','/tmp/p.py'],capture_output=True,text=True)
+  print(r.stdout); print(r.stderr[-3000:])
+finally:
+  sp.run(['docker','rm','-f','-v',n],capture_output=True)
+
+===== script probe33_inner.py =====
+import ldap, os, time
+U='ldap://127.0.0.1:3389'; S='dc=example,dc=test'
+B='ou=src,'+S; D='ou=dst,'+S; E='ou=other,'+S; P='ou=people,'+S; G='ou=groups,'+S; X='ou=subjects,'+S
+dmpw=os.environ['DMPW']
+def conn(dn=None,pw=None):
+  c=ldap.initialize(U); c.protocol_version=3; c.set_option(ldap.OPT_REFERRALS,0)
+  if dn: c.simple_bind_s(dn,pw)
+  return c
+dm=conn('cn=Directory Manager',dmpw)
+def who(s): return f'uid={s},{X}'
+def pwd(s): return f'Probe-Pw-{s}-1'
+def rc(f):
+  try: f(); return 0, ''
+  except ldap.LDAPError as e:
+    d=e.args[0] if e.args else {}
+    return d.get('result', -1), (d.get('desc','')+' '+d.get('info','')).strip()[:100]
+for dn,ou in [(X,'subjects'),(P,'people'),(B,'src'),(D,'dst'),(E,'other'),(G,'groups')]:
+  dm.add_s(dn,[('objectClass',[b'organizationalUnit']),('ou',[ou.encode()])])
+def T(b): return f'(target="ldap:///{b}")'
+WU=(S,T(S)+'(targetattr="uid || ou")','write')
+WC=(S,T(S)+'(targetattr="cn || uid || ou")','write')
+A={
+ 'm_S_tanotstar':[WU,(S,T(S)+'(targetattr!="*")','moddn')],
+ 'm_S_tauid':[WU,(S,T(S)+'(targetattr="uid")','moddn')],
+ 'm_S_tanotuid':[WU,(S,T(S)+'(targetattr!="uid")','moddn')],
+ 'm_S_denyta':[WU,(S,T(S),'moddn'),(D,T(D)+'(targetattr="uid")','DENYmoddn')],
+ 'm_S_denynotstar':[WU,(S,T(S),'moddn'),(D,T(D)+'(targetattr!="*")','DENYmoddn')],
+ 'm_newdn':[WU,(S,'(target="ldap:///uid=exact,'+D+'")','moddn')],
+ 'm_S':[WU,(S,T(S),'moddn')],
+}
+for s in A:
+  dm.add_s(who(s),[('objectClass',[b'inetOrgPerson']),('uid',[s.encode()]),('cn',[s.encode()]),('sn',[b'S']),('userPassword',[pwd(s).encode()])])
+for s,lst in A.items():
+  for k,(base,ta,perm) in enumerate(lst):
+    act='deny ('+perm[4:]+')' if perm.startswith('DENY') else 'allow ('+perm+')'
+    t=f'{ta}(version 3.0; acl "p33:{s}-{k}"; {act} userdn="ldap:///{who(s)}";)'
+    r=rc(lambda: dm.modify_s(base,[(ldap.MOD_ADD,'aci',[t.encode()])]))
+    if r[0]: print('aci',s,k,r)
+n=[0]
+def mkent(base,uid=None):
+  n[0]+=1; uid=uid or f'e{n[0]}'
+  dn=f'uid={uid},{base}'
+  dm.add_s(dn,[('objectClass',[b'inetOrgPerson']),('uid',[uid.encode()]),('cn',[uid.encode()]),('sn',[b'S'])])
+  return dn,uid
+def mv(s,dn,newrdn,sup,dold):
+  c=conn(who(s),pwd(s)); r=rc(lambda: c.rename_s(dn,newrdn,sup,dold)); c.unbind_s(); return r
+for s in A:
+  o=[]
+  dn,u=mkent(B); o.append('BD=%s'%mv(s,dn,f'uid={u}',D,0)[0])
+  dn,u=mkent(B); o.append('exact=%s'%mv(s,dn,'uid=exact',D,1)[0])
+  dm.add_s('ou=k%d,'%n[0]+D,[('objectClass',[b'organizationalUnit']),('ou',[b'k%d'%n[0]])])
+  sub='ou=k%d,'%n[0]+D
+  dn,u=mkent(B); o.append('Dsub=%s'%mv(s,dn,f'uid={u}',sub,0)[0])
+  print(f'{s:16}',' '.join(o))
+print('== spelling ==')
+def sp(label,dn,newrdn,sup):
+  r=rc(lambda: dm.rename_s(dn,newrdn,sup,1))
+  print(label,r[0],[d for d,_ in dm.search_s(S,ldap.SCOPE_SUBTREE,'('+newrdn+')',['1.1'])])
+dn,u=mkent(B,'sa'); sp('rename explicit sup respelled','uid=sa,'+B,'uid=sa2','OU=SRC,'+S)
+dn,u=mkent(B,'sb'); sp('rename src respelled no sup','uid=sb,OU=SRC,'+S,'uid=sb2',None)
+dn,u=mkent(B,'sc'); sp('rename src respelled + sup lower','uid=sc,OU=SRC,'+S,'uid=sc2',B)
+dn,u=mkent(B,'sd'); sp('move sup respelled','uid=sd,'+B,'uid=sd','OU=DST,'+S)
+print('== memberOf after case-only rename of member ==')
+mkent(P,'mm')
+dm.add_s('cn=grp,'+G,[('objectClass',[b'groupOfNames']),('cn',[b'grp']),('member',[b'uid=mm,'+P.encode()])])
+print(rc(lambda: dm.rename_s('uid=mm,'+P,'uid=MM',None,1)))
+time.sleep(1)
+print(dm.search_s('cn=grp,'+G,ldap.SCOPE_BASE,'(objectClass=*)',['member'])[0][1], dm.search_s('uid=mm,'+P,ldap.SCOPE_BASE,'(objectClass=*)',['memberOf'])[0])
+
+===== script probe34.py =====
+# Oracle probe 30: moddn right semantics (CAND-39) and case-only rename (CAND-30).
+# DSL multi-element targetattr lists. Runs a throwaway pinned 389 container; inner script uses python-ldap.
+import subprocess as sp, time, secrets, sys
+ref=open(sys.argv[1]).read().strip()
+pw=secrets.token_hex(16); n='muse-probe34-'+secrets.token_hex(3)
+sp.run(['docker','run','-d','--name',n,'-e','DS_DM_PASSWORD='+pw,'-v','/data',ref],stdout=sp.DEVNULL,check=True)
+try:
+  for i in range(600):
+    l=sp.run(['docker','logs',n],capture_output=True,text=True)
+    if '389-ds-container started.' in l.stdout+l.stderr: break
+    time.sleep(0.5)
+  print('image',ref)
+  r=sp.run(['docker','exec',n,'dsconf','localhost','backend','create','--suffix','dc=example,dc=test','--be-name','userroot','--create-suffix'],capture_output=True,text=True); print('backend',r.returncode)
+  r=sp.run(['docker','exec',n,'dsconf','localhost','backend','create','--suffix','dc=example,dc=net','--be-name','second','--create-suffix'],capture_output=True,text=True); print('backend2',r.returncode,r.stderr[-200:])
+  r=sp.run(['docker','exec',n,'dsconf','localhost','config','replace','nsslapd-dynamic-plugins=on'],capture_output=True,text=True); print('dynplugins',r.returncode)
+  for plug in ['referential-integrity','memberof']:
+    r=sp.run(['docker','exec',n,'dsconf','localhost','plugin',plug,'enable'],capture_output=True,text=True); print('plugin',plug,r.returncode)
+  r=sp.run(['docker','exec',n,'dsconf','localhost','config','get','nsslapd-moddn-aci'],capture_output=True,text=True); print(r.stdout.strip())
+  time.sleep(3)
+  sp.run(['docker','cp','probe34_inner.py',n+':/tmp/p.py'],check=True)
+  r=sp.run(['docker','exec','-e','DMPW='+pw,n,'python3','/tmp/p.py'],capture_output=True,text=True)
+  print(r.stdout); print(r.stderr[-3000:])
+finally:
+  sp.run(['docker','rm','-f','-v',n],capture_output=True)
+
+===== script probe34_inner.py =====
+import ldap, os, time
+U='ldap://127.0.0.1:3389'; S='dc=example,dc=test'
+B='ou=src,'+S; D='ou=dst,'+S; E='ou=other,'+S; P='ou=people,'+S; G='ou=groups,'+S; X='ou=subjects,'+S
+dmpw=os.environ['DMPW']
+def conn(dn=None,pw=None):
+  c=ldap.initialize(U); c.protocol_version=3; c.set_option(ldap.OPT_REFERRALS,0)
+  if dn: c.simple_bind_s(dn,pw)
+  return c
+dm=conn('cn=Directory Manager',dmpw)
+def who(s): return f'uid={s},{X}'
+def pwd(s): return f'Probe-Pw-{s}-1'
+def rc(f):
+  try: f(); return 0, ''
+  except ldap.LDAPError as e:
+    d=e.args[0] if e.args else {}
+    return d.get('result', -1), (d.get('desc','')+' '+d.get('info','')).strip()[:100]
+for dn,ou in [(X,'subjects'),(P,'people'),(B,'src'),(D,'dst'),(E,'other'),(G,'groups')]:
+  dm.add_s(dn,[('objectClass',[b'organizationalUnit']),('ou',[ou.encode()])])
+def T(b): return f'(target="ldap:///{b}")'
+WU=(S,T(S)+'(targetattr="uid || ou")','write')
+WC=(S,T(S)+'(targetattr="cn || uid || ou")','write')
+N='dc=example,dc=net'; NB='ou=far,'+N
+dm.add_s(NB,[('objectClass',[b'organizationalUnit']),('ou',[b'far'])])
+A={
+ 'm_both':[WU,(S,T(S),'moddn'),(N,T(N),'moddn'),(N,T(N)+'(targetattr="uid || ou")','write')],
+ 'm_S':[WU,(S,T(S),'moddn')],
+ 'newdn':[WU,(S,'(target="ldap:///uid=exactZ,'+D+'")','moddn')],
+ 'w_src':[(B,T(B)+'(targetattr="uid || ou")','write'),(S,T(S),'moddn')],
+ 'w_dst':[(D,T(D)+'(targetattr="uid || ou")','write'),(S,T(S),'moddn')],
+ 'denyw_dst_uid':[WU,(S,T(S),'moddn'),(D,T(D)+'(targetattr="uid")','DENYwrite')],
+ 'denyw_src_uid':[WU,(S,T(S),'moddn'),(B,T(B)+'(targetattr="uid")','DENYwrite')],
+ 'denyM_B_uid':[WU,(S,T(S),'moddn'),(B,T(B)+'(targetattr="uid")','DENYmoddn')],
+ 'denyM_B_ns':[WU,(S,T(S),'moddn'),(B,T(B)+'(targetattr!="*")','DENYmoddn')],
+ 'denyM_B_star':[WU,(S,T(S),'moddn'),(B,T(B)+'(targetattr="*")','DENYmoddn')],
+}
+for s in A:
+  dm.add_s(who(s),[('objectClass',[b'inetOrgPerson']),('uid',[s.encode()]),('cn',[s.encode()]),('sn',[b'S']),('userPassword',[pwd(s).encode()])])
+for s,lst in A.items():
+  for k,(base,ta,perm) in enumerate(lst):
+    act='deny ('+perm[4:]+')' if perm.startswith('DENY') else 'allow ('+perm+')'
+    t=f'{ta}(version 3.0; acl "p34:{s}-{k}"; {act} userdn="ldap:///{who(s)}";)'
+    r=rc(lambda: dm.modify_s(base,[(ldap.MOD_ADD,'aci',[t.encode()])]))
+    if r[0]: print('aci',s,k,r)
+n=[0]
+def mkent(base,uid=None):
+  n[0]+=1; uid=uid or f'e{n[0]}'
+  dn=f'uid={uid},{base}'
+  dm.add_s(dn,[('objectClass',[b'inetOrgPerson']),('uid',[uid.encode()]),('cn',[uid.encode()]),('sn',[b'S'])])
+  return dn,uid
+def mv(s,dn,newrdn,sup,dold):
+  c=conn(who(s),pwd(s)); r=rc(lambda: c.rename_s(dn,newrdn,sup,dold)); c.unbind_s(); return r
+print('== cross-backend ==')
+dn,u=mkent(B); print('DM S->N', rc(lambda: dm.rename_s(dn,f'uid={u}',NB,0)))
+dn,u=mkent(NB); print('DM N->S', rc(lambda: dm.rename_s(dn,f'uid={u}',D,0)))
+dn,u=mkent(B); print('m_both S->N', mv('m_both',dn,f'uid={u}',NB,0))
+dn,u=mkent(NB); print('m_both N->S', mv('m_both',dn,f'uid={u}',D,0))
+print('DM ghost S->N', rc(lambda: dm.rename_s('uid=ghostx,'+B,'uid=ghostx',NB,0)))
+print('m_both ghost S->N', mv('m_both','uid=ghosty,'+B,'uid=ghosty',NB,0))
+dn,u=mkent(B); print('m_both S->N missing sup', mv('m_both',dn,f'uid={u}','ou=nope,'+N,0))
+dn,u=mkent(B); print('m_S S->N', mv('m_S',dn,f'uid={u}',NB,0))
+print('== gates ==')
+for s in ['newdn','w_src','w_dst','denyw_dst_uid','denyw_src_uid']:
+  dn,u=mkent(B); a=mv(s,dn,'uid=exactZ' if s=='newdn' else f'uid={u}',D,1 if s=='newdn' else 0)[0]
+  dn,u=mkent(B); b=mv(s,dn,f'uid={u}r',D,1)[0]
+  print(f'{s:16} BD={a} BDren={b}')
+print('== existence with targeted denies ==')
+for s in ['denyM_B_uid','denyM_B_ns','denyM_B_star']:
+  n[0]+=1; g=mv(s,f'uid=g{n[0]},{B}',f'uid=g{n[0]}',D,0)[0]
+  dn,u=mkent(B); real=mv(s,dn,f'uid={u}',D,0)[0]
+  dn,u=mkent(D); intoB=mv(s,dn,f'uid={u}',B,0)[0]
+  print(f'{s:16} ghostInB={g} realBD={real} DB={intoB}')
+print('== group move: memberOf ==')
+mkent(P,'gm1')
+dm.add_s('cn=mob,'+P,[('objectClass',[b'groupOfNames']),('cn',[b'mob']),('member',[b'uid=gm1,'+P.encode()])])
+print('move group', rc(lambda: dm.rename_s('cn=mob,'+P,'cn=mob',G,0)))
+time.sleep(2); print(' memberOf', dm.search_s('uid=gm1,'+P,ldap.SCOPE_BASE,'(objectClass=*)',['memberOf'])[0][1])
+print('== subtree move with group+member inside, and outside group ==')
+T1='ou=unit,'+B
+dm.add_s(T1,[('objectClass',[b'organizationalUnit']),('ou',[b'unit'])])
+mkent(T1,'inner')
+dm.add_s('cn=ingrp,'+T1,[('objectClass',[b'groupOfNames']),('cn',[b'ingrp']),('member',[b'uid=inner,'+T1.encode()])])
+dm.add_s('cn=outgrp,'+G,[('objectClass',[b'groupOfNames']),('cn',[b'outgrp']),('member',[b'uid=inner,'+T1.encode()])])
+print('move subtree', rc(lambda: dm.rename_s(T1,'ou=unit',D,0)))
+time.sleep(3)
+T2='ou=unit,'+D
+print(' outgrp', dm.search_s('cn=outgrp,'+G,ldap.SCOPE_BASE,'(objectClass=*)',['member'])[0][1])
+print(' ingrp', dm.search_s('cn=ingrp,'+T2,ldap.SCOPE_BASE,'(objectClass=*)',['member'])[0][1])
+print(' inner memberOf', dm.search_s('uid=inner,'+T2,ldap.SCOPE_BASE,'(objectClass=*)',['memberOf'])[0][1])
+print('== move under mixed-case stored superior ==')
+dm.add_s('ou=MixCase,'+D,[('objectClass',[b'organizationalUnit']),('ou',[b'MixCase'])])
+dn,u=mkent(B); print('move', rc(lambda: dm.rename_s(dn,f'uid={u}','ou=mixcase,'+D,0)), [d for d,_ in dm.search_s(D,ldap.SCOPE_SUBTREE,f'(uid={u})',['1.1'])])
+dn,u=mkent(B); print('move typeupper', rc(lambda: dm.rename_s(dn,f'UID={u}','OU=MIXCASE,'+D,0)), [d for d,_ in dm.search_s(D,ldap.SCOPE_SUBTREE,f'(uid={u})',['1.1'])])
+print('== same spelling no-op vs respell of parent ==')
+dn,u=mkent(B,'nop')
+print('rename via OU=SRC', rc(lambda: dm.rename_s('uid=nop,OU=SRC,'+S,'uid=nop',None,1)), [d for d,_ in dm.search_s(S,ldap.SCOPE_SUBTREE,'(uid=nop)',['1.1'])])
+print('rename back lower', rc(lambda: dm.rename_s('uid=nop,'+B,'uid=nop',None,1)), [d for d,_ in dm.search_s(S,ldap.SCOPE_SUBTREE,'(uid=nop)',['1.1'])])
+print('== non-ASCII case-only ==')
+v='\u00e9t\u00e9'
+dm.add_s(f'uid={v},{B}'.encode().decode(),[('objectClass',[b'inetOrgPerson']),('uid',[v.encode()]),('cn',[b'x']),('sn',[b'S'])])
+print('rename', rc(lambda: dm.rename_s(f'uid={v},{B}','uid=\u00c9T\u00c9',None,1)), [ (d,a) for d,a in dm.search_s(B,ldap.SCOPE_ONELEVEL,'(cn=x)',['uid'])])

@@ -10,6 +10,78 @@ correctness fixes from the 2026-10-03 review series, complete console account an
 workflows, stricter release gates, and native-engine attribute, filter, ACI,
 ModRDN and DSL attribute-list behavior aligned with the pinned 389 image. Earlier releases are summarized at the end.
 
+## Unreleased (after v0.6.0): moves (moddn) and case-only renames
+
+Not in v0.6.0; for the next release. Native now matches the pinned 389
+image for cross-parent moves and case-only renames (contract C8; oracle
+probes 30-34; CAND-39 and CAND-30 resolved by the owner decision of
+2026-10-04 to add `moddn` and grant it in the runtime ACIs). This
+supersedes the CAND-39 and CAND-30 entries under Known limitations below:
+
+- **Moves to a different parent work on both engines (`moddn`).** Native
+  now supports 389's `moddn` permission: a move needs `moddn` on the new
+  superior (entry level) plus write on the RDN attribute on the old DN; no
+  add or delete right is checked any more. The runtime ACIs
+  `runtime-people-write`, `runtime-groups-write` and
+  `runtime-addsuffix-N-write` now include `moddn`, so REST, MCP and the
+  console can move entries within and between people and groups (and
+  within each additional suffix) on both engines; before, 389 refused every
+  such move with 50. Subtree moves carry their children, member values
+  pointing into the moved subtree follow it and memberOf is recomputed. A
+  missing new superior is 32 for a caller holding `moddn` there, else 50.
+- **Moves between managed suffixes are refused.** The LDAP answer is
+  affectsMultipleDSAs(71) on both engines (389 keeps each suffix in its
+  own backend; native used to allow the move). REST and MCP refuse it up
+  front with a `newDN` / `forbidden` field error ("moves across managed
+  suffixes are not supported") once an If-Match revision is present and
+  before it is compared, so a stale revision on such a move still gets the
+  403; on 389 this used to be a misleading "directory unavailable" error
+  from the 71.
+- **Case-only renames succeed (`uid=keeper` -> `uid=Keeper`).** Native
+  used to answer 68; it now respells the DN (and its children's DNs), as
+  on 389. With deleteoldrdn the RDN value is respelled too. Member values
+  and memberOf are left as written. A rename takes its parent spelling
+  from the request DN (an explicit equal newSuperior is ignored) and a
+  move takes the stored spelling of the new parent; a rename whose result
+  only changes the parent spelling respells it instead of being a no-op.
+- **Operator DSL ACLs no longer allow moves on native.** They needed
+  write and add before; a move now needs `moddn`, which the DSL
+  `permissions` list cannot express (raw ACIs can). This matches 389,
+  which never allowed DSL-granted moves.
+- **Missing modrdn source or superior: 32 with `moddn`, else 50.** A
+  subject other than Directory Manager gets 32 for a missing source entry
+  or new superior only if it holds `moddn` on that DN through an ACI whose
+  `targetattr` covers an arbitrary attribute; otherwise 50 (refines the
+  v0.6.0 CAND-36 rule, which answered 50 for every such subject).
+- **`targetattr!="*"` ACIs and moves.** A negated list holding `"*"`
+  still covers no attribute, but when it lists `moddn` it does grant the
+  entry-level move gate on the new superior.
+
+Upgrade risk (moves): the runtime ACI text changes (`moddn` added), and
+runtime ACIs feed the directory revision, so **every scenario gets a new
+directory revision on both engines**. `/health/ready` is 503 until a
+write-mode bootstrap writes the new marker and ACIs; persistent
+deployments with `startupMode: validate` need one merge apply. Until
+then `verify`/`inspect` report a mismatch and `reset.Compare` fails. Native
+evaluates the ACIs it compiles at labldapd start, so native moves follow
+the new rules as soon as the upgraded labldapd runs; 389 runtime moves
+stay 50 until the bootstrap rewrites the stored ACIs. Versions must match
+(see below): an old labldapd with a new control plane is not detected
+(labldapd publishes no revision) and keeps refusing runtime moves with 50;
+raw ACIs that use `moddn` stop an old labldapd with `invalid_aci`. A
+rollback to v0.6.0 leaves 389 ACIs carrying `moddn`, so `verify` reports
+a mismatch until a bootstrap rewrites them. Raw ACIs on native that relied
+on write + add for moves must grant `moddn` on the destination. Security:
+the runtime credential can now move entries under people and groups over
+raw LDAP on both engines, including `ou=groups` under `ou=people` and its
+own entry out of people (which would cut off its ACIs until a reset);
+REST and MCP refuse moves of protected entries (suffix roots, people,
+groups, the runtime account and the marker), but not of an OU that
+contains one of them. A user moved out of people
+leaves the Users list and the `runtime-password` scope; a group moved out
+of groups leaves the Groups list. `target_from`/`target_to` are not
+supported on native (D38).
+
 ## Upgrade risks (read first)
 
 Risks 1–4 affect deployments that use raw ACIs (`allowRawACI: true` with `aciTexts`)
@@ -30,7 +102,7 @@ change them either: that ACL compiles to `targetattr!="userPassword"` before and
 
 1. **Unknown attribute names in ACLs and ACIs now fail startup** ([#29](https://github.com/hilather/go-lab-ldap-mcp/pull/29)). A
    `targetattr` name must exist in the pinned 389 schema (type, alias, numeric OID or
-   `-oid` placeholder). A raw ACI naming anything else (a typo, an object class such as
+   `-oid` placeholder; DSL lists take type names or aliases only). A raw ACI naming anything else (a typo, an object class such as
    `person`, the native-only `pwdChangedTime`) stops labldapd with `aciTexts` /
    `invalid_aci`. A DSL ACL naming one in `attributes.allow` or `attributes.deny` fails
    `labldap` config validation with `unknown_attribute`, and every element of the list
@@ -373,10 +445,14 @@ Build application images with the same `VERSION` so
 - Residual LabLDAP-surface deltas vs 389 remain in
   `docs/design/native-engine-parity-contract.md` and `test/parity`.
   389 is still the oracle.
-- Cross-parent moves differ: native allows them with entry write and add, while 389
-  refuses them for every account without a `moddn` grant, including the runtime
-  account (CAND-39, owner decision pending).
-- Case-only renames return 68 on native and succeed on 389 (CAND-30).
+- ~~Cross-parent moves differ (CAND-39)~~ and ~~case-only renames return 68 on
+  native (CAND-30)~~: resolved after v0.6.0 (see "Unreleased (after v0.6.0)" above).
+  Moves need `moddn` on the new superior on both engines, the runtime ACIs grant it,
+  and case-only renames respell the DN.
+- A ModifyDN request that spells the suffix value in a different case
+  (`uid=keeper,ou=src,DC=EXAMPLE,dc=test`) is refused with 53 on native, while 389
+  accepts it and stores that spelling: native's suffix check compares RDNs exactly
+  (CAND-40, pending a fold-aware fix).
 - Native Bind does not yet complete or abandon outstanding operations first
   (proposed ADR-0014).
 - Directory writes are serialized within one control process; external LDAP writers

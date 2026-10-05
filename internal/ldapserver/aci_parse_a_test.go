@@ -68,14 +68,14 @@ func TestParseACITextARuntimeGolden(t *testing.T) {
 			target:  "ou=people,dc=example,dc=test",
 			mode:    ACITargetAttrDenyA,
 			attrs:   []string{"aci"},
-			perms:   []Permission{PermAdd, PermDelete, PermWrite, PermRead, PermSearch, PermCompare},
+			perms:   []Permission{PermAdd, PermDelete, PermWrite, PermRead, PermSearch, PermCompare, PermModDN},
 			subject: aciRuntimeDNA,
 		},
 		"labldap:runtime-groups-write": {
 			target:  "ou=groups,dc=example,dc=test",
 			mode:    ACITargetAttrDenyA,
 			attrs:   []string{"aci"},
-			perms:   []Permission{PermAdd, PermDelete, PermWrite, PermRead, PermSearch, PermCompare},
+			perms:   []Permission{PermAdd, PermDelete, PermWrite, PermRead, PermSearch, PermCompare, PermModDN},
 			subject: aciRuntimeDNA,
 		},
 		"labldap:runtime-password": {
@@ -360,6 +360,9 @@ func TestParseACITextARejects(t *testing.T) {
 		{"unknown clause targetfilter", `(targetfilter="(uid=x)")` + validPrefix + validBody},
 		{"unknown clause ip", validPrefix + validBody[:len(validBody)-1] + `)(ip="127.0.0.1")`},
 		{"389-only targattrfilters", `(targattrfilters="add=cn")` + validPrefix + validBody},
+		// D38: 389's moddn source/destination filters are outside the grammar.
+		{"389-only target_from", `(target_from="ldap:///ou=a,dc=example,dc=test")` + validPrefix + validBody},
+		{"389-only target_to", `(target_to="ldap:///ou=a,dc=example,dc=test")` + validPrefix + validBody},
 		{"unknown permission", `(target="ldap:///dc=example,dc=test")(version 3.0; acl "x"; allow (read,proxy) userdn="ldap:///all";)`},
 		{"389 perm 'all' out of subset", `(target="ldap:///dc=example,dc=test")(version 3.0; acl "x"; allow (all) userdn="ldap:///all";)`},
 		{"empty permission list", `(target="ldap:///dc=example,dc=test")(version 3.0; acl "x"; allow () userdn="ldap:///all";)`},

@@ -76,8 +76,8 @@ func managedRuntimeACIs(n *Normalized) []NamedACI {
 	who := `userdn="ldap:///` + aciEscape(n.Runtime.DN) + `"`
 	out := []NamedACI{
 		namedRuntime("runtime-suffix-read", suf, who, []string{"read", "search", "compare"}, "*", "userPassword"),
-		namedRuntime("runtime-people-write", people, who, []string{"add", "delete", "write", "read", "search", "compare"}, "*", "aci"),
-		namedRuntime("runtime-groups-write", groups, who, []string{"add", "delete", "write", "read", "search", "compare"}, "*", "aci"),
+		namedRuntime("runtime-people-write", people, who, []string{"add", "delete", "write", "read", "search", "compare", "moddn"}, "*", "aci"),
+		namedRuntime("runtime-groups-write", groups, who, []string{"add", "delete", "write", "read", "search", "compare", "moddn"}, "*", "aci"),
 		namedRuntime("runtime-password", people, who, []string{"write"}, "userPassword", ""),
 	}
 	for i, extra := range n.AdditionalSuffixes {
@@ -85,7 +85,7 @@ func managedRuntimeACIs(n *Normalized) []NamedACI {
 		dn := extra.String()
 		out = append(out,
 			namedRuntime("runtime-addsuffix-"+id+"-read", dn, who, []string{"read", "search", "compare"}, "*", "userPassword"),
-			namedRuntime("runtime-addsuffix-"+id+"-write", dn, who, []string{"add", "delete", "write", "read", "search", "compare"}, "*", "aci"),
+			namedRuntime("runtime-addsuffix-"+id+"-write", dn, who, []string{"add", "delete", "write", "read", "search", "compare", "moddn"}, "*", "aci"),
 			namedRuntime("runtime-addsuffix-"+id+"-password", dn, who, []string{"write"}, "userPassword", ""),
 		)
 	}

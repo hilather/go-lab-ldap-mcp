@@ -84,11 +84,34 @@ func (p *MemberOfPlugin) AfterWrite(ctx context.Context, tx UpdateTx, ev WriteEv
 	// Seeds are the direct members of the group side of the event, before
 	// and after: every entry whose derived memberOf could have changed.
 	seeds := map[string]config.DN{}
+	// moved maps a member value naming the renamed entry or one of its
+	// descendants to the new DN. In production this plugin runs before
+	// referint (config/plan.go), so member values may still carry the old
+	// DNs here; mapping them makes the result independent of plugin
+	// order. 389 ends with memberOf computed from the moved graph (oracle
+	// probe 34). This assumes referint also rewrites the member values;
+	// config/plan.go always enables both plugins.
+	moved := func(d config.DN) config.DN { return d }
+	var movedTo config.DN
+	if ev.Op == WriteRename && ev.Before != nil && ev.After != nil {
+		from, err1 := config.ParseDN(ev.Before.DN)
+		to, err2 := config.ParseDN(ev.After.DN)
+		if err1 == nil && err2 == nil && from.FoldedKey() != to.FoldedKey() {
+			moved = func(d config.DN) config.DN {
+				if nd, ok := d.Rebase(from, to); ok {
+					return nd
+				}
+				return d
+			}
+			movedTo = to
+		}
+	}
 	seed := func(e *Entry) {
 		if e == nil || !isGroupEntry(e) {
 			return
 		}
 		for _, m := range memberDNs(e) {
+			m = moved(m)
 			if p.inScope(m) {
 				seeds[m.FoldedKey()] = m
 			}
@@ -102,6 +125,20 @@ func (p *MemberOfPlugin) AfterWrite(ctx context.Context, tx UpdateTx, ev WriteEv
 		// recompute below rewrites them from the post-rename graph.
 		seed(ev.Before)
 		seed(ev.After)
+		if movedTo.Depth() > 0 {
+			// A subtree move: every moved entry may belong to a moved group,
+			// and every moved group's members see its new DN.
+			moving, err := tx.Subtree(ctx, movedTo)
+			if err != nil && !errors.Is(err, ErrNoSuchObject) {
+				return fmt.Errorf("ldapserver: memberof: list moved subtree: %w", err)
+			}
+			for _, e := range moving {
+				if d, err := config.ParseDN(e.DN); err == nil && p.inScope(d) {
+					seeds[d.FoldedKey()] = d
+				}
+				seed(e)
+			}
+		}
 	case WriteDelete:
 		// A deleted group's members lose its memberOf; a deleted user needs
 		// nothing (its memberOf dies with the entry; referint repairs the
@@ -111,7 +148,7 @@ func (p *MemberOfPlugin) AfterWrite(ctx context.Context, tx UpdateTx, ev WriteEv
 	if len(seeds) == 0 {
 		return nil
 	}
-	idx, err := p.indexGroups(ctx, tx)
+	idx, err := p.indexGroups(ctx, tx, moved)
 	if err != nil {
 		return err
 	}
@@ -131,6 +168,7 @@ func (p *MemberOfPlugin) AfterWrite(ctx context.Context, tx UpdateTx, ev WriteEv
 				continue
 			}
 			for _, m := range memberDNs(g) {
+				m = moved(m)
 				mk := m.FoldedKey()
 				if _, seen := seeds[mk]; !seen && p.inScope(m) {
 					seeds[mk] = m
@@ -154,7 +192,7 @@ func (p *MemberOfPlugin) AfterWrite(ctx context.Context, tx UpdateTx, ev WriteEv
 // memberOf values and nsmemberof classes are removed, missing ones added.
 func (p *MemberOfPlugin) Fixup(ctx context.Context, store Store) error {
 	return store.Update(ctx, func(tx UpdateTx) error {
-		idx, err := p.indexGroups(ctx, tx)
+		idx, err := p.indexGroups(ctx, tx, func(d config.DN) config.DN { return d })
 		if err != nil {
 			return err
 		}
@@ -190,7 +228,9 @@ type groupIndex struct {
 
 // indexGroups scans the managed suffix once and builds the membership
 // graph. A missing suffix yields an empty index (nothing to maintain).
-func (p *MemberOfPlugin) indexGroups(ctx context.Context, tx ReadTx) (*groupIndex, error) {
+// moved rewrites member values that still name a renamed subtree (see
+// AfterWrite); Fixup passes the identity.
+func (p *MemberOfPlugin) indexGroups(ctx context.Context, tx ReadTx, moved func(config.DN) config.DN) (*groupIndex, error) {
 	idx := &groupIndex{groups: map[string]*Entry{}, byMember: map[string][]*Entry{}}
 	for _, suf := range p.scopes() {
 		entries, err := tx.Subtree(ctx, suf)
@@ -210,6 +250,7 @@ func (p *MemberOfPlugin) indexGroups(ctx context.Context, tx ReadTx) (*groupInde
 			}
 			idx.groups[d.FoldedKey()] = e
 			for _, m := range memberDNs(e) {
+				m = moved(m)
 				idx.byMember[m.FoldedKey()] = append(idx.byMember[m.FoldedKey()], e)
 			}
 		}

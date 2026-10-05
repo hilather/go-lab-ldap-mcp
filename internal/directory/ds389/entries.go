@@ -159,6 +159,12 @@ func (r *Runtime) MoveEntry(ctx context.Context, move directory.EntryMove) (dire
 	if err := requireRevision(move.Revision); err != nil {
 		return directory.DirectoryEntry{}, err
 	}
+	if r.managedSuffixIndex(from) != r.managedSuffixIndex(to) {
+		// 389 answers affectsMultipleDSAs for a move between backends and
+		// native matches it (oracle probe 34; resolved CAND-39); refuse it
+		// up front with a stable field error on both engines.
+		return directory.DirectoryEntry{}, directory.Error("newDN", directory.FieldForbidden, "moves across managed suffixes are not supported")
+	}
 	newParent, ok := to.Parent()
 	if !ok {
 		return directory.DirectoryEntry{}, cfgErr("newDN", "parent_missing", "new DN parent is missing")
@@ -182,7 +188,10 @@ func (r *Runtime) MoveEntry(ctx context.Context, move directory.EntryMove) (dire
 		if e := r.requireParent(ctx, c, to); e != nil {
 			return e
 		}
-		req := ldap.NewModifyDNRequest(from.String(), newRDN, move.DeleteOld, newParent.String())
+		// The stored DN is the source so a rename keeps the stored parent
+		// spelling (both engines take a rename's parent spelling from the
+		// request DN; resolved CAND-30).
+		req := ldap.NewModifyDNRequest(live.DN, newRDN, move.DeleteOld, newParent.String())
 		if e := c.ModifyDN(ctx, req); e != nil {
 			return e
 		}

@@ -155,7 +155,7 @@ Predecessor KD-1–KD-18 remain binding. KD-R1–KD-R14 from the post-M0 remaini
 | ACI ID | Target | Permissions | Attrs |
 | --- | --- | --- | --- |
 | `labldap:runtime-suffix-read` | managed suffix | read, search, compare | allow `*`, deny `userPassword` |
-| `labldap:runtime-people-write` | people container subtree | add, delete, write, read, search, compare | `*` except `aci` (KD-R23) |
+| `labldap:runtime-people-write` | people container subtree | add, delete, write, read, search, compare (moddn added by CAND-39, 2026-10-04) | `*` except `aci` (KD-R23) |
 | `labldap:runtime-groups-write` | groups container subtree | same | `*` except `aci` (KD-R23) |
 | `labldap:runtime-password` | people container | write | `userPassword` only |
 

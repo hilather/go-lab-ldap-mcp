@@ -61,6 +61,19 @@ func (r *Runtime) parseManagedDN(raw, path string) (config.DN, error) {
 	return d, nil
 }
 
+// managedSuffixIndex returns the index of the deepest managed suffix
+// holding d, or -1. Each managed suffix is its own naming context (a 389
+// backend), so moves between them are refused (resolved CAND-39).
+func (r *Runtime) managedSuffixIndex(d config.DN) int {
+	best, depth := -1, -1
+	for i, suf := range r.managedSuffixDNs() {
+		if config.UnderAny(d, []config.DN{suf}) && suf.Depth() > depth {
+			best, depth = i, suf.Depth()
+		}
+	}
+	return best
+}
+
 func (r *Runtime) requireParent(ctx context.Context, c *ldapclient.Conn, child config.DN) error {
 	parent, ok := child.Parent()
 	if !ok {

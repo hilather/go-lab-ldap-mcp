@@ -141,6 +141,24 @@ func (d DN) Parent() (DN, bool) {
 	return DN{rdns: append([]rdn(nil), d.rdns[1:]...)}, true
 }
 
+// Rebase replaces from, an ancestor-or-self of d compared by FoldedKey,
+// by to: the leading RDNs of d are kept as spelled and to's RDNs follow.
+// ok is false when from is not d or an ancestor of d. Unlike a byte-length
+// prefix swap it is safe for values whose lowercase form changes length.
+func (d DN) Rebase(from, to DN) (DN, bool) {
+	keep := len(d.rdns) - len(from.rdns)
+	if len(from.rdns) == 0 || keep < 0 {
+		return DN{}, false
+	}
+	if (DN{rdns: d.rdns[keep:]}).FoldedKey() != from.FoldedKey() {
+		return DN{}, false
+	}
+	out := DN{rdns: make([]rdn, 0, keep+len(to.rdns))}
+	out.rdns = append(out.rdns, d.rdns[:keep]...)
+	out.rdns = append(out.rdns, to.rdns...)
+	return out, true
+}
+
 // UnderAny reports whether d equals or is a descendant of any suffix.
 func UnderAny(d DN, suffixes []DN) bool {
 	for _, s := range suffixes {

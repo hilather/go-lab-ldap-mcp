@@ -24,10 +24,10 @@ import (
 // Recorded as a Delta candidate for the T-147 oracle to confirm.
 //
 // Rename (modrdn) support mirrors 389's plugin: member/uniqueMember values
-// naming the old DN are rewritten to the new DN in the same commit. When
-// both plugins are registered, run referint before memberof in
-// Options.Plugins so memberOf recompute sees the repaired forward
-// references.
+// naming the old DN, or a descendant of a moved subtree, are rewritten to
+// the new DN in the same commit. The production order is memberof then
+// referint (config/plan.go); memberOf maps old member DNs to their moved
+// DNs itself, so its result does not depend on the order.
 //
 // Scope: repairs touch only group entries inside the managed suffix.
 // Deletes and renames of entries outside the suffix are ignored entirely,
@@ -100,16 +100,26 @@ func (p *RefIntPlugin) AfterWrite(ctx context.Context, tx UpdateTx, ev WriteEven
 		if err1 != nil || err2 != nil || !p.inScope(from) || !p.inScope(to) {
 			return nil
 		}
-		if from.EqualFold(to) {
+		if from.FoldedKey() == to.FoldedKey() {
+			// A case-only rename (the store's identity is the folded key)
+			// leaves member values as written, as on 389 (probes 30, 31).
 			return nil
 		}
-		replacement := []byte(to.String())
+		// Values naming the renamed entry or one of its descendants follow
+		// it, as on 389 (oracle probe 34: a subtree move rewrites member
+		// values pointing beneath it). Equal folded DNs (a case-only
+		// rename) are left as written (probes 30, 31).
 		return p.repair(ctx, tx, func(g *Entry) bool {
 			return mapMemberValues(g, func(v []byte, uniqueMember bool) []byte {
 				d, ok := dnFromValue(v, uniqueMember)
-				if !ok || !d.EqualFold(from) {
+				if !ok {
 					return v
 				}
+				nd, ok := d.Rebase(from, to)
+				if !ok {
+					return v
+				}
+				replacement := []byte(nd.String())
 				if !uniqueMember {
 					return replacement
 				}

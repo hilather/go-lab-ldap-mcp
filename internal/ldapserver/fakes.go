@@ -200,7 +200,9 @@ func (t fakeTx) Rename(ctx context.Context, from, to config.DN) error {
 	if _, ok := t.entries[fromKey]; !ok {
 		return fmt.Errorf("ldapserver fake store rename: %w", ErrNoSuchObject)
 	}
-	if _, ok := t.entries[toKey]; ok {
+	// Equal folded keys are a respell (resolved CAND-30): the entry and its
+	// subtree keep their keys and only their DN strings change.
+	if _, ok := t.entries[toKey]; ok && toKey != fromKey {
 		return fmt.Errorf("ldapserver fake store rename: %w", ErrEntryExists)
 	}
 	type move struct{ oldKey, newKey, newDN string }
@@ -210,14 +212,15 @@ func (t fakeTx) Rename(ctx context.Context, from, to config.DN) error {
 		if k != fromKey && !strings.HasSuffix(k, fromSuffix) {
 			continue
 		}
-		// Folded keys and canonical DN strings have equal length (folding
-		// only lowercases), so stripping len(fromKey) bytes drops exactly the
-		// old base from both forms.
-		moves = append(moves, move{
-			oldKey: k,
-			newKey: k[:len(k)-len(fromKey)] + toKey,
-			newDN:  e.DN[:len(e.DN)-len(fromKey)] + to.String(),
-		})
+		d, err := config.ParseDN(e.DN)
+		if err != nil {
+			return fmt.Errorf("ldapserver fake store rename: %w", err)
+		}
+		nd, ok := d.Rebase(from, to)
+		if !ok {
+			continue
+		}
+		moves = append(moves, move{oldKey: k, newKey: nd.FoldedKey(), newDN: nd.String()})
 	}
 	for _, m := range moves {
 		if m.newKey == m.oldKey {
@@ -227,14 +230,17 @@ func (t fakeTx) Rename(ctx context.Context, from, to config.DN) error {
 			return fmt.Errorf("ldapserver fake store rename: %w", ErrEntryExists)
 		}
 	}
+	// Delete every old key before inserting, so a respell (equal keys) or
+	// a chain of moves never drops an entry another move just wrote.
+	staged := make(map[string]*Entry, len(moves))
 	for _, m := range moves {
-		if m.newKey == m.oldKey {
-			continue
-		}
 		c := cloneEntry(t.entries[m.oldKey])
 		c.DN = m.newDN
+		staged[m.newKey] = c
 		delete(t.entries, m.oldKey)
-		t.entries[m.newKey] = c
+	}
+	for k, c := range staged {
+		t.entries[k] = c
 	}
 	return nil
 }

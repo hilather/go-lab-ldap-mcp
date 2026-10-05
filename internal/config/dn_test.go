@@ -1,6 +1,7 @@
 package config_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/hilather/go-lab-ldap-mcp/internal/config"
@@ -111,5 +112,36 @@ func TestDescendantIsStructural(t *testing.T) {
 	}
 	if config.UnderAny(contest, []config.DN{suffix}) {
 		t.Fatal("unrelated DN must not be under managed suffix")
+	}
+}
+
+func TestDNRebase(t *testing.T) {
+	t.Parallel()
+	mk := func(s string) config.DN {
+		t.Helper()
+		if s == "" {
+			return config.DN{}
+		}
+		d, err := config.ParseDN(s)
+		if err != nil {
+			t.Fatalf("ParseDN(%q): %v", s, err)
+		}
+		return d
+	}
+	for _, tc := range []struct {
+		d, from, to, want string
+		ok                bool
+	}{
+		{"uid=a,ou=People,dc=x", "ou=people,dc=x", "ou=groups,dc=x", "uid=a,ou=groups,dc=x", true},
+		{"ou=people,dc=x", "OU=PEOPLE,dc=x", "ou=PEOPLE,dc=x", "ou=PEOPLE,dc=x", true},
+		{"uid=İa,ou=İt,dc=x", "ou=" + strings.ToLower("İ") + "t,dc=x", "ou=İT,dc=x", "uid=İa,ou=İT,dc=x", true},
+		{"ou=people,dc=x", "uid=a,ou=people,dc=x", "ou=g,dc=x", "", false},
+		{"uid=a,ou=peoplex,dc=x", "ou=people,dc=x", "ou=g,dc=x", "", false},
+		{"uid=a,dc=x", "", "ou=g,dc=x", "", false},
+	} {
+		got, ok := mk(tc.d).Rebase(mk(tc.from), mk(tc.to))
+		if ok != tc.ok || (ok && got.String() != tc.want) {
+			t.Errorf("Rebase(%q, %q, %q) = %q, %v; want %q, %v", tc.d, tc.from, tc.to, got.String(), ok, tc.want, tc.ok)
+		}
 	}
 }
