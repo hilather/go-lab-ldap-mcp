@@ -34,3 +34,19 @@ func TestKnownMatchesOracle(t *testing.T) {
 		}
 	}
 }
+
+func TestPrimary(t *testing.T) {
+	for in, want := range map[string]string{
+		"pwdHistory":          "passwordHistory",
+		"homeTelephoneNumber": "homePhone",
+		"fax;lang-en":         "facsimileTelephoneNumber;lang-en",
+		"rfc822Mailbox":       "mail",
+		"2.5.4.4":             "sn",
+		"mail":                "mail",
+		"notAnAttribute;x":    "notAnAttribute;x",
+	} {
+		if got := Primary(in); got != want {
+			t.Errorf("Primary(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

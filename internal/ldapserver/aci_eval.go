@@ -93,7 +93,11 @@ func (eng *aciEngine) Allowed(ctx context.Context, tx ReadTx, check ACICheck) (b
 		if !aci.HasPerm(check.Perm) {
 			continue
 		}
-		if check.Attribute != "" && !aci.TargetsAttr(check.Attribute, check.Options) {
+		if check.EntryDenyOnly {
+			if !aci.Deny || aci.AttrMode != ACITargetAttrNoneA {
+				continue
+			}
+		} else if check.Attribute != "" && !aci.TargetsAttr(check.Attribute, check.Options) {
 			continue
 		}
 		match, err := eng.subjectMatchA(ctx, tx, aci, check, &groups)
@@ -108,6 +112,10 @@ func (eng *aciEngine) Allowed(ctx context.Context, tx ReadTx, check ACICheck) (b
 			return false, nil
 		}
 		allowed = true
+	}
+	if check.EntryDenyOnly {
+		// No deny without targetattr matched (errors returned above).
+		return true, nil
 	}
 	return allowed, nil
 }

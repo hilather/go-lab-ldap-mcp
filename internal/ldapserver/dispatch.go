@@ -21,6 +21,16 @@ var errDenied = errors.New("ldapserver: access denied")
 // an abandoned operation gets no response PDU (RFC 4511 section 4.11).
 func (s *Server) dispatchOp(ctx context.Context, c *conn, m *Message) {
 	name := opName(m.Op)
+	// CAND-38: 389 rejects a search filter holding an absolute true/false
+	// set ((&), (|), RFC 4526) with protocolError(2) "Bad search filter",
+	// for every subject and base, before looking at controls, and keeps
+	// the connection (oracle probes 19, 25, 26, 28).
+	if sr, ok := m.Op.(*SearchRequest); ok && filterHasAbsoluteSet(sr.Filter) {
+		res := Result{Code: ResultProtocolError, DiagnosticMessage: "Bad search filter"}
+		c.sendResult(m.ID, responseFor(m.Op, res))
+		s.metrics().ObserveOperation(name, res.Code)
+		return
+	}
 	if res, ok := s.checkControls(m); !ok {
 		c.sendResult(m.ID, responseFor(m.Op, res))
 		s.metrics().ObserveOperation(name, res.Code)
@@ -113,21 +123,33 @@ func (s *Server) allowed(ctx context.Context, tx ReadTx, subj Subject, target co
 	return s.allowedIdentity(ctx, tx, subj, target, id, opts, perm)
 }
 
+// entryWriteNotDenied is 389's modrdn entry gate (resolved CAND-36): the
+// rename is blocked only by a deny-write ACI without targetattr covering
+// dn. Evaluation errors fail closed (logged by allowedCheck).
+func (s *Server) entryWriteNotDenied(ctx context.Context, tx ReadTx, subj Subject, dn config.DN) bool {
+	return s.allowedCheck(ctx, tx, ACICheck{Subject: subj, Target: dn, Perm: PermWrite, EntryDenyOnly: true})
+}
+
 // allowedIdentity is allowed for an attribute identity the caller already
 // resolved (filter leaves resolve through parseAttrDesc instead of
 // attributeIdentity; see matchSearchFilter). opts are the description's
 // lowercased options, matched against targetattr options (CAND-34).
 func (s *Server) allowedIdentity(ctx context.Context, tx ReadTx, subj Subject, target config.DN, attr string, opts []string, perm Permission) bool {
-	ok, err := s.opts.ACI.Allowed(ctx, tx, ACICheck{
+	return s.allowedCheck(ctx, tx, ACICheck{
 		Subject:   subj,
 		Target:    target,
 		Attribute: attr,
 		Options:   opts,
 		Perm:      perm,
 	})
+}
+
+// allowedCheck runs one ACI check; an evaluation error denies (logged).
+func (s *Server) allowedCheck(ctx context.Context, tx ReadTx, check ACICheck) bool {
+	ok, err := s.opts.ACI.Allowed(ctx, tx, check)
 	if err != nil {
 		s.opts.Logger.LogAttrs(ctx, slog.LevelWarn, "aci evaluation failed; denying",
-			slog.String("error", err.Error()), slog.String("perm", string(perm)))
+			slog.String("error", err.Error()), slog.String("perm", string(check.Perm)))
 		return false
 	}
 	return ok

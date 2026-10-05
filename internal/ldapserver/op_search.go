@@ -73,7 +73,6 @@ func (s *Server) runSearch(ctx context.Context, c *conn, m *Message, req *Search
 		}
 	}
 	deadline := time.Now().Add(timeLimit)
-	leafless := filterHasAbsoluteSet(req.Filter)
 
 	var matched []*Entry
 	code := ResultSuccess
@@ -90,7 +89,7 @@ func (s *Server) runSearch(ctx context.Context, c *conn, m *Message, req *Search
 			if err != nil {
 				return nil
 			}
-			if !s.searchResultVisible(ctx, tx, subj, entryDN, e, req.Filter, leafless) {
+			if !s.searchResultVisible(ctx, tx, subj, entryDN, e, req.Filter) {
 				return nil
 			}
 			if len(matched) >= sizeLimit {
@@ -185,13 +184,9 @@ func (s *Server) runSearch(ctx context.Context, c *conn, m *Message, req *Search
 // C8). As on 389 (resolved CAND-35) there is no entry-level search check:
 // each evaluated filter leaf needs search on its attribute (matchSearchFilter)
 // and the subject must read at least one stored attribute (entryReadable).
-// absolute is filterHasAbsoluteSet(f): such a filter can be True without
-// checking any leaf; 389 rejects it (oracle probe 19), so native keeps the
-// entry-level search check for it (CAND-38).
-func (s *Server) searchResultVisible(ctx context.Context, tx ReadTx, subj Subject, dn config.DN, e *Entry, f Filter, absolute bool) bool {
-	if absolute && !s.allowed(ctx, tx, subj, dn, "", PermSearch) {
-		return false
-	}
+// Filters holding an absolute true/false set never get here: dispatchOp
+// rejects them with protocolError(2) as 389 does (resolved CAND-38).
+func (s *Server) searchResultVisible(ctx context.Context, tx ReadTx, subj Subject, dn config.DN, e *Entry, f Filter) bool {
 	if s.matchSearchFilter(ctx, tx, subj, dn, e, f) != filterTrue {
 		return false
 	}
@@ -201,8 +196,8 @@ func (s *Server) searchResultVisible(ctx context.Context, tx ReadTx, subj Subjec
 }
 
 // filterHasAbsoluteSet reports whether f contains an empty AND or OR
-// (RFC 4526 absolute true/false), which can decide the filter without any
-// attribute leaf being checked.
+// (RFC 4526 absolute true/false) anywhere, including under NOT. 389
+// rejects such search filters (CAND-38, see dispatchOp).
 func filterHasAbsoluteSet(f Filter) bool {
 	switch n := f.(type) {
 	case *FilterAnd:

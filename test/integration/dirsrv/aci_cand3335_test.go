@@ -27,10 +27,10 @@ import (
 //   - a value written as userid is stored and checked as uid.
 //
 // 389's answer for option-bearing names depends on what the connection
-// evaluated before (D36); rows use fresh connections and one row pins it.
-// Not asserted here (open, see the parity contract): modrdn under an
-// attribute-scoped deny-write (CAND-36), targetattr!="*" (CAND-37) and
-// absolute filters such as (&), which 389 rejects (CAND-38).
+// evaluated before (D36); rows use fresh connections, and the D36 rows
+// accept either answer on 389 and pin native to the fresh one.
+// Modrdn gates (CAND-36), targetattr!="*" (CAND-37) and absolute filters
+// (CAND-38) are asserted in TestACIModRDNStarListsAbsoluteFilters.
 func TestACITargetAttrOptionsAndEntryLevel(t *testing.T) {
 	const (
 		suffix = "dc=example,dc=test"
@@ -191,30 +191,31 @@ func TestACITargetAttrOptionsAndEntryLevel(t *testing.T) {
 		}
 	}
 
-	// D36 (probe 24): on one connection, after (uid=fa_bob) 389 applies the
-	// uid decision to uid;x-test, so d_uidopt's deny on uid;x-test no longer
-	// hides the leaf. Native gives the fresh-connection answer every time.
-	c := as("d_uidopt")
-	_ = search(c, "(uid=fa_bob)")
-	wantD36 := ""
-	if env.engine == Engine389DS {
-		wantD36 = "fa_bob"
+	// D36 (probe 24): on one connection 389 may reuse its decision for the
+	// plain type (uid) when it later checks uid;x-test. The reuse is a
+	// per-connection cache artefact and not reliable (it was observed both
+	// ways), so on 389 either the fresh or the cached answer is accepted;
+	// native is pinned to the fresh answer.
+	d36 := func(subject, fresh, cached string) {
+		t.Helper()
+		c := as(subject)
+		_ = search(c, "(uid=fa_bob)")
+		got := search(c, "(uid;x-test=bobtag)")
+		if got == fresh || (env.engine == Engine389DS && got == cached) {
+			return
+		}
+		want := "[" + fresh + "]"
+		if env.engine == Engine389DS {
+			want += " or [" + cached + "]"
+		}
+		t.Errorf("%s: D36 %s same-connection (uid;x-test=bobtag): got [%s], want %s", env.engine, subject, got, want)
 	}
-	if got := search(c, "(uid;x-test=bobtag)"); got != wantD36 {
-		t.Errorf("%s: D36 d_uidopt same-connection (uid;x-test=bobtag): got [%s], want [%s]", env.engine, got, wantD36)
-	}
-	// D36 mirror (probe 24): t_uidopt's allow covers only uid;x-test; after
-	// (uid=fa_bob) is denied on the same connection, 389 reuses that denial
-	// for uid;x-test, while native grants it as on a fresh connection.
-	c2 := as("t_uidopt")
-	_ = search(c2, "(uid=fa_bob)")
-	wantD36t := "fa_bob"
-	if env.engine == Engine389DS {
-		wantD36t = ""
-	}
-	if got := search(c2, "(uid;x-test=bobtag)"); got != wantD36t {
-		t.Errorf("%s: D36 t_uidopt same-connection (uid;x-test=bobtag): got [%s], want [%s]", env.engine, got, wantD36t)
-	}
+	// d_uidopt denies uid;x-test: fresh hides the leaf, cached (uid
+	// allowed) shows it.
+	d36("d_uidopt", "", "fa_bob")
+	// t_uidopt allows only uid;x-test: fresh grants it, cached (uid
+	// denied) does not.
+	d36("t_uidopt", "fa_bob", "")
 
 	code := func(err error) uint16 {
 		var le *ldap.Error

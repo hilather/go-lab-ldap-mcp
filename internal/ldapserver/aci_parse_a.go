@@ -87,9 +87,11 @@ const (
 	// Attrs is targeted.
 	ACITargetAttrDenyA
 	// ACITargetAttrNoneA is an omitted targetattr clause. As on 389 (oracle
-	// probes 16, 18, 19; resolved CAND-35) such an ACI targets no attribute
-	// for read, search, compare and write checks; entry-level checks (add,
-	// delete, the modrdn gates) still apply it.
+	// probes 16, 18, 19, 25-27; resolved CAND-35, CAND-36) such an ACI
+	// targets no attribute for read, search, compare and write checks;
+	// entry-level add/delete checks apply it, and a deny-write one blocks a
+	// rename (ACICheck.EntryDenyOnly). An allow without targetattr grants
+	// nothing for a rename.
 	ACITargetAttrNoneA
 )
 
@@ -156,7 +158,8 @@ type ParsedACI struct {
 	// entry itself or descendants, per C8) is the evaluator's concern.
 	TargetDN config.DN
 	// AttrMode and Attrs carry the targetattr clause. Attrs is nil when
-	// AttrMode is ACITargetAttrAllA or ACITargetAttrNoneA.
+	// AttrMode is ACITargetAttrAllA or ACITargetAttrNoneA. A negated list
+	// may hold "*" (CAND-37), which makes it cover no attribute.
 	AttrMode ACITargetAttrModeA
 	Attrs    []string
 	// Deny reports a deny (...) rule instead of allow (...). Deny-wins
@@ -203,6 +206,11 @@ func (p *ParsedACI) TargetsAttr(base string, opts []string) bool {
 // not uid.
 func aciAttrInA(list []string, base string, opts []string) bool {
 	for _, a := range list {
+		if a == "*" {
+			// Only a negated list keeps "*" (CAND-37): it covers every
+			// attribute, so the negation covers none.
+			return true
+		}
 		name, rest, hasOpts := strings.Cut(a, ";")
 		if !strings.EqualFold(name, base) {
 			continue
@@ -582,7 +590,12 @@ func (p *aciParserA) parseTargetAttrClauseA(out *ParsedACI) error {
 	attrs := make([]string, 0, len(parts))
 	for _, a := range parts {
 		if a == "*" {
+			// 389 accepts "*" inside a list and after != (oracle probes
+			// 25, 26; resolved CAND-37). Positive: every attribute.
+			// Negated: kept in Attrs, so the clause excludes every
+			// attribute and covers none.
 			star = true
+			attrs = append(attrs, a)
 			continue
 		}
 		if !aciAttrNameReA.MatchString(a) && !aciAttrOIDReA.MatchString(a) {
@@ -596,11 +609,7 @@ func (p *aciParserA) parseTargetAttrClauseA(out *ParsedACI) error {
 		attrs = append(attrs, a)
 	}
 	switch {
-	case star && len(parts) != 1:
-		return aciErrA(v.pos, `"*" cannot be combined with named attributes in targetattr`)
-	case star && negate:
-		return aciErrA(v.pos, `targetattr!= does not accept "*"`)
-	case star:
+	case star && !negate:
 		out.AttrMode = ACITargetAttrAllA
 	case negate:
 		out.AttrMode = ACITargetAttrDenyA

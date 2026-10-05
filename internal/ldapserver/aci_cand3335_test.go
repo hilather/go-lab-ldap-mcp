@@ -143,7 +143,7 @@ func replayOracleRows(t *testing.T, probes []string, table map[string][][2]strin
 				var got string
 				if err := srv.opts.Store.View(ctx, func(tx ReadTx) error {
 					got = matchingNames(t, entries, func(e *Entry) bool {
-						return srv.searchResultVisible(ctx, tx, s, mustDNA(t, e.DN), e, f, filterHasAbsoluteSet(f))
+						return srv.searchResultVisible(ctx, tx, s, mustDNA(t, e.DN), e, f)
 					})
 					return nil
 				}); err != nil {
@@ -177,48 +177,6 @@ func replayOracleRows(t *testing.T, probes []string, table map[string][][2]strin
 	return rows, compares
 }
 
-// TestAbsoluteFilterKeepsEntryLevelSearchCheck: 389 rejects (&) and (|)
-// (oracle probe 19), so native keeps the entry-level search check for a
-// filter holding one (CAND-38) and a read-only subject cannot list entries.
-func TestAbsoluteFilterKeepsEntryLevelSearchCheck(t *testing.T) {
-	t.Parallel()
-	srv := cand3335Server(t)
-	entries := cand3335Entries()
-	ctx := context.Background()
-	for _, tc := range []struct{ subj, filter, want string }{
-		{"e_deny_star", "(&)", ""},
-		{"e_deny_star", "(|(&)(sn=S))", ""},
-		{"e_deny_star", "(!(|))", ""},
-		{"e_deny_notpw", "(&)", ""},
-		// The kept entry-level check still applies attribute-scoped denies
-		// (pre-existing behaviour, no 389 result to compare with).
-		{"d_uidopt", "(&)", ""},
-		{"t_descopt", "(&)", "fa_alice,fa_bob,fa_carol"},
-		{"e_allow_noattr", "(&)", ""},
-	} {
-		f := parseTestFilter(t, tc.filter)
-		if !filterHasAbsoluteSet(f) {
-			t.Fatalf("%s: not absolute", tc.filter)
-		}
-		s := Subject{DN: mustDNA(t, "uid="+tc.subj+",ou=people,dc=example,dc=test")}
-		var got string
-		if err := srv.opts.Store.View(ctx, func(tx ReadTx) error {
-			got = matchingNames(t, entries, func(e *Entry) bool {
-				return srv.searchResultVisible(ctx, tx, s, mustDNA(t, e.DN), e, f, true)
-			})
-			return nil
-		}); err != nil {
-			t.Fatal(err)
-		}
-		if got != tc.want {
-			t.Errorf("%s %s: got [%s], want [%s]", tc.subj, tc.filter, got, tc.want)
-		}
-	}
-	if filterHasAbsoluteSet(parseTestFilter(t, "(&(sn=S)(!(uid=x)))")) {
-		t.Fatal("leaf-only filter reported absolute")
-	}
-}
-
 // TestTargetAttrSchemaCheckMatchesOracle replays probe 16/19's verdicts for
 // ACI text added over LDAP: names outside the 389 schema fail to parse.
 func TestTargetAttrSchemaCheckMatchesOracle(t *testing.T) {
@@ -234,9 +192,6 @@ func TestTargetAttrSchemaCheckMatchesOracle(t *testing.T) {
 			op := "="
 			if m[1] == "!" {
 				op = "!="
-			}
-			if op == "!=" && m[2] == "*" {
-				continue // CAND-37 (open): native rejects targetattr!="*", 389 accepts it.
 			}
 			text := `(target="ldap:///dc=example,dc=test")(targetattr` + op + `"` + m[2] + `")(version 3.0; acl "x"; allow (read) userdn="ldap:///all";)`
 			_, err := ParseACITextA(text)
@@ -293,7 +248,7 @@ func TestAttributeIdentityResolvesSecondDescriptors(t *testing.T) {
 		var got string
 		if err := srv.opts.Store.View(ctx, func(tx ReadTx) error {
 			got = matchingNames(t, entries, func(e *Entry) bool {
-				return srv.searchResultVisible(ctx, tx, s, mustDNA(t, e.DN), e, f, false)
+				return srv.searchResultVisible(ctx, tx, s, mustDNA(t, e.DN), e, f)
 			})
 			return nil
 		}); err != nil {

@@ -1,4 +1,4 @@
-# Filter attribute-description oracle probes (contract C6, delta D34, CAND-31/32, CAND-33/34/35, D36)
+# Filter attribute-description oracle probes (contract C6, delta D34, CAND-31/32, CAND-33/34/35, D36, CAND-36/37/38)
 # Pinned image quay.io/389ds/dirsrv@sha256:f2851654c5df545cd893d84bea8d08c28dc25f0930493fbfed1d8a6eacf657f7
 # Captured 2026-10-03/04 in throwaway containers. Directory Manager passwords were random per run and are not recorded; the probe scripts below hard-code throwaway subject passwords (Probe-Pw-...) that exist only inside those containers. Password hashes in transcripts are redacted.
 
@@ -2465,3 +2465,691 @@ func main() {
 	}
 	fmt.Println(strings.Join(out, " "))
 }
+
+# Probes 25-29 (2026-10-04, resolved CAND-36/37/38 and the DSL list follow-up; open CAND-39 and CAND-30): modrdn ACL gates, result-code ordering, no-op and case-only renames, cross-parent moves (25-27, 29); targetattr!="*" and lists holding "*" (25, 26); absolute filters (26, 28, 29). Each probe ran the outer script on the host and the inner script with python-ldap inside the container.
+
+===== probe 25 =====
+image quay.io/389ds/dirsrv@sha256:f2851654c5df545cd893d84bea8d08c28dc25f0930493fbfed1d8a6eacf657f7
+backend 0
+moddn-aci {'nsslapd-moddn-aci': [b'on']}
+ACI ADD w_uid_exim 1  export (21, 'Invalid syntax ACL Syntax Error(-5):(target=\\22ldap:///ou=probe-36,dc=example,dc=test\\22)(')
+ACI ADD w_uid_exim 2  import (21, 'Invalid syntax ACL Syntax Error(-5):(target=\\22ldap:///ou=dest,dc=example,dc=test\\22)(vers')
+ACI ADD w_exim 0  export (21, 'Invalid syntax ACL Syntax Error(-5):(target=\\22ldap:///ou=probe-36,dc=example,dc=test\\22)(')
+ACI ADD w_exim 1  import (21, 'Invalid syntax ACL Syntax Error(-5):(target=\\22ldap:///ou=dest,dc=example,dc=test\\22)(vers')
+ACI ADD w_uid_ex 1  export (21, 'Invalid syntax ACL Syntax Error(-5):(target=\\22ldap:///ou=probe-36,dc=example,dc=test\\22)(')
+ACI ADD w_uid_im 1  import (21, 'Invalid syntax ACL Syntax Error(-5):(target=\\22ldap:///ou=dest,dc=example,dc=test\\22)(vers')
+ACI ADD w_star_exim_deny_desc 1  export (21, 'Invalid syntax ACL Syntax Error(-5):(target=\\22ldap:///ou=probe-36,dc=example,dc=test\\22)(')
+ACI ADD w_star_exim_deny_desc 2  import (21, 'Invalid syntax ACL Syntax Error(-5):(target=\\22ldap:///ou=dest,dc=example,dc=test\\22)(vers')
+== CAND-36 modrdn ==
+w_uid                    ren_del1=0 ren_del0=0 ren_cn_del1=50 ren_cnnew_del0=50 move=50 move_ren=50
+w_cn                     ren_del1=50 ren_del0=50 ren_cn_del1=50 ren_cnnew_del0=0 move=50 move_ren=50
+w_star                   ren_del1=0 ren_del0=0 ren_cn_del1=0 ren_cnnew_del0=0 move=50 move_ren=50
+w_star_deny_desc         ren_del1=0 ren_del0=0 ren_cn_del1=0 ren_cnnew_del0=0 move=50 move_ren=50
+w_star_deny_desclang     ren_del1=0 ren_del0=0 ren_cn_del1=0 ren_cnnew_del0=0 move=50 move_ren=50
+w_star_deny_uid          ren_del1=50 ren_del0=50 ren_cn_del1=50 ren_cnnew_del0=0 move=50 move_ren=50
+w_noattr                 ren_del1=50 ren_del0=50 ren_cn_del1=50 ren_cnnew_del0=50 move=50 move_ren=50
+w_uid_addB               ren_del1=0 ren_del0=0 ren_cn_del1=50 ren_cnnew_del0=50 move=50 move_ren=50
+w_uidopt                 ren_del1=50 ren_del0=50 ren_cn_del1=50 ren_cnnew_del0=50 move=50 move_ren=50
+w_uid_cn                 ren_del1=0 ren_del0=0 ren_cn_del1=0 ren_cnnew_del0=0 move=50 move_ren=50
+w_uid_addD               ren_del1=0 ren_del0=0 ren_cn_del1=50 ren_cnnew_del0=50 move=50 move_ren=50
+w_uid_exim               ren_del1=0 ren_del0=0 ren_cn_del1=50 ren_cnnew_del0=50 move=50 move_ren=50
+w_exim                   ren_del1=50 ren_del0=50 ren_cn_del1=50 ren_cnnew_del0=50 move=50 move_ren=50
+w_uid_ex                 ren_del1=0 ren_del0=0 ren_cn_del1=50 ren_cnnew_del0=50 move=50 move_ren=50
+w_uid_im                 ren_del1=0 ren_del0=0 ren_cn_del1=50 ren_cnnew_del0=50 move=50 move_ren=50
+w_star_exim_deny_desc    ren_del1=0 ren_del0=0 ren_cn_del1=0 ren_cnnew_del0=0 move=50 move_ren=50
+w_uid_denyall            ren_del1=50 ren_del0=50 ren_cn_del1=50 ren_cnnew_del0=50 move=50 move_ren=50
+w_uid_denyadd            ren_del1=0 ren_del0=0 ren_cn_del1=50 ren_cnnew_del0=50 move=50 move_ren=50
+w_uid_denyread           ren_del1=0 ren_del0=0 ren_cn_del1=50 ren_cnnew_del0=50 move=50 move_ren=50
+== CAND-37 targetattr!="*" ==
+n_rsc          (uid=fa_bob)->[] | (objectClass=*)->[] | cmp sn=S ERR50 | mod desc 50 | add 50 | del 50
+n_deny         (uid=fa_bob)->['fa_bob'] | (objectClass=*)->['fa_bob:cn/description/objectclass/sn/uid'] | cmp sn=S True | mod desc 50 | add 50 | del 50
+n_write        (uid=fa_bob)->['fa_bob'] | (objectClass=*)->['fa_bob:cn/description/objectclass/sn/uid'] | cmp sn=S True | mod desc 50 | add 50 | del 50
+n_ad           (uid=fa_bob)->['fa_bob'] | (objectClass=*)->['fa_bob:cn/description/objectclass/sn/uid'] | cmp sn=S True | mod desc 50 | add 0 | del 0
+n_deny_ad      (uid=fa_bob)->['fa_bob'] | (objectClass=*)->['fa_bob:cn/description/objectclass/sn/uid'] | cmp sn=S True | mod desc 50 | add 50 | del 50
+n_mix          (uid=fa_bob)->[] | (objectClass=*)->[] | cmp sn=S ERR50 | mod desc 50 | add 50 | del 50
+c_noattr_ad    (uid=fa_bob)->['fa_bob'] | (objectClass=*)->['fa_bob:cn/description/objectclass/sn/uid'] | cmp sn=S True | mod desc 50 | add 0 | del 0
+c_star_ad      (uid=fa_bob)->['fa_bob'] | (objectClass=*)->['fa_bob:cn/description/objectclass/sn/uid'] | cmp sn=S True | mod desc 50 | add 0 | del 0
+c_rsc          (uid=fa_bob)->['fa_bob'] | (objectClass=*)->['fa_bob:cn/description/objectclass/sn/uid'] | cmp sn=S True | mod desc 50 | add 50 | del 50
+l_allow2       (uid=fa_bob)->['fa_bob'] | (objectClass=*)->[] | cmp sn=S True | mod desc 50 | add 50 | del 50
+l_deny2        (uid=fa_bob)->['fa_bob'] | (objectClass=*)->['fa_bob:cn/objectclass/sn/uid'] | cmp sn=S True | mod desc 50 | add 50 | del 50
+== CAND-38 absolute filters ==
+dm     (&)                        rc=2 Protocol error Bad search filter [alive]
+dm     (|)                        rc=2 Protocol error Bad search filter [alive]
+dm     (!(&))                     rc=2 Protocol error Bad search filter [alive]
+dm     (!(|))                     rc=2 Protocol error Bad search filter [alive]
+dm     (&(uid=fa_bob)(&))         rc=2 Protocol error Bad search filter [alive]
+dm     (|(uid=fa_bob)(|))         rc=2 Protocol error Bad search filter [alive]
+dm     (&(uid=fa_bob)(|(&)))      rc=2 Protocol error Bad search filter [alive]
+dm     (uid=fa_bob)               rc=0 ['uid=fa_bob'] [alive]
+anon   (&)                        rc=2 Protocol error Bad search filter [alive]
+anon   (|)                        rc=2 Protocol error Bad search filter [alive]
+anon   (!(&))                     rc=2 Protocol error Bad search filter [alive]
+anon   (!(|))                     rc=2 Protocol error Bad search filter [alive]
+anon   (&(uid=fa_bob)(&))         rc=2 Protocol error Bad search filter [alive]
+anon   (|(uid=fa_bob)(|))         rc=2 Protocol error Bad search filter [alive]
+anon   (&(uid=fa_bob)(|(&)))      rc=2 Protocol error Bad search filter [alive]
+anon   (uid=fa_bob)               rc=0 [] [alive]
+c_rsc  (&)                        rc=2 Protocol error Bad search filter [alive]
+c_rsc  (|)                        rc=2 Protocol error Bad search filter [alive]
+c_rsc  (!(&))                     rc=2 Protocol error Bad search filter [alive]
+c_rsc  (!(|))                     rc=2 Protocol error Bad search filter [alive]
+c_rsc  (&(uid=fa_bob)(&))         rc=2 Protocol error Bad search filter [alive]
+c_rsc  (|(uid=fa_bob)(|))         rc=2 Protocol error Bad search filter [alive]
+c_rsc  (&(uid=fa_bob)(|(&)))      rc=2 Protocol error Bad search filter [alive]
+c_rsc  (uid=fa_bob)               rc=0 ['uid=fa_bob'] [alive]
+assert-modify (&)        rc=12 Critical extension is unavailable 
+assert-modify (|)        rc=12 Critical extension is unavailable 
+assert-modify (sn=S)     rc=12 Critical extension is unavailable 
+assert-modify (sn=nope)  rc=12 Critical extension is unavailable 
+dm base (&) rc=2 Protocol error Bad search filter
+dm base (|) rc=2 Protocol error Bad search filter
+
+
+exit=0
+
+===== probe 26 =====
+image quay.io/389ds/dirsrv@sha256:f2851654c5df545cd893d84bea8d08c28dc25f0930493fbfed1d8a6eacf657f7
+backend 0
+aci m_uid_moddn 0 0 
+aci m_uid_moddn 1 0 
+aci m_moddn_only 0 0 
+aci m_star_moddn_plain 0 0 
+aci m_star_moddn_plain 1 0 
+aci m_uid 0 0 
+aci m_star 0 0 
+aci m_cn_denyneg_cn 0 0 
+aci m_cn_denyneg_cn 1 0 
+aci m_cn_denystar 0 0 
+aci m_cn_denystar 1 0 
+aci m_cn_denynegstar 0 0 
+aci m_cn_denynegstar 1 0 
+aci m_cn_denyall 0 0 
+aci m_cn_denyall 1 0 
+aci m_cn_denydesc 0 0 
+aci m_cn_denydesc 1 0 
+aci m_negstar_write 0 0 
+aci m_cn_denyall_tf 0 0 
+aci m_cn_denyall_tf 1 0 
+aci m_runtime 0 0 
+aci m_runtime 1 0 
+aci m_runtime 2 0 
+aci s_starlist 0 0 
+aci s_rsc 0 0 
+== modrdn ==
+m_uid_moddn          ren_del1=0 ren_sup_same=0 ren_sup_same_samerdn=0 ren_cnnew_del0=50 move_D=0 move_D_ren=0
+m_moddn_only         ren_del1=50 ren_sup_same=50 ren_sup_same_samerdn=50 ren_cnnew_del0=50 move_D=50 move_D_ren=50
+m_star_moddn_plain   ren_del1=0 ren_sup_same=0 ren_sup_same_samerdn=0 ren_cnnew_del0=0 move_D=0 move_D_ren=0
+m_uid                ren_del1=0 ren_sup_same=0 ren_sup_same_samerdn=0 ren_cnnew_del0=50 move_D=50 move_D_ren=50
+m_star               ren_del1=0 ren_sup_same=0 ren_sup_same_samerdn=0 ren_cnnew_del0=0 move_D=50 move_D_ren=50
+m_cn_denyneg_cn      ren_del1=50 ren_sup_same=50 ren_sup_same_samerdn=50 ren_cnnew_del0=0 move_D=50 move_D_ren=50
+m_cn_denystar        ren_del1=50 ren_sup_same=50 ren_sup_same_samerdn=50 ren_cnnew_del0=50 move_D=50 move_D_ren=50
+m_cn_denynegstar     ren_del1=50 ren_sup_same=50 ren_sup_same_samerdn=50 ren_cnnew_del0=0 move_D=50 move_D_ren=50
+m_cn_denyall         ren_del1=50 ren_sup_same=50 ren_sup_same_samerdn=50 ren_cnnew_del0=50 move_D=50 move_D_ren=50
+m_cn_denydesc        ren_del1=50 ren_sup_same=50 ren_sup_same_samerdn=50 ren_cnnew_del0=0 move_D=50 move_D_ren=50
+m_negstar_write      ren_del1=50 ren_sup_same=50 ren_sup_same_samerdn=50 ren_cnnew_del0=50 move_D=50 move_D_ren=50
+m_cn_denyall_tf      ren_del1=50 ren_sup_same=50 ren_sup_same_samerdn=50 ren_cnnew_del0=50 move_D=50 move_D_ren=50
+m_runtime            ren_del1=0 ren_sup_same=0 ren_sup_same_samerdn=0 ren_cnnew_del0=0 move_D=50 move_D_ren=50
+== star list ==
+s_starlist [('uid=fa_bob', ['cn', 'description', 'objectclass', 'sn', 'uid'])]
+s_rsc [('uid=fa_bob', ['cn', 'description', 'objectclass', 'sn', 'uid'])]
+== absolute filters, special bases ==
+dm base=''           (&)              rc=2 Protocol error Bad search filter
+dm base=''           (|)              rc=2 Protocol error Bad search filter
+dm base=''           (objectClass=*)  rc=0 n=1
+dm base='cn=schema'  (&)              rc=2 Protocol error Bad search filter
+dm base='cn=schema'  (|)              rc=2 Protocol error Bad search filter
+dm base='cn=schema'  (objectClass=*)  rc=0 n=1
+dm base='cn=config'  (&)              rc=2 Protocol error Bad search filter
+dm base='cn=config'  (|)              rc=2 Protocol error Bad search filter
+dm base='cn=config'  (objectClass=*)  rc=0 n=1
+anon rootdse (&) rc=2 Protocol error Bad search filter
+anon rootdse (objectClass=*) rc=0 n=1
+
+
+exit=0
+
+===== probe 27 =====
+image quay.io/389ds/dirsrv@sha256:f2851654c5df545cd893d84bea8d08c28dc25f0930493fbfed1d8a6eacf657f7
+backend 0
+== exact-target scoping: rename uid=e_old -> uid=e_oldx (del1 / del0) ==
+x_write_old              del1=0 del0=0
+x_write_new              del1=50 del0=50
+x_write_B_deny_old       del1=50 del0=50
+x_write_B_deny_new       del1=0 del0=0
+x_write_B_denyattr_new   del1=0 del0=0
+== ordering ==
+x_none   missing=50 onto_existing=68 move_missing_sup=50 move_missing_entry=50 move_into_self=53 bad_newrdn_attr=50 outside_suffix=71
+x_uid    missing=50 onto_existing=68 move_missing_sup=50 move_missing_entry=50 move_into_self=53 bad_newrdn_attr=50 outside_suffix=71
+x_star   missing=50 onto_existing=68 move_missing_sup=50 move_missing_entry=50 move_into_self=53 bad_newrdn_attr=65 outside_suffix=71
+
+
+exit=0
+
+===== probe 28 =====
+image quay.io/389ds/dirsrv@sha256:f2851654c5df545cd893d84bea8d08c28dc25f0930493fbfed1d8a6eacf657f7
+backend 0
+== no-op and case-only renames ==
+dm     noop_sup_del0    rc=0 before=[('uid=nop0dm,ou=probe-36,dc=example,dc=test', {'uid': ['nop0dm'], 'modifyTimestamp': ['20261004211746Z'], 'modifiersName': ['cn=directory manager']})] after=[('uid=nop0dm,ou=probe-36,dc=example,dc=test', {'uid': ['nop0dm'], 'modifyTimestamp': ['20261004211747Z'], 'modifiersName': ['cn=directory manager']})]
+dm     noop_sup_del1    rc=0 before=[('uid=nop1dm,ou=probe-36,dc=example,dc=test', {'uid': ['nop1dm'], 'modifyTimestamp': ['20261004211747Z'], 'modifiersName': ['cn=directory manager']})] after=[('uid=nop1dm,ou=probe-36,dc=example,dc=test', {'uid': ['nop1dm'], 'modifyTimestamp': ['20261004211748Z'], 'modifiersName': ['cn=directory manager']})]
+dm     noop_nosup_del1  rc=0 before=[('uid=nop2dm,ou=probe-36,dc=example,dc=test', {'uid': ['nop2dm'], 'modifyTimestamp': ['20261004211748Z'], 'modifiersName': ['cn=directory manager']})] after=[('uid=nop2dm,ou=probe-36,dc=example,dc=test', {'uid': ['nop2dm'], 'modifyTimestamp': ['20261004211749Z'], 'modifiersName': ['cn=directory manager']})]
+dm     case_del1        rc=0 before=[('uid=caseadm,ou=probe-36,dc=example,dc=test', {'uid': ['caseadm'], 'modifyTimestamp': ['20261004211749Z'], 'modifiersName': ['cn=directory manager']})] after=[('uid=CASEADM,ou=probe-36,dc=example,dc=test', {'uid': ['CASEADM'], 'modifyTimestamp': ['20261004211750Z'], 'modifiersName': ['cn=directory manager']})]
+dm     case_del0        rc=0 before=[('uid=casebdm,ou=probe-36,dc=example,dc=test', {'uid': ['casebdm'], 'modifyTimestamp': ['20261004211750Z'], 'modifiersName': ['cn=directory manager']})] after=[('uid=CASEBDM,ou=probe-36,dc=example,dc=test', {'uid': ['casebdm'], 'modifyTimestamp': ['20261004211751Z'], 'modifiersName': ['cn=directory manager']})]
+m_uid  noop_sup_del0    rc=0 before=[('uid=nop0muid,ou=probe-36,dc=example,dc=test', {'uid': ['nop0muid'], 'modifyTimestamp': ['20261004211751Z'], 'modifiersName': ['cn=directory manager']})] after=[('uid=nop0muid,ou=probe-36,dc=example,dc=test', {'uid': ['nop0muid'], 'modifyTimestamp': ['20261004211753Z'], 'modifiersName': ['uid=m_uid,ou=people,dc=example,dc=test']})]
+m_uid  noop_sup_del1    rc=0 before=[('uid=nop1muid,ou=probe-36,dc=example,dc=test', {'uid': ['nop1muid'], 'modifyTimestamp': ['20261004211753Z'], 'modifiersName': ['cn=directory manager']})] after=[('uid=nop1muid,ou=probe-36,dc=example,dc=test', {'uid': ['nop1muid'], 'modifyTimestamp': ['20261004211754Z'], 'modifiersName': ['uid=m_uid,ou=people,dc=example,dc=test']})]
+m_uid  noop_nosup_del1  rc=0 before=[('uid=nop2muid,ou=probe-36,dc=example,dc=test', {'uid': ['nop2muid'], 'modifyTimestamp': ['20261004211754Z'], 'modifiersName': ['cn=directory manager']})] after=[('uid=nop2muid,ou=probe-36,dc=example,dc=test', {'uid': ['nop2muid'], 'modifyTimestamp': ['20261004211755Z'], 'modifiersName': ['uid=m_uid,ou=people,dc=example,dc=test']})]
+m_uid  case_del1        rc=0 before=[('uid=caseamuid,ou=probe-36,dc=example,dc=test', {'uid': ['caseamuid'], 'modifyTimestamp': ['20261004211755Z'], 'modifiersName': ['cn=directory manager']})] after=[('uid=CASEAMUID,ou=probe-36,dc=example,dc=test', {'uid': ['CASEAMUID'], 'modifyTimestamp': ['20261004211756Z'], 'modifiersName': ['uid=m_uid,ou=people,dc=example,dc=test']})]
+m_uid  case_del0        rc=0 before=[('uid=casebmuid,ou=probe-36,dc=example,dc=test', {'uid': ['casebmuid'], 'modifyTimestamp': ['20261004211756Z'], 'modifiersName': ['cn=directory manager']})] after=[('uid=CASEBMUID,ou=probe-36,dc=example,dc=test', {'uid': ['casebmuid'], 'modifyTimestamp': ['20261004211757Z'], 'modifiersName': ['uid=m_uid,ou=people,dc=example,dc=test']})]
+== anonymous ordering ==
+anon missing 50
+anon onto_existing 68
+anon into_self 53
+anon plain 50
+== absolute filter vs critical control ==
+crit-unknown (&) rc=2 Protocol error Bad search filter
+crit-unknown (uid=o_a) rc=12 Critical extension is unavailable 
+== unknown RDN type as DM ==
+dm bad_newrdn_attr 65
+dm bad_newrdn_attr del1 68
+
+
+exit=0
+
+===== probe 29 =====
+image quay.io/389ds/dirsrv@sha256:f2851654c5df545cd893d84bea8d08c28dc25f0930493fbfed1d8a6eacf657f7
+backend 0
+del0 rc=65 after=['uid=bad0,ou=probe-36,dc=example,dc=test']
+del1 rc=68 after=['uid=bad1,ou=probe-36,dc=example,dc=test']
+after cleanup []
+base 'not a dn' (&) rc=2 Bad search filter
+base 'not a dn' (objectClass=*) rc=34 invalid dn
+base 'uid=ghost,ou=probe-36,dc=example,dc=test' (&) rc=2 Bad search filter
+base 'uid=ghost,ou=probe-36,dc=example,dc=test' (objectClass=*) rc=32 
+badcookie (&) rc=2 Bad search filter
+badcookie (objectClass=*) rc=12 Simple Paged Results Search failed
+
+
+exit=0
+
+===== script probe25.py =====
+# Oracle probe 25: CAND-36 (modrdn ACL), CAND-37 (targetattr!="*"), CAND-38 (absolute filters),
+# DSL multi-element targetattr lists. Runs a throwaway pinned 389 container; inner script uses python-ldap.
+import subprocess as sp, time, secrets, sys
+ref=open(sys.argv[1]).read().strip()
+pw=secrets.token_hex(16); n='muse-probe25-'+secrets.token_hex(3)
+sp.run(['docker','run','-d','--name',n,'-e','DS_DM_PASSWORD='+pw,'-v','/data',ref],stdout=sp.DEVNULL,check=True)
+try:
+  for i in range(600):
+    l=sp.run(['docker','logs',n],capture_output=True,text=True)
+    if '389-ds-container started.' in l.stdout+l.stderr: break
+    time.sleep(0.5)
+  print('image',ref)
+  r=sp.run(['docker','exec',n,'dsconf','localhost','backend','create','--suffix','dc=example,dc=test','--be-name','userroot','--create-suffix'],capture_output=True,text=True); print('backend',r.returncode)
+  sp.run(['docker','cp','probe25_inner.py',n+':/tmp/p.py'],check=True)
+  r=sp.run(['docker','exec','-e','DMPW='+pw,n,'python3','/tmp/p.py'],capture_output=True,text=True)
+  print(r.stdout); print(r.stderr[-3000:])
+finally:
+  sp.run(['docker','rm','-f','-v',n],capture_output=True)
+
+===== script probe25_inner.py =====
+import ldap, ldap.modlist, os
+from ldap.controls import LDAPControl
+U='ldap://127.0.0.1:3389'; S='dc=example,dc=test'; B='ou=probe-36,'+S; D='ou=dest,'+S; P='ou=people,'+S
+dmpw=os.environ['DMPW']
+def conn(dn=None,pw=None):
+  c=ldap.initialize(U); c.protocol_version=3; c.set_option(ldap.OPT_REFERRALS,0)
+  if dn: c.simple_bind_s(dn,pw)
+  return c
+dm=conn('cn=Directory Manager',dmpw)
+def who(s): return f'uid={s},{P}'
+def pwd(s): return f'Probe-Pw-{s}-1'
+def rc(f):
+  try: f(); return 0, ''
+  except ldap.LDAPError as e:
+    d=e.args[0] if e.args else {}
+    return d.get('result', -1), (d.get('desc','')+' '+d.get('info','')).strip()[:90]
+print('moddn-aci', dm.search_s('cn=config',ldap.SCOPE_BASE,'(objectClass=*)',['nsslapd-moddn-aci'])[0][1])
+dm.add_s(P,[('objectClass',[b'organizationalUnit']),('ou',[b'people'])])
+dm.add_s(B,[('objectClass',[b'organizationalUnit']),('ou',[b'probe-36'])])
+dm.add_s(D,[('objectClass',[b'organizationalUnit']),('ou',[b'dest'])])
+RSC='read,search,compare'
+A={ # subject: list of (base, targetattr clause, perms or DENY...)
+ # CAND-36
+ 'w_uid':[(B,'(targetattr="uid")','write')],
+ 'w_cn':[(B,'(targetattr="cn")','write')],
+ 'w_star':[(B,'(targetattr="*")','write')],
+ 'w_star_deny_desc':[(B,'(targetattr="*")','write'),(B,'(targetattr="description")','DENYwrite')],
+ 'w_star_deny_desclang':[(B,'(targetattr="*")','write'),(B,'(targetattr="description;lang-en")','DENYwrite')],
+ 'w_star_deny_uid':[(B,'(targetattr="*")','write'),(B,'(targetattr="uid")','DENYwrite')],
+ 'w_noattr':[(B,'','write')],
+ 'w_uid_addB':[(B,'(targetattr="uid")','write'),(B,'','add')],
+ 'w_uidopt':[(B,'(targetattr="uid;x-test")','write')],
+ 'w_uid_cn':[(B,'(targetattr="uid || cn")','write')],
+ 'w_uid_addD':[(B,'(targetattr="uid")','write'),(D,'','add')],
+ 'w_uid_exim':[(B,'(targetattr="uid")','write'),(B,'','export'),(D,'','import')],
+ 'w_exim':[(B,'','export'),(D,'','import')],
+ 'w_uid_ex':[(B,'(targetattr="uid")','write'),(B,'','export')],
+ 'w_uid_im':[(B,'(targetattr="uid")','write'),(D,'','import')],
+ 'w_star_exim_deny_desc':[(B,'(targetattr="*")','write'),(B,'','export'),(D,'','import'),(B,'(targetattr="description")','DENYwrite'),(D,'(targetattr="description")','DENYwrite')],
+ 'w_uid_denyall':[(B,'(targetattr="uid")','write'),(B,'','DENYwrite')],
+ 'w_uid_denyadd':[(B,'(targetattr="uid")','write'),(B,'','DENYadd')],
+ 'w_uid_denyread':[(B,'(targetattr="uid")','write'),(B,'(targetattr="*")','DENYread,search,compare')],
+ # CAND-37
+ 'n_rsc':[(B,'(targetattr!="*")',RSC)],
+ 'n_deny':[(B,'(targetattr="*")',RSC),(B,'(targetattr!="*")','DENY'+RSC)],
+ 'n_write':[(B,'(targetattr="*")',RSC),(B,'(targetattr!="*")','write')],
+ 'n_ad':[(B,'(targetattr="*")',RSC),(B,'(targetattr!="*")','add,delete')],
+ 'n_deny_ad':[(B,'(targetattr="*")',RSC+',add,delete'),(B,'(targetattr!="*")','DENYadd,delete')],
+ 'n_mix':[(B,'(targetattr!="* || sn")',RSC)],
+ 'c_noattr_ad':[(B,'(targetattr="*")',RSC),(B,'','add,delete')],
+ 'c_star_ad':[(B,'(targetattr="*")',RSC),(B,'(targetattr="*")','add,delete')],
+ 'c_rsc':[(B,'(targetattr="*")',RSC)],
+ # DSL multi-element
+ 'l_allow2':[(B,'(targetattr="uid || sn")',RSC)],
+ 'l_deny2':[(B,'(targetattr!="userPassword || description")',RSC)],
+}
+for s in A:
+  dm.add_s(who(s),[('objectClass',[b'inetOrgPerson']),('uid',[s.encode()]),('cn',[s.encode()]),('sn',[b'S']),('userPassword',[pwd(s).encode()])])
+for i,(s,lst) in enumerate(A.items()):
+  for k,(base,ta,perm) in enumerate(lst):
+    act='deny ('+perm[4:]+')' if perm.startswith('DENY') else 'allow ('+perm+')'
+    t=f'(target="ldap:///{base}"){ta}(version 3.0; acl "p25:{s}-{k}"; {act} userdn="ldap:///{who(s)}";)'
+    r=rc(lambda: dm.modify_s(base,[(ldap.MOD_ADD,'aci',[t.encode()])]))
+    if r[0]!=0: print('ACI ADD',s,k,ta,perm,r)
+def mkent(base,uid,extra=()):
+  dn=f'uid={uid},{base}'
+  rc(lambda: dm.delete_s(dn))
+  dm.add_s(dn,[('objectClass',[b'inetOrgPerson']),('uid',[uid.encode()]),('cn',[uid.encode()]),('sn',[b'S']),('description',[b'd'])]+list(extra))
+  return dn
+print('== CAND-36 modrdn ==')
+subs36=[s for s in A if s.startswith('w_')]
+ops=[('ren_del1',lambda dn,u:(f'uid={u}x',None,1)),('ren_del0',lambda dn,u:(f'uid={u}x',None,0)),
+     ('ren_cn_del1',lambda dn,u:(f'cn={u}',None,1)),('ren_cnnew_del0',lambda dn,u:(f'cn={u}new',None,0)),
+     ('move',lambda dn,u:(f'uid={u}',D,0)),('move_ren',lambda dn,u:(f'uid={u}y',D,1))]
+for s in subs36:
+  out=[]
+  for j,(name,f) in enumerate(ops):
+    u=f'm{j}{s}'
+    dn=mkent(B,u,[('uid;x-test',[b't'])] if 'uidopt' in s else [])
+    newrdn,sup,dold=f(dn,u)
+    c=conn(who(s),pwd(s))
+    r=rc(lambda: c.rename_s(dn,newrdn,sup,dold))
+    c.unbind_s()
+    out.append(f'{name}={r[0]}')
+    # cleanup
+    for d in [dn, f'{newrdn},{sup or B}']: rc(lambda: dm.delete_s(d))
+  print(f'{s:24}',' '.join(out))
+print('== CAND-37 targetattr!="*" ==')
+fb=mkent(B,'fa_bob')
+for s in [s for s in A if s[0] in 'ncl']:
+  c=conn(who(s),pwd(s))
+  res=[]
+  def srch(flt,attrs=None):
+    try:
+      r=c.search_s(B,ldap.SCOPE_ONELEVEL,flt,attrs)
+      return sorted(dn.split(',')[0][4:]+(':'+'/'.join(sorted(a.lower() for a in at)) if attrs is None else '') for dn,at in r)
+    except ldap.LDAPError as e: return 'ERR'+str(e.args[0].get('result'))
+  res.append(f'(uid=fa_bob)->{srch("(uid=fa_bob)",["1.1"])}')
+  res.append(f'(objectClass=*)->{srch("(objectClass=*)")}')
+  r=rc(lambda: c.compare_s(fb,'sn','S')); 
+  try: res.append('cmp sn=S '+str(c.compare_s(fb,'sn','S')))
+  except ldap.LDAPError as e: res.append('cmp sn=S ERR'+str(e.args[0].get('result')))
+  res.append('mod desc '+str(rc(lambda: c.modify_s(fb,[(ldap.MOD_REPLACE,'description',[b'x'])]))[0]))
+  child=f'uid=k_{s},{B}'
+  res.append('add '+str(rc(lambda: c.add_s(child,[('objectClass',[b'inetOrgPerson']),('uid',[('k_'+s).encode()]),('cn',[b'k']),('sn',[b'S'])]))[0]))
+  victim=mkent(B,'v_'+s)
+  res.append('del '+str(rc(lambda: c.delete_s(victim))[0]))
+  rc(lambda: dm.delete_s(child)); rc(lambda: dm.delete_s(victim))
+  c.unbind_s()
+  print(f'{s:14}',' | '.join(res))
+print('== CAND-38 absolute filters ==')
+anon=conn()
+for label,c in [('dm',dm),('anon',anon),('c_rsc',conn(who('c_rsc'),pwd('c_rsc')))]:
+  for flt in ['(&)','(|)','(!(&))','(!(|))','(&(uid=fa_bob)(&))','(|(uid=fa_bob)(|))','(&(uid=fa_bob)(|(&)))','(uid=fa_bob)']:
+    try:
+      r=c.search_s(B,ldap.SCOPE_ONELEVEL,flt,['1.1']); out='rc=0 '+str(sorted(d.split(',')[0] for d,_ in r))
+    except ldap.LDAPError as e:
+      d=e.args[0]; out=f"rc={d.get('result')} {d.get('desc')} {d.get('info','')}"
+    # does the connection survive?
+    try: c.search_s(fb,ldap.SCOPE_BASE,'(objectClass=*)',['1.1']); alive='alive'
+    except ldap.LDAPError as e: alive='DEAD '+str(e.args[0].get('desc'))
+    print(f'{label:6} {flt:26} {out} [{alive}]')
+    if alive!='alive':
+      c = dm if label!='dm' else None
+      if label=='dm': dm=conn('cn=Directory Manager',dmpw); c=dm
+      elif label=='anon': c=conn()
+      else: c=conn(who('c_rsc'),pwd('c_rsc'))
+# assertion control and base-scope
+for flt in ['(&)','(|)','(sn=S)','(sn=nope)']:
+  ctrl=LDAPControl('1.3.6.1.1.12',True,None)
+  import ldap.filter
+  from pyasn1.codec.ber import encoder
+  # encode assertion filter via ldap.controls helper
+  from ldap.controls import simple
+  try:
+    from ldap.controls.libldap import AssertionControl
+    actrl=AssertionControl(True,flt)
+    dm.modify_ext_s(fb,[(ldap.MOD_REPLACE,'description',[b'a'])],serverctrls=[actrl]); out='rc=0'
+  except ldap.LDAPError as e:
+    d=e.args[0]; out=f"rc={d.get('result')} {d.get('desc')} {d.get('info','')}"
+  except Exception as e: out='EXC '+repr(e)[:100]
+  print(f'assert-modify {flt:10} {out}')
+for flt in ['(&)','(|)']:
+  try:
+    r=dm.search_s(fb,ldap.SCOPE_BASE,flt,['1.1']); out='rc=0 '+str(len(r))
+  except ldap.LDAPError as e:
+    d=e.args[0]; out=f"rc={d.get('result')} {d.get('desc')} {d.get('info','')}"
+  print(f'dm base {flt} {out}')
+
+===== script probe26.py =====
+# Oracle probe 26: follow-up to probe 25 (moddn right, same-parent newSuperior, entry-level denies on modrdn, star lists, absolute filters on rootDSE/schema).
+# DSL multi-element targetattr lists. Runs a throwaway pinned 389 container; inner script uses python-ldap.
+import subprocess as sp, time, secrets, sys
+ref=open(sys.argv[1]).read().strip()
+pw=secrets.token_hex(16); n='muse-probe26-'+secrets.token_hex(3)
+sp.run(['docker','run','-d','--name',n,'-e','DS_DM_PASSWORD='+pw,'-v','/data',ref],stdout=sp.DEVNULL,check=True)
+try:
+  for i in range(600):
+    l=sp.run(['docker','logs',n],capture_output=True,text=True)
+    if '389-ds-container started.' in l.stdout+l.stderr: break
+    time.sleep(0.5)
+  print('image',ref)
+  r=sp.run(['docker','exec',n,'dsconf','localhost','backend','create','--suffix','dc=example,dc=test','--be-name','userroot','--create-suffix'],capture_output=True,text=True); print('backend',r.returncode)
+  sp.run(['docker','cp','probe26_inner.py',n+':/tmp/p.py'],check=True)
+  r=sp.run(['docker','exec','-e','DMPW='+pw,n,'python3','/tmp/p.py'],capture_output=True,text=True)
+  print(r.stdout); print(r.stderr[-3000:])
+finally:
+  sp.run(['docker','rm','-f','-v',n],capture_output=True)
+
+===== script probe26_inner.py =====
+import ldap, os
+U='ldap://127.0.0.1:3389'; S='dc=example,dc=test'; B='ou=probe-36,'+S; D='ou=dest,'+S; P='ou=people,'+S; G='ou=groups,'+S
+dmpw=os.environ['DMPW']
+def conn(dn=None,pw=None):
+  c=ldap.initialize(U); c.protocol_version=3; c.set_option(ldap.OPT_REFERRALS,0)
+  if dn: c.simple_bind_s(dn,pw)
+  return c
+dm=conn('cn=Directory Manager',dmpw)
+def who(s): return f'uid={s},{P}'
+def pwd(s): return f'Probe-Pw-{s}-1'
+def rc(f):
+  try: f(); return 0, ''
+  except ldap.LDAPError as e:
+    d=e.args[0] if e.args else {}
+    return d.get('result', -1), (d.get('desc','')+' '+d.get('info','')).strip()[:120]
+for dn,ou in [(P,'people'),(B,'probe-36'),(D,'dest'),(G,'groups')]:
+  dm.add_s(dn,[('objectClass',[b'organizationalUnit']),('ou',[ou.encode()])])
+RSC='read,search,compare'
+def T(b): return f'(target="ldap:///{b}")'
+A={
+ 'm_uid_moddn':[(B,T(B)+'(targetattr="uid")','write'),(S,f'(target_from="ldap:///{B}")(target_to="ldap:///{D}")','moddn')],
+ 'm_moddn_only':[(S,f'(target_from="ldap:///{B}")(target_to="ldap:///{D}")','moddn')],
+ 'm_star_moddn_plain':[(B,T(B)+'(targetattr="*")','write'),(S,'','moddn')],
+ 'm_uid':[(B,T(B)+'(targetattr="uid")','write')],
+ 'm_star':[(B,T(B)+'(targetattr="*")','write')],
+ 'm_cn_denyneg_cn':[(B,T(B)+'(targetattr="cn")','write'),(B,T(B)+'(targetattr!="cn")','DENYwrite')],
+ 'm_cn_denystar':[(B,T(B)+'(targetattr="cn")','write'),(B,T(B)+'(targetattr="*")','DENYwrite')],
+ 'm_cn_denynegstar':[(B,T(B)+'(targetattr="cn")','write'),(B,T(B)+'(targetattr!="*")','DENYwrite')],
+ 'm_cn_denyall':[(B,T(B)+'(targetattr="cn")','write'),(B,T(B),'DENYwrite')],
+ 'm_cn_denydesc':[(B,T(B)+'(targetattr="cn")','write'),(B,T(B)+'(targetattr="description")','DENYwrite')],
+ 'm_negstar_write':[(B,T(B)+'(targetattr!="*")','write')],
+ 'm_cn_denyall_tf':[(B,T(B)+'(targetattr="cn")','write'),(B,T(B)+'(targetfilter="(sn=S)")','DENYwrite')],
+ 'm_runtime':[(P,T(P)+'(targetattr!="aci")','add,delete,write,read,search,compare'),(G,T(G)+'(targetattr!="aci")','add,delete,write,read,search,compare'),(S,T(S)+'(targetattr!="userPassword")',RSC)],
+ 's_starlist':[(B,T(B)+'(targetattr="* || sn")',RSC)],
+ 's_rsc':[(B,T(B)+'(targetattr="*")',RSC)],
+}
+for s in A:
+  dm.add_s(who(s),[('objectClass',[b'inetOrgPerson']),('uid',[s.encode()]),('cn',[s.encode()]),('sn',[b'S']),('userPassword',[pwd(s).encode()])])
+for s,lst in A.items():
+  for k,(base,ta,perm) in enumerate(lst):
+    act='deny ('+perm[4:]+')' if perm.startswith('DENY') else 'allow ('+perm+')'
+    t=f'{ta}(version 3.0; acl "p26:{s}-{k}"; {act} userdn="ldap:///{who(s)}";)'
+    r=rc(lambda: dm.modify_s(base,[(ldap.MOD_ADD,'aci',[t.encode()])]))
+    print('aci',s,k,r[0],r[1][:80] if r[0] else '')
+def mkent(base,uid):
+  dn=f'uid={uid},{base}'
+  rc(lambda: dm.delete_s(dn))
+  dm.add_s(dn,[('objectClass',[b'inetOrgPerson']),('uid',[uid.encode()]),('cn',[uid.encode()]),('sn',[b'S']),('description',[b'd'])])
+  return dn
+print('== modrdn ==')
+ops=[('ren_del1',lambda b,u:(f'uid={u}x',None,1)),('ren_sup_same',lambda b,u:(f'uid={u}x',b,1)),('ren_sup_same_samerdn',lambda b,u:(f'uid={u}',b,0)),
+     ('ren_cnnew_del0',lambda b,u:(f'cn={u}new',None,0)),('move_D',lambda b,u:(f'uid={u}',D,0)),('move_D_ren',lambda b,u:(f'uid={u}y',D,1))]
+for s in A:
+  if not s.startswith('m_'): continue
+  base = P if s=='m_runtime' else B
+  out=[]
+  for j,(name,f) in enumerate(ops):
+    u=f'r{j}{s}'.replace('_','')
+    dn=mkent(base,u)
+    newrdn,sup,dold=f(base,u)
+    if s=='m_runtime' and name.startswith('move'): sup=G
+    c=conn(who(s),pwd(s))
+    r=rc(lambda: c.rename_s(dn,newrdn,sup,dold))
+    c.unbind_s()
+    out.append(f'{name}={r[0]}')
+    for d in [dn, f'{newrdn},{sup or base}']: rc(lambda: dm.delete_s(d))
+  print(f'{s:20}',' '.join(out))
+print('== star list ==')
+fb=mkent(B,'fa_bob')
+for s in ['s_starlist','s_rsc']:
+  c=conn(who(s),pwd(s))
+  try:
+    r=c.search_s(B,ldap.SCOPE_ONELEVEL,'(uid=fa_bob)'); print(s, sorted((d.split(',')[0], sorted(a.lower() for a in at)) for d,at in r))
+  except ldap.LDAPError as e: print(s,'ERR',e.args[0].get('result'))
+print('== absolute filters, special bases ==')
+for base,scope in [('',ldap.SCOPE_BASE),('cn=schema',ldap.SCOPE_BASE),('cn=config',ldap.SCOPE_BASE)]:
+  for flt in ['(&)','(|)','(objectClass=*)']:
+    try: r=dm.search_s(base,scope,flt,['1.1']); out=f'rc=0 n={len(r)}'
+    except ldap.LDAPError as e: d=e.args[0]; out=f"rc={d.get('result')} {d.get('desc')} {d.get('info','')}"
+    print(f'dm base={base!r:12} {flt:16} {out}')
+anon=conn()
+for flt in ['(&)','(objectClass=*)']:
+  try: r=anon.search_s('',ldap.SCOPE_BASE,flt,['1.1']); out=f'rc=0 n={len(r)}'
+  except ldap.LDAPError as e: d=e.args[0]; out=f"rc={d.get('result')} {d.get('desc')} {d.get('info','')}"
+  print(f'anon rootdse {flt} {out}')
+
+===== script probe27.py =====
+# Oracle probe 27: modrdn ACL target scoping (exact entry DN targets) and result-code ordering.
+# DSL multi-element targetattr lists. Runs a throwaway pinned 389 container; inner script uses python-ldap.
+import subprocess as sp, time, secrets, sys
+ref=open(sys.argv[1]).read().strip()
+pw=secrets.token_hex(16); n='muse-probe27-'+secrets.token_hex(3)
+sp.run(['docker','run','-d','--name',n,'-e','DS_DM_PASSWORD='+pw,'-v','/data',ref],stdout=sp.DEVNULL,check=True)
+try:
+  for i in range(600):
+    l=sp.run(['docker','logs',n],capture_output=True,text=True)
+    if '389-ds-container started.' in l.stdout+l.stderr: break
+    time.sleep(0.5)
+  print('image',ref)
+  r=sp.run(['docker','exec',n,'dsconf','localhost','backend','create','--suffix','dc=example,dc=test','--be-name','userroot','--create-suffix'],capture_output=True,text=True); print('backend',r.returncode)
+  sp.run(['docker','cp','probe27_inner.py',n+':/tmp/p.py'],check=True)
+  r=sp.run(['docker','exec','-e','DMPW='+pw,n,'python3','/tmp/p.py'],capture_output=True,text=True)
+  print(r.stdout); print(r.stderr[-3000:])
+finally:
+  sp.run(['docker','rm','-f','-v',n],capture_output=True)
+
+===== script probe27_inner.py =====
+import ldap, os
+U='ldap://127.0.0.1:3389'; S='dc=example,dc=test'; B='ou=probe-36,'+S; D='ou=dest,'+S; P='ou=people,'+S
+dmpw=os.environ['DMPW']
+def conn(dn=None,pw=None):
+  c=ldap.initialize(U); c.protocol_version=3; c.set_option(ldap.OPT_REFERRALS,0)
+  if dn: c.simple_bind_s(dn,pw)
+  return c
+dm=conn('cn=Directory Manager',dmpw)
+def who(s): return f'uid={s},{P}'
+def pwd(s): return f'Probe-Pw-{s}-1'
+def rc(f):
+  try: f(); return 0
+  except ldap.LDAPError as e:
+    d=e.args[0] if e.args else {}
+    return d.get('result', -1)
+for dn,ou in [(P,'people'),(B,'probe-36'),(D,'dest')]:
+  dm.add_s(dn,[('objectClass',[b'organizationalUnit']),('ou',[ou.encode()])])
+def mkent(base,uid):
+  dn=f'uid={uid},{base}'; rc(lambda: dm.delete_s(dn))
+  dm.add_s(dn,[('objectClass',[b'inetOrgPerson']),('uid',[uid.encode()]),('cn',[uid.encode()]),('sn',[b'S'])]); return dn
+OLD='uid=e_old,'+B; NEW='uid=e_oldx,'+B
+def T(b): return f'(target="ldap:///{b}")'
+A={
+ 'x_write_old':[(B,T(OLD)+'(targetattr="uid")','write')],
+ 'x_write_new':[(B,T(NEW)+'(targetattr="uid")','write')],
+ 'x_write_B_deny_old':[(B,T(B)+'(targetattr="uid")','write'),(B,T(OLD),'DENYwrite')],
+ 'x_write_B_deny_new':[(B,T(B)+'(targetattr="uid")','write'),(B,T(NEW),'DENYwrite')],
+ 'x_write_B_denyattr_new':[(B,T(B)+'(targetattr="uid")','write'),(B,T(NEW)+'(targetattr="uid")','DENYwrite')],
+ 'x_none':[(B,T(B)+'(targetattr="*")','read,search,compare')],
+ 'x_uid':[(B,T(B)+'(targetattr="uid")','write')],
+ 'x_star':[(B,T(B)+'(targetattr="*")','write,read,search,compare')],
+}
+for s in A:
+  dm.add_s(who(s),[('objectClass',[b'inetOrgPerson']),('uid',[s.encode()]),('cn',[s.encode()]),('sn',[b'S']),('userPassword',[pwd(s).encode()])])
+for s,lst in A.items():
+  for k,(base,ta,perm) in enumerate(lst):
+    act='deny ('+perm[4:]+')' if perm.startswith('DENY') else 'allow ('+perm+')'
+    t=f'{ta}(version 3.0; acl "p27:{s}-{k}"; {act} userdn="ldap:///{who(s)}";)'
+    r=rc(lambda: dm.modify_s(base,[(ldap.MOD_ADD,'aci',[t.encode()])]))
+    if r: print('aci fail',s,k,r)
+print('== exact-target scoping: rename uid=e_old -> uid=e_oldx (del1 / del0) ==')
+for s in [s for s in A if s.startswith('x_write')]:
+  res=[]
+  for dold in (1,0):
+    mkent(B,'e_old'); rc(lambda: dm.delete_s(NEW))
+    c=conn(who(s),pwd(s)); res.append(f'del{dold}={rc(lambda: c.rename_s(OLD,"uid=e_oldx",None,dold))}'); c.unbind_s()
+    rc(lambda: dm.delete_s(OLD)); rc(lambda: dm.delete_s(NEW))
+  print(f'{s:24}',' '.join(res))
+print('== ordering ==')
+mkent(B,'o_a'); mkent(B,'o_b')
+for s in ['x_none','x_uid','x_star']:
+  c=conn(who(s),pwd(s)); out=[]
+  out.append('missing='+str(rc(lambda: c.rename_s('uid=ghost,'+B,'uid=ghost2',None,1))))
+  out.append('onto_existing='+str(rc(lambda: c.rename_s('uid=o_a,'+B,'uid=o_b',None,1))))
+  out.append('move_missing_sup='+str(rc(lambda: c.rename_s('uid=o_a,'+B,'uid=o_a','ou=nope,'+S,0))))
+  out.append('move_missing_entry='+str(rc(lambda: c.rename_s('uid=ghost,'+B,'uid=ghost',D,0))))
+  out.append('move_into_self='+str(rc(lambda: c.rename_s(B,'ou=probe-36','uid=o_a,'+B,0))))
+  out.append('bad_newrdn_attr='+str(rc(lambda: c.rename_s('uid=o_a,'+B,'nosuchattr=x',None,0))))
+  out.append('outside_suffix='+str(rc(lambda: c.rename_s('uid=o_a,'+B,'uid=o_a','ou=x,dc=other',0))))
+  c.unbind_s(); print(f'{s:8}',' '.join(out))
+
+===== script probe28.py =====
+# Oracle probe 28: no-op and case-only renames, anonymous modrdn ordering, absolute filter vs critical control order, unknown RDN type as DM.
+# DSL multi-element targetattr lists. Runs a throwaway pinned 389 container; inner script uses python-ldap.
+import subprocess as sp, time, secrets, sys
+ref=open(sys.argv[1]).read().strip()
+pw=secrets.token_hex(16); n='muse-probe28-'+secrets.token_hex(3)
+sp.run(['docker','run','-d','--name',n,'-e','DS_DM_PASSWORD='+pw,'-v','/data',ref],stdout=sp.DEVNULL,check=True)
+try:
+  for i in range(600):
+    l=sp.run(['docker','logs',n],capture_output=True,text=True)
+    if '389-ds-container started.' in l.stdout+l.stderr: break
+    time.sleep(0.5)
+  print('image',ref)
+  r=sp.run(['docker','exec',n,'dsconf','localhost','backend','create','--suffix','dc=example,dc=test','--be-name','userroot','--create-suffix'],capture_output=True,text=True); print('backend',r.returncode)
+  sp.run(['docker','cp','probe28_inner.py',n+':/tmp/p.py'],check=True)
+  r=sp.run(['docker','exec','-e','DMPW='+pw,n,'python3','/tmp/p.py'],capture_output=True,text=True)
+  print(r.stdout); print(r.stderr[-3000:])
+finally:
+  sp.run(['docker','rm','-f','-v',n],capture_output=True)
+
+===== script probe28_inner.py =====
+import ldap, os, time
+from ldap.controls import LDAPControl
+U='ldap://127.0.0.1:3389'; S='dc=example,dc=test'; B='ou=probe-36,'+S; P='ou=people,'+S
+dmpw=os.environ['DMPW']
+def conn(dn=None,pw=None):
+  c=ldap.initialize(U); c.protocol_version=3; c.set_option(ldap.OPT_REFERRALS,0)
+  if dn: c.simple_bind_s(dn,pw)
+  return c
+dm=conn('cn=Directory Manager',dmpw)
+def who(s): return f'uid={s},{P}'
+def pwd(s): return f'Probe-Pw-{s}-1'
+def rc(f):
+  try: f(); return 0
+  except ldap.LDAPError as e:
+    d=e.args[0] if e.args else {}
+    return d.get('result', -1)
+for dn,ou in [(P,'people'),(B,'probe-36')]:
+  dm.add_s(dn,[('objectClass',[b'organizationalUnit']),('ou',[ou.encode()])])
+dm.add_s(who('m_uid'),[('objectClass',[b'inetOrgPerson']),('uid',[b'm_uid']),('cn',[b'm']),('sn',[b'S']),('userPassword',[pwd('m_uid').encode()])])
+dm.modify_s(B,[(ldap.MOD_ADD,'aci',[f'(target="ldap:///{B}")(targetattr="uid")(version 3.0; acl "p28"; allow (write) userdn="ldap:///{who("m_uid")}";)'.encode()])])
+dm.modify_s(B,[(ldap.MOD_ADD,'aci',[f'(target="ldap:///{B}")(targetattr="*")(version 3.0; acl "p28r"; allow (read,search,compare) userdn="ldap:///anyone";)'.encode()])])
+def mk(uid):
+  dn=f'uid={uid},{B}'; rc(lambda: dm.delete_s(dn))
+  dm.add_s(dn,[('objectClass',[b'inetOrgPerson']),('uid',[uid.encode()]),('cn',[b'c']),('sn',[b'S'])]); return dn
+def show(base):
+  try:
+    r=dm.search_s(B,ldap.SCOPE_ONELEVEL,'(uid=*)',['uid','modifyTimestamp','modifiersName'])
+    return [(d,{k:[v.decode() for v in vs] for k,vs in a.items()}) for d,a in r if base.lower() in d.lower()]
+  except ldap.LDAPError as e: return 'ERR'
+print('== no-op and case-only renames ==')
+for who_,c in [('dm',dm),('m_uid',conn(who('m_uid'),pwd('m_uid')))]:
+  for label,uid,newrdn,sup,dold in [('noop_sup_del0','nop0','uid=nop0'+'',B,0),('noop_sup_del1','nop1','uid=nop1',B,1),('noop_nosup_del1','nop2','uid=nop2',None,1),
+                                    ('case_del1','casea','uid=CASEA',None,1),('case_del0','caseb','uid=CASEB',None,0)]:
+    u=uid+who_.replace('_','')
+    nr=newrdn.replace(uid,u).replace(uid.upper(),u.upper())
+    dn=mk(u); before=show(u); time.sleep(1.1)
+    r=rc(lambda: c.rename_s(dn,nr,sup,dold))
+    after=show(u)
+    print(f'{who_:6} {label:16} rc={r} before={before} after={after}')
+    rc(lambda: dm.delete_s(dn)); rc(lambda: dm.delete_s(f'{nr},{B}'))
+print('== anonymous ordering ==')
+mk('o_a'); mk('o_b')
+an=conn()
+print('anon missing', rc(lambda: an.rename_s('uid=ghost,'+B,'uid=ghost2',None,1)))
+print('anon onto_existing', rc(lambda: an.rename_s('uid=o_a,'+B,'uid=o_b',None,1)))
+print('anon into_self', rc(lambda: an.rename_s(B,'ou=probe-36','uid=o_a,'+B,0)))
+print('anon plain', rc(lambda: an.rename_s('uid=o_a,'+B,'uid=o_c',None,1)))
+print('== absolute filter vs critical control ==')
+unk=LDAPControl('1.3.6.1.4.1.99999.1',True,None)
+for flt in ['(&)','(uid=o_a)']:
+  try: r=dm.search_ext_s(B,ldap.SCOPE_ONELEVEL,flt,['1.1'],serverctrls=[unk]); out='rc=0'
+  except ldap.LDAPError as e: d=e.args[0]; out=f"rc={d.get('result')} {d.get('desc')} {d.get('info','')}"
+  print('crit-unknown', flt, out)
+print('== unknown RDN type as DM ==')
+print('dm bad_newrdn_attr', rc(lambda: dm.rename_s('uid=o_a,'+B,'nosuchattr=x',None,0)))
+print('dm bad_newrdn_attr del1', rc(lambda: dm.rename_s('uid=o_a,'+B,'nosuchattr=x',None,1)))
+
+===== script probe29.py =====
+# Oracle probe 29: unknown RDN type on a fresh entry (does a 65 commit?), (&) vs invalid base DN and bad paged cookie.
+# DSL multi-element targetattr lists. Runs a throwaway pinned 389 container; inner script uses python-ldap.
+import subprocess as sp, time, secrets, sys
+ref=open(sys.argv[1]).read().strip()
+pw=secrets.token_hex(16); n='muse-probe29-'+secrets.token_hex(3)
+sp.run(['docker','run','-d','--name',n,'-e','DS_DM_PASSWORD='+pw,'-v','/data',ref],stdout=sp.DEVNULL,check=True)
+try:
+  for i in range(600):
+    l=sp.run(['docker','logs',n],capture_output=True,text=True)
+    if '389-ds-container started.' in l.stdout+l.stderr: break
+    time.sleep(0.5)
+  print('image',ref)
+  r=sp.run(['docker','exec',n,'dsconf','localhost','backend','create','--suffix','dc=example,dc=test','--be-name','userroot','--create-suffix'],capture_output=True,text=True); print('backend',r.returncode)
+  sp.run(['docker','cp','probe29_inner.py',n+':/tmp/p.py'],check=True)
+  r=sp.run(['docker','exec','-e','DMPW='+pw,n,'python3','/tmp/p.py'],capture_output=True,text=True)
+  print(r.stdout); print(r.stderr[-3000:])
+finally:
+  sp.run(['docker','rm','-f','-v',n],capture_output=True)
+
+===== script probe29_inner.py =====
+import ldap, os
+from ldap.controls import SimplePagedResultsControl
+U='ldap://127.0.0.1:3389'; S='dc=example,dc=test'; B='ou=probe-36,'+S
+dm=ldap.initialize(U); dm.protocol_version=3; dm.simple_bind_s('cn=Directory Manager',os.environ['DMPW'])
+dm.add_s(B,[('objectClass',[b'organizationalUnit']),('ou',[b'probe-36'])])
+def mk(u):
+  dn=f'uid={u},{B}'; dm.add_s(dn,[('objectClass',[b'inetOrgPerson']),('uid',[u.encode()]),('cn',[b'c']),('sn',[b'S'])]); return dn
+def rc(f):
+  try: f(); return 0
+  except ldap.LDAPError as e: return e.args[0].get('result')
+def listing(): return sorted(d for d,_ in dm.search_s(B,ldap.SCOPE_ONELEVEL,'(objectClass=*)',['1.1']))
+for dold in (0,1):
+  dn=mk(f'bad{dold}')
+  print(f'del{dold} rc={rc(lambda: dm.rename_s(dn,"nosuchattr=x",None,dold))} after={listing()}')
+  rc(lambda: dm.delete_s(dn)); rc(lambda: dm.delete_s('nosuchattr=x,'+B))
+print('after cleanup', listing())
+for base,flt in [('not a dn','(&)'),('not a dn','(objectClass=*)'),('uid=ghost,'+B,'(&)'),('uid=ghost,'+B,'(objectClass=*)')]:
+  try: dm.search_s(base,ldap.SCOPE_BASE,flt,['1.1']); out='rc=0'
+  except ldap.LDAPError as e: d=e.args[0]; out=f"rc={d.get('result')} {d.get('info','')}"
+  print('base',repr(base),flt,out)
+for flt in ['(&)','(objectClass=*)']:
+  c=SimplePagedResultsControl(True,size=10,cookie=b'garbage-cookie')
+  try: dm.search_ext_s(B,ldap.SCOPE_ONELEVEL,flt,['1.1'],serverctrls=[c]); out='rc=0'
+  except ldap.LDAPError as e: d=e.args[0]; out=f"rc={d.get('result')} {d.get('info','')}"
+  print('badcookie',flt,out)

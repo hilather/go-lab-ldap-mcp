@@ -263,8 +263,8 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "allow": { "type": "array", "items": { "type": "string" } },
-            "deny": { "type": "array", "items": { "type": "string" } }
+            "allow": { "type": "array", "maxItems": 64, "items": { "type": "string" } },
+            "deny": { "type": "array", "maxItems": 64, "items": { "type": "string" } }
           }
         },
         "rawACI": { "type": "string" }

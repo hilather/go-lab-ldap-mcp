@@ -475,6 +475,24 @@ func TestAssertionFilterUsesOperationalAttrs(t *testing.T) {
 	}
 }
 
+// TestSearchRejectsAbsoluteFilters: (&) and (|) at any depth are a field
+// error, not an engine protocolError mapped to "directory unavailable"
+// (parity CAND-38); leaf-only nesting stays valid.
+func TestSearchRejectsAbsoluteFilters(t *testing.T) {
+	t.Parallel()
+	for _, filter := range []string{"(&)", "(|)", "(!(&))", "(!(|))", "(&(uid=alice)(|))", "(|(uid=alice)(&(sn=x)(&)))"} {
+		err := validateSearchFilter(filter)
+		if err == nil || !hasField(err, "filter", "invalid") {
+			t.Errorf("%s: %v, want filter invalid", filter, err)
+		}
+	}
+	for _, filter := range []string{"(&(sn=S)(!(uid=x)))", "(|(uid=a)(uid=b))", "(!(uid=x))"} {
+		if err := validateSearchFilter(filter); err != nil {
+			t.Errorf("%s: %v", filter, err)
+		}
+	}
+}
+
 func TestConfigFieldCodes(t *testing.T) {
 	t.Parallel()
 	err := cfgErr("filter", "over_broad", "search too broad")

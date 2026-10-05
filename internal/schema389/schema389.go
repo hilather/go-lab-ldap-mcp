@@ -17,12 +17,15 @@ var attributeTypesFile string
 var (
 	once  sync.Once
 	known map[string]struct{}
-	image string
-	count int
+	// primary maps every lowercase NAME, alias and OID to the NAME.
+	primary map[string]string
+	image   string
+	count   int
 )
 
 func load() {
 	known = map[string]struct{}{}
+	primary = map[string]string{}
 	for _, line := range strings.Split(attributeTypesFile, "\n") {
 		line = strings.TrimSpace(line)
 		if rest, ok := strings.CutPrefix(line, "# image "); ok {
@@ -33,8 +36,12 @@ func load() {
 			continue
 		}
 		count++
-		for _, f := range strings.Fields(line) {
+		fields := strings.Fields(line)
+		for _, f := range fields {
 			known[strings.ToLower(f)] = struct{}{}
+			if len(fields) > 1 {
+				primary[strings.ToLower(f)] = fields[1]
+			}
 		}
 	}
 }
@@ -48,6 +55,26 @@ func Known(desc string) bool {
 	base, _, _ := strings.Cut(desc, ";")
 	_, ok := known[strings.ToLower(strings.TrimSpace(base))]
 	return ok
+}
+
+// Primary rewrites the base of an attribute description that is an alias
+// or OID in the pinned 389 schema to the attribute type's NAME, keeping any
+// options as written (pwdHistory;x-a becomes passwordHistory;x-a). Unknown
+// names come back trimmed and unchanged. targetattr names are compared
+// literally on both engines, so a name meant to cover the stored attribute
+// must use this spelling.
+func Primary(desc string) string {
+	once.Do(load)
+	desc = strings.TrimSpace(desc)
+	base, opts, hasOpts := strings.Cut(desc, ";")
+	name, ok := primary[strings.ToLower(strings.TrimSpace(base))]
+	if !ok {
+		return desc
+	}
+	if hasOpts {
+		return name + ";" + opts
+	}
+	return name
 }
 
 // Image returns the image reference recorded in the data file header.

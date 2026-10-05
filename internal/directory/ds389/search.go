@@ -153,6 +153,12 @@ func validateSearchFilter(raw string) error {
 		var attr string
 		switch p.Tag {
 		case ldap.FilterAnd, ldap.FilterOr, ldap.FilterNot:
+			// Both engines answer protocolError(2) for an absolute filter
+			// (RFC 4526 (&) or (|), at any depth; parity CAND-38), which
+			// would surface as "directory unavailable". Reject it here.
+			if p.Tag != ldap.FilterNot && len(p.Children) == 0 {
+				return cfgErr("filter", "invalid", "absolute filters (&) and (|) are not supported; use (objectClass=*)")
+			}
 			for _, child := range p.Children {
 				if err := inspect(child); err != nil {
 					return err

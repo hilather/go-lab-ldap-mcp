@@ -2,6 +2,7 @@ package config
 
 import (
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -163,7 +164,7 @@ func emitACI(a v1alpha1.ACL, n *Normalized) (string, string, error) {
 	}
 	// CAND-33: every listed name must be a valid targetattr spelling that
 	// the pinned 389 schema defines, as 389 rejects the ACI otherwise
-	// (oracle probe 16). Only single-element lists are emitted (see below).
+	// (oracle probe 16). dslTargetAttr then builds the clause.
 	for _, l := range []struct {
 		field string
 		names []string
@@ -172,22 +173,153 @@ func emitACI(a v1alpha1.ACL, n *Normalized) (string, string, error) {
 			if !aciAttrRe.MatchString(name) {
 				return "", "", fieldErr("spec.acls."+a.ID+".attributes."+l.field, "invalid_attribute", "attribute name is not allowed")
 			}
+			// An empty option ("userPassword;", "mail;;x") covers nothing
+			// in targetattr (CAND-34), so such a deny would exclude
+			// nothing and such an allow would grant nothing.
+			if _, opts, ok := strings.Cut(name, ";"); ok && slices.Contains(strings.Split(opts, ";"), "") {
+				return "", "", fieldErr("spec.acls."+a.ID+".attributes."+l.field, "invalid_attribute", "attribute name has an empty option")
+			}
 			if name != "*" && !schema389.Known(name) {
 				return "", "", fieldErr("spec.acls."+a.ID+".attributes."+l.field, "unknown_attribute", "attribute is not defined in the 389 schema")
 			}
 		}
 	}
-	allow := "*"
-	deny := ""
-	// Every element was validated above.
-	if len(a.Attributes.Allow) == 1 {
-		allow = a.Attributes.Allow[0]
-	}
-	if len(a.Attributes.Deny) == 1 {
-		deny = a.Attributes.Deny[0]
+	allow, deny, err := dslTargetAttr(a)
+	if err != nil {
+		return "", "", err
 	}
 	b := aciBuilder{name: "labldap:" + a.ID, targetDN: tgt, perms: perms, allow: allow, deny: deny, who: who}
 	return b.String(), tgt, nil
+}
+
+// MaxACIAttrs bounds the names in one emitted targetattr list; it equals
+// the native parser's limit (ldapserver aciMaxAttrsA, kept in sync by a
+// test there).
+const MaxACIAttrs = 64
+
+// dslTargetAttr turns attributes.allow/deny into the allow or deny string
+// for aciBuilder (resolved DSL follow-up, oracle probe 25: lists are
+// 389 "a || b" lists). Allow alone: targetattr="a || b" ("*" anywhere, or
+// no list, means every attribute). Deny with an allow list that is empty
+// or holds "*": targetattr!="a || b". Both: the allow names a deny name
+// does not cover (same base after alias resolution, deny options a subset
+// of the allow name's, as targetattr options work since CAND-34); a
+// same-base deny that cannot be expressed that way, an empty result, and
+// any deny "*" (it would leave no attribute, or compile to
+// targetattr!="*", which still grants entry-level add/delete) are
+// rejected.
+func dslTargetAttr(a v1alpha1.ACL) (allow, deny string, err error) {
+	path := "spec.acls." + a.ID + ".attributes."
+	for _, l := range []struct {
+		field string
+		names []string
+	}{{"allow", a.Attributes.Allow}, {"deny", a.Attributes.Deny}} {
+		if len(l.names) > MaxACIAttrs {
+			return "", "", fieldErr(path+l.field, "too_many_attributes", "too many attribute names in one list")
+		}
+	}
+	allowAll := len(a.Attributes.Allow) == 0
+	for _, n := range a.Attributes.Allow {
+		if n == "*" {
+			allowAll = true
+		}
+	}
+	for _, n := range a.Attributes.Deny {
+		if n == "*" {
+			return "", "", fieldErr(path+"deny", "invalid_attribute_filter", `deny "*" leaves no attribute; remove the ACL or narrow it`)
+		}
+	}
+	// targetattr names are compared literally on both engines, so every
+	// emitted name is the 389 NAME (userid -> uid, rfc822Mailbox -> mail,
+	// pwdHistory -> passwordHistory) with its options; otherwise an allow
+	// would grant nothing and a deny would exclude nothing.
+	join := func(field string, names []string) (string, error) {
+		canon := make([]string, len(names))
+		for i, n := range names {
+			canon[i] = schema389.Primary(PrimaryAttrDescription(n))
+		}
+		names = dedupFold(canon)
+		if len(names) > MaxACIAttrs {
+			return "", fieldErr(path+field, "too_many_attributes", "too many attribute names in one list")
+		}
+		return strings.Join(names, " || "), nil
+	}
+	switch {
+	case len(a.Attributes.Deny) == 0 && allowAll:
+		return "*", "", nil
+	case len(a.Attributes.Deny) == 0:
+		allow, err = join("allow", a.Attributes.Allow)
+		return allow, "", err
+	case allowAll:
+		deny, err = join("deny", a.Attributes.Deny)
+		return "", deny, err
+	}
+	var kept []string
+	for _, an := range a.Attributes.Allow {
+		aBase, aOpts := splitDSLAttr(an)
+		drop := false
+		for _, dn := range a.Attributes.Deny {
+			dBase, dOpts := splitDSLAttr(dn)
+			if !strings.EqualFold(aBase, dBase) {
+				continue
+			}
+			if !optionSubset(dOpts, aOpts) {
+				return "", "", fieldErr(path+"deny", "invalid_attribute_filter", "a deny name with options narrower than an allow name of the same attribute cannot be expressed as one ACI")
+			}
+			drop = true
+		}
+		if !drop {
+			kept = append(kept, an)
+		}
+	}
+	if len(kept) == 0 {
+		return "", "", fieldErr(path+"deny", "invalid_attribute_filter", "no attribute is left after removing the denied names")
+	}
+	allow, err = join("allow", kept)
+	return allow, "", err
+}
+
+// splitDSLAttr returns a DSL attribute name's canonical base (aliases
+// resolved, so rfc822Mailbox and mail compare equal) and its options.
+func splitDSLAttr(name string) (string, []string) {
+	base, rest, _ := strings.Cut(name, ";")
+	var opts []string
+	if rest != "" || strings.Contains(name, ";") {
+		opts = strings.Split(rest, ";")
+	}
+	return CanonicalAttrType(schema389.Primary(base)), opts
+}
+
+// optionSubset reports whether every option in sub appears in set
+// (case-insensitive). An empty option never matches, as in targetattr.
+func optionSubset(sub, set []string) bool {
+	for _, o := range sub {
+		found := false
+		for _, h := range set {
+			if o != "" && strings.EqualFold(o, h) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
+}
+
+// dedupFold drops case-insensitive duplicates, keeping the first spelling.
+func dedupFold(names []string) []string {
+	out := make([]string, 0, len(names))
+	seen := map[string]bool{}
+	for _, n := range names {
+		k := strings.ToLower(n)
+		if !seen[k] {
+			seen[k] = true
+			out = append(out, n)
+		}
+	}
+	return out
 }
 
 func targetDN(t v1alpha1.Target, n *Normalized) (string, error) {
