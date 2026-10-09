@@ -15,7 +15,9 @@ the end.
 
 ## Unreleased (after v0.7.0)
 
-Nothing yet.
+- Go toolchain and builder image move from `go1.26.8` to `go1.26.9` (`go.mod`
+  `toolchain`, CI/Makefile `GOTOOLCHAIN`, `deploy/docker/golang.digest` and the
+  Dockerfiles). go1.26.8 lacks the standard-library fixes for GO-2026-6603..6617.
 
 ## Upgrade risks (read first)
 

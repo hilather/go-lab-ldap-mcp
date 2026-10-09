@@ -5,13 +5,13 @@ Recorded 2026-08-12 against the LabLDAP design baseline.
 | Component | Design baseline | Pinned in this repo | Where |
 | --- | --- | --- | --- |
 | Go language | 1.26.x | `1.26` | `go.mod` `go` directive |
-| Go toolchain | go1.26.8 (latest 1.26 patch 2026-09-30) | `go1.26.8` | `go.mod` `toolchain` |
+| Go toolchain | go1.26.9 (latest 1.26 patch 2026-10-08) | `go1.26.9` | `go.mod` `toolchain` |
 | Node.js | 22.12 or later | `22.14.0` (host LTS; `>=22.12.0` engines) | `.node-version`, `.nvmrc`, `frontend/package.json` |
 | pnpm | exact packageManager + lockfile | `pnpm@10.14.0` | `frontend/package.json` `packageManager`, `frontend/pnpm-lock.yaml` |
 | React | 19.2 | `19.2.8` (T-095) | `frontend/package.json`, `frontend/pnpm-lock.yaml` |
 | MCP Go SDK | v1.7.0+ / spec 2026-07-28 | `v1.7.0` (`StreamableHTTPOptions.Stateless=true`) | `go.mod`; `internal/mcpserver` |
 | 389 DS image | pin by digest | `quay.io/389ds/dirsrv@sha256:f2851654c5df545cd893d84bea8d08c28dc25f0930493fbfed1d8a6eacf657f7` | `deploy/docker/dirsrv.digest`, `deploy/docker/dirsrv-image-contract.md` |
-| Go builder image | pin by digest | `golang:1.26.8@sha256:0f063af2d465d8dcae54cce04278ada488b96f77b42449c8d071e47d016cc65a` | `deploy/docker/golang.digest` |
+| Go builder image | pin by digest | `golang:1.26.9@sha256:f1f0bcc2c524a3ced375fcb4d1ecb7aa371aa7070e112599aaca45cc02d0101b` | `deploy/docker/golang.digest` |
 | Node builder image | pin by digest | `node:22.14.0-bookworm@sha256:e5ddf893cc6aeab0e5126e4edae35aa43893e2836d1d246140167ccc2616f5d7` | `deploy/docker/node.digest` |
 | Control runtime image | pin by digest | `alpine:3.21@sha256:48b0309ca019d89d40f670aa1bc06e426dc0931948452e8491e3d65087abc07d` | `deploy/docker/alpine.digest` |
 | LDAP client | `github.com/go-ldap/ldap/v3` | `v3.4.14` (T-028 bootstrap DM helper; T-046 runtime) | `go.mod`; only `internal/directory/ds389` and `internal/directory/ldapclient` may import it |
@@ -20,7 +20,7 @@ Recorded 2026-08-12 against the LabLDAP design baseline.
 | Playwright | product acceptance (T-107) | `@playwright/test@1.62.1`, `@axe-core/playwright@4.10.2` | `test/e2e/package.json` |
 | govulncheck | reachable vulns (T-007 / T-118) | `golang.org/x/vuln/cmd/govulncheck@v1.1.4` | `Makefile` `GOVULNCHECK_MOD` |
 
-No deviation from the Go or Node baseline. 2026-09-30: toolchain and builder image moved from go1.26.5 to go1.26.8, which fixes the go1.26.5 standard-library findings GO-2026-6090, GO-2026-6089, GO-2026-5972, GO-2026-6218, and GO-2026-5026 (fixed in go1.26.6). Frontend scaffold (T-095): React 19.2.8, Vite 8.2.1, TanStack Query 5.101.4, React Router 8.3.0, React Hook Form 7.85.0, Zod 4.4.3, openapi-fetch 0.17.0. `pnpm install --frozen-lockfile && pnpm build` must succeed from the committed lockfile.
+No deviation from the Go or Node baseline. 2026-09-30: toolchain and builder image moved from go1.26.5 to go1.26.8, which fixes the go1.26.5 standard-library findings GO-2026-6090, GO-2026-6089, GO-2026-5972, GO-2026-6218, and GO-2026-5026 (fixed in go1.26.6). 2026-10-08: toolchain and builder image moved from go1.26.8 to go1.26.9 for the standard-library advisories GO-2026-6603..6617 (fixed in go1.26.9). Frontend scaffold (T-095): React 19.2.8, Vite 8.2.1, TanStack Query 5.101.4, React Router 8.3.0, React Hook Form 7.85.0, Zod 4.4.3, openapi-fetch 0.17.0. `pnpm install --frozen-lockfile && pnpm build` must succeed from the committed lockfile.
 
 ## Developer tools
 

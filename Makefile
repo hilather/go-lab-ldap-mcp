@@ -4,7 +4,7 @@ GO               ?= go
 PNPM             ?= pnpm
 # Full oracle suite starts a pinned directory for each case; budget is cumulative.
 INTEGRATION_TIMEOUT ?= 45m
-export GOTOOLCHAIN ?= go1.26.8
+export GOTOOLCHAIN ?= go1.26.9
 export GOPROXY    ?= https://proxy.golang.org,direct
 
 GOVULNCHECK_MOD  := golang.org/x/vuln/cmd/govulncheck@v1.1.4

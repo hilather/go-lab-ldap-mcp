@@ -46,6 +46,6 @@ image IDs + workflow path) and `dist/release/SHA256SUMS`. Signing
 | ID | Reason | Expires |
 | --- | --- | --- |
 
-None. The go1.26.8 toolchain fixes the go1.26.5 standard-library findings
+None. The go1.26.8 toolchain (now go1.26.9) fixes the go1.26.5 standard-library findings
 (GO-2026-6090, GO-2026-6089, GO-2026-5972, GO-2026-6218, GO-2026-5026) that
 were listed here until they expired on 2026-09-14.

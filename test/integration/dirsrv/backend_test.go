@@ -31,7 +31,7 @@ func shippedBootstrap(t *testing.T) string {
 		shippedBin = filepath.Join(dir, "labldap-bootstrap")
 		cmd := exec.Command("go", "build", "-o", shippedBin, "./cmd/labldap-bootstrap")
 		cmd.Dir = moduleRootOrFatal(t)
-		cmd.Env = append(os.Environ(), "GOTOOLCHAIN=go1.26.8")
+		cmd.Env = append(os.Environ(), "GOTOOLCHAIN=go1.26.9")
 		out, err := cmd.CombinedOutput()
 		if err != nil {
 			shippedErr = err
