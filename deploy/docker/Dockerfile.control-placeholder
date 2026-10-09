@@ -1,12 +1,12 @@
 # labldap-control:placeholder is a thin T-042 image, not T-108.
 # Do not tag this labldap-control:dev. Do not push (OD-004).
 
-ARG GO_IMAGE=golang:1.26.8
+ARG GO_IMAGE=golang:1.26.9
 ARG ALPINE_IMAGE=alpine:3.21
 FROM ${GO_IMAGE} AS build
 WORKDIR /src
 ENV CGO_ENABLED=0
-ENV GOTOOLCHAIN=go1.26.8
+ENV GOTOOLCHAIN=go1.26.9
 COPY go.mod go.sum ./
 RUN go mod download
 COPY cmd ./cmd

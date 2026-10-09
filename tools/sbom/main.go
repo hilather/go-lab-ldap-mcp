@@ -163,7 +163,7 @@ func build(root string) (document, error) {
 func goModules(root string) ([]component, error) {
 	cmd := exec.Command("go", "list", "-m", "-json", "all")
 	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "GOTOOLCHAIN=go1.26.8")
+	cmd.Env = append(os.Environ(), "GOTOOLCHAIN=go1.26.9")
 	out, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("go list: %w", err)

@@ -4,7 +4,7 @@
 # manager cache, test secrets, or Directory Manager credentials.
 
 # FROM-time ARGs must be declared before the first FROM (legacy builder).
-ARG GO_IMAGE=docker.io/library/golang:1.26.8@sha256:0f063af2d465d8dcae54cce04278ada488b96f77b42449c8d071e47d016cc65a
+ARG GO_IMAGE=docker.io/library/golang:1.26.9@sha256:f1f0bcc2c524a3ced375fcb4d1ecb7aa371aa7070e112599aaca45cc02d0101b
 ARG NODE_IMAGE=docker.io/library/node:22.14.0-bookworm@sha256:e5ddf893cc6aeab0e5126e4edae35aa43893e2836d1d246140167ccc2616f5d7
 ARG ALPINE_IMAGE=docker.io/library/alpine:3.21@sha256:48b0309ca019d89d40f670aa1bc06e426dc0931948452e8491e3d65087abc07d
 
@@ -22,7 +22,7 @@ RUN pnpm build
 FROM ${GO_IMAGE} AS build
 WORKDIR /src
 ENV CGO_ENABLED=0
-ENV GOTOOLCHAIN=go1.26.8
+ENV GOTOOLCHAIN=go1.26.9
 ARG VERSION=dev
 ARG REVISION=unknown
 ARG BUILT_AT=unknown

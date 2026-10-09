@@ -9,7 +9,7 @@ Image: `labldap-control:dev` (OD-004; do not push)
 Multi-stage:
 
 1. Pinned `node:22.14.0-bookworm` builds `frontend/` with `pnpm@10.14.0 --frozen-lockfile`.
-2. Pinned `golang:1.26.8` copies `frontend/dist` over `internal/web/dist` and links a static `labldap`.
+2. Pinned `golang:1.26.9` copies `frontend/dist` over `internal/web/dist` and links a static `labldap`.
 3. Pinned `alpine:3.21` runtime: `ca-certificates`, `wget` (HEALTHCHECK), user `65532`, no source tree.
 
 Builder digest files: `deploy/docker/{golang,node,alpine}.digest`. 389 DS remains `deploy/docker/dirsrv.digest`.

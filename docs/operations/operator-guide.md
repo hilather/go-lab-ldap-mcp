@@ -51,7 +51,7 @@ implement the LDAP wire protocol.
 
 - Docker Engine **24+** and Compose **v2.24+** (OD-020). `make compose-up`
   runs `tools/composepreflight`.
-- Go 1.26 / toolchain `go1.26.8` if you build from source (`docs/toolchain.md`).
+- Go 1.26 / toolchain `go1.26.9` if you build from source (`docs/toolchain.md`).
 - Secret files are untracked (`/secrets/`). Examples under
   `config/examples/secrets/` are **lab placeholders** (`lab-fixture-*`),
   not production credentials.
