@@ -23,7 +23,7 @@
   <img alt="Go" src="https://img.shields.io/badge/Go-1.26-00ADD8?style=flat-square&logo=go&logoColor=white" />
   <img alt="389-ds" src="https://img.shields.io/badge/389--ds-2.4.6-3D9B8F?style=flat-square" />
   <img alt="MCP" src="https://img.shields.io/badge/MCP-2026--07--28-111111?style=flat-square" />
-  <img alt="Release" src="https://img.shields.io/badge/release-v0.7.0-ecece8?style=flat-square&labelColor=111111" />
+  <img alt="Release" src="https://img.shields.io/badge/release-v0.7.1-ecece8?style=flat-square&labelColor=111111" />
 </p>
 
 ![LabLDAP console](docs/assets/console.jpg)
@@ -192,7 +192,7 @@ loopback, which compose already does.
 | [Operator guide](docs/operations/operator-guide.md) | Day-2 limits and failure modes |
 | [Troubleshooting](docs/operations/troubleshooting.md) | Ready checks, TLS, tokens, vanished entries |
 | [MCP catalog](docs/mcp/catalog.md) | Tools, resources, scopes |
-| [Release notes](docs/release/notes.md) | v0.7.0 contents and residuals (v0.6.0, v0.5.0 and v0.4.1 summarized) |
+| [Release notes](docs/release/notes.md) | v0.7.1 toolchain and lockfile patch over v0.7.0 (no behavior or directory-revision change); v0.7.0 moddn and revision notes (v0.6.0, v0.5.0 and v0.4.1 summarized) |
 
 Architecture and design live under [`docs/`](docs/). Contributing:
 [`CONTRIBUTING.md`](CONTRIBUTING.md).
@@ -214,13 +214,16 @@ not pushed to a public registry.
 
 ## Status
 
-**v0.7.0** — native moves (`moddn`) and case-only renames aligned with
-the pinned 389 image; the runtime ACIs grant `moddn`, so REST, MCP and
-the console can move entries on both engines (read the upgrade risks in
-the release notes before upgrading raw-ACI, DSL-ACL or persistent
-deployments: every scenario gets a new directory revision). Native
-`labldapd` remains the default engine; 389 DS is `engine: 389ds` /
-`make compose-up-389ds`. See [release notes](docs/release/notes.md).
+**v0.7.1** — toolchain and lockfile patch over v0.7.0 (Go `go1.26.9`,
+frontend `source-map-js` 1.2.2). No behavior change and no
+directory-revision change. **v0.7.0** added native moves (`moddn`) and
+case-only renames aligned with the pinned 389 image; the runtime ACIs
+grant `moddn`, so REST, MCP and the console can move entries on both
+engines (read the upgrade risks in the release notes before upgrading
+raw-ACI, DSL-ACL or persistent deployments from v0.6.0: every scenario
+gets a new directory revision). Native `labldapd` remains the default
+engine; 389 DS is `engine: 389ds` / `make compose-up-389ds`. See
+[release notes](docs/release/notes.md).
 
 Licensed under the [MIT License](LICENSE).
 

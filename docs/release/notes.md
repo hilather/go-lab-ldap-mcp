@@ -1,9 +1,33 @@
-# LabLDAP v0.7.0 release notes
+# LabLDAP v0.7.1 release notes
 
-Date: 2026-10-05  
-Tag: **v0.7.0** (on the squash commit of the v0.7.0 notes PR)  
-Prior: [v0.6.0](https://github.com/hilather/go-lab-ldap-mcp/releases/tag/v0.6.0)  
+Date: 2026-10-19  
+Tag: **v0.7.1** (on the squash commit of the v0.7.1 notes PR)  
+Prior: [v0.7.0](https://github.com/hilather/go-lab-ldap-mcp/releases/tag/v0.7.0)  
 Images: `labldap-control:dev`, `labldap-bootstrap:dev`, `labldapd:dev` (OD-004; do not push)
+
+v0.7.1 is a toolchain and lockfile patch over v0.7.0
+([#36](https://github.com/hilather/go-lab-ldap-mcp/pull/36),
+[#35](https://github.com/hilather/go-lab-ldap-mcp/pull/35)). No behavior
+change and no directory-revision change. The v0.7.0 upgrade risks below still
+apply to a v0.6.0 → v0.7.1 upgrade. Earlier releases are summarized at the end.
+
+## v0.7.1
+
+No behavior change and no directory-revision change.
+
+- Go toolchain and builder image move from `go1.26.8` to `go1.26.9` (`go.mod`
+  `toolchain`, CI/Makefile `GOTOOLCHAIN`, `deploy/docker/golang.digest` and the
+  Dockerfiles). go1.26.8 lacks the standard-library fixes for GO-2026-6603..6617
+  ([#36](https://github.com/hilather/go-lab-ldap-mcp/pull/36)).
+- Frontend `source-map-js` 1.2.1 → 1.2.2 in `frontend/pnpm-lock.yaml` only
+  ([#35](https://github.com/hilather/go-lab-ldap-mcp/pull/35); GHSA-68fv-2mgg-jv7q).
+  Dev/lockfile change; the production build output is unchanged.
+
+## Unreleased (after v0.7.1)
+
+Nothing yet.
+
+## v0.7.0
 
 v0.7.0 contains everything merged after v0.6.0, which is [#33](https://github.com/hilather/go-lab-ldap-mcp/pull/33). Native now
 matches the pinned 389 image for cross-parent moves (`moddn`, CAND-39) and case-only
@@ -13,16 +37,12 @@ oracle probes 30–34). It is a minor release because every scenario gets a new
 directory revision; read the upgrade risks first. Earlier releases are summarized at
 the end.
 
-## Unreleased (after v0.7.0)
+## v0.7.0 upgrade risks (read first when upgrading from v0.6.0)
 
-- Go toolchain and builder image move from `go1.26.8` to `go1.26.9` (`go.mod`
-  `toolchain`, CI/Makefile `GOTOOLCHAIN`, `deploy/docker/golang.digest` and the
-  Dockerfiles). go1.26.8 lacks the standard-library fixes for GO-2026-6603..6617.
-
-## Upgrade risks (read first)
-
-These apply to every deployment, including the default lab profile, because the
-runtime ACI text changes.
+These apply to every deployment moving off v0.6.0 or earlier, including a
+direct upgrade to v0.7.1 and the default lab profile, because the v0.7.0
+runtime ACI text changes. A deployment already on v0.7.0 gets no new directory
+revision from v0.7.1 and needs no bootstrap or merge apply.
 
 1. **New directory revision on both engines.** The runtime ACIs
    `runtime-people-write`, `runtime-groups-write` and `runtime-addsuffix-N-write` now
@@ -131,8 +151,8 @@ of 2026-10-04 to add `moddn` and grant it in the runtime ACIs).
 
 | Component | Pin |
 | --- | --- |
-| LabLDAP source | `v0.7.0` (`git describe`; see `dist/release/provenance.json`) |
-| Go | 1.26 / toolchain `go1.26.8` |
+| LabLDAP source | `v0.7.1` (`git describe`; see `dist/release/provenance.json`) |
+| Go | 1.26 / toolchain `go1.26.9` |
 | Node / pnpm | 22.14.0 / `pnpm@10.14.0` |
 | React | 19.2.8 |
 | 389 DS | `quay.io/389ds/dirsrv` digest in `deploy/docker/dirsrv.digest` (`389-ds-base-2.4.6`) |
@@ -196,7 +216,7 @@ Build application images with the same `VERSION` so
 ## Migration guidance
 
 v0.6.0 → v0.7.0 keeps `apiVersion: labldap.dev/v1alpha1`; REST, MCP and config
-shapes are unchanged. Read "Upgrade risks" first.
+shapes are unchanged. Read "v0.7.0 upgrade risks" first.
 
 1. Upgrade labldapd, the control plane and the bootstrap image together with the same
    `VERSION`. An old labldapd with a new control plane is not detected.
@@ -243,7 +263,7 @@ Product acceptance:
 - The live browser smoke (native) moves an entry from people to groups and respells it
   ([#33](https://github.com/hilather/go-lab-ldap-mcp/pull/33)).
 
-Security: the toolchain is still `go1.26.8` (unchanged from v0.6.0); there are no approved
+Security: the toolchain is `go1.26.9` ([#36](https://github.com/hilather/go-lab-ldap-mcp/pull/36)); there are no approved
 exceptions. See
 [dependency-policy.md](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/security/dependency-policy.md).
 
