@@ -216,7 +216,7 @@ Build application images with the same `VERSION` so
 ## Migration guidance
 
 v0.6.0 → v0.7.0 keeps `apiVersion: labldap.dev/v1alpha1`; REST, MCP and config
-shapes are unchanged. Read "Upgrade risks" first.
+shapes are unchanged. Read "v0.7.0 upgrade risks" first.
 
 1. Upgrade labldapd, the control plane and the bootstrap image together with the same
    `VERSION`. An old labldapd with a new control plane is not detected.
