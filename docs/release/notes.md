@@ -37,10 +37,12 @@ oracle probes 30–34). It is a minor release because every scenario gets a new
 directory revision; read the upgrade risks first. Earlier releases are summarized at
 the end.
 
-## Upgrade risks (read first)
+## v0.7.0 upgrade risks (read first when upgrading from v0.6.0)
 
-These apply to every deployment, including the default lab profile, because the
-runtime ACI text changes.
+These apply to every deployment moving off v0.6.0 or earlier, including a
+direct upgrade to v0.7.1 and the default lab profile, because the v0.7.0
+runtime ACI text changes. A deployment already on v0.7.0 gets no new directory
+revision from v0.7.1 and needs no bootstrap or merge apply.
 
 1. **New directory revision on both engines.** The runtime ACIs
    `runtime-people-write`, `runtime-groups-write` and `runtime-addsuffix-N-write` now
