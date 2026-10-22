@@ -7,14 +7,14 @@
 # only (compose native-secret-prep); nothing sensitive is baked into the image.
 
 # FROM-time ARGs must be declared before the first FROM (legacy builder).
-ARG GO_IMAGE=docker.io/library/golang:1.26.9@sha256:f1f0bcc2c524a3ced375fcb4d1ecb7aa371aa7070e112599aaca45cc02d0101b
+ARG GO_IMAGE=docker.io/library/golang:1.26.10@sha256:672c944cfd07599b5f1bb179869270cdc94c6254e41db4d431259693cb286b82
 # Default matches deploy/docker/labldapd.digest. Release files must stay digest-pinned.
 ARG ALPINE_IMAGE=docker.io/library/alpine:3.21@sha256:48b0309ca019d89d40f670aa1bc06e426dc0931948452e8491e3d65087abc07d
 
 FROM ${GO_IMAGE} AS build
 WORKDIR /src
 ENV CGO_ENABLED=0
-ENV GOTOOLCHAIN=go1.26.9
+ENV GOTOOLCHAIN=go1.26.10
 ARG VERSION=dev
 ARG REVISION=unknown
 ARG BUILT_AT=unknown

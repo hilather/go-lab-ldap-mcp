@@ -25,7 +25,10 @@ No behavior change and no directory-revision change.
 
 ## Unreleased (after v0.7.1)
 
-Nothing yet.
+- Go toolchain and builder image move from `go1.26.9` to `go1.26.10` (`go.mod`
+  `toolchain`, CI and Makefile `GOTOOLCHAIN`, `deploy/docker/golang.digest`,
+  Dockerfiles, toolchain tools and docs). go1.26.9 lacks the crypto/x509 fix for
+  GO-2026-6809.
 
 ## v0.7.0
 
