@@ -25,6 +25,7 @@ No behavior change and no directory-revision change.
 
 ## Unreleased (after v0.7.1)
 
+- `deploy/docker/Dockerfile.control-placeholder` pins `GO_IMAGE` to the same `golang:1.26.10` digest as the other three Dockerfiles (Keystone nit on #38).
 - Go toolchain and builder image move from `go1.26.9` to `go1.26.10` (`go.mod`
   `toolchain`, CI and Makefile `GOTOOLCHAIN`, `deploy/docker/golang.digest`,
   Dockerfiles, toolchain tools and docs). go1.26.9 lacks the crypto/x509 fix for
