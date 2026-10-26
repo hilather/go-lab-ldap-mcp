@@ -1,27 +1,19 @@
-# LabLDAP v0.7.1 release notes
+# LabLDAP v0.7.2 release notes
 
-Date: 2026-10-19  
-Tag: **v0.7.1** (on the squash commit of the v0.7.1 notes PR)  
-Prior: [v0.7.0](https://github.com/hilather/go-lab-ldap-mcp/releases/tag/v0.7.0)  
+Date: 2026-10-26  
+Tag: **v0.7.2** (on the squash commit of the v0.7.2 notes PR)  
+Prior: [v0.7.1](https://github.com/hilather/go-lab-ldap-mcp/releases/tag/v0.7.1)  
 Images: `labldap-control:dev`, `labldap-bootstrap:dev`, `labldapd:dev` (OD-004; do not push)
 
-v0.7.1 is a toolchain and lockfile patch over v0.7.0
-([#36](https://github.com/hilather/go-lab-ldap-mcp/pull/36),
-[#35](https://github.com/hilather/go-lab-ldap-mcp/pull/35)). No behavior
+v0.7.2 is a toolchain patch over v0.7.1
+([#38](https://github.com/hilather/go-lab-ldap-mcp/pull/38),
+[#39](https://github.com/hilather/go-lab-ldap-mcp/pull/39)). No behavior
 change and no directory-revision change. The v0.7.0 upgrade risks below still
-apply to a v0.6.0 → v0.7.1 upgrade. Earlier releases are summarized at the end.
+apply to a v0.6.0 → v0.7.2 upgrade. Earlier releases are summarized at the end.
 
-## v0.7.1
+## Unreleased (after v0.7.2)
 
-No behavior change and no directory-revision change.
-
-- Go toolchain and builder image move from `go1.26.8` to `go1.26.9` (`go.mod`
-  `toolchain`, CI/Makefile `GOTOOLCHAIN`, `deploy/docker/golang.digest` and the
-  Dockerfiles). go1.26.8 lacks the standard-library fixes for GO-2026-6603..6617
-  ([#36](https://github.com/hilather/go-lab-ldap-mcp/pull/36)).
-- Frontend `source-map-js` 1.2.1 → 1.2.2 in `frontend/pnpm-lock.yaml` only
-  ([#35](https://github.com/hilather/go-lab-ldap-mcp/pull/35); GHSA-68fv-2mgg-jv7q).
-  Dev/lockfile change; the production build output is unchanged.
+Nothing yet.
 
 ## v0.7.2
 
@@ -35,6 +27,18 @@ no directory-revision change.
   `toolchain`, CI and Makefile `GOTOOLCHAIN`, `deploy/docker/golang.digest`,
   Dockerfiles, toolchain tools and docs). go1.26.9 lacks the crypto/x509 fix for
   GO-2026-6809.
+
+## v0.7.1
+
+No behavior change and no directory-revision change.
+
+- Go toolchain and builder image move from `go1.26.8` to `go1.26.9` (`go.mod`
+  `toolchain`, CI/Makefile `GOTOOLCHAIN`, `deploy/docker/golang.digest` and the
+  Dockerfiles). go1.26.8 lacks the standard-library fixes for GO-2026-6603..6617
+  ([#36](https://github.com/hilather/go-lab-ldap-mcp/pull/36)).
+- Frontend `source-map-js` 1.2.1 → 1.2.2 in `frontend/pnpm-lock.yaml` only
+  ([#35](https://github.com/hilather/go-lab-ldap-mcp/pull/35); GHSA-68fv-2mgg-jv7q).
+  Dev/lockfile change; the production build output is unchanged.
 
 ## v0.7.0
 
@@ -160,8 +164,8 @@ of 2026-10-04 to add `moddn` and grant it in the runtime ACIs).
 
 | Component | Pin |
 | --- | --- |
-| LabLDAP source | `v0.7.1` (`git describe`; see `dist/release/provenance.json`) |
-| Go | 1.26 / toolchain `go1.26.9` |
+| LabLDAP source | `v0.7.2` (`git describe`; see `dist/release/provenance.json`) |
+| Go | 1.26 / toolchain `go1.26.10` |
 | Node / pnpm | 22.14.0 / `pnpm@10.14.0` |
 | React | 19.2.8 |
 | 389 DS | `quay.io/389ds/dirsrv` digest in `deploy/docker/dirsrv.digest` (`389-ds-base-2.4.6`) |
@@ -272,7 +276,7 @@ Product acceptance:
 - The live browser smoke (native) moves an entry from people to groups and respells it
   ([#33](https://github.com/hilather/go-lab-ldap-mcp/pull/33)).
 
-Security: the toolchain is `go1.26.9` ([#36](https://github.com/hilather/go-lab-ldap-mcp/pull/36)); there are no approved
+Security: the toolchain is `go1.26.10` ([#38](https://github.com/hilather/go-lab-ldap-mcp/pull/38)); there are no approved
 exceptions. See
 [dependency-policy.md](https://github.com/hilather/go-lab-ldap-mcp/blob/main/docs/security/dependency-policy.md).
 
