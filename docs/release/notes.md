@@ -23,7 +23,12 @@ No behavior change and no directory-revision change.
   ([#35](https://github.com/hilather/go-lab-ldap-mcp/pull/35); GHSA-68fv-2mgg-jv7q).
   Dev/lockfile change; the production build output is unchanged.
 
-## Unreleased (after v0.7.1)
+## v0.7.2
+
+Date: 2026-10-26. Toolchain patch over v0.7.1
+([#38](https://github.com/hilather/go-lab-ldap-mcp/pull/38),
+[#39](https://github.com/hilather/go-lab-ldap-mcp/pull/39)). No behavior change and
+no directory-revision change.
 
 - `deploy/docker/Dockerfile.control-placeholder` pins `GO_IMAGE` to the same `golang:1.26.10` digest as the other three Dockerfiles (Keystone nit on #38).
 - Go toolchain and builder image move from `go1.26.9` to `go1.26.10` (`go.mod`
