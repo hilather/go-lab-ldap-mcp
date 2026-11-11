@@ -13,7 +13,10 @@ apply to a v0.6.0 → v0.7.2 upgrade. Earlier releases are summarized at the end
 
 ## Unreleased (after v0.7.2)
 
-Nothing yet.
+- Go toolchain 1.26.10 → 1.26.11 (`go.mod` `toolchain`, CI and Makefile
+  `GOTOOLCHAIN`, `deploy/docker/golang.digest`, Dockerfiles, toolchain tools
+  and tests, and docs); go1.26.11 includes security fixes to cgo, the go command,
+  the compiler, the linker and net/http.
 
 ## v0.7.2
 
