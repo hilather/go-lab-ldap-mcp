@@ -30,7 +30,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  GOTOOLCHAIN: go1.26.10
+  GOTOOLCHAIN: go1.26.11
   GOPROXY: https://proxy.golang.org,direct
   COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
 
